@@ -436,8 +436,9 @@ CreditsRollFadeOut::
 ;@ Credits roll step 4 (after THE END has faded in): spawns one more ending object (entity $E8, part
 ;@ $10: the bird that crosses the screen at the very end, see EndingLastBird) just off the left edge
 ;@ (x $E0, y $10), flying to the right.
+;@ test: wCurrentBank = $17
 CreditsRollSendBird::
-;> slot = SpawnEntity(0xE8)               # spawn an ending object
+;> slot, full = SpawnEntity(bc, 0xE8)               # spawn an ending object
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityX[slot] = 0xE0
@@ -729,11 +730,11 @@ DrawCreditsNameRow::
 	add [hl]
 	ld e, a
 	ld d, $00
-;>         hBGTilesRequestCopy = mem[CreditsNameLetterAttrs + i]     # (used as scratch here)
+;>         hMultiPurposeG = mem[CreditsNameLetterAttrs + i]     # (used as scratch here)
 	ld hl, CreditsNameLetterAttrs
 	add hl, de
 	ld a, [hl]
-	ldh [hBGTilesRequestCopy], a
+	ldh [hMultiPurposeG], a
 ;>         tile = mem[CreditsNameLetterTiles + i]
 	ld hl, CreditsNameLetterTiles
 	add hl, de
@@ -745,9 +746,9 @@ DrawCreditsNameRow::
 	pop hl
 	ld [de], a
 	inc de
-;>     mem[oam + 3] = hBGTilesRequestCopy
+;>     mem[oam + 3] = hMultiPurposeG
 ;>     oam += 4
-	ldh a, [hBGTilesRequestCopy]
+	ldh a, [hMultiPurposeG]
 	ld [de], a
 	inc de
 ;=@char
@@ -821,6 +822,7 @@ WaterTilesUpper::
 ;@ Animates two rows of water in the background: every 16 frames queues two background draw commands,
 ;@ 20 tiles of WaterTilesLower at the map address dest and 20 tiles of WaterTilesUpper on the row above,
 ;@ both shifted by one tile every other time so the waves roll.
+;@ test: wCurrentBank = $17
 AnimateWaterRows::
 ;> if (hFrameCounter & 0x0F) != 2:
 	ldh a, [hFrameCounter]
@@ -928,8 +930,8 @@ WaveEffectFrame::
 	sub $05
 ;> rSCY = base
 	ldh [rSCY], a
-;> hBGTilesRequestCopy = base           # (used as scratch here)
-	ldh [hBGTilesRequestCopy], a
+;> hMultiPurposeG = base           # (used as scratch here)
+	ldh [hMultiPurposeG], a
 ;> if wTransitionGfx == 0xFE:
 	ld a, [wTransitionGfx]
 	cp $fe
@@ -998,10 +1000,10 @@ WaveEffectFrame::
 	ld hl, hBaseScrollX
 	add [hl]
 	ldh [rSCX], a
-;>     rSCY = u8((((off ^ 0x80) - 0x80) >> 1) + hBGTilesRequestCopy)   # half the swing, signed
+;>     rSCY = u8((((off ^ 0x80) - 0x80) >> 1) + hMultiPurposeG)   # half the swing, signed
 	pop af
 	sra a
-	ld hl, hBGTilesRequestCopy
+	ld hl, hMultiPurposeG
 	add [hl]
 	ldh [rSCY], a
 ;=@line
@@ -1045,6 +1047,7 @@ WaveLineOffsets::
 ;@ When the ROM byte at $0004 is not zero (a development switch; 0 in the released game), Up/Down
 ;@ restart the ending and Right/Left skip to the next scene.
 ;@ test: wGameplaySubtype = rand(0, 8)
+;@ test: wCurrentBank = $17
 CreditsHandler::
 ;> if hJoypadPressed & 0x0C and mem[0x0004]:     # debug: Up or Down
 	ldh a, [hJoypadPressed]
@@ -1313,7 +1316,7 @@ CreditsEndingScene::
 	ld [wIsIndoor], a
 ;> hRoomStatus = 0
 	ldh [hRoomStatus], a
-;> mem[0xC3C8] = 1
+;> wMarinSinging = 1
 	ld a, $01
 	ld [wMarinSinging], a
 ;> hMapRoom = 0x92
@@ -1412,11 +1415,12 @@ EndingNextStep::
 ;@ Step 1 of ending part 2: requests screen layout $16 (the night sky above the egg) and spawns two
 ;@ ending objects (entity $E8): part 0, the stairway that comes down to Link (EndingStairway), at x $40
 ;@ above the screen (y $E0), and part 1, the twinkling stars (EndingStars); Link stands at ($50, $98).
+;@ test: wCurrentBank = $17
 EndingSpawnStairway::
 ;> wBGMapToLoad = 0x16
 	ld a, $16
 	ld [wBGMapToLoad], a
-;> slot = SpawnEntity(0xE8)               # ending object, part 0
+;> slot, full = SpawnEntity(bc, 0xE8)               # ending object, part 0
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityX[slot] = 0x40
@@ -1427,7 +1431,7 @@ EndingSpawnStairway::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $e0
-;> slot = SpawnEntity(0xE8)
+;> slot, full = SpawnEntity(bc, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityPrivate1[slot] += 1           # part 1
@@ -1533,7 +1537,7 @@ EndingScrollSky::
 	ld [wSceneVar2], a
 ;> if wSceneVar2 >= 0x40:               # no wrap (no carry)
 ;>     return
-	jr nc, jr_017_4b16
+	jr nc, ResetSceneVars.return
 
 ;> hBaseScrollY -= 1
 	ldh a, [hBaseScrollY]
@@ -1542,7 +1546,7 @@ EndingScrollSky::
 ;> if hBaseScrollY != 0x90:
 ;>     return
 	cp $90
-	jr nz, jr_017_4b16
+	jr nz, ResetSceneVars.return
 
 ;> EndingNextStep()
 	call EndingNextStep
@@ -1584,7 +1588,7 @@ ResetSceneVars::
 	ld [wSceneSlowTimer], a
 
 ;> return
-jr_017_4b16:
+.return
 	ret
 
 
@@ -1610,6 +1614,7 @@ ClearScreenCommands::
 ;@ path: ending/scene
 ;@ Step 4 of ending part 2 (the owl is flying down meanwhile): blanks the background two rows per
 ;@ frame (ClearScreenCommands, 9 frames), then scrolls the map to y $F0 and goes on.
+;@ test: wCurrentBank = $17
 EndingClearScreen::
 ;> if wEntityWorkRAM[0] == 9:
 	ld a, [wEntityWorkRAM]
@@ -1756,6 +1761,7 @@ WindFishPictureRows::
 ;@ Step 8 of ending part 2: draws the Wind Fish into the black sky, one row per frame (10 frames).
 ;@ Then turns on the wave effect (wTransitionGfx $FF, see WaveEffectFrame) with the first fade step
 ;@ 12 frames later, sets LYC to $56 and plays the wave sound $1F.
+;@ test: wCurrentBank = $17
 EndingDrawWindFish::
 ;> if wEntityWorkRAM[0] == 10:
 	ld a, [wEntityWorkRAM]
@@ -1916,7 +1922,7 @@ EndingWindFishSpeaks::
 	ld a, [wSceneTimer]
 	and a
 ;>     return
-	jr nz, jr_017_4d88
+	jr nz, OpenWindFishDialog.return
 
 ;> EndingNextStep()
 	call EndingNextStep
@@ -1935,7 +1941,7 @@ OpenWindFishDialog::
 	ldh [hWaveSfx], a
 
 ;> return
-jr_017_4d88:
+.return
 	ret
 
 
@@ -2242,7 +2248,7 @@ EndingSpawnInstruments::
 
 ;>@each while True:
 .spawn
-;>     slot = SpawnEntity(0xE8)           # ending object
+;>     slot, full = SpawnEntity(bc, 0xE8)           # ending object
 	ld a, $e8
 	call SpawnEntity
 ;>     i = wEntityWorkRAM[0]
@@ -2357,6 +2363,7 @@ EndingWaitInstruments::
 ;@ Step 19 of ending part 2: while the instruments play, Koholint's inhabitants appear one last time in
 ;@ five pictures that fade in and out, then the island itself dissolves. Runs the sub-step
 ;@ wEntityWorkRAM of IslandMemorySteps.
+;@ test: wCurrentBank = $17
 EndingIslandMemories::
 ;> IslandMemorySteps[wEntityWorkRAM[0]]()
 	ld a, [wEntityWorkRAM]
@@ -2435,6 +2442,7 @@ WhiteFadeOBP1::
 ;@ path: ending/memories
 ;@ Memories sub-step 0: fades everything to white (a step every 8 frames, 12 steps), then requests
 ;@ tile set $1D for the pictures, resets the scroll and removes all entities.
+;@ test: wCurrentBank = $17
 MemoryFadeToWhite::
 ;> if (hFrameCounter & 7) == 0:
 	ldh a, [hFrameCounter]
@@ -2516,6 +2524,7 @@ ShakeScreenSideways::
 ;@ Memories sub-step 1: the first picture (screen layout $20, BowWow in front of a house) with
 ;@ BowWow (entity $6D) at ($48, $50), entity $6F at ($68, $30) and two entities $78 at ($2C, $58)
 ;@ and ($60, $52), the second one with wEntityPrivate1 = 1.
+;@ test: wCurrentBank = $17
 MemoryScene1::
 ;> wSceneFadeStep = 0
 	xor a
@@ -2523,7 +2532,7 @@ MemoryScene1::
 ;> wBGMapToLoad = 0x20
 	ld a, $20
 	ld [wBGMapToLoad], a
-;> slot = SpawnEntity(0x6D)
+;> slot, full = SpawnEntity(bc, 0x6D)
 	ld a, $6d
 	call SpawnEntity
 ;> wEntityX[slot] = 0x48
@@ -2534,7 +2543,7 @@ MemoryScene1::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $50
-;> slot = SpawnEntity(0x6F)
+;> slot, full = SpawnEntity(bc, 0x6F)
 	ld a, $6f
 	call SpawnEntity
 ;> wEntityX[slot] = 0x68
@@ -2545,7 +2554,7 @@ MemoryScene1::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $30
-;> slot = SpawnEntity(0x78)
+;> slot, full = SpawnEntity(bc, 0x78)
 	ld a, $78
 	call SpawnEntity
 ;> wEntityX[slot] = 0x2C
@@ -2556,7 +2565,7 @@ MemoryScene1::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $58
-;> slot = SpawnEntity(0x78)
+;> slot, full = SpawnEntity(bc, 0x78)
 	ld a, $78
 	call SpawnEntity
 ;> wEntityX[slot] = 0x60
@@ -2635,7 +2644,7 @@ MemoryScene2::
 	ld [wBGMapToLoad], a
 ;> ClearAllEntities()
 	call ClearAllEntities
-;> slot = SpawnEntity(0x71)
+;> slot, full = SpawnEntity(bc, 0x71)
 	ld a, $71
 	call SpawnEntity
 ;> wEntityX[slot] = 0x48
@@ -2658,7 +2667,7 @@ MemoryScene2::
 	ld hl, wEntityDirection
 	add hl, de
 	ld [hl], $02
-;> slot = SpawnEntity(0x72)
+;> slot, full = SpawnEntity(bc, 0x72)
 	ld a, $72
 	call SpawnEntity
 ;> wEntityX[slot] = 0x78
@@ -2720,7 +2729,7 @@ MemoryScene3::
 	ld [wBGMapToLoad], a
 ;> ClearAllEntities()
 	call ClearAllEntities
-;> slot = SpawnEntity(0xC5)
+;> slot, full = SpawnEntity(bc, 0xC5)
 	ld a, $c5
 	call SpawnEntity
 ;> wEntityX[slot] = 0x28
@@ -2731,7 +2740,7 @@ MemoryScene3::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $40
-;> slot = SpawnEntity(0x09)
+;> slot, full = SpawnEntity(bc, 0x09)
 	ld a, $09
 	call SpawnEntity
 ;> wEntityX[slot] = 0x48
@@ -2742,7 +2751,7 @@ MemoryScene3::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $50
-;> slot = SpawnEntity(0x09)
+;> slot, full = SpawnEntity(bc, 0x09)
 	ld a, $09
 	call SpawnEntity
 ;> wEntityX[slot] = 0x68
@@ -2803,7 +2812,7 @@ MemoryScene4::
 	ld [wBGMapToLoad], a
 ;> ClearAllEntities()
 	call ClearAllEntities
-;> slot = SpawnEntity(0x3F)
+;> slot, full = SpawnEntity(bc, 0x3F)
 	ld a, $3f
 	call SpawnEntity
 ;> wEntityX[slot] = 0x78
@@ -2865,7 +2874,7 @@ MemoryScene5::
 	ld [wBGMapToLoad], a
 ;> ClearAllEntities()
 	call ClearAllEntities
-;> slot = SpawnEntity(0x3E)
+;> slot, full = SpawnEntity(bc, 0x3E)
 	ld a, $3e
 	call SpawnEntity
 ;> wEntityX[slot] = 0x28
@@ -2876,7 +2885,7 @@ MemoryScene5::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $50
-;> slot = SpawnEntity(0x6E)
+;> slot, full = SpawnEntity(bc, 0x6E)
 	ld a, $6e
 	call SpawnEntity
 ;> wEntityX[slot] = 0x18
@@ -2887,7 +2896,7 @@ MemoryScene5::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $4c
-;> slot = SpawnEntity(0x6E)
+;> slot, full = SpawnEntity(bc, 0x6E)
 	ld a, $6e
 	call SpawnEntity
 ;> wEntityX[slot] = 0x38
@@ -2898,7 +2907,7 @@ MemoryScene5::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $54
-;> slot = SpawnEntity(0x6E)
+;> slot, full = SpawnEntity(bc, 0x6E)
 	ld a, $6e
 	call SpawnEntity
 ;> wEntityX[slot] = 0x28
@@ -2909,7 +2918,7 @@ MemoryScene5::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $30
-;> slot = SpawnEntity(0x6F)
+;> slot, full = SpawnEntity(bc, 0x6F)
 	ld a, $6f
 	call SpawnEntity
 ;> wEntityX[slot] = 0x78
@@ -3031,11 +3040,11 @@ MemoryDissolveIsland::
 ;>     return
 .wait
 	and a
-	jr nz, jr_017_5279
+	jr nz, MemoryLoadPillar.return
 
 	ldh a, [hFrameCounter]
 	and $03
-	jr nz, jr_017_5279
+	jr nz, MemoryLoadPillar.return
 
 ;> if wSceneVarB != 0x3F:
 	ld a, [wSceneVarB]
@@ -3085,7 +3094,7 @@ MemoryLoadPillar::
 	jp MemoryNextStep
 
 
-jr_017_5279:
+.return
 	ret
 
 
@@ -3300,7 +3309,7 @@ MemoryShowPillar::
 ;> wTileMapToLoad = 0x15
 	ld a, $15
 	ld [wTileMapToLoad], a
-;> slot = SpawnEntity(0xE8)               # ending object, part 0
+;> slot, full = SpawnEntity(bc, 0xE8)               # ending object, part 0
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityX[slot] = 0x40
@@ -3315,7 +3324,7 @@ MemoryShowPillar::
 	ld hl, wEntityState
 	add hl, de
 	ld [hl], $02
-;> slot = SpawnEntity(0xE8)
+;> slot, full = SpawnEntity(bc, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityPrivate1[slot] += 1           # part 1: the stars
@@ -3832,11 +3841,12 @@ FarLogInit::
 ;@ Step 1 of ending part 4: requests screen layout $17 (the sea with clouds on the horizon) and spawns
 ;@ three ending objects: Link on his log far away (part 4) at ($48, $60) and two pieces of driftwood
 ;@ (part 5) at ($28, $68) and ($78, $60), the second with sprite variant 1.
+;@ test: wCurrentBank = $17
 FarLogSpawn::
 ;> wBGMapToLoad = 0x17
 	ld a, $17
 	ld [wBGMapToLoad], a
-;> slot = SpawnEntity(0xE8)
+;> slot, full = SpawnEntity(bc, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityX[slot] = 0x48
@@ -3851,7 +3861,7 @@ FarLogSpawn::
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $04
-;> slot = SpawnEntity(0xE8)
+;> slot, full = SpawnEntity(bc, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityX[slot] = 0x28
@@ -3866,7 +3876,7 @@ FarLogSpawn::
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $05
-;> slot = SpawnEntity(0xE8)
+;> slot, full = SpawnEntity(bc, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityX[slot] = 0x78
@@ -3996,11 +4006,12 @@ SkyViewInit::
 ;@ Step 1 of ending part 3: requests screen layout $18 and spawns two seagulls (ending object part 6)
 ;@ at ($18, $20) flying right and at ($78, $78) flying left (sprite variant 3), and the gleam (part 7)
 ;@ at ($68, $60); the fade-in starts $60 x 4 frames later.
+;@ test: wCurrentBank = $17
 SkyViewSpawn::
 ;> wBGMapToLoad = 0x18
 	ld a, $18
 	ld [wBGMapToLoad], a
-;> slot = SpawnEntity(0xE8)
+;> slot, full = SpawnEntity(bc, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityX[slot] = 0x18
@@ -4019,7 +4030,7 @@ SkyViewSpawn::
 	ld hl, wEntitySpeedX
 	add hl, de
 	ld [hl], $03
-;> slot = SpawnEntity(0xE8)
+;> slot, full = SpawnEntity(bc, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityX[slot] = 0x78
@@ -4042,7 +4053,7 @@ SkyViewSpawn::
 	ld hl, wEntitySpriteVariant
 	add hl, de
 	ld [hl], $03
-;> slot = SpawnEntity(0xE8)
+;> slot, full = SpawnEntity(bc, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityX[slot] = 0x68
@@ -4254,6 +4265,7 @@ LinkWakesInit::
 ;@ (ending object part 8, sprite variants 2, 1 and 0) at ($18, $55), ($68, $58) and ($88, $60) and a
 ;@ seagull (part 9) at ($08, $50) flying up to the right; the face animation starts $50 x 4 frames
 ;@ later.
+;@ test: wCurrentBank = $17
 LinkWakesSpawn::
 ;> wBGMapToLoad = 0x19
 	ld a, $19
@@ -4264,7 +4276,7 @@ LinkWakesSpawn::
 ;> rLYC = 0x42
 	ld a, $42
 	ldh [rLYC], a
-;> slot = SpawnEntity(0xE8)
+;> slot, full = SpawnEntity(bc, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityX[slot] = 0x18
@@ -4283,7 +4295,7 @@ LinkWakesSpawn::
 	ld hl, wEntitySpriteVariant
 	add hl, de
 	ld [hl], $02
-;> slot = SpawnEntity(0xE8)
+;> slot, full = SpawnEntity(bc, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityX[slot] = 0x68
@@ -4302,7 +4314,7 @@ LinkWakesSpawn::
 	ld hl, wEntitySpriteVariant
 	add hl, de
 	inc [hl]
-;> slot = SpawnEntity(0xE8)
+;> slot, full = SpawnEntity(bc, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityX[slot] = 0x88
@@ -4317,7 +4329,7 @@ LinkWakesSpawn::
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $08
-;> slot = SpawnEntity(0xE8)
+;> slot, full = SpawnEntity(bc, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityX[slot] = 0x08
@@ -4441,14 +4453,14 @@ LinkFaceWait::
 	ld a, [wSceneSlowTimer]
 	and a
 ;>     return
-	jr nz, jr_017_5c02
+	jr nz, LinkFaceNextStep.return
 
 ;> wSceneVar1 += 1                      # (LinkFaceNextStep)
 LinkFaceNextStep:
 	ld hl, wSceneVar1
 	inc [hl]
 
-jr_017_5c02:
+.return
 	ret
 
 
@@ -4607,7 +4619,7 @@ LinkWakesDone::
 	ld a, [wSceneTimer]
 	and a
 ;>     return
-	jr nz, jr_017_5d00
+	jr nz, CreditsNextScene.return
 
 ;> CreditsNextScene()                   # falls through
 
@@ -4651,13 +4663,13 @@ CreditsNextScene::
 ;> if wGameplaySubtype == 9:
 	ld a, [hl]
 	cp $09
-	jr nz, jr_017_5d00
+	jr nz, .return
 
 ;>     wGameplaySubtype = 0
 	ld [hl], $00
 
 ;> return
-jr_017_5d00:
+.return
 	ret
 
 
@@ -4815,11 +4827,12 @@ WindFishFliesInit::
 ;@ Step 1 of ending part 6: requests screen layout $1A (Link sitting on his log) and spawns the Wind
 ;@ Fish high in the sky (ending object part $0A) at x $40, y $4E. It is spawned into slot 0, whose x
 ;@ position WindFishFliesTiltUp later uses as the vertical scroll.
+;@ test: wCurrentBank = $17
 WindFishFliesSpawn::
 ;> wBGMapToLoad = 0x1A
 	ld a, $1a
 	ld [wBGMapToLoad], a
-;> slot = SpawnEntity(0xE8)
+;> slot, full = SpawnEntity(bc, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityX[slot] = 0x40
@@ -4842,6 +4855,7 @@ WindFishFliesSpawn::
 ;@ path: ending/windfish_flies
 ;@ Step 2 of ending part 6: the water rows at $9960 roll; fades the picture in, a step every 4 frames
 ;@ (12 steps); it then stays $60 x 4 frames.
+;@ test: wCurrentBank = $17
 WindFishFliesFadeIn::
 ;> AnimateWaterRows(0x9960)
 	ld de, $9960
@@ -4902,6 +4916,7 @@ WindFishFliesFadeIn::
 ;@ def WindFishFliesWait()
 ;@ path: ending/windfish_flies
 ;@ Step 3 of ending part 6: the water rolls until wSceneSlowTimer runs out.
+;@ test: wCurrentBank = $17
 WindFishFliesWait::
 ;> AnimateWaterRows(0x9960)
 	ld de, $9960
@@ -4931,6 +4946,7 @@ SittingFadeInOBP0::
 ;@ path: ending/windfish_flies
 ;@ Step 4 of ending part 6: changes sprite palette 0 through SittingFadeInOBP0, a step every 8
 ;@ frames (8 steps); the next step follows $20 frames later.
+;@ test: wCurrentBank = $17
 WindFishFliesFadeInOBP0::
 ;> AnimateWaterRows(0x9960)
 	ld de, $9960
@@ -4981,6 +4997,7 @@ WindFishFliesFadeInOBP0::
 ;@ path: ending/windfish_flies
 ;@ Step 5 of ending part 6: every $0A frames the Wind Fish shows its next frame (wEntityWorkRAM, read
 ;@ by EndingWindFishHigh) up to frame 2; the next step follows $20 frames later.
+;@ test: wCurrentBank = $17
 WindFishFliesCount::
 ;> AnimateWaterRows(0x9960)
 	ld de, $9960
@@ -5016,6 +5033,7 @@ WindFishFliesCount::
 ;@ def WindFishFliesWait2()
 ;@ path: ending/windfish_flies
 ;@ Step 6 of ending part 6: the water rolls until wSceneTimer runs out.
+;@ test: wCurrentBank = $17
 WindFishFliesWait2::
 ;> AnimateWaterRows(0x9960)
 	ld de, $9960
@@ -5311,7 +5329,7 @@ WindFishFliesTiltUp::
 ;>     wOBJ1Palette = 0xE3
 	ld a, $e3
 	ld [wOBJ1Palette], a
-;>     slot = SpawnEntity(0xE8)
+;>     slot, full = SpawnEntity(bc, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;>     wEntityX[slot] = 0x50
@@ -5437,7 +5455,7 @@ WindFishFliesFadeOut::
 ;>     wOBJ0Palette = 0x1E
 	ld a, $1e
 	ld [wOBJ0Palette], a
-;>     slot = SpawnEntity(0xE8)
+;>     slot, full = SpawnEntity(bc, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;>     wEntityX[slot] = 0x62
@@ -5499,6 +5517,7 @@ PortraitInit::
 ;@ Step 1 of ending part 7: requests screen layout $1B (the sky), sets the palettes ($1E, sprite
 ;@ palette 0 $6E: the portrait still pale) and spawns the portrait (ending object part $0D) at
 ;@ ($38, $50).
+;@ test: wCurrentBank = $17
 PortraitSpawn::
 ;> wBGMapToLoad = 0x1B
 	ld a, $1b
@@ -5511,7 +5530,7 @@ PortraitSpawn::
 ;> wOBJ0Palette = 0x6E
 	ld a, $6e
 	ld [wOBJ0Palette], a
-;> slot = SpawnEntity(0xE8)
+;> slot, full = SpawnEntity(bc, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityX[slot] = 0x38
@@ -5797,13 +5816,14 @@ FinalInit::
 ;@ Step 1 of ending part 8: requests screen layout $1C (sea and clouds), spawns Link on his log (ending
 ;@ object part $0E) at ($50, $78) and prepares the credits roll (step 0, no title yet), which starts
 ;@ $B0 x 4 frames later. Restarts the frame counter.
+;@ test: wCurrentBank = $17
 FinalSpawn::
 ;> wBGMapToLoad = 0x1C
 	ld a, $1c
 	ld [wBGMapToLoad], a
 ;> ResetSceneVars()
 	call ResetSceneVars
-;> slot = SpawnEntity(0xE8)
+;> slot, full = SpawnEntity(bc, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityX[slot] = 0x50
@@ -5935,7 +5955,7 @@ FinalScrollUp::
 	cp $c0
 	jr nz, .done
 
-;>     slot = SpawnEntity(0xE8)
+;>     slot, full = SpawnEntity(bc, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;>     wEntityX[slot] = 0x18
@@ -6028,6 +6048,7 @@ WindFishAwaySprites::
 ;@ Ending object part $0F: the small Wind Fish that flies away over the clouds after the credits,
 ;@ drawn relative to the view, flapping (a frame every 32 frames). Every other frame it moves right
 ;@ and up (speed 4, -1); once past x $A8 it ends the scene (EndingNextStep) and removes itself.
+;@ test: slot = rand(0, 15)
 EndingWindFishAway::
 ;> wOAMNextIndex = 0x3C
 	ld a, $3c
@@ -6222,6 +6243,7 @@ LinkOnLogSprites::
 ;@ path: ending/objects
 ;@ Ending object part $0E: Link on his log during the credits, bobbing with the waves (SeaBobOffsets,
 ;@ a step every 4 frames), drawn relative to the view, 4 frames of animation (one every 8 frames).
+;@ test: slot = rand(0, 15)
 EndingLinkOnLog::
 ;> wOAMNextIndex = 0x3C
 	ld a, $3c
@@ -6322,6 +6344,7 @@ LinkFaceSprites::
 ;@ Ending object part $0D: Link's portrait, bobbing like the sky behind it (SeaBobOffsets[wSceneVarF]
 ;@ halved): the 27 picture sprites at the start of the OAM buffer and the 7 face sprites of expression
 ;@ wSceneVar3 from OAM offset $40.
+;@ test: slot = rand(0, 15)
 EndingLinkPortrait::
 ;>@bob bob = mem[SeaBobOffsets + wSceneVarF] >> 1
 	ld a, [wSceneVarF]
@@ -6384,6 +6407,7 @@ StreakSprites::
 ;@ path: ending/objects
 ;@ Ending object part $0C, the streak of light at the end of ending part 6: draws its 3 sprites of the
 ;@ current variant and moves on to the next frame when its timer reads $30 and 1.
+;@ test: slot = rand(0, 15)
 EndingStreak::
 ;> wEntityPhysicsFlags[slot] = 0xC3     # 3 sprites
 	ld hl, wEntityPhysicsFlags
@@ -6440,6 +6464,7 @@ GlowRingSprites::
 ;@ Ending object part $0B: the ring of light that rises into the sky during the tilt of ending part 6,
 ;@ drawn relative to the view from the start of the entity OAM area, moving up 2/16 pixel per frame.
 ;@ When its timer first runs out the wave sound $17 plays (state 1 -> 2, then $C0 more frames).
+;@ test: slot = rand(0, 15)
 EndingGlowRing::
 ;> wOAMNextIndex = 0
 	xor a
@@ -6515,6 +6540,7 @@ SeaBobOffsets::
 ;@ Ending object part $0A: the Wind Fish high above Link in ending part 6. It moves with the view at
 ;@ 1.5 times its speed (so it seems farther away) and bobs; it is removed once below the screen.
 ;@ wEntityWorkRAM (0-2) is its frame.
+;@ test: slot = rand(0, 15)
 EndingWindFishHigh::
 ;> wOAMNextIndex = 0
 	ld a, $00
@@ -6597,6 +6623,7 @@ SkyStreakSprites::
 ;@ def EndingSkyStreak(slot: bc)
 ;@ path: ending/objects
 ;@ Ending object part 7: the gleam of light in the sky view of ending part 3; draws its 3 sprites.
+;@ test: slot = rand(0, 15)
 EndingSkyStreak::
 ;> wEntityPhysicsFlags[slot] = 0xC3     # 3 sprites
 	ld hl, wEntityPhysicsFlags
@@ -6620,6 +6647,7 @@ SeagullFrames::
 ;@ path: ending/objects
 ;@ Ending object part 6: a seagull gliding across the sky view of ending part 3, flapping through its
 ;@ 6 frames (one every 8 frames), mirrored when it flies to the left; removed past x $B0.
+;@ test: slot = rand(0, 15)
 EndingSeagull::
 ;> if (hFrameCounter & 7) == 0:
 	ldh a, [hFrameCounter]
@@ -6702,6 +6730,7 @@ DebrisBobOffsets::
 ;@ path: ending/objects
 ;@ Ending object part 4: Link on his log far out at sea (ending part 4), bobbing gently; the log's two
 ;@ frames alternate every 16 frames. Its 7 sprites start at the beginning of the entity OAM area.
+;@ test: slot = rand(0, 15)
 EndingFarLog::
 ;> wEntityPhysicsFlags[slot] = 0xC7     # 7 sprites
 	ld hl, wEntityPhysicsFlags
@@ -6754,6 +6783,7 @@ DebrisFrames::
 ;@ path: ending/objects
 ;@ Ending object part 5: a piece of driftwood floating near Link's log in ending part 4, bobbing with
 ;@ a phase that depends on its slot.
+;@ test: slot = rand(0, 15)
 EndingDebris::
 ;> wEntityPhysicsFlags[slot] = 0xC1     # 1 sprite
 	ld hl, wEntityPhysicsFlags
@@ -6801,6 +6831,7 @@ WaveDebrisFrames::
 ;@ WaveRasterScroll (the scroll of the lower screen) with a phase by variant (0: the current step,
 ;@ 1: 6 steps ahead, 2: $18 steps ahead and half as high), moving half (or a quarter) as far as the
 ;@ water.
+;@ test: slot = rand(0, 15)
 EndingWaveDebris::
 ;> wEntityPhysicsFlags[slot] = 0xC2     # 2 sprites
 	ld hl, wEntityPhysicsFlags
@@ -6898,6 +6929,7 @@ FlyingBirdDurations::
 ;@ path: ending/objects
 ;@ Ending object part 9: a seagull that flies up and away to the right in ending part 5, beating its
 ;@ wings (FlyingBirdDurations) and levelling off a little every 32 frames; removed past x $B0.
+;@ test: slot = rand(0, 15)
 EndingFlyingSeagull::
 ;> wEntityPhysicsFlags[slot] = 0xC2     # 2 sprites
 	ld hl, wEntityPhysicsFlags
@@ -7236,6 +7268,8 @@ DrawLinkForEnding::
 ;@ path: ending/stairway
 ;@ State 1: Link climbs up (speed -8) until he stands at y $5C; then he takes pose 2 and the owl
 ;@ (ending object part 2) flies in from the top at x $50 (speed $14 downwards, timer $30).
+;@ test: slot = rand(0, 15)
+;@ test: wCurrentBank = $17
 StairwayLinkClimbs::
 ;> hLinkSpeedY = 0xF8
 	ld a, $f8
@@ -7254,7 +7288,7 @@ StairwayLinkClimbs::
 ;> hLinkAnimationState = 2
 	ld a, $02
 	ldh [hLinkAnimationState], a
-;> owl = SpawnEntity(0xE8)
+;> owl, full = SpawnEntity(slot, 0xE8)
 	ld a, $e8
 	call SpawnEntity
 ;> wEntityPrivate1[owl] = 2             # the owl
@@ -7613,6 +7647,7 @@ OwlSprites::
 ;@ Ending object part 2: the owl that flies down to Link on the stairway, says farewell (dialog $CF)
 ;@ and flies away. Draws it from sprite 20 on (wing beat: a new frame every 8 frames), then runs its
 ;@ state (OwlStates).
+;@ test: slot = rand(0, 15)
 EndingOwl::
 ;> wOAMNextIndex = 0x50                 # sprite 20
 	ld a, $50
@@ -7658,6 +7693,7 @@ OwlStates::
 ;@ path: ending/owl
 ;@ State 0: after its start timer the owl flies down, slowing down by 1 every 4 frames; when its speed
 ;@ reaches 0 it hovers in front of Link (timer $80, next state).
+;@ test: slot = rand(0, 15)
 OwlDescend::
 ;> if GetEntityTimer(slot):
 	call GetEntityTimer

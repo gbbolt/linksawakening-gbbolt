@@ -12,6 +12,9 @@
   "entry": "Boot",
   "jump_table_rst": "0x00",
   "bank_writes": true,
+  "test_memory": {
+    "rom_bank_var": "wCurrentBank"
+  },
   "trace_entries": {},
   "objects": [
     "game.asm"

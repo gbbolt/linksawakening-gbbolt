@@ -882,13 +882,14 @@ UpdateRoomDarkness::
 	ret
 
 
-;@ def UpdateEntityTimers(slot: c)
+;@ def UpdateEntityTimers(slot: bc)
 ;@ path: entity/timers
 ;@ Counts the timers of entity `slot` down by one where they are not 0: wEntityTimer, wEntityTimer1,
 ;@ wEntityTimer2, wEntityDyingTimer, the drop timer (every 4th frame) and the flash timer, whose bit 2
 ;@ selects the flashing palette (hActiveEntityFlipAttribute = $10). Nothing counts on the world map (mode
 ;@ 7) or while a room transition, the inventory, a dialogue or an ocarina song runs; the flash is then
 ;@ off. Also clears hWallCheckOnly and hActiveEntityTileOffset.
+;@ test: slot = rand(0, 15)
 UpdateEntityTimers::
 ;> hWallCheckOnly = 0
 	xor a
@@ -1268,7 +1269,7 @@ CarriedEntityStep::
 	jr z, .normal
 ;>         ThrowCarriedEntity(slot)
 	call ThrowCarriedEntity
-;>         return ClearEntitySpeed()
+;>         return ClearEntitySpeed(slot)
 	jp ClearEntitySpeed
 .normal
 ;> if mem[0xC5AE]:

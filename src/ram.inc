@@ -98,7 +98,7 @@ DEF wNPCTilesLoadingStage EQU $C10F ;@ u8 Step of the second entity tile copy
 DEF wEntityTilesSlotA EQU $C197 ;@ u8 Which of the 4 entity tile slots ($8400 + slot * $100) the first request fills
 DEF wEntityTilesSlotB EQU $C10D ;@ u8 Which of the 4 entity tile slots the second request fills
 DEF wLoadedEntityTilesets EQU $C193 ;@ u8[4] Entity graphics set loaded in each of the 4 entity tile slots (bits 0-5 page, bits 6-7 bank group)
-DEF hBGTilesRequestCopy EQU $FFE8 ;@ u8 Copy of hNeedsUpdatingBGTiles taken at the start of VBlank
+DEF hMultiPurposeG EQU $FFE8 ;@ u8 Scratch byte G (meaning depends on the routine). The VBlank handler keeps its copy of hNeedsUpdatingBGTiles here; LoadRoom the bank of the room data; most entities a flag 'landed this frame' (wEntityZ & 0) or a loop index; the lever blocks 'rests at its end'; the Slime Eye which part is checked.
 DEF wDrawCommandsSize EQU $D600 ;@ u8 Size of the queued background draw commands at wDrawCommand
 DEF wDrawCommand EQU $D601 ;@ u8[96] Queue of background draw commands (address, length/mode, data; 0 ends), drawn in the next VBlank
 DEF hMapId EQU $FFF7 ;@ u8 The current map: dungeon / indoor area number (overworld when wIsIndoor is 0)
@@ -193,10 +193,10 @@ DEF hVolumeFadeOutTimer EQU $FFA8 ;@ u8 Counts down while the sound volume fades
 DEF hVolumeRight EQU $FFA9 ;@ u8 Sound master volume of the right output (0-7)
 DEF hVolumeLeft EQU $FFAA ;@ u8 Sound master volume of the left output ($00-$70, high nibble)
 DEF hVolumeFadeInTimer EQU $FFAB ;@ u8 Counts down while the sound volume fades back in (one step every 2 frames)
-DEF wSceneVar1 EQU $D001 ;@ u8 Credits scenes (wEntityWorkRAM+1): fade step, row counter or sub-state, depending on the step
-DEF wSceneVar2 EQU $D002 ;@ u8 Credits scenes (wEntityWorkRAM+2): scroll fraction, fade step or picture frame, depending on the step
-DEF wSceneVar3 EQU $D003 ;@ u8 Credits scenes (wEntityWorkRAM+3): fraction accumulator or picture frame, depending on the step
-DEF wSceneVar4 EQU $D004 ;@ u8 Credits scenes (wEntityWorkRAM+4): only cleared
+DEF wSceneVar1 EQU $D001 ;@ u8 Scene byte 1 (wEntityWorkRAM + 1), meaning set by the current scene: the ending and credits (fade step, row counter or sub-state), the intro and title (timers), the file copy menu (the source file), the Genie fight, the fishing game
+DEF wSceneVar2 EQU $D002 ;@ u8 Scene byte 2 (wEntityWorkRAM + 2), meaning set by the current scene: the ending and credits (scroll fraction, fade step or picture frame), the intro and title (timers, logo), the file copy menu (the destination file), the Genie fight, the fishing game
+DEF wSceneVar3 EQU $D003 ;@ u8 Scene byte 3 (wEntityWorkRAM + 3), meaning set by the current scene: the ending (fraction accumulator or picture frame), the title (a timer), the fishing game
+DEF wSceneVar4 EQU $D004 ;@ u8 Scene byte 4 (wEntityWorkRAM + 4), meaning set by the current scene: the intro's storm and beach scroll, the fishing rod; the ending only clears it
 DEF wSceneVar5 EQU $D005 ;@ u8 Credits scenes (wEntityWorkRAM+5): wave effect strength ($00 strongest ... $E0 weakest, in steps of $20), a fade step, or the credits roll's "same title" flag
 DEF wSceneTimer EQU $D006 ;@ u8 Credits scenes: countdown, -1 every frame (how long a step waits)
 DEF wSceneTimer2 EQU $D007 ;@ u8 Credits scenes: second countdown, -1 every frame
@@ -363,7 +363,7 @@ DEF wWaveRamDirty EQU $D3E7 ;@ u8 Set when a wave-channel effect ends: the music
 DEF wMusicSpeed EQU $C10B ;@ u8 0 = normal; 1 = the music is updated twice a frame; 2 = only every other frame
 DEF hTileSwapFinishCount EQU $FFBB ;@ u8 VBlanks that still advance the tile swap sequence after a room transition (set to 2)
 DEF wRoomEntitySetupDone EQU $C116 ;@ u8 Cleared when a room loads; a room's special character sets it after its one-time setup
-DEF wSongShowTimer EQU $D210 ;@ u16 Frames since the start of a song performance (Mamu's song, Manbo's dance)
+DEF wSongShowTimer EQU $D210 ;@ u16 Frames since the start of a song performance (Mamu's song, Manbo's dance, Marin's Ballad, the ocarina, the egg's song). Other entities use the low byte for themselves: the Trendy Game owner's slot, the Evil Eagle's wind noise counter, the spiked bar's rumble counter, the DethI fight's heartbeat counter
 DEF wSongShowStepTimer EQU $D212 ;@ u8 Frames into the current step of a song performance's dance
 DEF wSongShowStep EQU $D213 ;@ u8 Current step of a song performance's dance (index into the frame tables)
 DEF wSongShowPlaying EQU $D215 ;@ u8 Nonzero while Mamu's song plays (the frogs then take their frames from Mamu)
@@ -403,8 +403,8 @@ DEF wTransitionDrawDelay EQU $C12B ;@ u8 Frames to wait before drawing the next 
 DEF hLeverPullState EQU $FFBA ;@ u8 The lever (entity $69) Link pulls: 0 not held, 1 pulled further this frame, 2 held still
 DEF wFloorSwitchPressedTimer EQU $C1CB ;@ u8 Set to $60 when Link has stood on a floor switch (object $AA) long enough; counts down
 DEF wFloorSwitchStandFrames EQU $C1CA ;@ u8 Frames Link has stood on a floor switch (object $AA); at $18 it is pressed
-DEF wSmasherBallSlot EQU $D201 ;@ u8 Slot of the Smasher's iron ball
-DEF wSmasherSlot EQU $D202 ;@ u8 Slot of the Smasher (the ball checks hits against it)
+DEF wEntityScratch1 EQU $D201 ;@ u8 Shared entity byte (wEntityWorkRAM3 + 1); its meaning depends on the room's entity. The Smasher: slot of its iron ball. Rolling Bones: slot of his spiked bar. The Great Fairy, the honeycomb, the instrument, the flying rooster's grave: that entity's slot (others find it here). The final Nightmare: the boss's slot (its balls find it). The horse heads: the other piece's slot. Moldorm: step counter for its noise. The Angler Fish: frame counter for the falling rocks. The flying tiles: start of their pattern. The Grim Creeper: how many bats are in place ( = attack). The Turtle Rock head: home x. The Mad Batter: the chosen upgrade. The Trendy Game: the claw's sprite variant (2 open, 4 closed).
+DEF wEntityScratch2 EQU $D202 ;@ u8 Shared entity byte (wEntityWorkRAM3 + 2); its meaning depends on the room's entity. The Smasher: its own slot (the ball checks hits against it). Rolling Bones: his slot. The honeycomb scene: the bees' alarm (0 calm, counts up as they swarm out). The Angler Fish room: x of the next falling rock. The Great Fairy: her sprite blink. The final Nightmare (Moldorm form): a sound counter. The Grim Creeper: cleared for each formation. The Turtle Rock head: home y. The Trendy Game: palette of the crane's first button (0 = lit, blinks while waiting).
 DEF wEntityLiftStep EQU $C490 ;@ u8[16] Step of the lift animation while Link picks the entity up (reset to 0 when he starts)
 DEF wActiveProjectileCount EQU $C14D ;@ u8 Number of Link's projectiles (boomerang, sword beams) out this frame; their handlers count themselves in
 DEF wProjectileWeaponType EQU $C19E ;@ u8 Kind of weapon a projectile of Link's hits enemies with, set before the hit check (1 sword beam, 8 boomerang)
@@ -441,7 +441,7 @@ DEF hSavedIE EQU $FFD2 ;@ u8 rIE saved by DisableLCD while it waits for VBlank
 DEF wBombsOnScreen EQU $C14E ;@ u8 Bombs on screen: recounted every frame (Link can lay one at a time)
 DEF wHookshotInUse EQU $C1A4 ;@ u8 Set every frame while the hookshot is out (Link cannot use it again)
 DEF wTradeSceneState EQU $DB7F ;@ u8 Progress of a trading-sequence scene: 1 the fisherman got the hook, 2 Tarin knocked the honeycomb down
-DEF wTarinSlot EQU $D204 ;@ u8 Slot of Tarin in the honeycomb scene (the bees fly around him)
+DEF wEntityScratch4 EQU $D204 ;@ u8 Shared entity byte (wEntityWorkRAM3 + 4); its meaning depends on the room's entity. The honeycomb scene: Tarin's slot (the bees fly around him). The Trendy Game: the crane's x position (home 8).
 DEF wSaveSlotNames EQU $DB80 ;@ u8[15] Names of the three save files (5 characters each), read from battery RAM for the file menus
 DEF wSaveSlotDeathCounts EQU $DC00 ;@ u8[6] Death counters of the three save files for the file menu, two bytes each (BCD tens/ones, then hundreds)
 DEF wSaveSlotHealth EQU $DC06 ;@ u8[3] Health of each save file (eighths of a heart), for the file menu hearts
@@ -515,7 +515,7 @@ DEF hRandomPattern EQU $FFB9 ;@ u8 Random number 0-3 picked when the overworld m
 DEF wMarinReunion EQU $DB10 ;@ u8 Set by bank 2 (to wLowHealth + 1) before a fade-out; while nonzero the following Marin walks up to Link and speaks, then it is cleared
 DEF wMarinReunionTimer EQU $D468 ;@ u8 Countdown between the steps of the following Marin's walk to Link (MarinReunionStates)
 DEF wDebugDialogIndex EQU $C109 ;@ u8 Dialogue number chosen with the joypad in the text debugger (entity $6B)
-DEF wEvilEagleAttack EQU $D205 ;@ u8 The Evil Eagle's next attack (0 swoop, 1/4 drop from above, 2/3 fly across and blow)
+DEF wEntityScratch5 EQU $D205 ;@ u8 Shared entity byte (wEntityWorkRAM3 + 5); its meaning depends on the room's entity. The Evil Eagle: its next attack (0 swoop, 1/4 drop from above, 2/3 fly across and blow; the sword clash check reads it). Blaino: his current attack. The Grim Creeper: the bats' formation (0-7). The Trendy Game: the crane's y position (home 6).
 DEF wEvilEagleFightStarted EQU $D478 ;@ u8 Nonzero once the fight on top of Eagle's Tower has begun (set to 2)
 DEF wSignpostMazeStep EQU $D472 ;@ u8 How many signs of the signpost maze Link has read in the right order (0-13)
 DEF wSignpostReadPos EQU $D473 ;@ u8 Position (row and column nibbles) of the sign Link just read; 0 once handled
@@ -546,7 +546,7 @@ DEF wClashBoxX EQU $D5C0 ;@ u8 X offset (from the entity) of the box where Link'
 DEF wClashBoxHalfWidth EQU $D5C1 ;@ u8 Half width of the sword clash box
 DEF wClashBoxY EQU $D5C2 ;@ u8 Y offset (from the entity) of the sword clash box
 DEF wClashBoxHalfHeight EQU $D5C3 ;@ u8 Half height of the sword clash box
-DEF wEntityWorkRAM3 EQU $D200 ;@ u8[256] Third work area (the Desert Lanmola's trail of heights, ...); its first bytes also serve as single variables (wSmasherBallSlot, ...)
+DEF wEntityWorkRAM3 EQU $D200 ;@ u8[256] Third work area of the room's special entities (the Desert Lanmola's trail of heights, ...). Byte 0 alone is a single variable in the Marin beach and picture scenes, the Trendy Game and the Slime Eel fight; bytes 1-6 are the shared bytes wEntityScratch1-6
 DEF wLanmolaHoleX EQU $C1CD ;@ u8 X of the hole the Desert Lanmola came out of / dives into (sand spurts from it)
 DEF wLanmolaHoleY EQU $C1CE ;@ u8 Y of the Desert Lanmola's hole
 DEF wRoomEventShuttersClosed EQU $C190 ;@ u8 Nonzero once a room event has closed the shutters behind Link (they open when its trigger fires)
@@ -649,8 +649,8 @@ DEF wShopShelfItems EQU $C505 ;@ u8[4] Shop item on each of the four shelf place
 DEF wShopCarriedShelf EQU $C50B ;@ u8 Shelf place (0-3) of the shop item Link carries
 DEF wShopPunishThief EQU $DB46 ;@ u8 Nonzero after Link stole from the shop: on his next visit the shop owner strikes him down (cleared when he has died)
 DEF wScriptedWarpTimer EQU $C1BC ;@ u8 Frames until a scripted warp starts (counts down while no dialogue is open; Link cannot move meanwhile)
-DEF wEntityScratch3 EQU $D203 ;@ u8 Shared entity variable at $D203 (the Trendy Game: palette of the crane's second button, $10 = lit)
-DEF wEntityScratch6 EQU $D206 ;@ u8 Shared entity variable at $D206 (the Trendy Game: how far the crane's cable is let down)
+DEF wEntityScratch3 EQU $D203 ;@ u8 Shared entity byte (wEntityWorkRAM3 + 3); its meaning depends on the room's entity. The Trendy Game: palette of the crane's second button ($10 = lit)
+DEF wEntityScratch6 EQU $D206 ;@ u8 Shared entity byte (wEntityWorkRAM3 + 6); its meaning depends on the room's entity. The Trendy Game: how far the crane's cable is let down
 DEF wMasterStalfosSwordFrame EQU $D207 ;@ u8 Master Stalfos: frame of his sword sprite (0-3; $FF = not drawn, during the stroke)
 DEF wMasterStalfosTorsoFrame EQU $D208 ;@ u8 Master Stalfos: frame of his torso (0 or 1 = mirrored)
 DEF wMasterStalfosLegsFrame EQU $D209 ;@ u8 Master Stalfos: frame of his legs (0 or 1, the walking step)

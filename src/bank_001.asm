@@ -45,10 +45,10 @@ SaveMenuInit::
 	jr nz, .done
 ;> hVolumeRight = 3
 	ld a, $03
-	ldh [$ffa9], a
+	ldh [hVolumeRight], a
 ;> hVolumeLeft = 0x30
 	ld a, $30
-	ldh [$ffaa], a
+	ldh [hVolumeLeft], a
 ;> IncrementGameplaySubtype()                    # next step
 	call IncrementGameplaySubtype
 ;> wScrollXOffset = 0
@@ -56,11 +56,11 @@ SaveMenuInit::
 	ld [wScrollXOffset], a
 ;> wInventoryAppearing = 0
 	ld [wInventoryAppearing], a
-;> mem[0xC1B8] = 0
+;> wSongMenuOpenTimer = 0
 	ld [wSongMenuOpenTimer], a
-;> mem[0xC1B9] = 0
+;> wSongMenuCloseTimer = 0
 	ld [wSongMenuCloseTimer], a
-;> mem[0xC1B5] = 0
+;> wSongMenuShown = 0
 	ld [wSongMenuShown], a
 ;> wTileMapToLoad = 0x0F             # the menu tile set
 	ld a, $0f
@@ -131,7 +131,7 @@ SaveMenuInput::
 	ldh a, [hJoypadPressed]
 	and $b0
 ;>     return
-	jr z, SaveMenuQuitToTitle.done
+	jr z, InitLCDRegisters.done
 ;> hJingle = 0x13                    # confirm sound
 	ld a, $13
 	ldh [hJingle], a
@@ -151,10 +151,10 @@ SaveMenuInput::
 	ld a, [wIsIndoor]
 	and a
 	jr z, .done
-;>     mem[0xC50A] = 0
+;>     wItemButtonsDisabled = 0
 	xor a
 	ld [wItemButtonsDisabled], a
-;>     mem[0xC116] = 0
+;>     wRoomEntitySetupDone = 0
 	ld [wRoomEntitySetupDone], a
 .done
 	ret
@@ -206,6 +206,15 @@ SaveMenuQuitToTitle::
 	call ClearHRAMPartAndWRAM
 ;> StartIntroMode()                   # back to game mode 0, the intro
 	call StartIntroMode
+;> InitLCDRegisters()                   # falls through into it
+
+;@ def InitLCDRegisters()
+;@ path: system/lcd
+;@ Switches the screen on (rLCDC and wLCDControl $C7: background, sprites 8x16, window map $9C00), puts the
+;@ window at x 7 and below the screen (y $80, hidden) and sets the sound volume to full on both sides.
+;@ The end of SaveMenuQuitToTitle; Init calls it at power-on.
+;@ test: skip writes the LCD registers
+InitLCDRegisters::
 ;> rLCDC = 0xC7
 	ld a, $c7
 	ldh [rLCDC], a
@@ -221,10 +230,10 @@ SaveMenuQuitToTitle::
 	ldh [rWY], a
 ;> hVolumeRight = 7
 	ld a, $07
-	ldh [$ffa9], a
+	ldh [hVolumeRight], a
 ;> hVolumeLeft = 0x70
 	ld a, $70
-	ldh [$ffaa], a
+	ldh [hVolumeLeft], a
 .done
 	ret
 
@@ -390,8 +399,8 @@ GameOverSpin::
 	and a
 	jr nz, .spin
 ;>@f     hLinkAnimationState = mem[GameOverSpinLinkFrames + (hLinkCountdown >> 3)]
-;>@v     mem[0xC3CD] = mem[GameOverSpinValues + (hLinkCountdown >> 3)]
-;>@c     mem[0xC3CB] = 1
+;>@v     wRoomDarkness = mem[GameOverSpinValues + (hLinkCountdown >> 3)]
+;>@c     wRoomHasTorches = 1
 ;>@o0     wOBJ0Palette = 0x1C            # darker sprites
 ;>@o1     wOBJ1Palette = wBGPalette
 ;>@r     return
@@ -429,11 +438,11 @@ GameOverSpin::
 ;> wScrollXOffset = 0
 	xor a
 	ld [wScrollXOffset], a
-;> mem[0xD415] = 0
+;> wKillCounter = 0
 	ld [wKillCounter], a
-;> mem[0xD47C] = 0
-	ld [$d47c], a
-;> mem[0xD47A] = 0
+;> wActivePowerUp = 0
+	ld [wActivePowerUp], a
+;> wPowerUpHits = 0
 	ld [wPowerUpHits], a
 ;> fill(0xC3CB, 0, 3)
 	ld [wRoomHasTorches], a
@@ -595,10 +604,10 @@ GameOverMenu::
 	ld [wBGPalette], a
 ;> rBGP = 0
 	ldh [rBGP], a
-;> mem[0xD6FB] = 0
-	ld [$d6fb], a
-;> mem[0xD475] = 0
-	ld [$d475], a
+;> wRaisedBlocksState = 0
+	ld [wRaisedBlocksState], a
+;> wIsSpinningInHole = 0
+	ld [wIsSpinningInHole], a
 ;> wMapEntrancePositionX = hLinkX
 	ldh a, [hLinkX]
 	ld [wMapEntrancePositionX], a
@@ -694,7 +703,7 @@ GameplayWorldHandler::
 ;@ path: world/load
 ;@ The steps of game mode $0B (dw per value of wGameplaySubtype): 0 pick the background layout,
 ;@ 1 place Link and load the room, 2 load the room's tiles, 3 load the tile set, 4 and 5 draw the room,
-;@ 6 switch the window on and start the fade in, 7 play (the main play routine at $0B53 in bank 0).
+;@ 6 switch the window on and start the fade in, 7 play (the main play routine at WorldGameplayFrame in bank 0).
 WorldSteps::
 	dw WorldLoadPickLayout
 	dw WorldLoadPlaceLink
@@ -703,7 +712,7 @@ WorldSteps::
 	dw WorldLoadDrawRoom
 	dw WorldLoadDrawRoom2
 	dw WorldLoadStartFadeIn
-	dw $0b53
+	dw WorldGameplayFrame
 
 ;@ path: world/load
 ;@ Minimap layout for each map (hMapId $00-$0C, one byte), copied to wMinimapLayout when a map is
@@ -726,7 +735,7 @@ WorldLoadPickLayout::
 	call IncrementGameplaySubtype
 ;> if not wIsIndoor:
 ;>@o1     wBGMapToLoad = 2
-;>@o2     mem[0xFFB9] = (GetRandomByte() | hFrameCounter) & 3      # a random number 0-3
+;>@o2     hRandomPattern = (GetRandomByte() | hFrameCounter) & 3      # a random number 0-3
 ;>@o3     return
 	ld a, [wIsIndoor]
 	and a
@@ -863,7 +872,7 @@ WorldLoadPlaceLink::
 	call LoadRoomEntities
 ;> SpawnFollowers()                        # the companions following Link
 	call SpawnFollowers
-;> mem[0xFFA6] = 0xFF
+;> hAnimatedTilesFrameCount = 0xFF
 	ld a, $ff
 	ldh [hAnimatedTilesFrameCount], a
 ;> if wIsIndoor:
@@ -1004,8 +1013,8 @@ WorldLoadDrawRoom2::
 ;@ def WorldLoadStartFadeIn()
 ;@ path: world/load
 ;@ Step 6: puts the window (the status bar) back and switches it on, keeps Link's motion state in
-;@ mem[0xD463] while motion state 4 holds him during the fade in, and starts the fade (skipped, with
-;@ fixed palettes, when $C3CB is set). Ends in bank 2's room start code (SelectAreaMusicFar).
+;@ wSavedLinkMotionState while motion state 4 holds him during the fade in, and starts the fade (skipped, with
+;@ fixed palettes, when wRoomHasTorches is set). Ends in bank 2's room start code (SelectAreaMusicFar).
 ;@ test: skip writes LCDC and calls bank 2
 WorldLoadStartFadeIn::
 ;> ResetWindow()                        # window at the bottom again
@@ -1018,7 +1027,7 @@ WorldLoadStartFadeIn::
 	ldh [rLCDC], a
 ;> IncrementGameplaySubtype()
 	call IncrementGameplaySubtype
-;> mem[0xD463] = wLinkMotionState
+;> wSavedLinkMotionState = wLinkMotionState
 	ld a, [wLinkMotionState]
 	ld [wSavedLinkMotionState], a
 ;> wLinkMotionState = 4
@@ -1029,11 +1038,11 @@ WorldLoadStartFadeIn::
 	ld [wTransitionSequenceCounter], a
 ;> wTransitionFrameCounter = 0
 	ld [wTransitionFrameCounter], a
-;> if mem[0xC3CB]:
+;> if wRoomHasTorches:
 	ld a, [wRoomHasTorches]
 	and a
 	jr z, .done
-;>     wBGPalette = mem[0xC5AD]
+;>     wBGPalette = wRoomDarkPalette
 	ld a, [wRoomDarkPalette]
 	ld [wBGPalette], a
 ;>     wOBJ0Palette = 0x1C
@@ -2678,6 +2687,7 @@ DrawQuitOkText::
 ;@ def FileDeleteSelectIdle()
 ;@ path: menu/erase
 ;@ The end of FileDeleteSelect when nothing is chosen: draws the fairy cursor.
+;@ test: wCurrentBank = $01
 FileDeleteSelectIdle::
 ;> DrawFileSelectCursor()
 	call DrawFileSelectCursor
@@ -3858,7 +3868,7 @@ MinimapClearCommands::
 DrawMinimapFrame::
 ;>@cp copy(0xD651, MinimapClearCommands, 0x29)
 	ld hl, MinimapClearCommands
-	ld de, $d650
+	ld de, wDrawCommand + $4F
 	ld c, $29
 .copy
 	ld a, [hli]
@@ -4469,7 +4479,7 @@ ReturnToWorld::
 	cp $04
 ;>     return
 	jr nz, ResetWindow.done
-;> mem[0xC50A] = 0
+;> wItemButtonsDisabled = 0
 	xor a
 	ld [wItemButtonsDisabled], a
 ;> wRoomEntitySetupDone = 0
@@ -4534,7 +4544,7 @@ ResetWindow::
 ;> rWX = 6
 	ld a, $06
 	ldh [rWX], a
-;> mem[0xC150] = 8
+;> wInventorySlideSpeed = 8
 	ld a, $08
 	ld [wInventorySlideSpeed], a
 ;> wInventoryAppearing = 0
@@ -5047,7 +5057,7 @@ DrawWorldMapPlaceMarkerSprites::
 ;> wOAMNextIndex = 8
 	ld a, $08
 	ld [wOAMNextIndex], a
-;> mem[0xFFF5] = 0
+;> hActiveEntityTileOffset = 0
 	xor a
 	ldh [hActiveEntityTileOffset], a
 ;> DrawEntitySprites(sprites, 8)                 # draw 8 sprites at the popup position
@@ -5683,7 +5693,7 @@ SpawnFollowers::
 	ld a, e
 	cp $ff
 	jr nz, .removeRooster
-;>     slot = SpawnEntity(0xD5)
+;>     slot, full = SpawnEntity(bc, 0xD5)
 	ld a, $d5
 	call SpawnEntity
 ;>     wEntityX[slot] = hLinkX
@@ -5708,7 +5718,7 @@ SpawnFollowers::
 ;>@g1     for slot in reversed(range(16)):  # remove a ghost still there
 ;>@g2         if wEntityType[slot] == 0xD4 and wEntityStatus[slot]:
 ;>@g3             wEntityStatus[slot] = 0
-;>@g4     slot = SpawnEntity(0xD4)
+;>@g4     slot, full = SpawnEntity(bc, 0xD4)
 ;>@g5     wEntityX[slot] = hLinkX
 ;>@g6     wEntityY[slot] = hLinkY + wLinkSpriteDY
 ;>@g7     wEntityPrivate1[slot] += 1
@@ -5716,7 +5726,7 @@ SpawnFollowers::
 	ld a, [wIsGhostFollowingLink]
 	cp $01
 	jr z, .spawnGhost
-;>@e elif wIsGhostFollowingLink == 2 and not wIsIndoor and hMapRoom >= 0x40 and mem[0xDB68] & 2:
+;>@e elif wIsGhostFollowingLink == 2 and not wIsIndoor and hMapRoom >= 0x40 and wDungeonFlags[3] & 2:
 	cp $02
 	jr nz, SpawnMarinFollower
 	ld a, [wIsIndoor]
@@ -5726,7 +5736,7 @@ SpawnFollowers::
 	ldh a, [hMapRoom]
 	cp $40
 	jr c, SpawnMarinFollower
-	ld a, [$db68]
+	ld a, [wDungeonFlags + 3]
 	and $02
 	jr z, SpawnMarinFollower
 ;>@w     wIsGhostFollowingLink = 0 if wPowerBraceletLevel >= 2 else 1
@@ -5827,7 +5837,7 @@ SpawnMarinFollower::
 	ld a, e
 	cp $ff
 	jr nz, .remove
-;> slot = SpawnEntity(0xC1)
+;> slot, full = SpawnEntity(bc, 0xC1)
 	ld a, $c1
 	call SpawnEntity
 ;> wEntityX[slot] = hLinkX
@@ -5958,7 +5968,7 @@ SpawnBowWowFollower::
 	ld a, e
 	cp $ff
 	jr nz, .remove
-;>     slot = SpawnEntity(0x6D)
+;>     slot, full = SpawnEntity(bc, 0x6D)
 	ld a, $6d
 	call SpawnEntity
 ;>     wEntityX[slot] = hLinkX
@@ -6023,8 +6033,8 @@ StartIntroMode::
 ;@ Address in bank $0F of the tile of each hex digit 0-F (16 dw: $5700, $5710 ... $5790 for 0-9, $5800
 ;@ ... $5850 for A-F), used by DrawDebugDialogIndex.
 HexDigitTileAddresses::
-	dw $5700, $5710, $5720, $5730, $5740, $5750, $5760, $5770
-	dw $5780, $5790, $5800, $5810, $5820, $5830, $5840, $5850
+	dw FontTiles + $700, FontTiles + $710, FontTiles + $720, FontTiles + $730, FontTiles + $740, FontTiles + $750, FontTiles + $760, FontTiles + $770
+	dw FontTiles + $780, FontTiles + $790, Tiles0F5800, Tiles0F5800 + $10, Tiles0F5800 + $20, Tiles0F5800 + $30, Tiles0F5800 + $40, Tiles0F5800 + $50
 
 ;@ def DrawDebugDialogIndex()
 ;@ path: text/debug
@@ -6755,7 +6765,7 @@ UpdateMarinBeach::
 ;@ def DrawSceneSpritePair(oam: hl, frame: de)
 ;@ path: event/marin_beach
 ;@ Writes two OAM entries at `oam`: y = hActiveEntityDrawY - hBaseScrollY (also kept in
-;@ hBGTilesRequestCopy for the caller), x = hActiveEntityX and hActiveEntityX + 8, tiles and attributes
+;@ hMultiPurposeG for the caller), x = hActiveEntityX and hActiveEntityX + 8, tiles and attributes
 ;@ from the 4-byte record at `frame` (the format of MarinBeachSprites).
 ;@ test: oam = rand(0xC000, 0xDFF0); frame = rand(0xC000, 0xDFF0)
 DrawSceneSpritePair::
@@ -6765,8 +6775,8 @@ DrawSceneSpritePair::
 	ld c, a
 	ldh a, [hActiveEntityDrawY]
 	sub c
-;> hBGTilesRequestCopy = y
-	ldh [hBGTilesRequestCopy], a
+;> hMultiPurposeG = y
+	ldh [hMultiPurposeG], a
 ;> mem[oam] = y
 	ld [hli], a
 ;> mem[oam + 1] = hActiveEntityX
@@ -6970,8 +6980,8 @@ UpdateSeagull::
 ;>     wVfxSpeedY[slot] -= 1
 	dec [hl]
 .checkGone
-;>@g if hBGTilesRequestCopy >= 0xF0 and wVfxSpeedY[slot] & 0x80:
-	ldh a, [hBGTilesRequestCopy]
+;>@g if hMultiPurposeG >= 0xF0 and wVfxSpeedY[slot] & 0x80:
+	ldh a, [hMultiPurposeG]
 	cp $f0
 	jr c, .done
 	ld hl, wVfxSpeedY
@@ -9439,7 +9449,7 @@ IntroMarin::
 ;> wEntityPhysicsFlags[0] = 0
 	xor a
 	ld [wEntityPhysicsFlags], a
-;> DrawEntity16x16(IntroMarinFrames)
+;> DrawEntity16x16(slot, IntroMarinFrames)
 	ld de, IntroMarinFrames
 	call DrawEntity16x16
 ;> wOAMNextIndex += 8
@@ -9468,7 +9478,7 @@ IntroMarinStates::
 IntroMarinWalk::
 ;> ScrollIntroBeachFast()
 	call ScrollIntroBeachFast
-;> SetEntitySpriteVariant((hFrameCounter >> 3) & 1)
+;> SetEntitySpriteVariant(slot, (hFrameCounter >> 3) & 1)
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -9482,7 +9492,7 @@ IntroMarinWalk::
 ;>     wEntityTimer[slot] = 0x40
 	call GetEntityTimer
 	ld [hl], $40
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 .walk
 ;> wEntityPrivateCounter[slot] -= 1
@@ -9509,13 +9519,13 @@ IntroMarinWalk::
 IntroMarinStop::
 ;> AnimateIntroSeaTiles()
 	call AnimateIntroSeaTiles
-;> SetEntitySpriteVariant(1)
+;> SetEntitySpriteVariant(slot, 1)
 	ld a, $01
 	call SetEntitySpriteVariant
 ;> if GetEntityTimer(slot) == 0:
 	call GetEntityTimer
 	jr nz, .wait
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 ;>     wEntityStatus[1] = 7
 	ld a, $07
@@ -9568,7 +9578,7 @@ IntroMarinPan::
 ;>         wEntityTimer[slot] = 0x40
 	call GetEntityTimer
 	ld [hl], $40
-;>         return IncrementEntityState()
+;>         return IncrementEntityState(slot)
 	jp IncrementEntityState
 .at20
 ;>     if hBaseScrollX == 0x20:
@@ -9585,7 +9595,7 @@ IntroMarinPan::
 	call DrawBeachColumn2
 	xor a
 .legs
-;> SetEntitySpriteVariant((hFrameCounter >> 2) & 1)
+;> SetEntitySpriteVariant(slot, (hFrameCounter >> 2) & 1)
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -9607,7 +9617,7 @@ IntroMarinPanSlow::
 	jr nz, .wait
 ;>@w1     wEntityTimer[slot] -= 1
 ;>@w2     AnimateIntroSeaTiles()
-;>@w3     return SetEntitySpriteVariant(1)
+;>@w3     return SetEntitySpriteVariant(slot, 1)
 ;> ScrollIntroBeachSlow()
 	call ScrollIntroBeachSlow
 ;> if hFrameCounter & 1 == 0:
@@ -9657,7 +9667,7 @@ IntroMarinPanSlow::
 ;>             wEntityTimer[slot] = 0xE0
 	call GetEntityTimer
 	ld [hl], $e0
-;>             return IncrementEntityState()
+;>             return IncrementEntityState(slot)
 	jp IncrementEntityState
 .at20
 ;>         if hBaseScrollX == 0x20:
@@ -9674,7 +9684,7 @@ IntroMarinPanSlow::
 	call DrawBeachColumn2
 	xor a
 .legs
-;>@v SetEntitySpriteVariant((hFrameCounter >> 4) & 1)
+;>@v SetEntitySpriteVariant(slot, (hFrameCounter >> 4) & 1)
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -9707,7 +9717,7 @@ IntroMarinKneel::
 	and $01
 ;>     return
 	jr nz, .done
-;> SetEntitySpriteVariant(2)
+;> SetEntitySpriteVariant(slot, 2)
 	ld a, $02
 	call SetEntitySpriteVariant
 ;> wEntitySpriteVariant[1] = 0
@@ -9735,7 +9745,7 @@ IntroMarinKneel::
 	cp $36
 	jr c, .done
 .pose
-;>     SetEntitySpriteVariant(3)
+;>     SetEntitySpriteVariant(slot, 3)
 	ld a, $03
 	call SetEntitySpriteVariant
 ;>     wEntitySpriteVariant[1] = 1
@@ -9780,7 +9790,7 @@ IntroSparkle::
 ;> wEntityPhysicsFlags[0] = 0
 	xor a
 	ld [wEntityPhysicsFlags], a
-;> DrawEntity16x16(IntroSparkleFrames)
+;> DrawEntity16x16(slot, IntroSparkleFrames)
 	ld de, IntroSparkleFrames
 	call DrawEntity16x16
 ;> wOAMNextIndex += 8
@@ -9863,7 +9873,7 @@ IntroLink::
 ;>     wEntityPhysicsFlags[0] = 0
 	xor a
 	ld [wEntityPhysicsFlags], a
-;>     DrawEntity16x16(IntroLinkFrames)
+;>     DrawEntity16x16(slot, IntroLinkFrames)
 	ld de, IntroLinkFrames
 	call DrawEntity16x16
 ;>     wOAMNextIndex += 8
@@ -9895,7 +9905,7 @@ IntroLinkWait::
 	jr nz, .done
 ;>     wEntityTimer[slot] = 0x90
 	ld [hl], $90
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 .done
 	ret
@@ -9915,7 +9925,7 @@ IntroLinkWait2::
 	dec [hl]
 ;>     if wEntityTimer[slot] == 0:
 	jr z, .next
-;>@n         return IncrementEntityState()
+;>@n         return IncrementEntityState(slot)
 .done
 ;> return
 	ret
@@ -9936,7 +9946,7 @@ IntroScrollToSky::
 	ld a, [wSceneFadeStep]
 	cp $13
 	jr z, .rowsDone
-;>@e1     IncrementEntityState()
+;>@e1     IncrementEntityState(slot)
 ;>@e2     wEntityTimer[slot] = 0x17
 ;>@e3     hVolumeRight = 7
 ;>@e4     hVolumeLeft = 0x70
@@ -10190,12 +10200,12 @@ DrawIntroSkyRow::
 ;@ path: title/storm
 ;@ Sources (in bank $10) of the four frames of the storm sea's 8 animated tiles (4 dw, $80 bytes each).
 IntroSeaTilesA::
-	dw $5000, $5080, $5100, $5180
+	dw Tiles105000, Tiles105000 + $80, Tiles105000 + $100, Tiles105000 + $180
 
 ;@ path: title/beach
 ;@ Sources (in bank $10) of the four frames of the beach sea's 8 animated tiles (4 dw).
 IntroSeaTilesB::
-	dw $5200, $5280, $5300, $5380
+	dw Tiles105000 + $200, Tiles105000 + $280, Tiles105000 + $300, Tiles105000 + $380
 ;@ path: title/intro
 ;@ The sea animation's frame (as a byte offset into IntroSeaTilesA / B: 0, 2, 4, 6) for each step of 16
 ;@ frames (8 bytes): forth and back.
@@ -10676,12 +10686,12 @@ CopyInstrumentTilesStage::
 ;=@o
 	sla c
 	rl b
-;>@c CopyTilesFromBank0C(0x4D00 + offset, 0x8D00 + offset)
+;>@c CopyTilesFromBank0C(WorldTiles8C00 + 0x100 + offset, 0x8D00 + offset)
 	ld hl, $8d00
 	add hl, bc
 	push hl
 	pop de
-	ld hl, $4d00
+	ld hl, WorldTiles8C00 + $100
 	add hl, bc
 ;=@c
 	call CopyTilesFromBank0C

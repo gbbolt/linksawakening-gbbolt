@@ -29,6 +29,9 @@ def build(ctx):
     rd = _la.RoomData(rom)
     names = _la.Names(ctx)
     world = _la.World(rom)
+    cn = _la.ChestNames(ctx)
+    music = _la.table(ctx, 'OverworldMusicTracks', 256) or [0] * 256
+    recs, chest_recs = [], []
     big = [bytearray(16 * 160) for _ in range(16 * 128)]
     marks, cards = [], []
     rows, chests = [], []
@@ -67,6 +70,7 @@ def build(ctx):
             ['Entity graphics set', {'text': '${:02X}'.format(sprset), 'code': 'OverworldSpritesetIds'}],
             ['Animated tiles', '${:02X}'.format(d['anim'])],
             ['Floor object', '${:02X}'.format(d['floor'])],
+            ['Music (OverworldMusicTracks)', _la.music_cell(ctx, music[r])],
             ['Neighbours', ', '.join('{} ${:02X}'.format(n, rr) for n, rr in
                                      (('north', r - 16), ('south', r + 16), ('west', r - 1), ('east', r + 1))
                                      if 0 <= rr < 256 and (n in ('north', 'south') or rr >> 4 == r >> 4))],
@@ -75,10 +79,17 @@ def build(ctx):
         if found:
             c = _la.chest_content(rom, 'ow', r)
             sections[0]['fields'].append(['Chest', '{} (content ${:02X}) at {}'.format(
-                _la.chest_content_name(c), c, ', '.join('({}, {})'.format(x, y) for x, y in found))])
+                cn.name(c), c, ', '.join('({}, {})'.format(x, y) for x, y in found))])
             chests.append([{'asset': 'ow-room-{:02x}'.format(r), 'text': '${:02X}'.format(r)},
                            ', '.join('({}, {})'.format(x, y) for x, y in found), '${:02X}'.format(c),
-                           _la.chest_content_name(c)])
+                           cn.name(c)])
+            chest_recs.append({'group': 'overworld', 'room': r, 'cells': found, 'content': c, 'item': cn.name(c),
+                               'dialog': cn.texts[c] if c < len(cn.texts) else None})
+        recs.append({'room': r, 'data': room_label, 'bank': d['bank'], 'address': d['addr'], 'tileset': tileset,
+                     'spriteset': sprset, 'anim': d['anim'], 'floor': d['floor'], 'music': music[r],
+                     'objects': [[x, y, o, s] for x, y, o, s in d['objects']],
+                     'entities': [[x, y, t] for x, y, t in ents],
+                     'warps': [list(w) for w in d['warps']], 'grid': grid})
         if ents:
             sections.append({'title': 'Entities', 'columns': ['x', 'y', 'type'],
                              'rows': [[x * 16, y * 16, names.entity_cell(t)] for x, y, t in ents]})
@@ -129,4 +140,11 @@ def build(ctx):
                         'chest\'s content: the room\'s byte in the room table of bank $14 at $4500 (see the indoor '
                         'chests for the codes).'],
                 'users': ['CheckLiftAndRead', 'EntityInit_ChestItem']})
+    out.append(_la.export(ctx, 'overworld-rooms', 'Overworld rooms (download)', recs,
+                          'All 256 overworld rooms: data label and address, tile set, entity graphics set, animated '
+                          'tiles, floor object, music track, the object list (x, y, object, strip), the entities '
+                          '(x, y, type in 16-pixel cells), the warps (type, map, room, x, y) and the built 10 x 8 '
+                          'object grid.'))
+    out.append(_la.export(ctx, 'overworld-chests', 'Overworld chests (download)', chest_recs,
+                          'The overworld chests: room, chest cells, content code, item and the dialog shown.'))
     return out + cards

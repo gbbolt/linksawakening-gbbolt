@@ -12,6 +12,11 @@ GROUP = 'indoors'
 DUNGEONS = ['Tail Cave', 'Bottle Grotto', 'Key Cavern', "Angler's Tunnel", "Catfish's Maw", 'Face Shrine',
             "Eagle's Tower", 'Turtle Rock', "Wind Fish's Egg", None, 'Caves']
 CHESTS = []
+ALT_TOWER = 0x44C0              # bank $14: the second layout of map 6
+TOWER_FLAGS = 0xDB6B            # wDungeon7Flags (bit 2: the tower has fallen)
+CN = [None]                    # the chest content names of the current build
+MUSIC = [[]]                   # IndoorMusicTracks
+ROOMS, CHEST_RECS = [], []     # the records of the downloads
 LAYOUTS = 0x4200               # bank $14: 64 bytes per map $00-$0A, the room at each of the 8 x 8 positions
 EMPTY = 255
 
@@ -62,15 +67,24 @@ def room_sheet(ctx, rd, names, g, mp, room, pic, grid, where):
         ['Animated tiles', '${:02X}'.format(d['anim'])],
         ['Room template', d['template']],
         ['Floor object', '${:02X}'.format(d['floor'])],
+        ['Music (IndoorMusicTracks)', _la.music_cell(ctx, MUSIC[0][mp]) if mp < len(MUSIC[0]) else '-'],
     ]}]
     chests = _la.find_chests(grid)
+    ROOMS.append({'group': g, 'room': room, 'map': mp, 'where': where, 'data': label, 'bank': d['bank'],
+                  'address': d['addr'], 'tileset': tileset, 'spriteset': sprset, 'anim': d['anim'],
+                  'template': d['template'], 'floor': d['floor'],
+                  'music': MUSIC[0][mp] if mp < len(MUSIC[0]) else None,
+                  'objects': [[x, y, o, s] for x, y, o, s in d['objects']], 'entities': [list(e) for e in ents],
+                  'warps': [list(w) for w in d['warps']], 'grid': grid})
     if chests:
         c = _la.chest_content(rd.rom, g, room)
+        CHEST_RECS.append({'group': 'indoor' + g, 'room': room, 'where': where, 'cells': chests, 'content': c,
+                           'item': CN[0].name(c), 'dialog': CN[0].texts[c] if c < len(CN[0].texts) else None})
         sections[0]['fields'].append(['Chest', '{} (content ${:02X}) at {}'.format(
-            _la.chest_content_name(c), c, ', '.join('({}, {})'.format(x, y) for x, y in chests))])
+            CN[0].name(c), c, ', '.join('({}, {})'.format(x, y) for x, y in chests))])
         CHESTS.append([{'asset': 'in-{}-{:02x}'.format(g.lower(), room), 'text': '{}${:02X}'.format(g, room)},
                        where, ', '.join('({}, {})'.format(x, y) for x, y in chests), '${:02X}'.format(c),
-                       _la.chest_content_name(c)])
+                       CN[0].name(c)])
     if ents:
         sections.append({'title': 'Entities', 'columns': ['x', 'y', 'type'],
                          'rows': [[x * 16, y * 16, names.entity_cell(t)] for x, y, t in ents]})
@@ -100,20 +114,28 @@ def build(ctx):
     names = _la.Names(ctx)
     world = _la.World(rom)
     CHESTS.clear()
+    ROOMS.clear()
+    CHEST_RECS.clear()
+    CN[:] = [_la.ChestNames(ctx)]
+    MUSIC[:] = [_la.table(ctx, 'IndoorMusicTracks', 32) or []]
     out, cards = [], []
     done = set()
     # ---- the dungeons, from their 8 x 8 layouts
-    for mp, title in enumerate(DUNGEONS):
+    for mp, title, alt in [(k, t, False) for k, t in enumerate(DUNGEONS)] + [(6, DUNGEONS[6], True)]:
         if title is None:
             continue
-        lay = layout(rom, mp)
+        lay = layout(rom, mp) if not alt else list(rom[_la.lin(0x14, ALT_TOWER):_la.lin(0x14, ALT_TOWER) + 64])
         g = _la.group_of_map(mp)
         img = [bytearray([EMPTY] * (8 * 160)) for _ in range(8 * 128)]
         marks = []
         for pos, room in enumerate(lay):
             if not room:
                 continue
-            if not world.load(True, mp, 0, pos=pos) or world.m.mem[_la.MAP_ROOM] != room:
+            if alt:
+                world.m.mem[TOWER_FLAGS] |= 4
+            ok = world.load(True, mp, 0, pos=pos)
+            world.m.mem[TOWER_FLAGS] &= ~4 & 0xFF
+            if not ok or world.m.mem[_la.MAP_ROOM] != room:
                 continue
             m = world.m
             pic = _la.room_picture(m)
@@ -140,6 +162,16 @@ def build(ctx):
             mk['x'] -= x0
             mk['y'] -= y0
         num = 'map ${:02X}'.format(mp)
+        if alt:
+            out.append(packed(ctx, crop, COLORS, name='dungeon-06-alt', scale=1, marks=marks,
+                              title='{} after the tower falls ({})'.format(title, num), unit='IndoorBRoomPointers',
+                              subtitle='{} rooms'.format(len(marks)),
+                              doc=['The second layout of {} (bank $14 at $44C0), used once bit 2 of wDungeon7Flags '
+                                   'is set: after the pillars are knocked down the top of the tower has come down a '
+                                   'floor. Drawn like the first layout, by the game\'s own loader with that bit '
+                                   'set.'.format(title)],
+                              users=['GetDungeonRoomStatusAddress', 'LoadRoom', 'IndoorBRoomPointers']))
+            continue
         out.append(packed(ctx, crop, COLORS,
                           name='dungeon-{:02x}'.format(mp), scale=1, marks=marks,
                           title='{} ({})'.format(title, num) if mp < 10 else 'Caves ({})'.format(num),
@@ -199,7 +231,21 @@ def build(ctx):
                         'chest gives: the room\'s byte in the room table of bank $14 ($4500 + $100 x group + room), '
                         'handed to the rising item (EntityInit_ChestItem): $00-$0B the items of '
                         'ChestItemInventoryIds, $0C-$15 counters, $16-$1A dungeon items, $1B-$1F rupees '
-                        '(ChestRupeesLow / ChestRupeesHigh). Rooms whose chest only appears after an event '
+                        '(ChestRupeesLow / ChestRupeesHigh). The item column is the first sentence of the '
+                        'dialog the game shows for that content (ChestItemTexts). Rooms whose chest only appears after an event '
                         '(enemies beaten, a switch) are not listed.'],
                 'users': ['CheckLiftAndRead', 'EntityInit_ChestItem', 'ChestItemInventoryIds']})
+    layouts = [{'map': mp, 'name': DUNGEONS[mp], 'rooms': layout(rom, mp)} for mp in range(11) if DUNGEONS[mp]]
+    layouts.append({'map': 6, 'name': DUNGEONS[6] + ' (after the tower falls)',
+                    'rooms': list(rom[_la.lin(0x14, ALT_TOWER):_la.lin(0x14, ALT_TOWER) + 64])})
+    out.append(_la.export(ctx, 'indoor-rooms', 'Indoor rooms (download)', ROOMS,
+                          'Every indoor room drawn here: group and room, the map it was entered on, data label and '
+                          'address, tile set, entity graphics set, animated tiles, room template, floor object, '
+                          'music track, the object list, entities, warps and the built 10 x 8 object grid.'))
+    out.append(_la.export(ctx, 'dungeon-layouts', 'Dungeon layouts (download)', layouts,
+                          'The 8 x 8 room layout of each dungeon map (bank $14, $4200 + 64 x map; 0 = no room), row by '
+                          'row, and the second layout of Eagle\'s Tower.'))
+    out.append(_la.export(ctx, 'indoor-chests', 'Indoor chests (download)', CHEST_RECS,
+                          'The indoor chests: group, room, where, chest cells, content code, item and the dialog '
+                          'shown.'))
     return out + cards

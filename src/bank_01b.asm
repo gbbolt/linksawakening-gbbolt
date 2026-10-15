@@ -5,17 +5,31 @@
 
 SECTION "ROM Bank $01b", ROMX[$4000], BANK[$1b]
 
-;@ def MusicEntryPoints_1B()
+;@ def MusicEntryInit_1B()
 ;@ path: sound/music/engine
-;@ The bank's three fixed entry points: $4000 InitMusic_1B, $4003 SilenceMusicAndNoise_1B and $4006
-;@ UpdateMusic_1B. UpdateSound calls $4006 once a frame; the other two are not used (bank $1F sets the
-;@ sound hardware up and stops the sound).
-;@ test: skip three separate jump instructions
-MusicEntryPoints_1B::
-;> return InitMusic_1B()                    # $4000
+;@ Entry point $4000 of this music bank (InitMusic_1B). Not used: bank $1F sets the sound hardware up.
+;@ test: skip resets the whole sound state
+MusicEntryInit_1B::
+;> return InitMusic_1B()
 	jp InitMusic_1B
-;> # $4003: jp SilenceMusicAndNoise_1B; $4006: jp UpdateMusic_1B
+
+
+;@ def MusicEntrySilence_1B()
+;@ path: sound/music/engine
+;@ Entry point $4003 of this music bank (SilenceMusicAndNoise_1B). Not used: bank $1F stops the sound.
+;@ test: skip changes the sound hardware
+MusicEntrySilence_1B::
+;> return SilenceMusicAndNoise_1B()
 	jp SilenceMusicAndNoise_1B
+
+
+;@ def MusicEntryUpdate_1B()
+;@ path: sound/music/engine
+;@ Entry point $4006 of this music bank, called once a frame by UpdateMusic while one of its songs plays:
+;@ plays the music on (UpdateMusic_1B).
+;@ test: skip plays the music through its tables
+MusicEntryUpdate_1B::
+;> return UpdateMusic_1B()
 	jp UpdateMusic_1B
 
 
@@ -229,7 +243,7 @@ SilenceNoiseSfx_1B::
 	ld [wNoiseSfxTimer], a
 ;> wNoiseSfxLocked = 0
 	ld [wNoiseSfxLocked], a
-;> mem[0xD3A3] = 0
+;> wSoundUnusedA3 = 0
 	ld [wSoundUnusedA3], a
 ;> rNR42 = 0x08                              # volume 0
 	ld a, $08
@@ -848,6 +862,7 @@ SustainNoteSkip_1B:
 ;@ test: mem[timer] = rng.choice([6, rand(1, 10)]); mem[ch + 0x0B] = rng.choice([0, 0, 1])
 ;@ test: mem[ch + 0x0F] = rng.choice([0, 0, 0x80]); mem[ch + 8] = rand(0, 255)
 ;@ test: for c in range(ch + 0x10, 0xD350, 0x10): mem[c + 1] = 0
+;@ test: wCurrentBank = $1B
 SustainNote_1B::
 ;> if wMusicChannel == 3:
 	ld a, [wMusicChannel]
@@ -1845,6 +1860,7 @@ ApplyFrequencyEffect_1B::
 ;@ test: wMusicChannel1[0x0E] = rand(0, 4); wMusicReleaseFrame[0] = rand(0, 4); wMusicChannel1[0x0F] = rng.choice([0, 0x80])
 ;@ test: wMusicChannel2[0x0B] = rng.choice([0, 0, 1]); wMusicChannel2[7] = rng.choice([0, 0x21, 0x83, 0x45])
 ;@ test: wMusicChannel2[0x0E] = rand(0, 4); wMusicReleaseFrame[1] = rand(0, 4); wMusicChannel2[0x0F] = rng.choice([0, 0x80])
+;@ test: wCurrentBank = $1B
 UpdateReleaseEnvelopes_1B::
 ;> if not wMusicChannel1[0x0B] and wMusicChannel1[7]:     # channel 1: no rest, a release
 	ld a, [wMusicChannel1 + $0B]
@@ -2680,9 +2696,9 @@ SilenceMusicAndNoise_1B::
 	ld [wNoiseSfxTimer], a
 ;> wNoiseSfxLocked = 0
 	ld [wNoiseSfxLocked], a
-;> mem[0xD3A3] = 0
+;> wSoundUnusedA3 = 0
 	ld [wSoundUnusedA3], a
-;> mem[0xD3E5] = 0
+;> wSoundUnusedE5 = 0
 	ld [wSoundUnusedE5], a
 ;> rNR42 = 0x08                              # volume 0
 	ld a, $08
@@ -2743,45 +2759,45 @@ ResetMusicState_1B::
 	ld [wMusicPitchDrop + 5], a
 ;> wJingleStep = 0
 	ld [wJingleStep], a
-;> mem[0xD395] = 0
+;> wUnusedSfxStep = 0
 	ld [wUnusedSfxStep], a
 ;> wWaveSfxStep = 0
 	ld [wWaveSfxStep], a
 ;> wJingleTimer = 0
 	ld [wJingleTimer], a
-;> mem[0xD391] = 0
+;> wUnusedSfxTimer = 0
 	ld [wUnusedSfxTimer], a
 ;> wWaveSfxTimer = 0
 	ld [wWaveSfxTimer], a
 ;> wJingleLocked = 0
 	ld [wJingleLocked], a
-;> mem[0xD3C7] = 0
+;> wUnusedSfxLocked = 0
 	ld [wUnusedSfxLocked], a
 ;> wWaveSfxLocked = 0
 	ld [wWaveSfxLocked], a
-;> mem[0xD3A0] = 0
+;> wSoundUnusedA0 = 0
 	ld [wSoundUnusedA0], a
-;> mem[0xD3A1] = 0
+;> wSoundUnusedA1 = 0
 	ld [wSoundUnusedA1], a
-;> mem[0xD3A2] = 0
+;> wSoundUnusedA2 = 0
 	ld [wSoundUnusedA2], a
 ;> wMusicBlocksWaveSfx = 0
 	ld [wMusicBlocksWaveSfx], a
-;> mem[0xD3D6] = 0
+;> wSfxFastVariant = 0
 	ld [wSfxFastVariant], a
-;> mem[0xD3D7] = 0
+;> wJingle22Count = 0
 	ld [wJingle22Count], a
-;> mem[0xD3D8] = 0
+;> wSoundUnusedD8 = 0
 	ld [wSoundUnusedD8], a
-;> mem[0xD3DC] = 0
+;> wWaveSfx1ECount = 0
 	ld [wWaveSfx1ECount], a
 ;> wWaveRamDirty = 0
 	ld [wWaveRamDirty], a
-;> mem[0xD3E2] = 0
+;> wJingleSubStep = 0
 	ld [wJingleSubStep], a
-;> mem[0xD3E3] = 0
+;> wSoundUnusedE3 = 0
 	ld [wSoundUnusedE3], a
-;> mem[0xD3E4] = 0
+;> wSoundUnusedE4 = 0
 	ld [wSoundUnusedE4], a
 ;> rNR12 = 0x08                              # square channels: volume 0
 	ld a, $08

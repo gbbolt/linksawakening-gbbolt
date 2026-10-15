@@ -73,7 +73,7 @@ SelectAreaMusic::
 
 ;>@clr1     wIndoorAltMusic = 0
 ;> else:
-;>     track = OverworldMusicTracks[hMapRoom]
+;>     track = mem[OverworldMusicTracks + hMapRoom]
 	ldh a, [hMapRoom]
 	ld e, a
 	ld d, $00
@@ -98,7 +98,7 @@ SelectAreaMusic::
 	and a
 	jr nz, .play
 
-;>             track = IndoorMusicTracks[hMapId]
+;>             track = mem[IndoorMusicTracks + hMapId]
 	ldh a, [hMapId]
 	ld e, a
 	ld d, $00
@@ -139,7 +139,7 @@ SelectAreaMusic::
 	cp $25
 	jr nc, .powerUp
 
-;>     if MusicTrackBeatsPowerUp[track]:
+;>     if mem[MusicTrackBeatsPowerUp + track]:
 	ld hl, MusicTrackBeatsPowerUp
 	add hl, de
 	ld a, [hl]
@@ -174,11 +174,11 @@ SelectAreaMusic::
 ;@ (hBGPosX / hBGPosY), with the item number from hMultiPurpose8 as its sprite variant.
 ;@ test: skip uses the slot SpawnEntity returns, which the trial's stand-in does not give
 SpawnChestContents::
-;> slot = SpawnEntity(0x07)                       # spawn entity type 7; carry = no free slot
+;> slot, full = SpawnEntity(bc, 0x07)                       # spawn entity type 7; carry = no free slot
 	push bc
 	ld a, $07
 	call SpawnEntity
-;> if not carry:
+;> if not full:
 	jr c, .done
 
 ;>     wEntityStatus[slot] -= 1
@@ -334,14 +334,14 @@ UseHookshot::
 	ldh a, [hLinkDirection]
 	ld c, a
 	ld b, $00
-;> wEntitySpeedX[slot] = HookshotSpeedX[d]
+;> wEntitySpeedX[slot] = mem[HookshotSpeedX + d]
 	ld hl, HookshotSpeedX
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntitySpeedX
 	add hl, de
 	ld [hl], a
-;> wEntitySpeedY[slot] = HookshotSpeedY[d]
+;> wEntitySpeedY[slot] = mem[HookshotSpeedY + d]
 	ld hl, HookshotSpeedY
 	add hl, bc
 	ld a, [hl]
@@ -359,6 +359,7 @@ UseHookshot::
 ;@ timers, moves Link (walking, dashing, jumping, recoil), runs the sword and the items in use, then
 ;@ handles the sword charge: holding the swing button with the sword out (state 5) charges it, and
 ;@ releasing a full charge ($28 frames) starts the spin attack.
+;@ test: wCurrentBank = $02
 LinkMotionInteractive::
 ;> if wArrowCooldown:
 	ld a, [wArrowCooldown]
@@ -566,7 +567,7 @@ UpdateItemUsePose::
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, $00
-;>     hLinkAnimationState = ItemUsePoses[d]
+;>     hLinkAnimationState = mem[ItemUsePoses + d]
 	ld hl, ItemUsePoses
 	add hl, de
 	ld a, [hl]
@@ -621,7 +622,7 @@ UpdateLinkMovement::
 
 	ldh a, [hLinkInteractiveMotionBlocked]
 	and a
-	jp nz, Jump_002_445c
+	jp nz, MoveLinkAndCollide.setLinkGroundVfxPrev
 
 .controls
 ;> else:
@@ -637,7 +638,7 @@ UpdateLinkMovement::
 	jr z, .dash
 
 ;>         if turned:
-;>             turned = JoypadToDirection[pressed] != hLinkDirection
+;>             turned = mem[JoypadToDirection + pressed] != hLinkDirection
 	ld e, a
 	ld d, $00
 	ld hl, JoypadToDirection
@@ -655,7 +656,7 @@ UpdateLinkMovement::
 ;>             AddDashDustVfx()                      # dust / splash under the feet
 	call AddDashDustVfx
 ;>             dashing = True
-	jr jr_002_440a
+	jr .checkMask
 
 .turn
 ;>         else:                                # pressed another direction: the dash stops
@@ -672,7 +673,7 @@ UpdateLinkMovement::
 ;>     if not dashing and not wIsLinkInTheAir:
 	ld a, [wIsLinkInTheAir]
 	and a
-	jr nz, jr_002_440a
+	jr nz, .checkMask
 
 ;>         e = 0x10 if wActivePowerUp == 1 else 0    # Piece of Power: second half of the tables
 	ld e, $00
@@ -689,12 +690,12 @@ UpdateLinkMovement::
 	or e
 	ld e, a
 	ld d, $00
-;>         hLinkSpeedX = WalkSpeedX[e]
+;>         hLinkSpeedX = mem[WalkSpeedX + e]
 	ld hl, WalkSpeedX
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkSpeedX], a
-;>         hLinkSpeedY = WalkSpeedY[e]
+;>         hLinkSpeedY = mem[WalkSpeedY + e]
 	ld hl, WalkSpeedY
 	add hl, de
 	ld a, [hl]
@@ -722,13 +723,13 @@ UpdateLinkMovement::
 ;>             wLinkWalkingFrameCount += 1
 	ld hl, wLinkWalkingFrameCount
 	inc [hl]
-;>             d = JoypadToDirection[e]
+;>             d = mem[JoypadToDirection + e]
 	ld hl, JoypadToDirection
 	add hl, de
 	ld a, [hl]
 ;>             if d != 0x0F:                    # $0F: opposite buttons pressed
 	cp $0f
-	jr z, jr_002_440a
+	jr z, .checkMask
 
 ;>                 if not wSwordCooldown:       # no turning during a swing
 	ld e, a
@@ -741,19 +742,19 @@ UpdateLinkMovement::
 	ldh [hLinkDirection], a
 
 .facingDone
-	jr jr_002_440a
+	jr .checkMask
 
 .standing
 ;>         elif not wPegasusBootsChargeMeter:
 	ld a, [wPegasusBootsChargeMeter]
 	and a
-	jr nz, jr_002_440a
+	jr nz, .checkMask
 
 ;>             wLinkWalkingFrameCount = 7           # standing pose
 	ld a, $07
 	ld [wLinkWalkingFrameCount], a
 
-jr_002_440a:
+.checkMask
 ;> if mask is None:
 ;>     mask = 3
 	ld e, $03
@@ -817,7 +818,7 @@ jr_002_440a:
 ;> if (mask & 0x80) == 0 and (hFrameCounter & mask) == 0:
 	ldh a, [hFrameCounter]
 	and e
-	jr nz, Jump_002_445c
+	jr nz, MoveLinkAndCollide.setLinkGroundVfxPrev
 
 	jr MoveLinkAndCollide
 
@@ -826,7 +827,7 @@ jr_002_440a:
 	ldh a, [hFrameCounter]
 	and [hl]
 ;=@ripret
-	jr z, jr_002_4469
+	jr z, MoveLinkAndCollide.return
 
 MoveLinkAndCollide:
 ;>     if wInventoryAppearing:
@@ -838,7 +839,7 @@ MoveLinkAndCollide:
 ;>     ApplyLinkSpeed()
 	call ApplyLinkSpeed
 
-Jump_002_445c:
+.setLinkGroundVfxPrev
 ;> wLinkGroundVfxPrev = wLinkGroundVfx
 	ld a, [wLinkGroundVfx]
 	ld [wLinkGroundVfxPrev], a
@@ -848,7 +849,7 @@ Jump_002_445c:
 ;> CollideLinkWithRoom()                               # walls, room edges
 	call CollideLinkWithRoom
 
-jr_002_4469:
+.return
 	ret
 
 
@@ -963,7 +964,7 @@ LinkFallWithGravity:
 	and $03
 	jr z, .steerY
 
-;>             diff = hLinkSpeedX - SideViewSpeedX[hJoypadHeld & 3]
+;>             diff = hLinkSpeedX - mem[SideViewSpeedX + (hJoypadHeld & 3)]
 	ld e, a
 	ld d, $00
 	ld hl, SideViewSpeedX
@@ -994,7 +995,7 @@ LinkFallWithGravity:
 	and $03
 	jr z, .height
 
-;>             diff = hLinkSpeedY - AirSteerSpeedY[(hJoypadHeld >> 2) & 3]
+;>             diff = hLinkSpeedY - mem[AirSteerSpeedY + ((hJoypadHeld >> 2) & 3)]
 	ld e, a
 	ld d, $00
 	ld hl, AirSteerSpeedY
@@ -1232,7 +1233,7 @@ UpdateSpinAttack::
 	sla a
 	add e
 	ld e, a
-;> wSwordAnimationState = SpinAttackSwordStates[i]
+;> wSwordAnimationState = mem[SpinAttackSwordStates + i]
 	ld hl, SpinAttackSwordStates
 	add hl, de
 	ld a, [hl]
@@ -1242,7 +1243,7 @@ UpdateSpinAttack::
 	add hl, de
 	ldh a, [hLinkDirection]
 	push af
-;> hLinkDirection = SpinAttackDirections[i]   # pose the sword in that direction
+;> hLinkDirection = mem[SpinAttackDirections + i]   # pose the sword in that direction
 	ld a, [hl]
 	ldh [hLinkDirection], a
 ;> UpdateSwordPose()
@@ -1291,6 +1292,7 @@ UpdateSpinAttack::
 ;@ path: link/sword
 ;@ One frame of the poke of the held-out sword against a wall (entered from UpdateSword with
 ;@ wSwordPokeTimer in a): the sword is shown straight out (state 3) until the timer ends.
+;@ test: wCurrentBank = $02
 UpdateSwordPoke::
 ;> wSwordPokeTimer = timer - 1
 	dec a
@@ -1322,11 +1324,12 @@ UpdateSwordPoke::
 ;@ def SwordHeldOutPose()
 ;@ path: link/sword
 ;@ Sword states 5 and up (held out): only the pose and offsets are set (UpdateSword jumps here).
+;@ test: wCurrentBank = $02
 SwordHeldOutPose::
 ;> UpdateSwordPose()
 	call UpdateSwordPose
 
-jr_002_4737:
+.return
 	ret
 
 
@@ -1343,7 +1346,7 @@ UpdateSword::
 	and a
 	jr z, .jump
 
-;>@spin     hLinkDirection = SpinFallDirections[(hFrameCounter >> 2) & 3]
+;>@spin     hLinkDirection = mem[SpinFallDirections + ((hFrameCounter >> 2) & 3)]
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -1384,7 +1387,7 @@ UpdateSword::
 	cp $03
 	jr nc, .sword
 
-;>@jp         hLinkAnimationState = JumpPoses[row + wJumpAnimationFrame]
+;>@jp         hLinkAnimationState = mem[JumpPoses + row + wJumpAnimationFrame]
 	ld e, a
 	ld d, $00
 	ld hl, JumpPoses
@@ -1423,7 +1426,7 @@ UpdateSword::
 	ld a, [wSwordAnimationState]
 	and a
 ;>     return
-	jr z, jr_002_4737
+	jr z, SwordHeldOutPose.return
 
 ;> wSwordCooldown = 4
 	ld hl, wSwordCooldown
@@ -1458,7 +1461,7 @@ UpdateSword::
 ;>         return EndSwordAction()                # swing over
 	jp z, EndSwordAction
 
-;>     wSwordStateTimer = SwordStateDurations[wSwordAnimationState - 1]
+;>     wSwordStateTimer = mem[SwordStateDurations + (wSwordAnimationState - 1)]
 	ld c, a
 	ld b, $00
 	ld hl, SwordStateDurations - 1
@@ -1490,43 +1493,43 @@ UpdateSwordPose::
 	add [hl]
 	ld c, a
 	ld b, $00
-;> wSwordSpriteFrame = SwordSpriteFrames[i]
+;> wSwordSpriteFrame = mem[SwordSpriteFrames + i]
 	ld hl, SwordSpriteFrames
 	add hl, bc
 	ld a, [hl]
 	ld [wSwordSpriteFrame], a
-;> if SwordLinkPoses[i] != 0xFF:
+;> if mem[SwordLinkPoses + i] != 0xFF:
 	ld hl, SwordLinkPoses
 	add hl, bc
 	ld a, [hl]
 	cp $ff
 	jr z, .offsets
 
-;>     hLinkAnimationState = SwordLinkPoses[i]
+;>     hLinkAnimationState = mem[SwordLinkPoses + i]
 	ldh [hLinkAnimationState], a
 
 .offsets
-;> wSwordSpriteDX = SwordSpriteDX[i]
+;> wSwordSpriteDX = mem[SwordSpriteDX + i]
 	ld hl, SwordSpriteDX
 	add hl, bc
 	ld a, [hl]
 	ld [wSwordSpriteDX], a
-;> wSwordSpriteDY = SwordSpriteDY[i]
+;> wSwordSpriteDY = mem[SwordSpriteDY + i]
 	ld hl, SwordSpriteDY
 	add hl, bc
 	ld a, [hl]
 	ld [wSwordSpriteDY], a
-;> wLinkSpriteDX = SwordLinkDX[i]
+;> wLinkSpriteDX = mem[SwordLinkDX + i]
 	ld hl, SwordLinkDX
 	add hl, bc
 	ld a, [hl]
 	ld [wLinkSpriteDX], a
-;> wLinkSpriteDY = SwordLinkDY[i]
+;> wLinkSpriteDY = mem[SwordLinkDY + i]
 	ld hl, SwordLinkDY
 	add hl, bc
 	ld a, [hl]
 	ld [wLinkSpriteDY], a
-;>@hb if SwordHitboxDX[i] and (not wIsUsingShield or (hFrameCounter & 1) == 0):
+;>@hb if mem[SwordHitboxDX + i] and (not wIsUsingShield or (hFrameCounter & 1) == 0):
 	ld hl, SwordHitboxDX
 	add hl, bc
 	ld a, [hl]
@@ -1543,18 +1546,18 @@ UpdateSwordPose::
 	jr nz, .rooms
 
 .hitbox
-;>     wSwordHitboxX = wSwordSpriteDX + SwordHitboxDX[i] + hLinkX
+;>     wSwordHitboxX = wSwordSpriteDX + mem[SwordHitboxDX + i] + hLinkX
 	ld a, [wSwordSpriteDX]
 	add [hl]
 	ld hl, hLinkX
 	add [hl]
 	ld [wSwordHitboxX], a
-;>     wSwordHitboxWidth = SwordHitboxWidth[i]
+;>     wSwordHitboxWidth = mem[SwordHitboxWidth + i]
 	ld hl, SwordHitboxWidth
 	add hl, bc
 	ld a, [hl]
 	ld [wSwordHitboxWidth], a
-;>@hy     wSwordHitboxY = wSwordSpriteDY + SwordHitboxDY[i] + wLinkDrawY
+;>@hy     wSwordHitboxY = wSwordSpriteDY + mem[SwordHitboxDY + i] + wLinkDrawY
 	ld a, [wSwordSpriteDY]
 	ld hl, SwordHitboxDY
 	add hl, bc
@@ -1563,7 +1566,7 @@ UpdateSwordPose::
 	add [hl]
 ;=@hy
 	ld [wSwordHitboxY], a
-;>     wSwordHitboxHeight = SwordHitboxHeight[i]
+;>     wSwordHitboxHeight = mem[SwordHitboxHeight + i]
 	ld hl, SwordHitboxHeight
 	add hl, bc
 	ld a, [hl]
@@ -2004,10 +2007,10 @@ LinkPlayingOcarina::
 ;>     return
 	jr nz, .noNote
 
-;> slot = SpawnEntity(0xC9)                       # a music note
+;> slot, full = SpawnEntity(bc, 0xC9)                       # a music note
 	ld a, $c9
 	call SpawnEntity
-;> if carry:
+;> if full:
 ;>     return
 	jr c, .noNote
 
@@ -2021,7 +2024,7 @@ LinkPlayingOcarina::
 	ld a, [wOcarinaNotePhase]
 	ld c, a
 	ld b, d
-;>@nx wEntityX[slot] = hLinkX + OcarinaNoteDX[p]
+;>@nx wEntityX[slot] = hLinkX + mem[OcarinaNoteDX + p]
 
 	ld hl, OcarinaNoteDX
 	add hl, bc
@@ -2031,7 +2034,7 @@ LinkPlayingOcarina::
 	add hl, de
 ;=@nx
 	ld [hl], a
-;> wEntitySpeedX[slot] = OcarinaNoteSpeedX[p]
+;> wEntitySpeedX[slot] = mem[OcarinaNoteSpeedX + p]
 	ld hl, OcarinaNoteSpeedX
 	add hl, bc
 	ld a, [hl]
@@ -2071,12 +2074,12 @@ UpdateDigging::
 ;>     return
 	jr z, .done
 
-;> if hMapId == 8 and mem[0xD219] == 2:
+;> if hMapId == 8 and wFinalNightmareForm == 2:
 	ldh a, [hMapId]
 	cp $08
 	jr nz, .dig
 
-	ld a, [$d219]
+	ld a, [wFinalNightmareForm]
 	cp $02
 	jr nz, .dig
 
@@ -2145,7 +2148,7 @@ UpdateDigging::
 
 
 .pose
-;>@dp hLinkAnimationState = DigPoses[hLinkDirection * 2 + ((wDigCounter >> 4) & 1)]
+;>@dp hLinkAnimationState = mem[DigPoses + (hLinkDirection * 2 + ((wDigCounter >> 4) & 1))]
 	rra
 	rra
 	rra
@@ -2303,9 +2306,9 @@ DigUpSquare::
 	ld a, $2d
 
 .spawn
-;>     slot = SpawnEntity(kind)
+;>     slot, full = SpawnEntity(bc, kind)
 	call SpawnEntity
-;>     if carry:
+;>     if full:
 ;>         return
 	jr c, .done
 
@@ -2377,7 +2380,7 @@ FindDigSpot::
 ;>@busyret     return True
 	jp nz, .cannot
 
-;>@px hBGPosX = (hLinkX + DigSpotDX[hLinkDirection] - 8) & 0xF0
+;>@px hBGPosX = (hLinkX + mem[DigSpotDX + hLinkDirection] - 8) & 0xF0
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, $00
@@ -2392,7 +2395,7 @@ FindDigSpot::
 ;> column = hBGPosX >> 4
 	swap a
 	ld c, a
-;>@py hBGPosY = (hLinkY + DigSpotDY[hLinkDirection] - 0x10) & 0xF0
+;>@py hBGPosY = (hLinkY + mem[DigSpotDY + hLinkDirection] - 0x10) & 0xF0
 	ld hl, DigSpotDY
 	add hl, de
 	ldh a, [hLinkY]
@@ -2567,7 +2570,7 @@ LinkMotionRevolvingDoor::
 	ldh [hLinkX], a
 ;> wLinkFrozen = 0x50
 	ld [wLinkFrozen], a
-;>@pose hLinkAnimationState = RevolvingDoorPoses[(wLinkMotionCounter >> 3) & 7]
+;>@pose hLinkAnimationState = mem[RevolvingDoorPoses + ((wLinkMotionCounter >> 3) & 7)]
 	ld a, [wLinkMotionCounter]
 	rra
 	rra
@@ -2835,14 +2838,14 @@ LinkMotionSwimming::
 	ld [wLinkWalkingFrameCount], a
 
 .facing
-;>     if JoypadToDirection[e] != 0x0F:
+;>     if mem[JoypadToDirection + e] != 0x0F:
 	ld hl, JoypadToDirection
 	add hl, de
 	ld a, [hl]
 	cp $0f
 	jr z, .animate
 
-;>         hLinkDirection = JoypadToDirection[e]
+;>         hLinkDirection = mem[JoypadToDirection + e]
 	ldh [hLinkDirection], a
 
 .animate
@@ -2934,10 +2937,10 @@ LinkMotionSwimming::
 
 ;> hRoomStatus |= 0x20
 	set 5, [hl]
-;> slot = SpawnEntity(0x35)                       # the hidden item
+;> slot, full = SpawnEntity(bc, 0x35)                       # the hidden item
 	ld a, $35
 	call SpawnEntity
-;> if carry:
+;> if full:
 ;>     return
 	jr c, .done
 
@@ -3076,7 +3079,7 @@ LinkMotionFallingDown::
 	cp $06
 	jr z, .fallen
 
-;>     hLinkAnimationState = FallInHolePoses[i]
+;>     hLinkAnimationState = mem[FallInHolePoses + i]
 	ld e, a
 	ld d, $00
 	ld hl, FallInHolePoses
@@ -3270,6 +3273,7 @@ LinkSankInSand::
 ;@ path: link/items
 ;@ Link's item-showing pose, kind 1 or 5 (wLinkShowItemPose; called from bank 0 every frame of the
 ;@ pose): on the frame wLinkShowItemTimer is $2E the jingle $17 plays, then as LinkHoldItemUpQuiet.
+;@ test: wCurrentBank = $02
 LinkHoldItemUp::
 ;> if wLinkShowItemTimer == 0x2E:
 	ld a, [wLinkShowItemTimer]
@@ -3286,6 +3290,7 @@ LinkHoldItemUp::
 ;@ Link stands (landing if he was in the air) holding something over his head (pose $6B). The thing
 ;@ is drawn with two sprites at OAM $C010: for kind 1 the sword (bank 0's sprite drawer, blinking palette),
 ;@ else one 8x16 object: tile $AE for kind 5, $8C for kind 4, $8E otherwise.
+;@ test: wCurrentBank = $02
 LinkHoldItemUpQuiet::
 ;> ResetSpinAttackAndDash()
 	call ResetSpinAttackAndDash
@@ -3553,33 +3558,33 @@ DrawMagicRod::
 	add $04
 
 .first
-;> hMultiPurpose0 = MagicRodSpriteDY[e]
+;> hMultiPurpose0 = mem[MagicRodSpriteDY + e]
 	ld e, a
 	ld d, $00
 	ld hl, MagicRodSpriteDY
 	add hl, de
 	ld a, [hl]
 	ldh [hMultiPurpose0], a
-;> hMultiPurpose1 = MagicRodSpriteDX[e]
+;> hMultiPurpose1 = mem[MagicRodSpriteDX + e]
 	ld hl, MagicRodSpriteDX
 	add hl, de
 	ld a, [hl]
 	ldh [hMultiPurpose1], a
-;> hMultiPurpose2 = MagicRodSpriteTiles[e * 2]
+;> hMultiPurpose2 = mem[MagicRodSpriteTiles + (e * 2)]
 	sla e
 	ld hl, MagicRodSpriteTiles
 	add hl, de
 	ld a, [hli]
 	ldh [hMultiPurpose2], a
-;> hMultiPurpose3 = MagicRodSpriteTiles[e * 2 + 1]
+;> hMultiPurpose3 = mem[MagicRodSpriteTiles + (e * 2 + 1)]
 	ld a, [hl]
 	ldh [hMultiPurpose3], a
-;> hMultiPurpose4 = MagicRodSpriteAttrs[e * 2]
+;> hMultiPurpose4 = mem[MagicRodSpriteAttrs + (e * 2)]
 	ld hl, MagicRodSpriteAttrs
 	add hl, de
 	ld a, [hli]
 	ldh [hMultiPurpose4], a
-;> hMultiPurpose5 = MagicRodSpriteAttrs[e * 2 + 1]
+;> hMultiPurpose5 = mem[MagicRodSpriteAttrs + (e * 2 + 1)]
 	ld a, [hl]
 	ldh [hMultiPurpose5], a
 ;>@y hMultiPurpose0 += wLinkDrawY + wLinkSpriteDY  # sprite y
@@ -3663,7 +3668,7 @@ PlaceMagicRodFireball::
 	ldh a, [hLinkDirection]
 	ld c, a
 	ld b, $00
-;>@x wEntityX[slot] = hLinkX + MagicRodFireballDX[d]
+;>@x wEntityX[slot] = hLinkX + mem[MagicRodFireballDX + d]
 	ld hl, MagicRodFireballDX
 	add hl, bc
 	ldh a, [hLinkX]
@@ -3672,7 +3677,7 @@ PlaceMagicRodFireball::
 	add hl, de
 ;=@x
 	ld [hl], a
-;>@yy wEntityY[slot] = hLinkY + MagicRodFireballDY[d]
+;>@yy wEntityY[slot] = hLinkY + mem[MagicRodFireballDY + d]
 
 	ld hl, MagicRodFireballDY
 	add hl, bc
@@ -3690,23 +3695,23 @@ PlaceMagicRodFireball::
 	jp SetArrowSpeed
 
 
-;@ def OpenLockedOrPushBlock(kind: hBGTilesRequestCopy)
+;@ def OpenLockedOrPushBlock(kind: hMultiPurposeG)
 ;@ path: object/blocks
 ;@ Link has pushed long enough against a key block or a movable block (called from the wall check with
-;@ $20 or $40 in hBGTilesRequestCopy, used here as a scratch byte; the square's probe point in
+;@ $20 or $40 in hMultiPurposeG, used here as a scratch byte; the square's probe point in
 ;@ hMultiPurpose4 / 5). $40: the block starts sliding (entity $06 spawned on its square). $20: if Link has
 ;@ a small key of this dungeon, one is used, the block disappears in a puff of smoke and the room
 ;@ remembers it (room status bit 6).
 OpenLockedOrPushBlock::
-;> if hBGTilesRequestCopy == 0x40:             # movable block
+;> if hMultiPurposeG == 0x40:             # movable block
 	push bc
 	push de
-	ldh a, [hBGTilesRequestCopy]
+	ldh a, [hMultiPurposeG]
 	cp $40
 	jr z, .push
 
-;>@p1     slot = SpawnEntity(0x06)               # the sliding block
-;>@p2     if not carry:
+;>@p1     slot, full = SpawnEntity(bc, 0x06)               # the sliding block
+;>@p2     if not full:
 ;>@p3         wEntityStatus[slot] -= 1
 ;>@p4         wEntityX[slot] = (hMultiPurpose4 & 0xF0) + 8
 ;>@p5         wEntityY[slot] = (hMultiPurpose5 & 0xF0) + 0x10
@@ -3819,9 +3824,9 @@ SpawnFallingRoomEventItem::
 	ld a, $3c
 
 .spawn
-;> slot = SpawnEntity(kind)
+;> slot, full = SpawnEntity(bc, kind)
 	call SpawnEntity
-;> if not carry:
+;> if not full:
 	jr c, .done
 
 ;>     wEntityX[slot] = 0x28
@@ -3861,6 +3866,7 @@ DebugWarpMaps::
 ;@ dialog cooldown, runs the 16 visual effect slots (dust, splashes, smoke, sparks...), and handles a
 ;@ staircase that appeared: once Link has stepped off it, stepping back on it (on the ground, carrying
 ;@ nothing) starts a warp. The B + Select debug warp is disabled (its jump is unconditional).
+;@ test: wCurrentBank = $02
 UpdateVfxAndStairs::
 ;> wRoomStatus[0x100] = 0
 	xor a
@@ -3880,12 +3886,12 @@ UpdateVfxAndStairs::
 ;> if hJoypadHeld & 0x20:                       # B held
 	ldh a, [hJoypadHeld]
 	and $20
-	jr z, jr_002_52ed
+	jr z, .loop2
 
 ;>     select = hJoypadPressed & 0x40           # not used: the jump below is unconditional
 	ldh a, [hJoypadPressed]
 	and $40
-	jr jr_002_52ed
+	jr .loop2
 
 ;> if False:                                    # the disabled debug warp (never reached)
 ;>     wWarpType = 1
@@ -3903,13 +3909,13 @@ UpdateVfxAndStairs::
 
 .keep
 	ld [wDebugWarpIndex], a
-;>     wWarpRoom = DebugWarpRooms[e]
+;>     wWarpRoom = mem[DebugWarpRooms + e]
 	ld d, $00
 	ld hl, DebugWarpRooms
 	add hl, de
 	ld a, [hl]
 	ld [wWarpRoom], a
-;>     wWarpMap = DebugWarpMaps[e]
+;>     wWarpMap = mem[DebugWarpMaps + e]
 	ld hl, DebugWarpMaps
 	add hl, de
 	ld a, [hl]
@@ -3926,7 +3932,7 @@ UpdateVfxAndStairs::
 ;>     return StartWarpFadeOutWithNoise()
 	jp StartWarpFadeOutWithNoise
 
-jr_002_52ed:
+.loop2
 ;> for c in range(15, -1, -1):
 	ld b, $00
 	ld c, $0f
@@ -4183,20 +4189,20 @@ VfxFourSprites::
 	ldh a, [hMultiPurpose1]
 	ld [de], a
 	inc de
-;>     mem[oam + 1] = hMultiPurpose2 + VfxType10DX[i - 1]
+;>     mem[oam + 1] = hMultiPurpose2 + mem[VfxType10DX + (i - 1)]
 	ldh a, [hMultiPurpose2]
 	ld hl, VfxType10DX - 1
 	add hl, bc
 	add [hl]
 	ld [de], a
 	inc de
-;>     mem[oam + 2] = VfxType10Tiles[i - 1]
+;>     mem[oam + 2] = mem[VfxType10Tiles + (i - 1)]
 	ld hl, VfxType10Tiles - 1
 	add hl, bc
 	ld a, [hl]
 	ld [de], a
 	inc de
-;>     mem[oam + 3] = VfxType10Attrs[i - 1]
+;>     mem[oam + 3] = mem[VfxType10Attrs + (i - 1)]
 	ld hl, VfxType10Attrs - 1
 	add hl, bc
 	ld a, [hl]
@@ -4313,12 +4319,12 @@ VfxGateOpening::
 ;=@i
 	ld e, a
 	ld d, b
-;> hMultiPurpose0 = VfxType9GateTiles[i]
+;> hMultiPurpose0 = mem[VfxType9GateTiles + i]
 	ld hl, VfxType9GateTiles
 	add hl, de
 	ld a, [hli]
 	ldh [hMultiPurpose0], a
-;> hMultiPurpose1 = VfxType9GateTiles[i + 1]
+;> hMultiPurpose1 = mem[VfxType9GateTiles + i + 1]
 	ld a, [hl]
 	ldh [hMultiPurpose1], a
 ;> hBGPosX = 0x60
@@ -4490,7 +4496,7 @@ VfxFlyingSpark::
 	add hl, bc
 	ld e, [hl]
 	ld d, b
-;>@x     wVfxX[c] += VfxType7SpeedX[d]
+;>@x     wVfxX[c] += mem[VfxType7SpeedX + d]
 	ld hl, VfxType7SpeedX
 	add hl, de
 	ld a, [hl]
@@ -4499,7 +4505,7 @@ VfxFlyingSpark::
 	add [hl]
 ;=@x
 	ld [hl], a
-;>@y     wVfxY[c] += VfxType7SpeedY[d]
+;>@y     wVfxY[c] += mem[VfxType7SpeedY + d]
 	ld hl, VfxType7SpeedY
 	add hl, de
 	ld a, [hl]
@@ -4673,6 +4679,7 @@ VfxSplashDraw:
 ;@ Draws two sprites of an effect: the 8 bytes at table + offset (two times y offset, x offset, tile,
 ;@ attributes) are added to the effect's position (hMultiPurpose1 / 2) and written to the next free
 ;@ effect OAM entries (wOAMBuffer + $30 + wOAMNextIndex).
+;@ test: wCurrentBank = $02
 DrawVfxSpritePair::
 ;> src = table + offset
 	add hl, de
@@ -4735,6 +4742,7 @@ VfxType1SpritesAlt::
 ;@ def VfxSplashAlt()
 ;@ path: gfx/vfx
 ;@ The other look of visual effect 1: two sprites from VfxType1SpritesAlt, frame by bit 3 of the timer.
+;@ test: wCurrentBank = $02
 VfxSplashAlt::
 ;> frame = hMultiPurpose0 & 8
 	ldh a, [hMultiPurpose0]
@@ -4823,7 +4831,7 @@ LoadVfxPosition::
 ;> if hMultiPurpose2 < 0xA8:
 	cp $a8
 ;>     return
-	jr c, jr_002_56e1
+	jr c, FreeVfxSlot.return
 
 ;> FreeVfxSlot(c)                              # (falls through)
 
@@ -4838,7 +4846,7 @@ FreeVfxSlot::
 	xor a
 	ld [hl], a
 
-jr_002_56e1:
+.return
 	ret
 
 
@@ -4877,7 +4885,7 @@ AdvanceVfxOAM::
 	cp $60
 	jr c, .done
 
-;>@rot     wOAMNextIndex = VfxOAMStartOffsets[(hFrameCounter + wActiveEntitySlot) & 7]
+;>@rot     wOAMNextIndex = mem[VfxOAMStartOffsets + ((hFrameCounter + wActiveEntitySlot) & 7)]
 	ldh a, [hFrameCounter]
 	ld hl, wActiveEntitySlot
 	add [hl]
@@ -5003,7 +5011,7 @@ UpdateRoomDoors::
 ;>         if carry: break
 	jr nc, .findOpen
 
-;>     wRoomShutterDoors &= DoorClearMasks[door - 4]
+;>     wRoomShutterDoors &= mem[DoorClearMasks + (door - 4)]
 	ld d, $00
 	ld hl, DoorClearMasks - 4
 	add hl, de
@@ -5063,7 +5071,7 @@ UpdateRoomDoors::
 ;>     if carry: break
 	jr nc, .findClose
 
-;> wRoomShutterDoorsCopy &= DoorClearMasks[door - 4]
+;> wRoomShutterDoorsCopy &= mem[DoorClearMasks + (door - 4)]
 	ld d, $00
 	ld hl, DoorClearMasks - 4
 	add hl, de
@@ -5182,7 +5190,7 @@ OpenDoorStep::
 	jr nz, .times4
 
 .setX
-;>@x hBGPosX = DoorColumnX[wDoorAnimIndex] + wDoorX[wDoorAnimIndex]
+;>@x hBGPosX = mem[DoorColumnX + wDoorAnimIndex] + wDoorX[wDoorAnimIndex]
 	ld hl, DoorColumnX
 	ld a, [wDoorAnimIndex]
 	ld c, a
@@ -5197,7 +5205,7 @@ OpenDoorStep::
 
 OpenDoorRows:
 ;> for row in (0, 9):                           # hMultiPurposeC: 0, then 9 (the second row)
-;>@y     hBGPosY = DoorRowDY[row + wDoorAnimIndex] + wDoorY[wDoorAnimIndex]
+;>@y     hBGPosY = mem[DoorRowDY + row + wDoorAnimIndex] + wDoorY[wDoorAnimIndex]
 	ld hl, DoorRowDY
 	ldh a, [hMultiPurposeC]
 	ld c, a
@@ -5243,14 +5251,14 @@ OpenDoorRows:
 ;>     mem[cmd + 2] = 0x01
 	ld a, $01
 	ld [hli], a
-;>     mem[cmd + 3] = DoorOpenTiles[base]
+;>     mem[cmd + 3] = mem[DoorOpenTiles + base]
 	push hl
 	ld hl, DoorOpenTiles
 	add hl, de
 	ld a, [hl]
 	pop hl
 	ld [hli], a
-;>     mem[cmd + 4] = DoorOpenTiles[base + 1]
+;>     mem[cmd + 4] = mem[DoorOpenTiles + base + 1]
 	push hl
 	ld hl, DoorOpenTiles + 1
 	add hl, de
@@ -5334,7 +5342,7 @@ OpenDoorRows:
 
 .squares
 ;> while True:                                  # the two squares of the door: i, then i + 8
-;>@sq     wRoomObjects[hMultiPurpose0 + DoorSquareOffsets[i]] = DoorOpenObjects[i]
+;>@sq     wRoomObjects[hMultiPurpose0 + mem[DoorSquareOffsets + i]] = mem[DoorOpenObjects + i]
 	ld hl, DoorSquareOffsets
 	add hl, bc
 	ld a, [hl]
@@ -5368,7 +5376,7 @@ OpenDoorRows:
 	call GetRoomStatusAddress_02
 	push hl
 	pop bc
-;>@st mem[status] |= DoorRoomStatusBits[wDoorAnimIndex]
+;>@st mem[status] |= mem[DoorRoomStatusBits + wDoorAnimIndex]
 	ld a, [wDoorAnimIndex]
 	ld e, a
 	ld d, $00
@@ -5380,14 +5388,14 @@ OpenDoorRows:
 	ld [bc], a
 ;> hRoomStatus = mem[status]
 	ldh [hRoomStatus], a
-;> neighbour = GetDungeonRoomStatusAddress(wIndoorRoom + DoorNeighbourRoomDelta[wDoorAnimIndex])
+;> neighbour = GetDungeonRoomStatusAddress(wIndoorRoom + mem[DoorNeighbourRoomDelta + wDoorAnimIndex])
 	ld hl, DoorNeighbourRoomDelta
 	add hl, de
 	ld a, [wIndoorRoom]
 	add [hl]
 	ld e, a
 	call GetDungeonRoomStatusAddress
-;>@nb mem[neighbour] |= DoorNeighbourStatusBits[wDoorAnimIndex]
+;>@nb mem[neighbour] |= mem[DoorNeighbourStatusBits + wDoorAnimIndex]
 	push hl
 	pop bc
 	ld a, [wDoorAnimIndex]
@@ -5498,7 +5506,7 @@ CloseDoorStep::
 	jr nz, .times4
 
 .setX
-;>@x hBGPosX = DoorCloseColumnX[j] + wDoorX[wDoorAnimIndex]
+;>@x hBGPosX = mem[DoorCloseColumnX + j] + wDoorX[wDoorAnimIndex]
 	ld hl, DoorCloseColumnX - 4
 	ld a, [wDoorAnimIndex]
 	ld c, a
@@ -5513,7 +5521,7 @@ CloseDoorStep::
 
 CloseDoorRows:
 ;> for row in (0, 4):                           # hMultiPurposeC
-;>@y     hBGPosY = DoorCloseRowDY[row + j] + wDoorY[wDoorAnimIndex]
+;>@y     hBGPosY = mem[DoorCloseRowDY + row + j] + wDoorY[wDoorAnimIndex]
 	ld hl, DoorCloseRowDY - 4
 	ldh a, [hMultiPurposeC]
 	ld c, a
@@ -5586,14 +5594,14 @@ CloseDoorRows:
 ;>     mem[cmd + 2] = 0x01
 	ld a, $01
 	ld [hli], a
-;>     mem[cmd + 3] = DoorCloseTiles[base]
+;>     mem[cmd + 3] = mem[DoorCloseTiles + base]
 	push hl
 	ld hl, DoorCloseTiles
 	add hl, de
 	ld a, [hl]
 	pop hl
 	ld [hli], a
-;>     mem[cmd + 4] = DoorCloseTiles[base + 1]
+;>     mem[cmd + 4] = mem[DoorCloseTiles + base + 1]
 	push hl
 	ld hl, DoorCloseTiles + 1
 	add hl, de
@@ -5674,7 +5682,7 @@ CloseDoorRows:
 
 .squares
 ;> while True:                                  # the two squares of the shutter: i = j, then j + 4
-;>@sq     wRoomObjects[hMultiPurpose0 + DoorCloseSquareOffsets[i]] = DoorCloseObjects[i]
+;>@sq     wRoomObjects[hMultiPurpose0 + mem[DoorCloseSquareOffsets + i]] = mem[DoorCloseObjects + i]
 	ld hl, DoorCloseSquareOffsets
 	add hl, bc
 	ld a, [hl]
@@ -5718,7 +5726,7 @@ CloseDoorRows:
 	ld e, a
 	ld d, $00
 	add hl, de
-;>@clr mem[status] &= ~DoorRoomStatusBits[wDoorAnimIndex]
+;>@clr mem[status] &= ~mem[DoorRoomStatusBits + wDoorAnimIndex]
 	push hl
 	ld a, [wDoorAnimIndex]
 	ld e, a
@@ -5747,7 +5755,7 @@ RunRoomEvent::
 	ld a, [wRoomEvent]
 	and a
 ;>     return
-	jp z, Jump_002_5bc8
+	jp z, RoomEventVfxDone.return
 
 ;> CheckRoomEventTrigger(wRoomEvent)
 	call CheckRoomEventTrigger
@@ -5864,7 +5872,7 @@ RoomEventFired::
 RoomEventDropEntity::
 ;> RoomEventFired()
 	call RoomEventFired
-;> e = SpawnEntity(0x2F)
+;> e, full = SpawnEntity(bc, 0x2F)
 	ld a, $2f
 	call SpawnEntity
 ;> wEntityX[e] = 0x88
@@ -5918,7 +5926,7 @@ RoomEventVfxDone:
 ;> hRoomStatus = mem[status]
 	ldh [hRoomStatus], a
 
-Jump_002_5bc8:
+.return
 ;> return
 	ret
 
@@ -7029,7 +7037,7 @@ UpdateHealthCounter::
 ;> wLowHealth = 0
 	xor a
 	ld [wLowHealth], a
-;>@low if wHealth < LowHealthThresholds[wMaxHearts - 3]:
+;>@low if wHealth < mem[LowHealthThresholds + (wMaxHearts - 3)]:
 	ld a, [wMaxHearts]
 	ld e, a
 	ld d, $00
@@ -7757,7 +7765,7 @@ DrawInventoryStatic::
 	jr nz, .next
 
 .blank
-;>@bl         wDrawCommand[SubscreenSlotOffsets[c]:+2] = (0x7F, 0x7F)
+;>@bl         wDrawCommand[mem[SubscreenSlotOffsets + c]:+2] = (0x7F, 0x7F)
 	push de
 	ld hl, SubscreenSlotOffsets
 	add hl, bc
@@ -7774,7 +7782,7 @@ DrawInventoryStatic::
 	cp $02
 	jr nz, .popDe
 
-;>@b2             wDrawCommand[SubscreenSlotOffsets[2] + 7:+2] = (0x7F, 0x7F)
+;>@b2             wDrawCommand[mem[SubscreenSlotOffsets + 2] + 7:+2] = (0x7F, 0x7F)
 	inc hl
 	inc hl
 	inc hl
@@ -7920,13 +7928,13 @@ DrawSwordPowerSparkle::
 
 
 .found
-;> hMultiPurpose0 = SwordSparkleX[e]
+;> hMultiPurpose0 = mem[SwordSparkleX + e]
 	ld d, $00
 	ld hl, SwordSparkleX
 	add hl, de
 	ld a, [hl]
 	ldh [hMultiPurpose0], a
-;> hMultiPurpose1 = SwordSparkleY[e]
+;> hMultiPurpose1 = mem[SwordSparkleY + e]
 	ld hl, SwordSparkleY
 	add hl, de
 	ld a, [hl]
@@ -8005,7 +8013,7 @@ InventoryInput::
 ;> elif hMapId < 0x08:                          # a dungeon: Link's room on the minimap
 	ldh a, [hMapId]
 	cp $08
-	jp nc, Jump_002_64bb
+	jp nc, .moveInventoryCursor
 
 ;>     y = (wMinimapLinkCell & 0xF8) + 0x58
 	ld a, [wMinimapLinkCell]
@@ -8071,7 +8079,7 @@ InventoryInput::
 ;=@at
 	ld [wOAMBuffer + 3], a
 
-Jump_002_64bb:
+.moveInventoryCursor
 ;> MoveInventoryCursor()
 	call MoveInventoryCursor
 ;> UpdateSongMenu()                               # the song menu
@@ -8085,7 +8093,7 @@ Jump_002_64bb:
 ;>     return                                   # the selector is hidden
 	jr nz, .done
 
-;> y = SubscreenSelectorY[wInventoryCursor]
+;> y = mem[SubscreenSelectorY + wInventoryCursor]
 	ld a, [wInventoryCursor]
 	ld e, a
 	ld d, $00
@@ -8096,7 +8104,7 @@ Jump_002_64bb:
 	ld [wOAMBuffer + 4], a
 ;> wOAMBuffer[8] = y
 	ld [wOAMBuffer + 8], a
-;> wOAMBuffer[5] = SubscreenSelectorX[wInventoryCursor]
+;> wOAMBuffer[5] = mem[SubscreenSelectorX + wInventoryCursor]
 	ld hl, SubscreenSelectorX
 	add hl, de
 	ld a, [hl]
@@ -8151,7 +8159,7 @@ MoveInventoryCursor::
 	and a
 	jr nz, .vertical
 
-;>@sx         wInventoryCursor += CursorStepX[hJoypadPressed & 0x03]
+;>@sx         wInventoryCursor += mem[CursorStepX + (hJoypadPressed & 0x03)]
 	ldh a, [hJoypadPressed]
 	and $03
 	ld e, a
@@ -8178,7 +8186,7 @@ MoveInventoryCursor::
 	ld [wInventoryCursor], a
 
 .vertical
-;>@sy     wInventoryCursor += CursorStepY[(hJoypadPressed >> 2) & 0x03]
+;>@sy     wInventoryCursor += mem[CursorStepY + ((hJoypadPressed >> 2) & 0x03)]
 	ldh a, [hJoypadPressed]
 	srl a
 	srl a
@@ -8297,8 +8305,8 @@ MoveInventoryCursor::
 	ld hl, wSongMenuCloseTimer
 	ld a, [wSongMenuOpenTimer]
 	or [hl]
-;>     return Jump_002_667b()
-	jp nz, Jump_002_667b
+;>     return DrawSelectedInventorySlot.return()
+	jp nz, DrawSelectedInventorySlot.return
 
 ;> if hJoypadPressed & 0x10:                    # A: swap the selected item onto A
 	ldh a, [hJoypadPressed]
@@ -8365,8 +8373,8 @@ MoveInventoryCursor::
 ;> if not (hJoypadPressed & 0x20):              # B: swap the selected item onto B
 	ldh a, [hJoypadPressed]
 	and $20
-;>     return Jump_002_667b()
-	jr z, Jump_002_667b
+;>     return DrawSelectedInventorySlot.return()
+	jr z, DrawSelectedInventorySlot.return
 
 ;> old = wItemB
 	ld a, [wItemB]
@@ -8440,7 +8448,7 @@ DrawSelectedInventorySlot::
 ;=@d
 	call DrawItemSlots
 
-Jump_002_667b:
+.return
 ;> return
 	ret
 
@@ -8539,7 +8547,7 @@ UpdateSongMenu::
 	ld a, [wSongMenuShown]
 	and a
 ;>     return
-	jp z, Jump_002_684a
+	jp z, .return
 
 ;> else:
 ;>     frame = 0
@@ -8634,7 +8642,7 @@ UpdateSongMenu::
 	ld a, [wSongMenuFrame]
 	cp $00
 ;>     return
-	jr nz, Jump_002_684a
+	jr nz, .return
 
 ;> if hJoypadPressed & 0x41:                    # Right or Select: the next learned song
 	ldh a, [hJoypadPressed]
@@ -8655,7 +8663,7 @@ UpdateSongMenu::
 .setNext
 ;=@n
 	ld [hl], a
-;>         if wOcarinaSongFlags & SongMenuSongBits[wSelectedSong]:
+;>         if wOcarinaSongFlags & mem[SongMenuSongBits + wSelectedSong]:
 	ld e, a
 	ld d, $00
 	ld hl, SongMenuSongBits
@@ -8685,7 +8693,7 @@ UpdateSongMenu::
 .setPrev
 ;=@p
 	ld [hl], a
-;>         if wOcarinaSongFlags & SongMenuSongBits[wSelectedSong]:
+;>         if wOcarinaSongFlags & mem[SongMenuSongBits + wSelectedSong]:
 	ld e, a
 	ld d, $00
 	ld hl, SongMenuSongBits
@@ -8710,7 +8718,7 @@ UpdateSongMenu::
 	ld hl, wOAMBuffer + $10
 	ld a, $38
 	ld [hli], a
-;>@x x = SongMenuNoteX[wSelectedSong]
+;>@x x = mem[SongMenuNoteX + wSelectedSong]
 	push hl
 	ld a, [wSelectedSong]
 	ld e, a
@@ -8738,7 +8746,7 @@ UpdateSongMenu::
 	ld [hli], a
 	ld [hl], $20
 
-Jump_002_684a:
+.return
 	ret
 
 
@@ -8839,7 +8847,7 @@ LoadDungeonMinimap::
 	ld d, $00
 	ld e, $00
 
-Jump_002_6ad0:
+.setTile2
 ;>     tile = wMinimapTiles[e]
 	ld hl, wMinimapTiles
 	add hl, de
@@ -8890,7 +8898,7 @@ Jump_002_6ad0:
 ;>         continue
 	jr z, .next
 
-;>@c     c = 0xD0 + MinimapRoomTypeTiles[mem[status] & 0x0F]
+;>@c     c = 0xD0 + mem[MinimapRoomTypeTiles + (mem[status] & 0x0F)]
 	ld a, [hl]
 	and $0f
 	ld c, a
@@ -8952,7 +8960,7 @@ Jump_002_6ad0:
 	inc e
 	ld a, e
 	cp $40
-	jp nz, Jump_002_6ad0
+	jp nz, .setTile2
 
 	ret
 
@@ -9328,7 +9336,7 @@ SideViewSwim::
 	and $01
 	jr nz, .move
 
-;>@dx     d = SideViewSwimSpeedX[hJoypadHeld & 0x0F] - hLinkSpeedX
+;>@dx     d = mem[SideViewSwimSpeedX + (hJoypadHeld & 0x0F)] - hLinkSpeedX
 	ldh a, [hJoypadHeld]
 	and $0f
 	ld e, a
@@ -9351,7 +9359,7 @@ SideViewSwim::
 	dec [hl]
 
 .speedY
-;>     d = SideViewSwimSpeedY[hJoypadHeld & 0x0F] - hLinkSpeedY
+;>     d = mem[SideViewSwimSpeedY + (hJoypadHeld & 0x0F)] - hLinkSpeedY
 	ld hl, SideViewSwimSpeedY
 	add hl, de
 	ld a, [hl]
@@ -9377,7 +9385,7 @@ SideViewSwim::
 	and $03
 	jr z, .apply
 
-;>     hLinkDirection = SideViewSwimDirections[hJoypadHeld & 0x03]
+;>     hLinkDirection = mem[SideViewSwimDirections + (hJoypadHeld & 0x03)]
 	ld e, a
 	ld d, $00
 	ld hl, SideViewSwimDirections
@@ -9435,7 +9443,7 @@ SideViewLadder::
 	ld [wJumpAnimationCounter], a
 ;> wJumpAnimationFrame = a
 	ld [wJumpAnimationFrame], a
-;>@sx hLinkSpeedX = LadderSpeedX[hJoypadHeld & 0x03]
+;>@sx hLinkSpeedX = mem[LadderSpeedX + (hJoypadHeld & 0x03)]
 	ldh a, [hJoypadHeld]
 	and $03
 	ld e, a
@@ -9445,7 +9453,7 @@ SideViewLadder::
 ;=@sx
 	ld a, [hl]
 	ldh [hLinkSpeedX], a
-;>@sy hLinkSpeedY = LadderSpeedY[(hJoypadHeld >> 2) & 0x03]
+;>@sy hLinkSpeedY = mem[LadderSpeedY + ((hJoypadHeld >> 2) & 0x03)]
 	ldh a, [hJoypadHeld]
 	rra
 	rra
@@ -9618,7 +9626,7 @@ SideViewWalk::
 	and $03
 	jr z, .airDone
 
-;>         d = hLinkSpeedX - SideViewSpeedX[hJoypadHeld & 0x03]
+;>         d = hLinkSpeedX - mem[SideViewSpeedX + (hJoypadHeld & 0x03)]
 	ld e, a
 	ld d, $00
 	ld hl, SideViewSpeedX
@@ -9664,7 +9672,7 @@ SideViewWalk::
 	ld [wJumpAnimationCounter], a
 
 .walk
-;>@wx hLinkSpeedX = SideViewSpeedX[hJoypadHeld & 0x03]
+;>@wx hLinkSpeedX = mem[SideViewSpeedX + (hJoypadHeld & 0x03)]
 	ldh a, [hJoypadHeld]
 	and $03
 	ld e, a
@@ -9674,7 +9682,7 @@ SideViewWalk::
 ;=@wx
 	ld a, [hl]
 	ldh [hLinkSpeedX], a
-;> direction = SideViewDirections[hJoypadHeld & 0x03]
+;> direction = mem[SideViewDirections + (hJoypadHeld & 0x03)]
 	ld hl, SideViewDirections
 	add hl, de
 	ld a, [hl]
@@ -9864,6 +9872,7 @@ SideViewProbeDY::
 ;@ solid ground or on the top of a one-way platform ($62 / $64 / $66, unless Down is held), stops him
 ;@ at ceilings and walls, and bounces him back when he dashes into a wall. Object $8A shows dialog
 ;@ $51 once.
+;@ test: wCurrentBank = $02
 SideViewCollideTiles::
 ;> SideViewProbe(4)                             # the body
 	ld c, $04
@@ -10041,7 +10050,7 @@ SideViewCollideTiles::
 ;@ physics ($01, $60) set the probe's bit in wLinkCollisionFlags.
 ;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
 SideViewProbe::
-;>@col column = ((hLinkX - 8 + SideViewProbeDX[probe]) & 0xFF) >> 4
+;>@col column = ((hLinkX - 8 + mem[SideViewProbeDX + probe]) & 0xFF) >> 4
 	ld hl, SideViewProbeDX
 	add hl, bc
 	ldh a, [hLinkX]
@@ -10051,7 +10060,7 @@ SideViewProbe::
 ;=@col
 	and $0f
 	ld e, a
-;> hMultiPurposeH = (hLinkY + SideViewProbeDY[probe] - 0x10) & 0xFF
+;> hMultiPurposeH = (hLinkY + mem[SideViewProbeDY + probe] - 0x10) & 0xFF
 	ld hl, SideViewProbeDY
 	add hl, bc
 	ldh a, [hLinkY]
@@ -10090,7 +10099,7 @@ SideViewProbe::
 ;@ Sets the wLinkCollisionFlags bit of side-view probe c (SideViewBlockedBits).
 ;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
 SetSideViewBlocked::
-;> wLinkCollisionFlags |= SideViewBlockedBits[probe]
+;> wLinkCollisionFlags |= mem[SideViewBlockedBits + probe]
 	ld hl, SideViewBlockedBits
 	add hl, bc
 	ld a, [wLinkCollisionFlags]
@@ -10478,7 +10487,7 @@ CollideLinkWithRoom::
 ;> CollideLinkWithWalls()
 	call CollideLinkWithWalls
 
-jr_002_714f:
+.return
 ;> return
 	ret
 
@@ -10539,7 +10548,7 @@ CollideLinkWithWalls::
 	ld a, [wDebugToggle]
 	or [hl]
 ;>     return
-	jr nz, jr_002_714f
+	jr nz, CollideLinkWithRoom.return
 
 ;> if hIsSideScrolling:
 	ldh a, [hIsSideScrolling]
@@ -10575,7 +10584,7 @@ CollideLinkWithWalls::
 ;=@d
 	ld a, e
 	ldh [hMultiPurposeC], a
-;> probe = WallProbePairs[3 - hMultiPurposeC]
+;> probe = mem[WallProbePairs + (3 - hMultiPurposeC)]
 	ld e, $02
 	ld a, [bc]
 	ld c, a
@@ -10670,7 +10679,7 @@ WallSlideVertical:
 	and $03
 	jr z, WallCheckHorizontal
 
-;>@nx     hLinkX += WallNudge[wLinkCollisionFlags & 0x03]
+;>@nx     hLinkX += mem[WallNudge + (wLinkCollisionFlags & 0x03)]
 	ld e, a
 	ld d, $00
 	ld hl, WallNudge
@@ -10702,7 +10711,7 @@ WallCheckHorizontal:
 ;=@h
 	ld a, e
 	ldh [hMultiPurposeC], a
-;>     probe = WallProbePairs[2 + hMultiPurposeC]
+;>     probe = mem[WallProbePairs + 2 + hMultiPurposeC]
 	ld e, $02
 	ld a, [bc]
 	ld c, a
@@ -10726,7 +10735,7 @@ WallCheckHorizontal:
 	and $0c
 	jr z, WallChecksDone
 
-;>@ny         hLinkY += WallNudge[(wLinkCollisionFlags & 0x0C) >> 2]
+;>@ny         hLinkY += mem[WallNudge + ((wLinkCollisionFlags & 0x0C) >> 2)]
 	srl a
 	srl a
 	ld e, a
@@ -10772,7 +10781,7 @@ DirectionJoypadBits::
 ;@ Returns carry set when the point blocks Link.
 ;@ test: skip its pseudo-code names local parts of the unit as functions
 ProbeWall::
-;> hMultiPurpose4 = (hLinkX - 8 + WallProbeDX[probe]) & 0xFF   # the point
+;> hMultiPurpose4 = (hLinkX - 8 + mem[WallProbeDX + probe]) & 0xFF   # the point
 	ld hl, WallProbeDX
 	add hl, bc
 	ldh a, [hLinkX]
@@ -10783,7 +10792,7 @@ ProbeWall::
 	swap a
 	and $0f
 	ld e, a
-;> hMultiPurpose5 = (hLinkY + WallProbeDY[probe] - 0x10) & 0xFF
+;> hMultiPurpose5 = (hLinkY + mem[WallProbeDY + probe] - 0x10) & 0xFF
 	ld hl, WallProbeDY
 	add hl, bc
 	ldh a, [hLinkY]
@@ -10913,7 +10922,7 @@ ProbeWall::
 	call PlayUnlockSound
 
 .keyholeEntity
-;>     e = SpawnEntity(0x28)
+;>     e, full = SpawnEntity(bc, 0x28)
 	ld a, $28
 	call SpawnEntity
 ;>     wEntityPrivate2[e] += 1
@@ -10937,7 +10946,7 @@ ProbeWall::
 
 ;>     ResetSoundEngine()
 	call ResetSoundEngine
-;>     e = SpawnEntity(0x5F)
+;>     e, full = SpawnEntity(bc, 0x5F)
 	ld a, $5f
 	call SpawnEntity
 ;>     wEntityPrivate4[e] -= 1
@@ -11086,7 +11095,7 @@ ProbeWall::
 	and a
 	jr nz, .jumpDown
 
-;>             if not (hJoypadHeld & DirectionJoypadBits[side]):
+;>             if not (hJoypadHeld & mem[DirectionJoypadBits + side]):
 	ld hl, DirectionJoypadBits
 	add hl, de
 	ldh a, [hJoypadHeld]
@@ -11106,12 +11115,12 @@ ProbeWall::
 .jumpDown
 ;>         ResetPegasusBoots()                  # jump down the ledge
 	call ResetPegasusBoots
-;>         hLinkSpeedX = LedgeJumpSpeedX[side]
+;>         hLinkSpeedX = mem[LedgeJumpSpeedX + side]
 	ld hl, LedgeJumpSpeedX
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkSpeedX], a
-;>         hLinkSpeedY = LedgeJumpSpeedY[side]
+;>         hLinkSpeedY = mem[LedgeJumpSpeedY + side]
 	ld hl, LedgeJumpSpeedY
 	add hl, de
 	ld a, [hl]
@@ -11454,7 +11463,7 @@ ProbeWall::
 ;>     return solid()
 	jr nc, .solid
 
-;>@rb if wRaisedBlocksState ^ RaisedBlockLoweredPhase[hRoomObjectType - 0xDB]:
+;>@rb if wRaisedBlocksState ^ mem[RaisedBlockLoweredPhase + (hRoomObjectType - 0xDB)]:
 	sub $db
 	ld e, a
 	ld d, $00
@@ -11614,7 +11623,7 @@ ProbeWall::
 	cp $05
 	jr nz, .push
 
-;>     if hLinkDirection != WallProbeDirections[probe]:
+;>     if hLinkDirection != mem[WallProbeDirections + probe]:
 	ld hl, WallProbeDirections
 	add hl, bc
 	ldh a, [hLinkDirection]
@@ -11693,7 +11702,7 @@ ProbeWall::
 	ld e, a
 	ld d, $00
 	call RemoveRoomObject
-;>     e = SpawnEntity(0x05)                    # the pieces
+;>     e, full = SpawnEntity(bc, 0x05)                    # the pieces
 	ld a, $05
 	call SpawnEntity
 ;>     if not e:                                # (carry: no free slot)
@@ -11778,9 +11787,9 @@ ProbeWall::
 	cp e
 	jr c, .blocked
 
-;>     hBGTilesRequestCopy = frames
+;>     hMultiPurposeG = frames
 	ld a, e
-	ldh [hBGTilesRequestCopy], a
+	ldh [hMultiPurposeG], a
 ;>     wLinkPushCounter = 0
 	xor a
 	ld [wLinkPushCounter], a
@@ -11788,7 +11797,7 @@ ProbeWall::
 	call OpenLockedOrPushBlock
 
 .blocked
-;> wLinkCollisionFlags |= WallBlockedBits[probe]   # .blocked
+;> wLinkCollisionFlags |= mem[WallBlockedBits + probe]   # .blocked
 	ld hl, WallBlockedBits
 	add hl, bc
 	ld a, [wLinkCollisionFlags]
@@ -12048,6 +12057,15 @@ UpdateLinkGround::
 ;>     return UpdateLinkShadow()
 	jr z, UpdateLinkShadow
 
+;> return StopLinkOnGround()                  # falls through into it
+
+;@ def StopLinkOnGround()
+;@ path: link/collision
+;@ The rest of UpdateLinkGround after its swimming and hookshot checks, also run on its own by the warp
+;@ fades (LinkMotionMapFadeOut, LinkMotionMapFadeIn): unless Link dashes or is in the air his speed is
+;@ stopped; then SetLinkSpriteDY runs on.
+;@ test: skip runs on into SetLinkSpriteDY
+StopLinkOnGround::
 ;> if not (wIsUsingPegasusBoots or wIsLinkInTheAir):
 	ld hl, wIsLinkInTheAir
 	ld a, [wIsUsingPegasusBoots]
@@ -12056,6 +12074,7 @@ UpdateLinkGround::
 
 ;>     StopLinkSpeed()
 	call StopLinkSpeed
+;> return SetLinkSpriteDY()                    # falls through into it
 
 ;@ def SetLinkSpriteDY()
 ;@ path: link/collision
@@ -12513,7 +12532,7 @@ LinkDrown::
 	ldh [hLinkMotionStep], a
 ;> StopLinkSpeed()
 	call StopLinkSpeed
-;>@sx hLinkSpeedX = SwimEntrySpeedX[hLinkDirection]
+;>@sx hLinkSpeedX = mem[SwimEntrySpeedX + hLinkDirection]
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, b
@@ -12522,7 +12541,7 @@ LinkDrown::
 	ld a, [hl]
 ;=@sx
 	ldh [hLinkSpeedX], a
-;> hLinkSpeedY = SwimEntrySpeedY[hLinkDirection]
+;> hLinkSpeedY = mem[SwimEntrySpeedY + hLinkDirection]
 	ld hl, SwimEntrySpeedY
 	add hl, de
 	ld a, [hl]
@@ -12622,7 +12641,7 @@ NormalGround:
 	cp $dd
 	jr nc, .offBlock
 
-;>@rs     if wRaisedBlocksState ^ RaisedBlockLoweredPhase[hRoomObjectType - 0xDB]:   # raised
+;>@rs     if wRaisedBlocksState ^ mem[RaisedBlockLoweredPhase + (hRoomObjectType - 0xDB)]:   # raised
 	sub $db
 	ld e, a
 	ld d, $00
@@ -12633,7 +12652,7 @@ NormalGround:
 	xor [hl]
 	jr z, .offBlock
 
-;>@ry         wLinkSpriteDY += RaisedBlockLinkDY[wRaisedBlockStep]
+;>@ry         wLinkSpriteDY += mem[RaisedBlockLinkDY + wRaisedBlockStep]
 	ld a, [wRaisedBlockStep]
 	ld e, a
 	ld d, $00
@@ -12667,12 +12686,12 @@ NormalGround:
 ;> if not wIsIndoor or wRoomTransitionState:
 	ld a, [wIsIndoor]
 	and a
-	jp z, Jump_002_7b28
+	jp z, .return
 
 	ld a, [wRoomTransitionState]
 	and a
 ;>     return
-	jr nz, Jump_002_7b28
+	jr nz, .return
 
 ;> if hRoomObjectType == 0xAA and not wFloorSwitchPressedTimer:   # a floor switch
 	ldh a, [hRoomObjectType]
@@ -12750,7 +12769,7 @@ NormalGround:
 	ld a, [hl]
 	cp $28
 ;>         return
-	jr c, Jump_002_7b28
+	jr c, .return
 
 ;>     hNoiseSfx = 0x2B
 	ld a, $2b
@@ -12764,7 +12783,7 @@ NormalGround:
 ;>     wCrackedFloorTimer = 0
 	ld [hl], $00
 
-Jump_002_7b28:
+.return
 	ret
 
 
@@ -12862,9 +12881,9 @@ UpdateRoomTransition::
 	push af
 	cp $03
 ;>     return RoomTransitionSteps[wRoomTransitionState - 1]()
-	jp c, Jump_002_7c50
+	jp c, .return
 
-;>@sx hLinkSpeedX = RoomScrollLinkSpeedX[wRoomTransitionDirection]
+;>@sx hLinkSpeedX = mem[RoomScrollLinkSpeedX + wRoomTransitionDirection]
 	ld a, [wRoomTransitionDirection]
 	ld c, a
 	ld b, $00
@@ -12873,7 +12892,7 @@ UpdateRoomTransition::
 	ld a, [hl]
 ;=@sx
 	ldh [hLinkSpeedX], a
-;> hLinkSpeedY = RoomScrollLinkSpeedY[wRoomTransitionDirection]
+;> hLinkSpeedY = mem[RoomScrollLinkSpeedY + wRoomTransitionDirection]
 	ld hl, RoomScrollLinkSpeedY
 	add hl, bc
 	ld a, [hl]
@@ -12882,13 +12901,13 @@ UpdateRoomTransition::
 	push bc
 	call ApplyLinkSpeed
 	pop bc
-;> hBaseScrollX += RoomScrollCameraDX[wRoomTransitionDirection]
+;> hBaseScrollX += mem[RoomScrollCameraDX + wRoomTransitionDirection]
 	ld hl, RoomScrollCameraDX
 	add hl, bc
 	ldh a, [hBaseScrollX]
 	add [hl]
 	ldh [hBaseScrollX], a
-;> hBaseScrollY += RoomScrollCameraDY[wRoomTransitionDirection]
+;> hBaseScrollY += mem[RoomScrollCameraDY + wRoomTransitionDirection]
 	ld hl, RoomScrollCameraDY
 	add hl, bc
 	ldh a, [hBaseScrollY]
@@ -12897,13 +12916,13 @@ UpdateRoomTransition::
 ;> if hBaseScrollY != wRoomScrollTargetY or hBaseScrollX != wRoomScrollTargetX:
 	ld hl, wRoomScrollTargetY
 	cp [hl]
-	jp nz, Jump_002_7c50
+	jp nz, .return
 
 	ldh a, [hBaseScrollX]
 	ld hl, wRoomScrollTargetX
 	cp [hl]
 ;>     return RoomTransitionSteps[wRoomTransitionState - 1]()
-	jp nz, Jump_002_7c50
+	jp nz, .return
 
 ;> if hNextDefaultMusicTrack:                   # the scroll has ended
 	pop af
@@ -13037,7 +13056,7 @@ UpdateRoomTransition::
 	ret
 
 
-Jump_002_7c50:
+.return
 ;> return RoomTransitionSteps[wRoomTransitionState - 1]()   # (the state pushed above)
 	pop af
 	dec a
@@ -13162,7 +13181,7 @@ LoadNextRoom::
 	ld [wIndoorRoom], a
 
 .indoorStep
-;>     room = wIndoorRoom + IndoorRoomStep[direction]
+;>     room = wIndoorRoom + mem[IndoorRoomStep + direction]
 	ld a, [hl]
 	ld hl, wIndoorRoom
 	jr .add
@@ -13187,7 +13206,7 @@ LoadNextRoom::
 
 .overworldStep
 ;> else:
-;>     room = hMapRoom + OverworldRoomStep[direction]
+;>     room = hMapRoom + mem[OverworldRoomStep + direction]
 	ld hl, OverworldRoomStep
 	add hl, bc
 	ld a, [hl]
@@ -13262,7 +13281,7 @@ EnterRoom:
 ;>     return NextTransitionStep()
 	jr z, NextTransitionStep
 
-;> track = OverworldMusicTracks[hMapRoom]
+;> track = mem[OverworldMusicTracks + hMapRoom]
 	ldh a, [hMapRoom]
 	ld e, a
 	ld d, $00
@@ -13275,7 +13294,7 @@ EnterRoom:
 ;>     return NextTransitionStep()
 	jr z, NextTransitionStep
 
-;>@bp beats = track < 0x25 and MusicTrackBeatsPowerUp[track]   # it plays even over the power-up music
+;>@bp beats = track < 0x25 and mem[MusicTrackBeatsPowerUp + track]   # it plays even over the power-up music
 	ld c, a
 	cp $25
 	jr nc, .powerUp
@@ -13430,19 +13449,19 @@ SetUpRoomScroll::
 	ld a, [wRoomTransitionDirection]
 	ld c, a
 	ld b, $00
-;> wRoomScrollTargetX += RoomScrollTargetDX[direction]
+;> wRoomScrollTargetX += mem[RoomScrollTargetDX + direction]
 	ld hl, RoomScrollTargetDX
 	add hl, bc
 	ld a, [wRoomScrollTargetX]
 	add [hl]
 	ld [wRoomScrollTargetX], a
-;> wRoomScrollTargetY += RoomScrollTargetDY[direction]
+;> wRoomScrollTargetY += mem[RoomScrollTargetDY + direction]
 	ld hl, RoomScrollTargetDY
 	add hl, bc
 	ld a, [wRoomScrollTargetY]
 	add [hl]
 	ld [wRoomScrollTargetY], a
-;>@dl wTransitionDrawLow = (wBGOriginLow + RoomScrollDrawDeltaLow[direction]) & 0xDF   # (carry kept)
+;>@dl wTransitionDrawLow = (wBGOriginLow + mem[RoomScrollDrawDeltaLow + direction]) & 0xDF   # (carry kept)
 	ld hl, RoomScrollDrawDeltaLow
 	add hl, bc
 	ld a, [wBGOriginLow]
@@ -13451,7 +13470,7 @@ SetUpRoomScroll::
 	and $df
 ;=@dl
 	ld [wTransitionDrawLow], a
-;>@dh wTransitionDrawHigh = (wBGOriginHigh + RoomScrollDrawDeltaHigh[direction] + carry) & 0x03
+;>@dh wTransitionDrawHigh = (wBGOriginHigh + mem[RoomScrollDrawDeltaHigh + direction] + carry) & 0x03
 	ld hl, RoomScrollDrawDeltaHigh
 	add hl, bc
 	ld a, [wBGOriginHigh]
@@ -13460,7 +13479,7 @@ SetUpRoomScroll::
 	and $03
 ;=@dh
 	ld [wTransitionDrawHigh], a
-;>@ol wBGOriginLow = (wBGOriginLow + RoomScrollOriginDeltaLow[direction]) & 0xDF
+;>@ol wBGOriginLow = (wBGOriginLow + mem[RoomScrollOriginDeltaLow + direction]) & 0xDF
 	ld hl, RoomScrollOriginDeltaLow
 	add hl, bc
 	ld a, [wBGOriginLow]
@@ -13469,7 +13488,7 @@ SetUpRoomScroll::
 	and $df
 ;=@ol
 	ld [wBGOriginLow], a
-;>@oh wBGOriginHigh = (wBGOriginHigh + RoomScrollOriginDeltaHigh[direction] + carry) & 0x03
+;>@oh wBGOriginHigh = (wBGOriginHigh + mem[RoomScrollOriginDeltaHigh + direction] + carry) & 0x03
 	ld hl, RoomScrollOriginDeltaHigh
 	add hl, bc
 	ld a, [wBGOriginHigh]
@@ -13478,17 +13497,17 @@ SetUpRoomScroll::
 	and $03
 ;=@oh
 	ld [wBGOriginHigh], a
-;> wTransitionStripLength = RoomScrollStripLength[direction]
+;> wTransitionStripLength = mem[RoomScrollStripLength + direction]
 	ld hl, RoomScrollStripLength
 	add hl, bc
 	ld a, [hl]
 	ld [wTransitionStripLength], a
-;> wTransitionStripsLeft = RoomScrollStripCount[direction]
+;> wTransitionStripsLeft = mem[RoomScrollStripCount + direction]
 	ld hl, RoomScrollStripCount
 	add hl, bc
 	ld a, [hl]
 	ld [wTransitionStripsLeft], a
-;> wTransitionObjectIndex = RoomScrollFirstObject[direction]
+;> wTransitionObjectIndex = mem[RoomScrollFirstObject + direction]
 	ld hl, RoomScrollFirstObject
 	add hl, bc
 	ld a, [hl]
@@ -13547,7 +13566,7 @@ OnConveyor::
 ;>     return
 	ret nz
 
-;>@cx hLinkX += ConveyorSpeedX[wLinkGroundType - 0xF0]
+;>@cx hLinkX += mem[ConveyorSpeedX + (wLinkGroundType - 0xF0)]
 	ld a, [wLinkGroundType]
 	sub $f0
 	ld e, a
@@ -13558,7 +13577,7 @@ OnConveyor::
 	ldh a, [hLinkX]
 	add [hl]
 	ldh [hLinkX], a
-;> hLinkY += ConveyorSpeedY[wLinkGroundType - 0xF0]
+;> hLinkY += mem[ConveyorSpeedY + (wLinkGroundType - 0xF0)]
 	ld hl, ConveyorSpeedY
 	add hl, de
 	ldh a, [hLinkY]
@@ -13636,13 +13655,13 @@ InWaterCurrent::
 	ld e, a
 
 .set
-;> hLinkSpeedX = WaterCurrentSpeedX[current]
+;> hLinkSpeedX = mem[WaterCurrentSpeedX + current]
 	ld d, $00
 	ld hl, WaterCurrentSpeedX
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkSpeedX], a
-;> hLinkSpeedY = WaterCurrentSpeedY[current]
+;> hLinkSpeedY = mem[WaterCurrentSpeedY + current]
 	ld hl, WaterCurrentSpeedY
 	add hl, de
 	ld a, [hl]

@@ -101,39 +101,39 @@ JoypadInterrupt::
 ;@ while the main loop waits for VBlank.
 ;@ test: skip runs in VBlank with the graphics bank switched in
 SwapInTiles9A::
-;> src = 0x6900
-	ld hl, $6900
+;> src = AnimatedTiles + 0x100
+	ld hl, AnimatedTiles + $100
 ;> dest = 0x89A0
 	ld de, $89a0
 ;> copy(dest, src, 0x30)               # in the shared end of RestoreTiles9A, which also
 ;> return RestoreGfxBank()              # clears the request before switching bank $0C back in
-	jr jr_000_0080
+	jr RestoreTiles9A.copy
 
 ;@ def SwapInTiles9D()
 ;@ path: gfx/tiles
 ;@ VBlank tile job 4: copies 3 tiles from bank $0C $6930 over the shared tiles $9D-$9F ($89D0).
 ;@ test: skip runs in VBlank with the graphics bank switched in
 SwapInTiles9D::
-;> src = 0x6930
-	ld hl, $6930
+;> src = AnimatedTiles + 0x130
+	ld hl, AnimatedTiles + $130
 ;> dest = 0x89D0
 	ld de, $89d0
 ;> copy(dest, src, 0x30)               # in the shared end of RestoreTiles9A, which also
 ;> return RestoreGfxBank()              # clears the request before switching bank $0C back in
-	jr jr_000_0080
+	jr RestoreTiles9A.copy
 
 ;@ def RestoreTiles9D()
 ;@ path: gfx/tiles
 ;@ VBlank tile job 5: puts the normal tiles $9D-$9F back (bank $0C $49D0 -> $89D0).
 ;@ test: skip runs in VBlank with the graphics bank switched in
 RestoreTiles9D::
-;> src = 0x49D0
-	ld hl, $49d0
+;> src = CommonWorldTiles + 0x1D0
+	ld hl, CommonWorldTiles + $1D0
 ;> dest = 0x89D0
 	ld de, $89d0
 ;> copy(dest, src, 0x30)               # in the shared end of RestoreTiles9A, which also
 ;> return RestoreGfxBank()              # clears the request before switching bank $0C back in
-	jr jr_000_0080
+	jr RestoreTiles9A.copy
 
 ;@ def RestoreTiles9A()
 ;@ path: gfx/tiles
@@ -142,12 +142,12 @@ RestoreTiles9D::
 ;@ bank $0C back in.
 ;@ test: skip runs in VBlank with the graphics bank switched in
 RestoreTiles9A::
-;> src = 0x49A0
-	ld hl, $49a0
+;> src = CommonWorldTiles + 0x1A0
+	ld hl, CommonWorldTiles + $1A0
 ;> dest = 0x89A0
 	ld de, $89a0
 
-jr_000_0080:
+.copy
 ;>@copy copy(dest, src, 0x30)          # 3 tiles
 	ld bc, $0030
 	call CopyData
@@ -282,12 +282,12 @@ Init::
 ;> set_rom_bank(1)
 	ld a, $01
 	ld [$2100], a
-;> CopyDMARoutineToHRAM()                   # bank 1 $7D19
-	call $7d19
+;> CopyDMARoutine()                   # bank 1
+	call CopyDMARoutine
 ;> hDMARoutine()                            # send the (empty) sprite table
 	call hDMARoutine
-;> InitLCDRegisters()                       # bank 1 $40CE: LCD on, window hidden, full volume
-	call $40ce
+;> InitLCDRegisters()                       # bank 1: LCD on, window hidden, full volume
+	call InitLCDRegisters
 ;> LoadTileset03()                              # loads the basic tiles from bank $0C
 	call LoadTileset03
 ;> rSTAT = 0x44                             # LCD interrupt when rLY == rLYC
@@ -305,13 +305,13 @@ Init::
 ;> set_rom_bank(1)
 	ld a, $01
 	ld [$2100], a
-;> CheckSaveFiles()                         # bank 1 $460F: checks the 3 save files in cartridge RAM
-	call $460f
+;> InitSaveFiles()                         # bank 1: checks the 3 save files in cartridge RAM
+	call InitSaveFiles
 ;> set_rom_bank(0x1F)
 	ld a, $1f
 	ld [$2100], a
-;> InitSoundEngine()                        # bank $1F $4000
-	call $4000
+;> SoundEntryInit()                        # bank $1F
+	call SoundEntryInit
 ;> hStartButtonDelay = 0x18
 	ld a, $18
 	ldh [hStartButtonDelay], a
@@ -443,8 +443,8 @@ MainLoop::
 ;>     set_rom_bank(1)
 	ld a, $01
 	ld [$2100], a
-;>     IntroRasterEffect()                  # bank 1 $6DB7
-	call $6db7
+;>     IntroRasterEffect()                  # bank 1
+	call IntroRasterEffect
 
 .transition
 ;> if wTransitionGfx != 0:
@@ -460,8 +460,8 @@ MainLoop::
 ;>         set_rom_bank(0x17)
 	ld a, $17
 	ld [$2100], a
-;>         TransitionEffect17()             # bank $17 $46A6
-	call $46a6
+;>         WaveEffectFrame()             # bank $17
+	call WaveEffectFrame
 ;=@fx
 	jp .regular
 
@@ -488,8 +488,8 @@ MainLoop::
 	cp $02
 	jr nz, .endWave
 
-;>                 EndWaveWarp()            # bank $14 $541B: starts the warp that follows the effect
-	call $541b
+;>                 EndWaveWarp()            # bank $14: starts the warp that follows the effect
+	call EndWaveWarp
 
 .endWave
 ;>             wTransitionGfx = 0
@@ -535,15 +535,15 @@ MainLoop::
 	cp $03
 	jr z, .palettesType3
 
-;>                     wBGPalette = mem[0x546A + i]   # palette tables in bank $14
-	ld hl, $546a
+;>                     wBGPalette = mem[WaveBGPalettes + i]   # palette tables in bank $14
+	ld hl, WaveBGPalettes
 	add hl, de
 	ld a, [hl]
 	ld [wBGPalette], a
 ;>                     wOBJ1Palette = mem[0x546A + i]
 	ld [wOBJ1Palette], a
-;>                     wOBJ0Palette = mem[0x547A + i]
-	ld hl, $547a
+;>                     wOBJ0Palette = mem[WaveOBJ0Palettes + i]
+	ld hl, WaveOBJ0Palettes
 	add hl, de
 	ld a, [hl]
 	ld [wOBJ0Palette], a
@@ -552,15 +552,15 @@ MainLoop::
 
 ;>                 else:
 .palettesType3
-;>                     wBGPalette = mem[0x548A + i]
-	ld hl, $548a
+;>                     wBGPalette = mem[WaveBGPalettes3 + i]
+	ld hl, WaveBGPalettes3
 	add hl, de
 	ld a, [hl]
 	ld [wBGPalette], a
 ;>                     wOBJ1Palette = mem[0x548A + i]
 	ld [wOBJ1Palette], a
-;>                     wOBJ0Palette = mem[0x549A + i]
-	ld hl, $549a
+;>                     wOBJ0Palette = mem[WaveOBJ0Palettes3 + i]
+	ld hl, WaveOBJ0Palettes3
 	add hl, de
 	ld a, [hl]
 	ld [wOBJ0Palette], a
@@ -640,7 +640,7 @@ MainLoop::
 	inc c
 
 .flipChosen
-;>@off                 offset = mem[0x54AA + (((hMultiPurpose0 + lo(wRasterLine)) & 0x1F) | hMultiPurpose1)]
+;>@off                 offset = mem[WarpWaveLineOffsets + (((hMultiPurpose0 + lo(wRasterLine)) & 0x1F) | hMultiPurpose1)]
 	ld hl, wRasterLine
 	ldh a, [hMultiPurpose0]
 	add [hl]
@@ -649,7 +649,7 @@ MainLoop::
 	or [hl]
 ;=@off
 	ld e, a
-	ld hl, $54aa
+	ld hl, WarpWaveLineOffsets
 	add hl, de
 ;>@neg                 if wTransitionGfxFrameCount & flip:  # every other frame the other way
 	ld a, [wTransitionGfxFrameCount]
@@ -763,15 +763,15 @@ MainLoop::
 ;> SwitchBank(1)
 	ld a, $01
 	call SwitchBank
-;> ClearOAMBuffer()                         # bank 1 $5CF0: hides all sprites
-	call $5cf0
+;> DisableSRAMAndClearOAM()                         # bank 1: hides all sprites
+	call DisableSRAMAndClearOAM
 ;> RunGameMode()
 	call RunGameMode
 ;> set_rom_bank(1)
 	ld a, $01
 	ld [$2100], a
-;> HideSpritesUnderWindow()                 # bank 1 $5D03
-	call $5d03
+;> HideSpritesUnderWindow()                 # bank 1
+	call HideSpritesUnderWindow
 ;> return FinishFrame()
 
 ;@ def FinishFrame()
@@ -783,8 +783,8 @@ FinishFrame::
 ;> set_rom_bank(0x1F)
 	ld a, $1f
 	ld [$2100], a
-;> UpdateVolumeFades()                      # bank $1F $7F80: hVolumeFadeOutTimer / hVolumeFadeInTimer
-	call $7f80
+;> UpdateVolumeAndSfxRequests()                      # bank $1F: hVolumeFadeOutTimer / hVolumeFadeInTimer
+	call UpdateVolumeAndSfxRequests
 ;> set_rom_bank(0x0C)
 	ld a, $0c
 	ld [$2100], a
@@ -879,7 +879,7 @@ LCDStatHandler::
 	cp $06
 	jr c, .fiveBands
 
-;>         rLYC = IntroBandLinesB[band]
+;>         rLYC = mem[IntroBandLinesB + band]
 	ld hl, IntroBandLinesB
 	add hl, de
 	ld a, [hl]
@@ -894,7 +894,7 @@ LCDStatHandler::
 
 ;>     else:
 .fiveBands
-;>         rLYC = IntroBandLinesA[band]
+;>         rLYC = mem[IntroBandLinesA + band]
 	ld hl, IntroBandLinesA
 	add hl, de
 	ld a, [hl]
@@ -951,11 +951,11 @@ LCDStatHandler::
 ;@ a list of background draw commands: VRAM address (high byte first), a byte with the count - 1
 ;@ in bits 0-5 and the drawing mode in bits 6-7, then the tiles; a 0 byte ends the list.
 BGMapPointers::
-	dw $0000, $62a5, $7313, $6f0f, $6f01, $701e, $7154, $d651
-	dw $6ec2, $7393, $7559, $74c0, $722b, $7637, $76b7, $7800
-	dw $7a0b, $7b8a, $54af, $5670, $6e81, $5310, $6365, $66ce
-	dw $67a1, $68e5, $6a34, $6b20, $6bdd, $6bdd, $5a73, $5c29
-	dw $5dc8, $5f67, $6106, $580e, $59ad
+	dw $0000, ScreenLayout01, ScreenLayout02, ScreenLayout03, ScreenLayout04, ScreenLayout05, ScreenLayout06, $d651
+	dw ScreenLayout08, ScreenLayout09, ScreenLayout0A, ScreenLayout0B, ScreenLayout0C, ScreenLayout0D, ScreenLayout0E, ScreenLayout0F
+	dw ScreenLayout10, ScreenLayout11, ScreenLayout12, ScreenLayout13, ScreenLayout14, ScreenLayout15, ScreenLayout16, ScreenLayout17
+	dw ScreenLayout18, ScreenLayout19, ScreenLayout1A, ScreenLayout1B, ScreenLayout1C, ScreenLayout1C, ScreenLayout1E, ScreenLayout1F
+	dw ScreenLayout20, ScreenLayout21, ScreenLayout22, ScreenLayout23, ScreenLayout24
 
 ;@ def LoadRequestedGraphics()
 ;@ path: world/drawing
@@ -1166,9 +1166,9 @@ VBlankHandler::
 	and a
 	jr nz, .done
 
-;>             hBGTilesRequestCopy = hNeedsUpdatingBGTiles
+;>             hMultiPurposeG = hNeedsUpdatingBGTiles
 	ldh a, [hNeedsUpdatingBGTiles]
-	ldh [hBGTilesRequestCopy], a
+	ldh [hMultiPurposeG], a
 ;>@g             if hNeedsUpdatingBGTiles or hNeedsUpdatingEnemiesTiles or wNeedsUpdatingNPCTiles:
 	ld hl, hNeedsUpdatingEnemiesTiles
 	or [hl]
@@ -1178,8 +1178,8 @@ VBlankHandler::
 
 ;>                 CopyRequestedTiles()
 	call CopyRequestedTiles
-;>                 if hBGTilesRequestCopy < 0x08:
-	ldh a, [hBGTilesRequestCopy]
+;>                 if hMultiPurposeG < 0x08:
+	ldh a, [hMultiPurposeG]
 	cp $08
 	jr nc, .dma
 
@@ -1202,7 +1202,7 @@ VBlankHandler::
 ;>                 hTileSwapFinishCount -= 1
 	dec a
 	ldh [hTileSwapFinishCount], a
-;>                 wRaisedBlockStep = VBlankAnimFrames[hTileSwapFinishCount]
+;>                 wRaisedBlockStep = mem[VBlankAnimFrames + hTileSwapFinishCount]
 	ld e, a
 	ld d, $00
 	ld hl, VBlankAnimFrames
@@ -1331,8 +1331,8 @@ CopyRequestedTiles::
 	add hl, bc
 	push hl
 	pop de
-;>         src = 0x5000 + (hWorldTileset << 8) + offset   # bank $0D: 256 bytes per tile set
-	ld hl, $5000
+;>         src = IndoorTileset00 + (hWorldTileset << 8) + offset   # bank $0D: 256 bytes per tile set
+	ld hl, IndoorTileset00
 	ldh a, [hWorldTileset]
 	add $50
 	ld h, a
@@ -1451,7 +1451,7 @@ CopyRequestedTiles::
 	ld d, a
 	ld e, $00
 	pop af
-;>@b1         set_rom_bank(mem[0x2D84 + (tileset >> 6)])   # bits 6-7 pick one of 4 banks
+;>@b1         set_rom_bank(mem[EntityTilesBanks + (tileset >> 6)])   # bits 6-7 pick one of 4 banks
 	swap a
 	rra
 	rra
@@ -1459,7 +1459,7 @@ CopyRequestedTiles::
 	ld c, a
 	ld b, $00
 ;=@b1
-	ld hl, $2d84
+	ld hl, EntityTilesBanks
 	add hl, bc
 	ld a, [hl]
 	ld [$2100], a
@@ -1534,7 +1534,7 @@ CopyRequestedTiles::
 	ld d, a
 	ld e, $00
 	pop af
-;>@b2         set_rom_bank(mem[0x2D84 + (tileset >> 6)])
+;>@b2         set_rom_bank(mem[EntityTilesBanks + (tileset >> 6)])
 	swap a
 	rra
 	rra
@@ -1542,7 +1542,7 @@ CopyRequestedTiles::
 	ld c, a
 	ld b, $00
 ;=@b2
-	ld hl, $2d84
+	ld hl, EntityTilesBanks
 	add hl, bc
 	ld a, [hl]
 	ld [$2100], a
@@ -1605,7 +1605,7 @@ CopyRequestedTiles::
 ;=@k
 	ld a, $01
 	ld [$2100], a
-	call $7bc5
+	call TileJobInstruments
 ;=@k2
 	jp RestoreGfxBank
 
@@ -1615,7 +1615,7 @@ CopyRequestedTiles::
 ;@ (index job - 8). Jobs 8-10 put three 64-byte pieces of special sprite tiles from $6960/$69A0/
 ;@ $69C0 in place; jobs 11-13 copy the normal tiles back from $4200/$4240/$4260.
 SpriteTileSwapSources::
-	dw $6960, $69a0, $69c0, $4200, $4240, $4260
+	dw AnimatedTiles + $160, AnimatedTiles + $1A0, AnimatedTiles + $1C0, WorldSpriteTiles, WorldSpriteTiles + $40, WorldSpriteTiles + $60
 
 ;@ path: gfx/tiles
 ;@ Destination addresses in VRAM of the sprite tile series, one 16-bit word per job $08-$0D:
@@ -1709,7 +1709,7 @@ RestoreBank::
 ;@ path: gfx/tiles
 ;@ Background tile job 2 indoors, one step per VBlank: steps 0-7 copy 512 bytes of tiles from
 ;@ bank $12 $7E00 to tiles $D0-$EF ($8D00); steps 8-11 run four routines of bank 2 (step 8 at
-;@ $6BB8 copies a row from the buffer at $D480 into the window map at $9DAA, the others draw
+;@ DrawMinimapBottomLeft copies a row from the buffer at $D480 into the window map at $9DAA, the others draw
 ;@ further parts), then the job ends.
 ;@ test: skip switches ROM banks and runs in VBlank
 CopyIndoorTilesJob2::
@@ -1728,7 +1728,7 @@ CopyIndoorTilesJob2::
 	ld a, $02
 	ld [$2100], a
 ;>     DrawMinimapBottomLeft()
-	call $6bb8
+	call DrawMinimapBottomLeft
 ;>     hBGTilesLoadingStage += 1
 	ld hl, hBGTilesLoadingStage
 	inc [hl]
@@ -1744,7 +1744,7 @@ CopyIndoorTilesJob2::
 	ld a, $02
 	ld [$2100], a
 ;>     DrawMinimapTopLeft()
-	call $6b92
+	call DrawMinimapTopLeft
 ;>     hBGTilesLoadingStage += 1
 	ld hl, hBGTilesLoadingStage
 	inc [hl]
@@ -1760,7 +1760,7 @@ CopyIndoorTilesJob2::
 	ld a, $02
 	ld [$2100], a
 ;>     DrawMinimapBottomRight()
-	call $6b6c
+	call DrawMinimapBottomRight
 ;>     hBGTilesLoadingStage += 1
 	ld hl, hBGTilesLoadingStage
 	inc [hl]
@@ -1773,7 +1773,7 @@ CopyIndoorTilesJob2::
 	ld a, $02
 	ld [$2100], a
 ;>     DrawMinimapTopRight()
-	call $6b46
+	call DrawMinimapTopRight
 ;>     hNeedsUpdatingBGTiles = 0            # job done
 	xor a
 	ldh [hNeedsUpdatingBGTiles], a
@@ -1801,12 +1801,12 @@ CopyIndoorTilesJob2::
 ;=@o
 	sla c
 	rl b
-;>@c     copy(0x8D00 + offset, 0x7E00 + offset, 0x40)
+;>@c     copy(0x8D00 + offset, DungeonTiles8C00 + 0x100 + offset, 0x40)
 	ld hl, $8d00
 	add hl, bc
 	push hl
 	pop de
-	ld hl, $7e00
+	ld hl, DungeonTiles8C00 + $100
 	add hl, bc
 ;=@c
 	ld bc, $0040
@@ -1828,13 +1828,13 @@ UpdateSound::
 ;> set_rom_bank(0x1F)
 	ld a, $1f
 	ld [$2100], a
-;> UpdateSoundEffects()                     # bank $1F $4006
-	call $4006
+;> SoundEntryUpdate()                     # bank $1F
+	call SoundEntryUpdate
 ;> if hWaveSfx:
 	ldh a, [hWaveSfx]
 	and a
 ;>     return
-	jr nz, jr_000_0876
+	jr nz, UpdateMusic.return
 
 ;> if wMusicSpeed == 0:
 	ld a, [wMusicSpeed]
@@ -1849,7 +1849,7 @@ UpdateSound::
 ;>     if hFrameCounter & 1: return
 	ldh a, [hFrameCounter]
 	and $01
-	jr nz, jr_000_0876
+	jr nz, UpdateMusic.return
 
 ;>     return UpdateMusic()
 	jr UpdateMusic
@@ -1869,15 +1869,15 @@ UpdateMusic::
 ;> set_rom_bank(0x1B)
 	ld a, $1b
 	ld [$2100], a
-;> UpdateMusicBank1B()                      # bank $1B $4006
-	call $4006
+;> MusicEntryUpdate_1B()                      # bank $1B
+	call MusicEntryUpdate_1B
 ;> set_rom_bank(0x1E)
 	ld a, $1e
 	ld [$2100], a
-;> UpdateMusicBank1E()                      # bank $1E $4006
-	call $4006
+;> MusicEntryUpdate_1E()                      # bank $1E
+	call MusicEntryUpdate_1E
 
-jr_000_0876:
+.return
 ;> return
 	ret
 
@@ -1902,29 +1902,32 @@ UpdateLinkAnimationStateFar::
 ;@ def GetEntityDropTimer(slot: bc) -> a
 ;@ path: entity/helpers
 ;@ Returns wEntityDropTimer[slot] (zero flag set when it is 0).
+;@ test: slot = rand(0, 15)
 GetEntityDropTimer::
 ;> table = wEntityDropTimer
 	ld hl, wEntityDropTimer
 ;> return mem[table + slot]                 # (the shared end in GetEntityTimer)
-	jr jr_000_0894
+	jr GetEntityTimer.return
 
 ;@ def GetEntityTimer1(slot: bc) -> a
 ;@ path: entity/helpers
 ;@ Returns wEntityTimer1[slot] (zero flag set when it is 0).
+;@ test: slot = rand(0, 15)
 GetEntityTimer1::
 ;> table = wEntityTimer1
 	ld hl, wEntityTimer1
 ;> return mem[table + slot]                 # (the shared end in GetEntityTimer)
-	jr jr_000_0894
+	jr GetEntityTimer.return
 
 ;@ def GetEntityTimer(slot: bc) -> a
 ;@ path: entity/helpers
 ;@ Returns wEntityTimer[slot] (zero flag set when it is 0). The two routines above share its end.
+;@ test: slot = rand(0, 15)
 GetEntityTimer::
 ;> table = wEntityTimer
 	ld hl, wEntityTimer
 
-jr_000_0894:
+.return
 ;>@t return mem[table + slot]
 	add hl, bc
 	ld a, [hl]
@@ -1937,7 +1940,7 @@ jr_000_0894:
 ;@ Spawns entity $AF - the item Link holds up when he gets something - at Link's position.
 ;@ test: skip spawns an entity
 SpawnHeldItemEntity::
-;> slot = SpawnEntity(0xAF)                 # SpawnEntity: new slot in de (no check whether it worked)
+;> slot, full = SpawnEntity(bc, 0xAF)                 # SpawnEntity: new slot in de (no check whether it worked)
 	ld a, $af
 	call SpawnEntity
 ;> wEntityX[slot] = hLinkX
@@ -1971,13 +1974,13 @@ PlayNoAmmoSound::
 ;@ the first instruction (`ld hl, $46E1`) are an unused second entry for another table.
 ;@ test: skip reads a table in another bank
 GetNameCharTile::
-;> table = 0x45E1
-	ld hl, $45e1
-	jr jr_000_08b9
+;> table = DialogCharGlyphs
+	ld hl, DialogCharGlyphs
+	jr .setTile
 
 	db $21, $e1, $46
 
-jr_000_08b9:
+.setTile
 ;> set_rom_bank(0x1C)
 	ld a, $1c
 	ld [$2100], a
@@ -2030,6 +2033,7 @@ StartClinkTimer::
 ;@ def DecrementEntityIgnoreHitsTimer(slot: bc)
 ;@ path: entity/helpers
 ;@ Counts wEntityIgnoreHitsTimer[slot] down by one, stopping at 0.
+;@ test: slot = rand(0, 15)
 DecrementEntityIgnoreHitsTimer::
 ;> if wEntityIgnoreHitsTimer[slot]:
 	ld hl, wEntityIgnoreHitsTimer
@@ -2090,7 +2094,7 @@ StartWarpFadeOutWithNoise::
 	ldh [hVolumeFadeOutTimer], a
 ;> hNoiseSfx = 0x06
 ;> return StartScreenFadeOut()
-	jr jr_000_0926
+	jr StartWarpFadeOut.setNoiseSfx
 
 ;@ def StartWarpFadeOutMusic()
 ;@ path: world/warps
@@ -2122,7 +2126,7 @@ StartWarpFadeOut::
 	ld a, $01
 	ldh [hSkipMusicSelection], a
 
-jr_000_0926:
+.setNoiseSfx
 ;> hNoiseSfx = 0x06
 	ld a, $06
 	ldh [hNoiseSfx], a
@@ -2141,7 +2145,7 @@ StartScreenFadeOut::
 	ld [wTransitionSequenceCounter], a
 ;> wTransitionFrameCounter = 0
 	ld [wTransitionFrameCounter], a
-;> mem[0xD478] = 0
+;> wEvilEagleFightStarted = 0
 	ld [wEvilEagleFightStarted], a
 ;> return False
 	and a
@@ -2286,7 +2290,7 @@ AddClinkVfx::
 ;@ its characters need (tables in bank 8), and requests the VBlank copies of those that are not
 ;@ loaded yet. Background: indoors one byte per room ($4040, a second page for maps $06-$19),
 ;@ on the overworld one byte per 2x2 block of rooms ($4000; $0F = keep). Entity tiles: a group
-;@ number per room ($4240 + page), then 4 tile set ids per group ($4540 overworld, $4788
+;@ number per room (OverworldSpritesetIds + page), then 4 tile set ids per group (OverworldSpritesets overworld, IndoorSpritesets
 ;@ indoors; $FF = keep). Two overworld groups change once a room event has happened there
 ;@ (rooms $C9 and $FD). The first changed slot goes to the first request, the others to the
 ;@ second. Switches the caller's bank back in at the end.
@@ -2300,11 +2304,11 @@ LoadRoomTilesets::
 	and a
 	jr z, .overworld
 
-;>     table = 0x4040
+;>     table = IndoorATilesetIds
 	ldh a, [hMapRoom]
 	ld e, a
 	ld d, $00
-	ld hl, $4040
+	ld hl, IndoorATilesetIds
 ;>     if 0x06 <= hMapId < 0x1A: table += 0x100   # the second group of indoor maps
 	ldh a, [hMapId]
 	cp $1a
@@ -2362,9 +2366,9 @@ LoadRoomTilesets::
 	and $07
 	or e
 	ld e, a
-;>@blk     tileset = mem[0x4000 + block]
+;>@blk     tileset = mem[OverworldTilesetIds + block]
 	ld d, $00
-	ld hl, $4000
+	ld hl, OverworldTilesetIds
 	add hl, de
 	ldh a, [hWorldTileset]
 	ld e, a
@@ -2390,7 +2394,7 @@ LoadRoomTilesets::
 	ldh a, [hMapRoom]
 	ld e, a
 	ld d, $00
-	ld hl, $4240
+	ld hl, OverworldSpritesetIds
 	ld a, [wIsIndoor]
 	ld d, a
 ;> if 0x06 <= hMapId < 0x1A: page += 1
@@ -2404,7 +2408,7 @@ LoadRoomTilesets::
 	inc d
 
 .groupPage
-;> group = mem[0x4240 + (page << 8) + hMapRoom]
+;> group = mem[OverworldSpritesetIds + (page << 8) + hMapRoom]
 	add hl, de
 	ld e, [hl]
 ;> if page == 0:                            # overworld
@@ -2418,7 +2422,7 @@ LoadRoomTilesets::
 	jr nz, .check21
 
 ;=@g23
-	ld a, [$d8c9]
+	ld a, [wRoomStatus + $C9]
 	and $20
 	jr z, .check21
 
@@ -2431,26 +2435,26 @@ LoadRoomTilesets::
 	jr nz, .groupDone
 
 ;=@g21
-	ld a, [$d8fd]
+	ld a, [wRoomStatus + $FD]
 	and $20
 	jr z, .groupDone
 
 	inc e
 
 .groupDone
-;> sets = (0x4788 if wIsIndoor else 0x4540) + 4 * group
+;> sets = (IndoorSpritesets if wIsIndoor else OverworldSpritesets) + 4 * group
 	ld d, $00
 	sla e
 	rl d
 	sla e
 	rl d
 ;=@sets
-	ld hl, $4540
+	ld hl, OverworldSpritesets
 	ld a, [wIsIndoor]
 	and a
 	jr z, .setsTable
 
-	ld hl, $4788
+	ld hl, IndoorSpritesets
 
 .setsTable
 ;=@sets
@@ -2593,8 +2597,8 @@ GameModeHandlers::
 ;@ Game mode $0A (bank 1 $67BC), then the common end of the frame.
 ;@ test: skip calls bank 1
 GameModeMural::
-;> Bank01_67BC()
-	call $67bc
+;> GameplayMuralHandler()
+	call GameplayMuralHandler
 ;> return EndGameModeFrame()
 	jp EndGameModeFrame
 
@@ -2604,8 +2608,8 @@ GameModeMural::
 ;@ Game mode 8, a picture shown full screen (bank 1 $654C), then the common end of the frame.
 ;@ test: skip calls bank 1
 GameModePicture::
-;> Bank01_654C()
-	call $654c
+;> GameplayPictureHandler()
+	call GameplayPictureHandler
 ;> return EndGameModeFrame()
 	jp EndGameModeFrame
 
@@ -2615,8 +2619,8 @@ GameModePicture::
 ;@ Game mode 9, Marin on the beach (bank 1 $5FBB), then the common end of the frame.
 ;@ test: skip calls bank 1
 GameModeMarinBeach::
-;> Bank01_5FBB()
-	call $5fbb
+;> GameplayMarinBeachHandler()
+	call GameplayMarinBeachHandler
 ;> return EndGameModeFrame()
 	jp EndGameModeFrame
 
@@ -2626,8 +2630,8 @@ GameModeMarinBeach::
 ;@ Game mode 7, the world map screen (bank 1 $546E), then the common end of the frame.
 ;@ test: skip calls bank 1
 GameModeWorldMap::
-;> Bank01_546E()
-	call $546e
+;> GameplayWorldMapHandler()
+	call GameplayWorldMapHandler
 ;> return EndGameModeFrame()
 	jp EndGameModeFrame
 
@@ -2637,8 +2641,8 @@ GameModeWorldMap::
 ;@ Game mode 6, the save menu: bank 1 $4000.
 ;@ test: skip jumps into bank 1
 GameModeSaveMenu::
-;> return Bank01_4000()
-	jp $4000
+;> return SaveMenuHandler()
+	jp SaveMenuHandler
 
 
 ;@ def GameModeIntro()
@@ -2646,8 +2650,8 @@ GameModeSaveMenu::
 ;@ Game mode 0, the intro and title screen: bank 1 $6E3E.
 ;@ test: skip jumps into bank 1
 GameModeIntro::
-;> return Bank01_6E3E()
-	jp $6e3e
+;> return GameplayIntroHandler()
+	jp GameplayIntroHandler
 
 
 ;@ def GameModeEnding()
@@ -2658,8 +2662,8 @@ GameModeEnding::
 ;> SwitchBank(0x17)
 	ld a, $17
 	call SwitchBank
-;> Call_17_482A()
-	call $482a
+;> CreditsHandler()
+	call CreditsHandler
 ;> return EndGameModeFrame()
 	jp EndGameModeFrame
 
@@ -2676,7 +2680,7 @@ UpdateEntitiesBank17::
 ;> back = 0x17
 	ld a, $17
 
-jr_000_0b1a:
+.updateEntities
 ;> UpdateEntities()
 	push af
 	call UpdateEntities
@@ -2696,7 +2700,7 @@ UpdateEntitiesBank1::
 ;> UpdateEntities()                              # (the end of UpdateEntitiesBank17)
 ;> return SwitchBank(0x01)
 	ld a, $01
-	jr jr_000_0b1a
+	jr UpdateEntitiesBank17.updateEntities
 
 ;@ def UpdateEntitiesBank2()
 ;@ path: entity/engine
@@ -2709,15 +2713,15 @@ UpdateEntitiesBank2::
 ;> UpdateEntities()                              # (the end of UpdateEntitiesBank17)
 ;> return SwitchBank(0x02)
 	ld a, $02
-	jr jr_000_0b1a
+	jr UpdateEntitiesBank17.updateEntities
 
 ;@ def GameModeFileSelect()
 ;@ path: system/modes
 ;@ Game mode 2, the file select screen: bank 1 $4711.
 ;@ test: skip jumps into bank 1
 GameModeFileSelect::
-;> return Bank01_4711()
-	jp $4711
+;> return GameplayFileSelectHandler()
+	jp GameplayFileSelectHandler
 
 
 ;@ def GameModeFileNew()
@@ -2725,8 +2729,8 @@ GameModeFileSelect::
 ;@ Game mode 3, a new file (name entry): bank 1 $494B.
 ;@ test: skip jumps into bank 1
 GameModeFileNew::
-;> return Bank01_494B()
-	jp $494b
+;> return GameplayFileNewHandler()
+	jp GameplayFileNewHandler
 
 
 ;@ def GameModeFileDelete()
@@ -2734,8 +2738,8 @@ GameModeFileNew::
 ;@ Game mode 4, deleting a file: bank 1 $4BE6.
 ;@ test: skip jumps into bank 1
 GameModeFileDelete::
-;> return Bank01_4BE6()
-	jp $4be6
+;> return GameplayFileDeleteHandler()
+	jp GameplayFileDeleteHandler
 
 
 ;@ def GameModeFileCopy()
@@ -2743,8 +2747,8 @@ GameModeFileDelete::
 ;@ Game mode 5, copying a file: bank 1 $4E34.
 ;@ test: skip jumps into bank 1
 GameModeFileCopy::
-;> return Bank01_4E34()
-	jp $4e34
+;> return GameplayFileCopyHandler()
+	jp GameplayFileCopyHandler
 
 
 ;@ def GameModeWorld()
@@ -2757,15 +2761,15 @@ GameModeWorld::
 ;> set_rom_bank(0x14)
 	ld a, $14
 	ld [$2100], a
-;> Bank14_5326()
-	call $5326
-;> Bank14_523C()                            # counts down several timers (compass chime, clink, ...)
-	call $523c
+;> UpdateRoomDarkness()
+	call UpdateRoomDarkness
+;> UpdateWorldTimers()                            # counts down several timers (compass chime, clink, ...)
+	call UpdateWorldTimers
 ;> SwitchBank(1)
 	ld a, $01
 	call SwitchBank
-;> return WorldStepDispatch()               # bank 1 $431E: table by wGameplaySubtype
-	jp $431e
+;> return GameplayWorldHandler()               # bank 1: table by wGameplaySubtype
+	jp GameplayWorldHandler
 
 
 ;@ def WorldGameplayFrame()
@@ -2813,7 +2817,7 @@ WorldGameplayFrame::
 	call RestoreBank
 
 .warpTimer
-;>     if not wDialogState and mem[0xC1BC]: # a scripted warp counts down
+;>     if not wDialogState and wScriptedWarpTimer: # a scripted warp counts down
 	ld a, [wDialogState]
 	and a
 	jr nz, .afterTimers
@@ -2825,10 +2829,10 @@ WorldGameplayFrame::
 ;>         hLinkInteractiveMotionBlocked = 2
 	ld hl, hLinkInteractiveMotionBlocked
 	ld [hl], $02
-;>         mem[0xC1BC] -= 1
+;>         wScriptedWarpTimer -= 1
 	dec a
 	ld [wScriptedWarpTimer], a
-;>         if mem[0xC1BC] == 0:
+;>         if wScriptedWarpTimer == 0:
 	jr nz, .afterTimers
 
 ;>             return StartWarpFadeOutWithNoise()
@@ -2864,10 +2868,10 @@ WorldGameplayFrame::
 	ld [wLinkSpriteDX], a
 ;> wLinkSpriteDY = 0
 	ld [wLinkSpriteDY], a
-;> mem[0xC11D] &= 0x7F                      # attributes of Link's two sprites: bit 7 (behind the background) off
+;> wLinkOAMAttrLeft &= 0x7F                      # attributes of Link's two sprites: bit 7 (behind the background) off
 	ld hl, wLinkOAMAttrLeft
 	res 7, [hl]
-;> mem[0xC11E] &= 0x7F
+;> wLinkOAMAttrRight &= 0x7F
 	ld hl, wLinkOAMAttrRight
 	res 7, [hl]
 ;> UpdateRoomDoors()
@@ -2943,14 +2947,14 @@ WorldGameplayFrame::
 
 .call61ED
 ;>     DrawItemSlots(c, e)                    # does nothing unless the debug byte at $0004 is set
-	call $61ed
+	call DrawItemSlots
 
 .bank14
 ;> SwitchBank(0x14)
 	ld a, $14
 	call SwitchBank
 ;> UpdateBumpShake()
-	call $59b0
+	call UpdateBumpShake
 ;> return EndGameModeFrame()
 
 ;@ def EndGameModeFrame()
@@ -3005,7 +3009,7 @@ UpdateLink::
 	cp $02
 	jr nz, .checkEnd
 
-;>         OpenDialog(ItemSceneDialogs[wLinkShowItemPose - 1])
+;>         OpenDialog(mem[ItemSceneDialogs + (wLinkShowItemPose - 1)])
 	ld a, [wLinkShowItemPose]
 	ld e, a
 	ld d, $00
@@ -3039,11 +3043,11 @@ UpdateLink::
 	rst $00
 
 ;@ path: link/items
-;@ Handlers (bank 2) of Link's item-showing poses 1-5, indexed by wLinkShowItemPose - 1. $5018
-;@ (poses 1 and 5) plays square sound $17 at timer $2E and goes on into $5023, the common pose
+;@ Handlers (bank 2) of Link's item-showing poses 1-5, indexed by wLinkShowItemPose - 1. LinkHoldItemUp
+;@ (poses 1 and 5) plays square sound $17 at timer $2E and goes on into LinkHoldItemUpQuiet, the common pose
 ;@ routine of poses 2-4.
 ShowItemPoseHandlers::
-	dw $5018, $5023, $5023, $5023, $5018
+	dw LinkHoldItemUp, LinkHoldItemUpQuiet, LinkHoldItemUpQuiet, LinkHoldItemUpQuiet, LinkHoldItemUp
 
 ;@ def UpdateLinkMain()
 ;@ path: link/frame
@@ -3106,7 +3110,7 @@ UpdateLinkMain::
 	ld a, $02
 	ld [$2100], a
 ;>             SetLinkSpriteDY()
-	call $781b
+	call SetLinkSpriteDY
 ;>             DrawLinkOAM()
 	call DrawLinkOAM
 ;>             UpdateEntities()
@@ -3134,7 +3138,7 @@ UpdateLinkMain::
 	ldh [hLinkCountdown], a
 
 .countdown2
-;> if mem[0xFFB6]: mem[0xFFB6] -= 1
+;> if hSwordClashCooldown: hSwordClashCooldown -= 1
 	ldh a, [hSwordClashCooldown]
 	and a
 	jr z, .checkDialog
@@ -3160,7 +3164,7 @@ UpdateLinkMain::
 	cp $07
 	jr z, .dispatch
 
-;>     if not (wHealth or mem[0xC50A] or wInventoryAppearing):   # out of health: Link dies
+;>     if not (wHealth or wItemButtonsDisabled or wInventoryAppearing):   # out of health: Link dies
 	ld a, [wHealth]
 	ld hl, wItemButtonsDisabled
 	or [hl]
@@ -3174,7 +3178,7 @@ UpdateLinkMain::
 ;>         hLinkCountdown = 0xBF
 	ld a, $bf
 	ldh [hLinkCountdown], a
-;>         mem[0xC3CC] = 0x10
+;>         wRoomDarknessShown = 0x10
 	ld a, $10
 	ld [wRoomDarknessShown], a
 ;>         wInvincibilityCounter = 0
@@ -3197,21 +3201,21 @@ UpdateLinkMain::
 
 ;@ path: link/motion
 ;@ Handler of each of Link's motion states (wLinkMotionState), run every world frame with bank
-;@ 2 switched in (raw addresses are in bank 2): 0 normal (LinkMotionNormal), 1 $4D92, 2 $490E,
+;@ 2 switched in (raw addresses are in bank 2): 0 normal (LinkMotionNormal), 1 LinkMotionSwimming, 2 LinkMotionJumping,
 ;@ 3 fading out for a warp (LinkMotionMapFadeOut), 4 fading in after it (LinkMotionMapFadeIn),
-;@ 5 $4D00, 6 $4F30, 7 dying (LinkMotionDying), 8 $50A2, 9 LinkMotionBank19, $0A $4EFF.
+;@ 5 LinkMotionRevolvingDoor, 6 LinkMotionFallingDown, 7 dying (LinkMotionDying), 8 LinkMotionRecover, 9 LinkMotionBank19, $0A LinkMotionCarriedUp.
 LinkMotionHandlers::
 	dw LinkMotionNormal
-	dw $4d92
-	dw $490e
+	dw LinkMotionSwimming
+	dw LinkMotionJumping
 	dw LinkMotionMapFadeOut
 	dw LinkMotionMapFadeIn
-	dw $4d00
-	dw $4f30
+	dw LinkMotionRevolvingDoor
+	dw LinkMotionFallingDown
 	dw LinkMotionDying
-	dw $50a2
+	dw LinkMotionRecover
 	dw LinkMotionBank19
-	dw $4eff
+	dw LinkMotionCarriedUp
 
 ;@ def UpdateLinkInTransition()
 ;@ path: link/frame
@@ -3226,7 +3230,7 @@ UpdateLinkInTransition::
 
 ;@ def LinkMotionBank19()
 ;@ path: link/motion
-;@ Motion state 9: runs bank $19 $5CA9 (it blocks Link's controls and steps by hLinkMotionStep).
+;@ Motion state 9: runs LinkMotionWarpHoleRise in bank $19 (it blocks Link's controls and steps by hLinkMotionStep).
 ;@ test: skip jumps into bank $19
 LinkMotionBank19::
 ;> SwitchBank(0x19)
@@ -3244,8 +3248,8 @@ LinkMotionDying::
 ;> SwitchBank(1)
 	ld a, $01
 	call SwitchBank
-;> return Bank01_4184()
-	jp $4184
+;> return GameOverHandler()
+	jp GameOverHandler
 
 ;@ def LinkMotionNormal()
 ;@ path: link/motion
@@ -3255,8 +3259,8 @@ LinkMotionNormal::
 ;> SwitchBank(2)
 	ld a, $02
 	call SwitchBank
-;> Bank02_426E()
-	call $426e
+;> LinkMotionInteractive()
+	call LinkMotionInteractive
 	ret
 
 
@@ -3270,7 +3274,7 @@ LinkMotionNormal::
 ;@ While Link can talk to someone, A (and B when wCanTalkToEntity is 2) talks instead.
 ;@ test: skip calls item routines in other banks
 HandleItemButtons::
-;> if mem[0xC50A] or wLinkFrozen or wHookshotInUse:
+;> if wItemButtonsDisabled or wLinkFrozen or wHookshotInUse:
 	ld a, [wItemButtonsDisabled]
 	ld hl, wLinkFrozen
 	or [hl]
@@ -3338,12 +3342,12 @@ HandleItemButtons::
 ;> if wLinkSlowAnimation or wIsCarryingLiftedObject:
 	ld a, [wLinkSlowAnimation]
 	and a
-	jp nz, Jump_000_0ed0
+	jp nz, UseItem.return
 
 	ld a, [wIsCarryingLiftedObject]
 	and a
 ;>     return
-	jp nz, Jump_000_0ed0
+	jp nz, UseItem.return
 
 ;>@bl if not (wSwordAnimationState == 3 and wSwordStateTimer >= 3) and hLinkInteractiveMotionBlocked:
 	ld a, [wSwordAnimationState]
@@ -3363,7 +3367,7 @@ HandleItemButtons::
 	ldh a, [hLinkInteractiveMotionBlocked]
 	and a
 ;>     return
-	jp nz, Jump_000_0ed0
+	jp nz, UseItem.return
 
 .boots
 ;> if wItemB == 8:                          # Pegasus Boots on B
@@ -3559,8 +3563,8 @@ UseItem::
 
 ;> elif item == 0x09:
 	cp $09
-;>     return UseOcarina()                  # bank 2 $41E6
-	jp z, $41e6
+;>     return UseOcarina()                  # bank 2
+	jp z, UseOcarina
 
 ;> elif item == 0x0C:
 	cp $0c
@@ -3574,24 +3578,24 @@ UseItem::
 
 ;> elif item == 0x07:                       # the magic rod
 	cp $07
-	jr nz, Jump_000_0ed0
+	jr nz, .return
 
 ;>     if not (wItemUsePoseTimer or wSwordAnimationState) and wActiveProjectileCount < 2:
 	ld hl, wSwordAnimationState
 	ld a, [wItemUsePoseTimer]
 	or [hl]
-	jr nz, Jump_000_0ed0
+	jr nz, .return
 
 ;=@rod
 	ld a, [wActiveProjectileCount]
 	cp $02
-	jr nc, Jump_000_0ed0
+	jr nc, .return
 
 ;>@rod         wItemUsePoseTimer = 0x8E
 	ld a, $8e
 	ld [wItemUsePoseTimer], a
 
-Jump_000_0ed0:
+.return
 ;> return
 	ret
 
@@ -3627,8 +3631,8 @@ UseShovel::
 ;>     return
 	ret nz
 
-;> if CheckDiggableSquare():                # bank 2 $4C35, carry = hard ground
-	call $4c35
+;> if FindDigSpot():                # bank 2, carry = hard ground
+	call FindDigSpot
 	jr nc, .soft
 
 ;>     hJingle = 0x07
@@ -3664,8 +3668,8 @@ UseHookshotItem::
 ;>     return
 	ret nz
 
-;> FireHookshot()                           # bank 2 $423B
-	call $423b
+;> UseHookshot()                           # bank 2
+	call UseHookshot
 	ret
 
 
@@ -3826,7 +3830,7 @@ UseBombs::
 	xor a
 	ld [wBombArrowWindow], a
 ;>     wEntityState[wBombArrowArrowSlot] = 1
-	ld a, [$c1c2]
+	ld a, [wBombArrowArrowSlot]
 	ld c, a
 	ld b, d
 	ld hl, wEntityState
@@ -3842,7 +3846,7 @@ UseBombs::
 	ld [wBombArrowWindow], a
 ;> wBombArrowBombSlot = slot
 	ld a, e
-	ld [$c1c1], a
+	ld [wBombArrowBombSlot], a
 ;> wItemUsePoseTimer = 0x0C
 	ld a, $0c
 	ld [wItemUsePoseTimer], a
@@ -3893,7 +3897,7 @@ UseBombs::
 	ldh a, [hLinkDirection]
 	ld c, a
 	ld b, d
-;>@bx wEntityX[slot] = u8(hLinkX + BombPlaceDX[d])
+;>@bx wEntityX[slot] = u8(hLinkX + mem[BombPlaceDX + d])
 	ld hl, BombPlaceDX
 	add hl, bc
 	ldh a, [hLinkX]
@@ -3902,7 +3906,7 @@ UseBombs::
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-;>@by wEntityY[slot] = u8(hLinkY + BombPlaceDY[d])
+;>@by wEntityY[slot] = u8(hLinkY + mem[BombPlaceDY + d])
 	ld hl, BombPlaceDY
 	add hl, bc
 	ldh a, [hLinkY]
@@ -4057,7 +4061,7 @@ UseBow::
 	ld a, [wActiveProjectileCount]
 	cp $02
 ;>     return
-	jr nc, jr_000_10ea
+	jr nc, SetArrowSpeed.return
 
 ;> wArrowCooldown = 0x10
 	ld a, $10
@@ -4082,14 +4086,14 @@ UseBow::
 
 ;> wBombArrowArrowSlot = slot
 	ld a, e
-	ld [$c1c2], a
+	ld [wBombArrowArrowSlot], a
 ;>@w if wBombArrowWindow:                     # a bomb was just laid: make a bomb arrow
 	ld a, [wBombArrowWindow]
 	and a
 	jr z, .plainArrow
 
 ;>     wEntityStatus[wBombArrowBombSlot] = 0       # the bomb goes
-	ld a, [$c1c1]
+	ld a, [wBombArrowBombSlot]
 	ld c, a
 	ld b, d
 	ld hl, wEntityStatus
@@ -4137,14 +4141,14 @@ SetArrowSpeed::
 	ld c, a
 
 .speed
-;> wEntitySpeedX[slot] = ArrowSpeedX[direction]
+;> wEntitySpeedX[slot] = mem[ArrowSpeedX + direction]
 	ld hl, ArrowSpeedX
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntitySpeedX
 	add hl, de
 	ld [hl], a
-;> wEntitySpeedY[slot] = ArrowSpeedY[direction]
+;> wEntitySpeedY[slot] = mem[ArrowSpeedY + direction]
 	ld hl, ArrowSpeedY
 	add hl, bc
 	ld a, [hl]
@@ -4152,7 +4156,7 @@ SetArrowSpeed::
 	add hl, de
 	ld [hl], a
 
-jr_000_10ea:
+.return
 ;> return
 	ret
 
@@ -4165,9 +4169,9 @@ jr_000_10ea:
 ;@ de, carry set when no entity slot was free. Keeps bc.
 ;@ test: skip spawns an entity
 SpawnLinkProjectile::
-;> slot = SpawnEntity(kind)                   # spawn the entity; carry = no free slot
+;> slot, full = SpawnEntity(bc, kind)                   # spawn the entity; carry = no free slot
 	call SpawnEntity
-;> if slot is None: return                  # carry: no free entity slot
+;> if full: return                  # carry: no free entity slot
 	ret c
 
 ;> wItemUsePoseTimer = 0x0C
@@ -4178,7 +4182,7 @@ SpawnLinkProjectile::
 	ldh a, [hLinkDirection]
 	ld c, a
 	ld b, $00
-;>@px wEntityX[slot] = u8(hLinkX + ProjectileStartDX[d])
+;>@px wEntityX[slot] = u8(hLinkX + mem[ProjectileStartDX + d])
 	ld hl, ProjectileStartDX
 	add hl, bc
 	ldh a, [hLinkX]
@@ -4187,7 +4191,7 @@ SpawnLinkProjectile::
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-;>@py wEntityY[slot] = u8(hLinkY + ProjectileStartDY[d])
+;>@py wEntityY[slot] = u8(hLinkY + mem[ProjectileStartDY + d])
 	ld hl, ProjectileStartDY
 	add hl, bc
 	ldh a, [hLinkY]
@@ -4202,14 +4206,14 @@ SpawnLinkProjectile::
 	ld hl, wEntityZ
 	add hl, de
 	ld [hl], a
-;> wEntitySpeedX[slot] = ProjectileSpeedX[d]
+;> wEntitySpeedX[slot] = mem[ProjectileSpeedX + d]
 	ld hl, ProjectileSpeedX
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntitySpeedX
 	add hl, de
 	ld [hl], a
-;> wEntitySpeedY[slot] = ProjectileSpeedY[d]
+;> wEntitySpeedY[slot] = mem[ProjectileSpeedY + d]
 	ld hl, ProjectileSpeedY
 	add hl, bc
 	ld a, [hl]
@@ -4290,10 +4294,10 @@ UseMagicPowder::
 ;>     return PlayNoAmmoSound()
 	jp z, PlayNoAmmoSound
 
-;> slot = SpawnEntity(0x08)                   # the powder cloud
+;> slot, full = SpawnEntity(bc, 0x08)                   # the powder cloud
 	ld a, $08
 	call SpawnEntity
-;> if slot is None: return                  # carry: no free entity slot
+;> if full: return                  # carry: no free entity slot
 	ret c
 
 ;> hJingle = 0x05
@@ -4332,7 +4336,7 @@ UseMagicPowder::
 	push bc
 	ldh a, [hLinkDirection]
 	ld c, a
-;>@mx wEntityX[slot] = u8(hLinkX + MagicPowderDX[d])
+;>@mx wEntityX[slot] = u8(hLinkX + mem[MagicPowderDX + d])
 	ld hl, MagicPowderDX
 	add hl, bc
 	ldh a, [hLinkX]
@@ -4341,7 +4345,7 @@ UseMagicPowder::
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-;>@my wEntityY[slot] = u8(hLinkY + MagicPowderDY[d])
+;>@my wEntityY[slot] = u8(hLinkY + mem[MagicPowderDY + d])
 	ld hl, MagicPowderDY
 	add hl, bc
 	ldh a, [hLinkY]
@@ -4429,8 +4433,8 @@ UseRocsFeather::
 ;> SwitchBank(2)
 	ld a, $02
 	call SwitchBank
-;> SideViewJump()                           # bank 2 $6FB1
-	call $6fb1
+;> CollideLinkWithRoom()                           # bank 2
+	call CollideLinkWithRoom
 	ret
 
 
@@ -4498,7 +4502,7 @@ UseSword::
 	ld [$c160], a
 ;> wSwordDirectionLocked = 0
 	ld [wSwordDirectionLocked], a
-;>@nz hNoiseSfx = SwordSwingNoises[GetRandomByte() & 3]   # a random swing noise
+;>@nz hNoiseSfx = mem[SwordSwingNoises + (GetRandomByte() & 3)]   # a random swing noise
 	call GetRandomByte
 	and $03
 	ld e, a
@@ -4521,7 +4525,7 @@ UseSword::
 	call StopLinkSpeed
 
 .beam
-;>@bm if wActiveProjectileCount or not mem[0xC5A9] or wSwordLevel != 2:
+;>@bm if wActiveProjectileCount or not wHealthIsFull or wSwordLevel != 2:
 	ld a, [wActiveProjectileCount]
 	and a
 	ret nz
@@ -4551,12 +4555,12 @@ UseSword::
 ;@ combination of the four buttons; $0F = no change).
 ;@ test: skip reads a table in bank 2
 SetLinkDirectionFromDpad::
-;>@dd d = mem[0x48B3 + (hJoypadHeld & 0x0F)]
+;>@dd d = mem[JoypadToDirection + (hJoypadHeld & 0x0F)]
 	ldh a, [hJoypadHeld]
 	and $0f
 	ld e, a
 	ld d, $00
-	ld hl, $48b3
+	ld hl, JoypadToDirection
 	add hl, de
 ;=@dd
 	ld a, [hl]
@@ -4637,7 +4641,7 @@ CheckSwordHitsObject::
 	ldh a, [hLinkDirection]
 
 .index
-;>@px hBGPosX = (hLinkX + SwordProbeDX[i] - 8) & 0xF0
+;>@px hBGPosX = (hLinkX + mem[SwordProbeDX + i] - 8) & 0xF0
 	ld e, a
 	ld d, $00
 	ld hl, SwordProbeDX
@@ -4651,7 +4655,7 @@ CheckSwordHitsObject::
 ;> column = hBGPosX >> 4
 	swap a
 	ld c, a
-;>@py hBGPosY = (hLinkY + SwordProbeDY[i] - 0x10) & 0xF0
+;>@py hBGPosY = (hLinkY + mem[SwordProbeDY + i] - 0x10) & 0xF0
 	ld hl, SwordProbeDY
 	add hl, de
 	ldh a, [hLinkY]
@@ -4760,7 +4764,7 @@ CheckSwordHitsObject::
 ;> slot = SpawnLinkProjectile(0x05)          # the flying leaves
 	ld a, $05
 	call SpawnLinkProjectile
-;> if slot is not None:
+;> if not full:
 	jr c, .drop
 
 ;>     wItemUsePoseTimer = 0
@@ -4810,9 +4814,9 @@ CheckSwordHitsObject::
 	ld a, $2d
 
 .spawnDrop
-;> slot = SpawnEntity(kind)
+;> slot, full = SpawnEntity(bc, kind)
 	call SpawnEntity
-;> if slot is None: return
+;> if full: return
 	ret c
 
 ;> wEntityX[slot] = hBGPosX + 8
@@ -4984,12 +4988,12 @@ ChargePegasusBoots::
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, $00
-;> hLinkSpeedX = PegasusDashSpeedX[d]
+;> hLinkSpeedX = mem[PegasusDashSpeedX + d]
 	ld hl, PegasusDashSpeedX
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkSpeedX], a
-;> hLinkSpeedY = PegasusDashSpeedY[d]
+;> hLinkSpeedY = mem[PegasusDashSpeedY + d]
 	ld hl, PegasusDashSpeedY
 	add hl, de
 	ld a, [hl]
@@ -5068,8 +5072,8 @@ StopLinkSpeed::
 ;@ Runs bank 2 $77FA, then draws Link's sword or held item (DrawLinkItemSprites).
 ;@ test: skip calls bank 2
 UpdateLinkItemSprites::
-;> Bank02_77FA()
-	call $77fa
+;> UpdateLinkGround()
+	call UpdateLinkGround
 
 ;@ def DrawLinkItemSprites()
 ;@ path: link/sprites
@@ -5146,8 +5150,8 @@ DrawLinkItemSprites::
 ;>         SwitchBank(2)
 	ld a, $02
 	call SwitchBank
-;>         DrawMagicRod()                   # bank 2 $514B
-	call $514b
+;>         DrawMagicRod()                   # bank 2
+	call DrawMagicRod
 ;>         if wItemUsePoseTimer & 0x7F == 0x0C and not (wDialogState or wRoomTransitionState):
 	ld a, [wItemUsePoseTimer]
 	and $7f
@@ -5174,8 +5178,8 @@ DrawLinkItemSprites::
 ;>                 SwitchBank(2)
 	ld a, $02
 	call SwitchBank
-;>                 Call_02_51C6()
-	call $51c6
+;>                 PlaceMagicRodFireball()
+	call PlaceMagicRodFireball
 
 .restore
 ;>     wItemUsePoseTimer = saved
@@ -5322,8 +5326,8 @@ SetDashBumpPoint::
 ;@ step 0 to load it. Entering a dungeon saves its entrance as the restart point.
 ;@ test: skip calls routines in other banks
 LinkMotionMapFadeOut::
-;> Bank02_780F()                            # Link stands still during the fade
-	call $780f
+;> StopLinkOnGround()                            # Link stands still during the fade
+	call StopLinkOnGround
 ;> if mem[0xC3C9]:                          # the fade was asked to start again
 	ld a, [$c3c9]
 	and a
@@ -5349,7 +5353,7 @@ LinkMotionMapFadeOut::
 	ld a, [wTransitionSequenceCounter]
 	cp $04
 ;>     return
-	jp nz, Jump_000_172d
+	jp nz, SetSpawnPoint.return
 
 ;> hBaseScrollX = 0
 	xor a
@@ -5367,8 +5371,8 @@ LinkMotionMapFadeOut::
 	dec e
 	jr nz, .clear
 
-;> if mem[0xC509]:                          # a shop item carried out without paying
-	ld a, [$c509]
+;> if wShopItemCarried:                          # a shop item carried out without paying
+	ld a, [wShopItemCarried]
 	and a
 	jr z, .notThief
 
@@ -5377,17 +5381,17 @@ LinkMotionMapFadeOut::
 	ld a, $04
 	call SwitchBank
 	pop af
-;>     ShopGiveItem(mem[0xC509])
-	call $79fa
+;>     ShopGiveItem(wShopItemCarried)
+	call ShopGiveItem
 ;>     wIsThief += 1
 	ld hl, wIsThief
 	inc [hl]
-;>     mem[0xDB46] += 1
+;>     wShopPunishThief += 1
 	ld hl, wShopPunishThief
 	inc [hl]
-;>     mem[0xD47E] = 1                      # the "thief" text follows the fade-in
+;>     wShowThiefMessage = 1                      # the "thief" text follows the fade-in
 	ld a, $01
-	ld [$d47e], a
+	ld [wShowThiefMessage], a
 ;>     hLinkAnimationState = 0
 	xor a
 	ldh [hLinkAnimationState], a
@@ -5402,7 +5406,7 @@ LinkMotionMapFadeOut::
 ;> wGameplaySubtype = 0                     # the world mode loads the new place
 	xor a
 	ld [wGameplaySubtype], a
-;> mem[0xC3CB] = 0
+;> wRoomHasTorches = 0
 	ld [wRoomHasTorches], a
 ;> hIsSideScrolling = 0
 	ldh [hIsSideScrolling], a
@@ -5501,7 +5505,7 @@ LinkMotionMapFadeOut::
 	ld c, a
 	ld a, $14
 	call SwitchBank
-;>@grid     grid = 0x4200 + 64 * hMapId         # bank $14: the map's 8x8 grid of rooms
+;>@grid     grid = DungeonLayouts + 64 * hMapId         # bank $14: the map's 8x8 grid of rooms
 	push hl
 	ldh a, [hMapId]
 	swap a
@@ -5512,7 +5516,7 @@ LinkMotionMapFadeOut::
 	rl d
 	sla e
 	rl d
-	ld hl, $4200
+	ld hl, DungeonLayouts
 	add hl, de
 ;>     if hMapId == 6 and wDungeon7Flags & 4:   # the other layout of map 6
 	ldh a, [hMapId]
@@ -5523,8 +5527,8 @@ LinkMotionMapFadeOut::
 	and $04
 	jr z, .search
 
-;>         grid = 0x44C0
-	ld hl, $44c0
+;>         grid = EaglesTowerLayout2
+	ld hl, EaglesTowerLayout2
 
 .search
 ;>     cell = 0
@@ -5564,7 +5568,7 @@ LinkMotionMapFadeOut::
 	ld a, $02
 	call SwitchBank
 ;>             LoadDungeonMinimap()
-	call $6a9b
+	call LoadDungeonMinimap
 ;>             mem[0xFFB4] = 0x30           # the dungeon's name shows after a moment
 	ld a, $30
 	ldh [$ffb4], a
@@ -5590,13 +5594,13 @@ LinkMotionMapFadeOut::
 	and a
 ;>     hLinkDirection = 0
 ;>     return
-	jr nz, jr_000_172e
+	jr nz, SetSpawnPoint.return2
 
 ;> if hMultiPurposeD:                       # came from a side-view place
 	ldh a, [hMultiPurposeD]
 	and a
 ;>     return
-	jr nz, Jump_000_172d
+	jr nz, SetSpawnPoint.return
 
 ;> if not wIsIndoor or hMapId >= 0x0A:
 	ld a, [wIsIndoor]
@@ -5608,7 +5612,7 @@ LinkMotionMapFadeOut::
 ;>     return SetSpawnPoint(record)
 	jr nc, SetSpawnPoint
 
-;>@en entry = 0x53E5 + 5 * hMapId              # a dungeon: its entrance (bank $14 table)
+;>@en entry = DungeonEntrances + 5 * hMapId              # a dungeon: its entrance (bank $14 table)
 	ld e, a
 	sla a
 	sla a
@@ -5616,19 +5620,19 @@ LinkMotionMapFadeOut::
 	ld e, a
 	ld d, $00
 ;=@en
-	ld hl, $53e5
+	ld hl, DungeonEntrances
 	add hl, de
 ;> set_rom_bank(0x14)
 	ld a, $14
 	ld [$2100], a
 ;> SetSpawnPoint(entry)
 	call SetSpawnPoint
-;>@sr wSpawnIndoorRoom = mem[0x5412 + hMapId]  # the entrance's cell in the dungeon grid
+;>@sr wSpawnIndoorRoom = mem[DungeonEntranceCells + hMapId]  # the entrance's cell in the dungeon grid
 	push de
 	ldh a, [hMapId]
 	ld e, a
 	ld d, $00
-	ld hl, $5412
+	ld hl, DungeonEntranceCells
 	add hl, de
 ;=@sr
 	ld a, [hl]
@@ -5667,12 +5671,12 @@ SetSpawnPoint::
 	ld a, [wIndoorRoom]
 	ld [de], a
 
-Jump_000_172d:
+.return
 ;> return
 	ret
 
 
-jr_000_172e:
+.return2
 	xor a
 	ldh [hLinkDirection], a
 	ret
@@ -5685,8 +5689,8 @@ jr_000_172e:
 ;@ saved as 1, otherwise 0), and a thief gets told off (dialogue $36).
 ;@ test: skip calls routines in other banks
 LinkMotionMapFadeIn::
-;> Bank02_780F()
-	call $780f
+;> StopLinkOnGround()
+	call StopLinkOnGround
 ;>@w if mem[0xD474]:                          # arrive with the wave effect
 	ld a, [$d474]
 	and a
@@ -5727,14 +5731,14 @@ LinkMotionMapFadeIn::
 
 .setState
 	ld [wLinkMotionState], a
-;> if mem[0xD47E]:
-	ld a, [$d47e]
+;> if wShowThiefMessage:
+	ld a, [wShowThiefMessage]
 	and a
 	jr z, .ret
 
-;>     mem[0xD47E] = 0
+;>     wShowThiefMessage = 0
 	xor a
-	ld [$d47e], a
+	ld [wShowThiefMessage], a
 ;>     OpenDialog(0x36)
 	ld a, $36
 	call OpenDialog
@@ -5959,7 +5963,7 @@ LinkPoseAttributes::
 ;@ path: link/animation
 ;@ Picks Link's pose (hLinkAnimationState) from a table in bank 2 chosen by what he does -
 ;@ normal walking ($48BE), with the shield ($48C6, $48D6 with the mirror shield; +8 while it is
-;@ raised), pushing ($48E6), carrying ($48EE), motion state 1 ($48F6 / $48FE) and climbing a
+;@ raised), pushing (LinkPushPoses), carrying (LinkCarryPoses), motion state 1 ($48F6 / $48FE) and climbing a
 ;@ ladder in side view ($4906) - indexed by 2 * direction + the walk frame (bit 3 of
 ;@ wLinkWalkingFrameCount). Runs with bank 2 switched in (UpdateLinkAnimationStateFar).
 ;@ test: skip reads tables in bank 2
@@ -5977,19 +5981,19 @@ UpdateLinkAnimationState::
 	or d
 	ld c, a
 	ld b, $00
-;> table = 0x48F6
-	ld hl, $48f6
+;> table = LinkSwimPoses
+	ld hl, LinkSwimPoses
 ;> if wLinkMotionState == 1:
 	ld a, [wLinkMotionState]
 	cp $01
 	jr nz, .notState1
 
-;>     if hLinkMotionStep: table = 0x48FE
+;>     if hLinkMotionStep: table = LinkDivePoses
 	ldh a, [hLinkMotionStep]
 	and a
 	jr z, .state1Done
 
-	ld hl, $48fe
+	ld hl, LinkDivePoses
 
 .state1Done
 ;=@t
@@ -6005,8 +6009,8 @@ UpdateLinkAnimationState::
 	cp $02
 	jr nz, .notLadder
 
-;>     table = 0x4906
-	ld hl, $4906
+;>     table = LinkSideViewWaterPoses
+	ld hl, LinkSideViewWaterPoses
 ;=@t
 	jr .pose
 
@@ -6016,7 +6020,7 @@ UpdateLinkAnimationState::
 	cp $01
 	jr z, .carrying
 
-;>@cp     table = 0x48EE
+;>@cp     table = LinkCarryPoses
 ;> elif not hLinkInWater and wLinkPushingTimer:
 	ldh a, [hLinkInWater]
 	and a
@@ -6026,26 +6030,26 @@ UpdateLinkAnimationState::
 	and a
 	jr nz, .pushing
 
-;>@pu     table = 0x48E6
+;>@pu     table = LinkPushPoses
 ;> elif not wShieldLevelEquipped:
 .shield
 	ld a, [wShieldLevelEquipped]
 	and a
 	jr nz, .withShield
 
-;>     table = 0x48BE
-	ld hl, $48be
+;>     table = LinkWalkPoses
+	ld hl, LinkWalkPoses
 ;=@t
 	jr .pose
 
 ;> else:
 .withShield
-;>     table = 0x48D6 if wShieldLevelEquipped == 2 else 0x48C6
-	ld hl, $48c6
+;>     table = LinkMirrorShieldWalkPoses if wShieldLevelEquipped == 2 else LinkShieldWalkPoses
+	ld hl, LinkShieldWalkPoses
 	cp $02
 	jr nz, .raised
 
-	ld hl, $48d6
+	ld hl, LinkMirrorShieldWalkPoses
 
 .raised
 ;>@r     if wIsUsingShield: table += 8        # the shield is raised
@@ -6067,12 +6071,12 @@ UpdateLinkAnimationState::
 
 .pushing
 ;=@pu
-	ld hl, $48e6
+	ld hl, LinkPushPoses
 	jr .pose
 
 .carrying
 ;=@cp
-	ld hl, $48ee
+	ld hl, LinkCarryPoses
 
 .pose
 ;> hLinkAnimationState = mem[table + i]
@@ -6098,8 +6102,8 @@ AnimateMarinBeachTiles::
 ;> set_rom_bank(0x10)
 	ld a, $10
 	ld [$2100], a
-;> src = 0x6500
-	ld hl, $6500
+;> src = Tiles106000 + 0x500
+	ld hl, Tiles106000 + $500
 ;> dest = 0x9500
 	ld de, $9500
 ;> f = hFrameCounter & 0x0F
@@ -6212,12 +6216,12 @@ UpdateAnimatedTiles::
 .world
 ;> elif wGameplayType < 0x0B or wWindowY != 0x80:
 	cp $0b
-	jp c, Jump_000_1d14
+	jp c, DrawLinkOAM.return
 
 	ld a, [wWindowY]
 	cp $80
 ;>     return
-	jp nz, Jump_000_1d14
+	jp nz, DrawLinkOAM.return
 
 ;> elif wInventoryAppearing or wDrawCommand[0] or wRoomTransitionState:
 	ld a, [wInventoryAppearing]
@@ -6296,7 +6300,7 @@ UpdateAnimatedTiles::
 	jr z, .bank17
 
 ;>@e17     set_rom_bank(0x17)
-;>@e17b     return Bank17_4060()
+;>@e17b     return DissolveIslandTilesStep()
 ;> if hBGChangeRequest == 0x0F: return BGChangeEntityTilesB()
 	cp $0f
 	jp z, BGChangeEntityTilesB
@@ -6314,7 +6318,7 @@ UpdateAnimatedTiles::
 	ld a, $17
 	ld [$2100], a
 ;=@e17b
-	jp $4060
+	jp DissolveIslandTilesStep
 
 
 .animate
@@ -6372,8 +6376,8 @@ AnimateTilesGroup1::
 ;> set_rom_bank(1)
 	ld a, $01
 	ld [$2100], a
-;> Call_01_5F62()
-	call $5f62
+;> DrawDebugDialogIndex()
+	call DrawDebugDialogIndex
 ;> set_rom_bank(0x0C)
 	ld a, $0c
 	ld [$2100], a
@@ -6381,9 +6385,9 @@ AnimateTilesGroup1::
 	jp DrawLinkOAM
 
 
-Jump_000_1ba7:
+.next
 	ld l, a
-	jr jr_000_1be5
+	jr AnimateTilesGroup4.setDest
 
 ;@ def AnimateTilesGroup2()
 ;@ path: gfx/animation
@@ -6419,7 +6423,7 @@ AnimateTilesGroupC::
 ;@ path: gfx/animation
 ;@ Animated tiles group $0B: page $6A every 16 frames. Its end (AnimateTilesEvery16) is shared by the
 ;@ groups that change every 16 frames: on a new frame it steps hAnimatedTilesStep by $40 and
-;@ copies 64 bytes from page:hAnimatedTilesStep (Jump_000_1ba7) to $96C0.
+;@ copies 64 bytes from page:hAnimatedTilesStep (AnimateTilesGroup1.next) to $96C0.
 ;@ test: skip writes VRAM
 AnimateTilesGroupB::
 ;> page = 0x6A
@@ -6436,7 +6440,7 @@ AnimateTilesEvery16:
 	call NextAnimatedTilesStep
 ;> copy(0x96C0, (page << 8) | step, 0x40)
 ;> return DrawLinkOAM()
-	jp Jump_000_1ba7
+	jp AnimateTilesGroup1.next
 
 
 ;@ path: gfx/animation
@@ -6457,7 +6461,7 @@ AnimateTilesGroup4::
 ;>     return UpdateLinkTiles()
 	jp nz, UpdateLinkTiles
 
-;>@s src = 0x6D00 | AnimatedTilesPhases[(hAnimatedTilesFrameCount >> 3) & 7]
+;>@s src = 0x6D00 | mem[AnimatedTilesPhases + ((hAnimatedTilesFrameCount >> 3) & 7)]
 	ldh a, [hAnimatedTilesFrameCount]
 	rra
 	rra
@@ -6471,11 +6475,11 @@ AnimateTilesGroup4::
 	ld l, [hl]
 	ld h, $6d
 
-jr_000_1be5:
+.setDest
 ;> dest = 0x96C0
 	ld de, $96c0
 
-jr_000_1be8:
+.copy
 ;> copy(dest, src, 0x40)
 	ld bc, $0040
 	call CopyData
@@ -6504,7 +6508,7 @@ AnimateTilesGroup6::
 ;>     return UpdateLinkTiles()
 	jp nz, UpdateLinkTiles
 
-;>@s src = 0x6F00 | AnimatedTilesPhases[(hAnimatedTilesFrameCount >> 3) & 7]
+;>@s src = 0x6F00 | mem[AnimatedTilesPhases + ((hAnimatedTilesFrameCount >> 3) & 7)]
 	ldh a, [hAnimatedTilesFrameCount]
 	rra
 	rra
@@ -6519,7 +6523,7 @@ AnimateTilesGroup6::
 	ld h, $6f
 ;> copy(0x96C0, src, 0x40)                 # the end of AnimateTilesGroup4
 ;> return DrawLinkOAM()
-	jp jr_000_1be5
+	jp AnimateTilesGroup4.setDest
 
 
 ;@ def AnimateTilesGroup7()
@@ -6539,7 +6543,7 @@ AnimateTilesGroup7::
 	ld hl, $dcc0
 	ld de, $90c0
 ;> return DrawLinkOAM()
-	jp jr_000_1be8
+	jp AnimateTilesGroup4.copy
 
 
 ;@ def AnimateTilesGroup8()
@@ -6562,7 +6566,7 @@ AnimateTilesEvery8:
 	call NextAnimatedTilesStep
 ;> copy(0x96C0, (page << 8) | step, 0x40)
 ;> return DrawLinkOAM()
-	jp Jump_000_1ba7
+	jp AnimateTilesGroup1.next
 
 
 ;@ def AnimateTilesGroup9()
@@ -6585,7 +6589,7 @@ AnimateTilesEvery4:
 	call NextAnimatedTilesStep
 ;> copy(0x96C0, (page << 8) | step, 0x40)
 ;> return DrawLinkOAM()
-	jp Jump_000_1ba7
+	jp AnimateTilesGroup1.next
 
 
 ;@ def AnimateTilesGroupA()
@@ -6653,7 +6657,7 @@ AnimateTilesGroupE::
 ;@ def UpdateLinkTiles()
 ;@ path: link/sprites
 ;@ Copies the two tiles of Link's current pose to sprite tiles 0-3 ($8000-$803F): tile numbers
-;@ from LinkPoseTiles (two per pose, the tiles are at bank $0C $5800 + 16 * tile), and his
+;@ from LinkPoseTiles (two per pose, the tiles are at bank $0C LinkSpriteTiles + 16 * tile), and his
 ;@ sprites' flip bits (bits 5-6) from LinkPoseAttributes into wLinkOAMAttrLeft/Right. Then
 ;@ DrawLinkOAM puts Link's sprites in OAM. Nothing when Link is not drawn (pose $FF).
 ;@ test: skip writes VRAM
@@ -6669,11 +6673,11 @@ UpdateLinkTiles::
 	sla a
 	ld c, a
 	ld b, $00
-;> left = LinkPoseTiles[i]
+;> left = mem[LinkPoseTiles + i]
 	add hl, bc
 	ld e, [hl]
 	push hl
-;>@al wLinkOAMAttrLeft = (wLinkOAMAttrLeft & 0x9F) | LinkPoseAttributes[i]
+;>@al wLinkOAMAttrLeft = (wLinkOAMAttrLeft & 0x9F) | mem[LinkPoseAttributes + i]
 	ld hl, LinkPoseAttributes
 	add hl, bc
 	ld a, [wLinkOAMAttrLeft]
@@ -6681,13 +6685,13 @@ UpdateLinkTiles::
 	or [hl]
 ;=@al
 	ld [wLinkOAMAttrLeft], a
-;> wLinkOAMAttrRight =(wLinkOAMAttrRight & 0x9F) | LinkPoseAttributes[i + 1]
+;> wLinkOAMAttrRight =(wLinkOAMAttrRight & 0x9F) | mem[LinkPoseAttributes + i + 1]
 	inc hl
 	ld a, [wLinkOAMAttrRight]
 	and $9f
 	or [hl]
 	ld [wLinkOAMAttrRight], a
-;>@cl copy(0x8000, 0x5800 + 16 * left, 0x20)  # the pose's left half (two 8x8 tiles)
+;>@cl copy(0x8000, LinkSpriteTiles + 16 * left, 0x20)  # the pose's left half (two 8x8 tiles)
 	ld d, $00
 	sla e
 	rl d
@@ -6698,7 +6702,7 @@ UpdateLinkTiles::
 	rl d
 	sla e
 	rl d
-	ld hl, $5800
+	ld hl, LinkSpriteTiles
 	add hl, de
 	push hl
 ;=@cl
@@ -6714,11 +6718,11 @@ UpdateLinkTiles::
 	dec d
 	jr nz, .copyLeft
 
-;> right = LinkPoseTiles[i + 1]
+;> right = mem[LinkPoseTiles + i + 1]
 	pop hl
 	inc hl
 	ld e, [hl]
-;>@cr copy(0x8020, 0x5800 + 16 * right, 0x20)  # the right half
+;>@cr copy(0x8020, LinkSpriteTiles + 16 * right, 0x20)  # the right half
 	ld d, $00
 	sla e
 	rl d
@@ -6729,7 +6733,7 @@ UpdateLinkTiles::
 	rl d
 	sla e
 	rl d
-	ld hl, $5800
+	ld hl, LinkSpriteTiles
 	add hl, de
 	push hl
 ;=@cr
@@ -6757,7 +6761,7 @@ DrawLinkOAM::
 	ldh a, [hLinkAnimationState]
 	inc a
 ;>     return
-	jr z, Jump_000_1d14
+	jr z, .return
 
 ;> wLinkFlashAttr = (wInvincibilityCounter << 2) & 0x10   # palette 1 on alternate 4-frame phases
 	ld a, [wInvincibilityCounter]
@@ -6774,7 +6778,7 @@ DrawLinkOAM::
 ;> if y >= 0x88:
 	cp $88
 ;>     return
-	jr nc, Jump_000_1d14
+	jr nc, .return
 
 ;> wOAMBuffer[8] = y
 	push af
@@ -6813,7 +6817,7 @@ DrawLinkOAM::
 	or d
 	ld [hli], a
 
-Jump_000_1d14:
+.return
 ;> return
 	ret
 
@@ -6823,13 +6827,13 @@ Jump_000_1d14:
 ;@ Background change $10: 4 tiles from bank $0E $4F00 into the first entity tile slot ($8400).
 ;@ test: skip switches ROM banks and writes VRAM
 BGChangeEntityTilesA::
-;> src = 0x4F00
-	ld hl, $4f00
+;> src = EntityTiles8F
+	ld hl, EntityTiles8F
 ;> bank = 0x0E
 	ld a, $0e
 ;> set_rom_bank(bank)                       # (the end of BGChangeEntityTilesB)
 ;> return CopyBGChangeTiles(src, 0x8400, 0x40)
-	jr jr_000_1d21
+	jr BGChangeEntityTilesB.copyBGChangeTiles
 
 ;@ def BGChangeEntityTilesB()
 ;@ path: gfx/tiles
@@ -6839,10 +6843,10 @@ BGChangeEntityTilesA::
 BGChangeEntityTilesB::
 ;> bank = 0x12
 	ld a, $12
-;> src = 0x6080
-	ld hl, $6080
+;> src = EntityTilesE0 + 0x80
+	ld hl, EntityTilesE0 + $80
 
-jr_000_1d21:
+.copyBGChangeTiles
 ;> set_rom_bank(bank)
 	ld [$2100], a
 ;> return CopyBGChangeTiles(src, 0x8400, 0x40)
@@ -6854,7 +6858,7 @@ jr_000_1d21:
 ;@ def BGChangeTradeItemTiles()
 ;@ path: gfx/tiles
 ;@ Background change $0D: the tiles of the current trading item (wTradeSequenceItem 2 and up,
-;@ 64 bytes each from bank $0C $4400 + (item - 2) * $40) into tiles $9A-$9D ($89A0).
+;@ 64 bytes each from bank $0C ItemSpriteTiles + (item - 2) * $40) into tiles $9A-$9D ($89A0).
 ;@ test: skip switches ROM banks and writes VRAM
 BGChangeTradeItemTiles::
 ;> if wTradeSequenceItem < 2:
@@ -6863,7 +6867,7 @@ BGChangeTradeItemTiles::
 ;>     return FinishBGChange()
 	jp c, FinishBGChange
 
-;>@s src = 0x4400 + (wTradeSequenceItem - 2) * 0x40
+;>@s src = ItemSpriteTiles + (wTradeSequenceItem - 2) * 0x40
 	sub $02
 	ld d, a
 	ld e, $00
@@ -6872,7 +6876,7 @@ BGChangeTradeItemTiles::
 	sra d
 ;=@s
 	rr e
-	ld hl, $4400
+	ld hl, ItemSpriteTiles
 	add hl, de
 ;> set_rom_bank(0x0C)
 	ld de, $89a0
@@ -6888,12 +6892,12 @@ BGChangeTradeItemTiles::
 ;@ Background change $0A: 2 tiles from bank $0C $68C0 to tiles $8E-$8F ($88E0).
 ;@ test: skip switches ROM banks and writes VRAM
 BGChangeTiles88E0Alt::
-;> src = 0x68C0
-	ld hl, $68c0
+;> src = AnimatedTiles + 0xC0
+	ld hl, AnimatedTiles + $C0
 ;> dest = 0x88E0
 	ld de, $88e0
 ;> return BGChangeTiles8CA0.copy2(src, dest)   # (shared end of BGChangeTiles8CA0)
-	jr jr_000_1dc4
+	jr BGChangeTiles8CA0.copyBGChangeTiles
 
 ;@ def BGChangeTilesBank11()
 ;@ path: gfx/tiles
@@ -6919,10 +6923,10 @@ BGChangeTilesBank11::
 	ld hl, $8d00
 	add hl, de
 	push hl
-;> src = 0x5000 + offset
-	ld hl, $5000
+;> src = EntityTiles50 + offset
+	ld hl, EntityTiles50
 
-jr_000_1d7b:
+.copy
 	add hl, de
 	pop de
 ;> copy(dest, src, 0x40)
@@ -6960,9 +6964,9 @@ BGChangeTilesBank13::
 	ld hl, $8d00
 	add hl, de
 	push hl
-;> copy(dest, 0x4D00 + offset, 0x40)       # the end of BGChangeTilesBank11
-	ld hl, $4d00
-	jr jr_000_1d7b
+;> copy(dest, EndingTiles4800 + 0x500 + offset, 0x40)       # the end of BGChangeTilesBank11
+	ld hl, EndingTiles4800 + $500
+	jr BGChangeTilesBank11.copy
 
 ;@ def BGChangeTiles88E0()
 ;@ path: gfx/tiles
@@ -6970,11 +6974,11 @@ BGChangeTilesBank13::
 ;@ test: skip switches ROM banks and writes VRAM
 BGChangeTiles88E0::
 ;> set_rom_bank(0x0C)
-	ld hl, $48e0
+	ld hl, CommonWorldTiles + $E0
 	ld de, $88e0
 	ld a, $0c
 	ld [$2100], a
-;> return CopyBGChangeTiles(0x48E0, 0x88E0, 0x20)
+;> return CopyBGChangeTiles(CommonWorldTiles + 0xE0, 0x88E0, 0x20)
 	ld bc, $0020
 	jp CopyBGChangeTiles
 
@@ -6985,12 +6989,12 @@ BGChangeTiles88E0::
 ;@ 32 bytes) is shared with BGChangeTiles88E0Alt.
 ;@ test: skip switches ROM banks and writes VRAM
 BGChangeTiles8CA0::
-;> src = 0x68E0
-	ld hl, $68e0
+;> src = AnimatedTiles + 0xE0
+	ld hl, AnimatedTiles + $E0
 ;> dest = 0x8CA0
 	ld de, $8ca0
 
-jr_000_1dc4:
+.copyBGChangeTiles
 ;> set_rom_bank(0x0C)
 	ld a, $0c
 	ld [$2100], a
@@ -7004,25 +7008,25 @@ jr_000_1dc4:
 ;@ Background change 3: 4 tiles from bank $12 $7F00 to background tiles $14-$17 ($9140).
 ;@ test: skip switches ROM banks and writes VRAM
 BGChangeTiles9140A::
-;> src = 0x7F00
-	ld hl, $7f00
+;> src = DungeonTiles8C00 + 0x200
+	ld hl, DungeonTiles8C00 + $200
 ;> bank = 0x12
 	ld a, $12
 ;> set_rom_bank(bank)                       # (the end of BGChangeTiles9140B)
 ;> return CopyBGChangeTiles64(src, 0x9140)
-	jr jr_000_1ddb
+	jr BGChangeTiles9140B.copyBGChangeTiles64
 
 ;@ def BGChangeTiles9140B()
 ;@ path: gfx/tiles
 ;@ Background change 4: 4 tiles from bank $0D $4C40 to $9140 (BGChangeTiles9140A shares its end).
 ;@ test: skip switches ROM banks and writes VRAM
 BGChangeTiles9140B::
-;> src = 0x4C40
-	ld hl, $4c40
+;> src = IndoorMapTiles4C + 0x40
+	ld hl, IndoorMapTiles4C + $40
 ;> bank = 0x0D
 	ld a, $0d
 
-jr_000_1ddb:
+.copyBGChangeTiles64
 ;> set_rom_bank(bank)
 	ld [$2100], a
 ;> return CopyBGChangeTiles64(src, 0x9140)
@@ -7034,7 +7038,7 @@ jr_000_1ddb:
 ;@ Bank $0C sources of the raised-block tiles (64 bytes each), read with wRaisedBlocksState (0 or
 ;@ 2) as byte offset: entries 0-1 at step 4 and 6, entries 2-3 at step 8 and $0A.
 RaisedBlockTilePointers::
-	dw $6840, $6840, $6800, $6880, $6800
+	dw AnimatedTiles + $40, AnimatedTiles + $40, AnimatedTiles, AnimatedTiles + $80, AnimatedTiles
 
 ;@ def UpdateRaisedBlocks(step: a)
 ;@ path: object/raised_blocks
@@ -7229,13 +7233,13 @@ CheckLiftAndRead::
 ;=@b
 	or [hl]
 ;>     return
-	jp nz, Jump_000_20a5
+	jp nz, LiftRoomObject.return
 
 ;> d = hLinkDirection
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, $00
-;>@px hBGPosX = (hLinkX + LiftProbeDX[d] - 8) & 0xF0
+;>@px hBGPosX = (hLinkX + mem[LiftProbeDX + d] - 8) & 0xF0
 	ld hl, LiftProbeDX
 	add hl, de
 	ldh a, [hLinkX]
@@ -7247,7 +7251,7 @@ CheckLiftAndRead::
 ;> c = hBGPosX >> 4
 	swap a
 	ld c, a
-;>@py hBGPosY = (hLinkY + LiftProbeDY[d] - 0x10) & 0xF0
+;>@py hBGPosY = (hLinkY + mem[LiftProbeDY + d] - 0x10) & 0xF0
 	ld hl, LiftProbeDY
 	add hl, de
 	ldh a, [hLinkY]
@@ -7282,7 +7286,7 @@ CheckLiftAndRead::
 ;> if obj != 0x9A:
 	ldh a, [hMultiPurpose0]
 	cp $9a
-	jr z, jr_000_1f10
+	jr z, .checkLinkDirection
 
 ;>@ph     if hMultiPurpose5 in (0x00, 0x50, 0x51) or not (hMultiPurpose5 == 1 or 0x11 <= hMultiPurpose5 < 0x7C or 0xD0 <= hMultiPurpose5 < 0xD4):
 	ldh a, [hMultiPurpose5]
@@ -7290,7 +7294,7 @@ CheckLiftAndRead::
 	jp z, ResetLiftPull
 
 	cp $01
-	jr z, jr_000_1ef8
+	jr z, .checkObj
 
 ;=@ph
 	cp $50
@@ -7307,39 +7311,39 @@ CheckLiftAndRead::
 	jp nc, ResetLiftPull
 
 	cp $d0
-	jr nc, jr_000_1ef8
+	jr nc, .checkObj
 
 	cp $7c
 ;>         return ResetLiftPull()           # nothing to do with it
 	jp nc, ResetLiftPull
 
-jr_000_1ef8:
+.checkObj
 ;>@rd if obj == 0x9A or (obj in (0x6F, 0x5E, 0xD4) and not wIsIndoor):   # readable: signs and tablets outdoors
 	ldh a, [hMultiPurpose0]
 	ld e, a
 	cp $6f
-	jr z, jr_000_1f08
+	jr z, .checkObj2
 
 	cp $5e
-	jr z, jr_000_1f08
+	jr z, .checkObj2
 
 ;=@rd
 	cp $d4
-	jp nz, Jump_000_1fa1
+	jp nz, .otherwise3
 
-jr_000_1f08:
+.checkObj2
 ;=@rd
 	ld a, [wIsIndoor]
 	and a
 	ld a, e
-	jp nz, Jump_000_1fa1
+	jp nz, .otherwise3
 
-jr_000_1f10:
+.checkLinkDirection
 ;>     if hLinkDirection == 2:              # facing up
 	ld e, a
 	ldh a, [hLinkDirection]
 	cp $02
-	jp nz, Jump_000_1ffd
+	jp nz, .checkItemB
 
 ;>         wCanTalkToEntity = 2
 	ld a, $02
@@ -7347,61 +7351,61 @@ jr_000_1f10:
 ;>         if hJoypadPressed & 0x30:        # A or B
 	ldh a, [hJoypadPressed]
 	and $30
-	jp z, Jump_000_1ffd
+	jp z, .checkItemB
 
 ;>             if obj == 0x5E:
 	ld a, e
 	cp $5e
-;>                 OpenDialogTable1(0x8E)   # (the call at jr_000_1f96)
+;>                 OpenDialogTable1(0x8E)   # (the call at CheckLiftAndRead.openDialogTable1)
 	ld a, $8e
-	jr z, jr_000_1f96
+	jr z, .openDialogTable1
 
 ;>             elif obj not in (0x6F, 0xD4):
 	ld a, e
 	cp $6f
-	jr z, jr_000_1f5b
+	jr z, .otherwise2
 
 	cp $d4
-	jr z, jr_000_1f5b
+	jr z, .otherwise2
 
 ;>                 if wIsMarinFollowingLink:   # object $9A
 	ld a, [wIsMarinFollowingLink]
 	and a
-	jr z, jr_000_1f42
+	jr z, .otherwise
 
 ;>                     OpenDialogTable2(0x78)
 	ld a, $78
 	call OpenDialogTable2
-	jp Jump_000_1ffd
+	jp .checkItemB
 
 
-jr_000_1f42:
+.otherwise
 ;>                 else:
 ;>@tx                     text = 0xFF if (wSwordLevel == 0 and hMapRoom == 0xA3) else 0xFC if hMapRoom == 0xFA else 0xFD
 	ld a, [wSwordLevel]
 	and a
 	ldh a, [hMapRoom]
-	jr nz, jr_000_1f50
+	jr nz, .setText
 
 	ld e, $ff
 	cp $a3
 ;=@tx
-	jr z, jr_000_1f58
+	jr z, .openDialog
 
-jr_000_1f50:
+.setText
 ;=@tx
 	ld e, $fc
 	cp $fa
-	jr z, jr_000_1f58
+	jr z, .openDialog
 
 	ld e, $fd
 
-jr_000_1f58:
+.openDialog
 ;>@od                     OpenDialog(text)
 	ld a, e
-	jr jr_000_1f9c
+	jr .openDialog2
 
-jr_000_1f5b:
+.otherwise2
 ;>             else:                        # a sign: its text from the room's entry
 ;>                 set_rom_bank(0x14)
 	ldh a, [hMapRoom]
@@ -7409,28 +7413,28 @@ jr_000_1f5b:
 	ld d, $00
 	ld a, $14
 	ld [$2100], a
-;>                 text = mem[0x55FF + hMapRoom]
-	ld hl, $55ff
+;>                 text = mem[OverworldSignTexts + hMapRoom]
+	ld hl, OverworldSignTexts
 	add hl, de
 	ld a, [wOcarinaSongFlags]
 	ld e, a
 	ld a, [hl]
 ;>                 if text == 0xA9 and wOcarinaSongFlags & 1: text = 0xAF
 	cp $a9
-	jr nz, jr_000_1f78
+	jr nz, .checkText
 
 	bit 0, e
-	jr z, jr_000_1f78
+	jr z, .checkText
 
 	ld a, $af
 
-jr_000_1f78:
+.checkText
 ;>                 if text == 0xAF and not wOcarinaSongFlags & 1:
 	cp $af
-	jr nz, jr_000_1f92
+	jr nz, .checkText2
 
 	bit 0, e
-	jr nz, jr_000_1f92
+	jr nz, .checkText2
 
 ;>@sp                     wSignpostReadPos = (hBGPosY & 0xF0) | (hBGPosX >> 4)   # where it was read
 	ldh a, [hBGPosX]
@@ -7442,61 +7446,61 @@ jr_000_1f78:
 ;=@sp
 	or e
 	ld [wSignpostReadPos], a
-	jp Jump_000_1ffd
+	jp .checkItemB
 
 
-jr_000_1f92:
+.checkText2
 ;>                 elif text == 0x83:
 	cp $83
-;>                     OpenDialog(text)     # (the call at jr_000_1f9c)
-	jr z, jr_000_1f9c
+;>                     OpenDialog(text)     # (the call at CheckLiftAndRead.openDialog2)
+	jr z, .openDialog2
 
 ;>                 else:
 ;>                     OpenDialogTable1(text)
 
-jr_000_1f96:
+.openDialogTable1
 	call OpenDialogTable1
-	jp Jump_000_1ffd
+	jp .checkItemB
 
 
-jr_000_1f9c:
+.openDialog2
 ;=@od
 	call OpenDialog
-	jr jr_000_1ffd
+	jr .checkItemB
 
-Jump_000_1fa1:
+.otherwise3
 ;> else:                                    # object $A0 is a chest
 ;>@ch     if obj == 0xA0 and wRoomEvent & 0x1F != 0x0D and hLinkDirection == 2:
 	cp $a0
-	jr nz, jr_000_1ffd
+	jr nz, .checkItemB
 
 	ld a, [wRoomEvent]
 	and $1f
 	cp $0d
-	jr z, jr_000_1ffd
+	jr z, .checkItemB
 
 ;=@ch
 	ldh a, [hLinkDirection]
 	cp $02
-	jr nz, jr_000_1ffd
+	jr nz, .checkItemB
 
 ;>         wCanTalkToEntity = 2
 	ld [wCanTalkToEntity], a
 ;>@op         if hJoypadPressed & 0x30 and (hIsSideScrolling or hLinkDirection == 2):
 	ldh a, [hJoypadPressed]
 	and $30
-	jr z, jr_000_1ffd
+	jr z, .checkItemB
 
 	ldh a, [hIsSideScrolling]
 	and a
-	jr nz, jr_000_1fc8
+	jr nz, .setPage
 
 ;=@op
 	ldh a, [hLinkDirection]
 	cp $02
-	jr nz, jr_000_1ffd
+	jr nz, .checkItemB
 
-jr_000_1fc8:
+.setPage
 ;>             set_rom_bank(0x14)
 	ld a, $14
 	ld [$2100], a
@@ -7508,72 +7512,71 @@ jr_000_1fc8:
 	ldh a, [hMapId]
 	cp $1a
 ;=@pg
-	jr nc, jr_000_1fdf
+	jr nc, .setContent
 
 	cp $06
-	jr c, jr_000_1fdf
+	jr c, .setContent
 
 	inc d
 
-jr_000_1fdf:
-;>             content = mem[0x4500 + (page << 8) + hMapRoom]   # what the chest holds
-	ld hl, $4500
+.setContent
+;>             content = mem[RoomInfoOverworld + (page << 8) + hMapRoom]   # what the chest holds
+	ld hl, RoomInfoOverworld
 	add hl, de
 	ld a, [hl]
 ;>             if content == 0x20:
 	cp $20
-	jr nz, jr_000_1ff3
+	jr nz, .setMultiPurpose8
 
 ;>                 content = 0x20 if wSwordLevel < 2 else 0x1C
 	ld a, [wSwordLevel]
 	cp $02
 	ld a, $20
-	jr c, jr_000_1ff3
+	jr c, .setMultiPurpose8
 
 	ld a, $1c
 
-jr_000_1ff3:
+.setMultiPurpose8
 ;>             hMultiPurpose8 = content
 	ldh [hMultiPurpose8], a
 ;>             set_rom_bank(2)
 	ld a, $02
 	ld [$2100], a
-;>             OpenChest()                  # bank 2 $41BA
-	call $41ba
+;>             SpawnChestContents()                  # bank 2
+	call SpawnChestContents
 
-Jump_000_1ffd:
-jr_000_1ffd:
+.checkItemB
 ;> # pulling with the Power Bracelet
 ;> if wItemB == 3:
 	ld a, [wItemB]
 	cp $03
-	jr nz, jr_000_200b
+	jr nz, .checkItemA
 
 ;>     if not hJoypadHeld & 0x20: return
 	ldh a, [hJoypadHeld]
 	and $20
-	jr nz, jr_000_201a
+	jr nz, .endSwordAction
 
 	ret
 
 
-jr_000_200b:
+.checkItemA
 ;> elif wItemA != 3 or not hJoypadHeld & 0x10:
 	ld a, [wItemA]
 	cp $03
-	jp nz, Jump_000_20a5
+	jp nz, LiftRoomObject.return
 
 	ldh a, [hJoypadHeld]
 	and $10
 ;>     return
-	jp z, Jump_000_20a5
+	jp z, LiftRoomObject.return
 
-jr_000_201a:
+.endSwordAction
 ;> set_rom_bank(2)
 	ld a, $02
 	ld [$2100], a
-;> Bank02_485E()
-	call $485e
+;> EndSwordAction()
+	call EndSwordAction
 ;> hLinkInteractiveMotionBlocked = 1
 	ld a, $01
 	ldh [hLinkInteractiveMotionBlocked], a
@@ -7581,25 +7584,25 @@ jr_000_201a:
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, $00
-;> hLinkAnimationState = LiftPullPoses[d]
+;> hLinkAnimationState = mem[LiftPullPoses + d]
 	ld hl, LiftPullPoses
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkAnimationState], a
-;> if not hJoypadHeld & LiftPullButtons[d]:   # not pulling back
+;> if not hJoypadHeld & mem[LiftPullButtons + d]:   # not pulling back
 	ld hl, LiftPullButtons
 	add hl, de
 	ldh a, [hJoypadHeld]
 	and [hl]
 ;>     return ResetLiftPull()
-	jr z, jr_000_207c
+	jr z, ResetLiftPull.setLiftPullCounter
 
-;> wLinkSpriteDX = LiftPullSpriteDX[d]
+;> wLinkSpriteDX = mem[LiftPullSpriteDX + d]
 	ld hl, LiftPullSpriteDX
 	add hl, de
 	ld a, [hl]
 	ld [wLinkSpriteDX], a
-;> wLinkSpriteDY = LiftPullSpriteDY[d]
+;> wLinkSpriteDY = mem[LiftPullSpriteDY + d]
 	ld hl, LiftPullSpriteDY
 	add hl, de
 	ld a, [hl]
@@ -7611,11 +7614,11 @@ jr_000_201a:
 	ld e, $08
 	ld a, [wActivePowerUp]
 	cp $01
-	jr nz, jr_000_205a
+	jr nz, .setLiftPullCounter
 
 	ld e, $03
 
-jr_000_205a:
+.setLiftPullCounter
 ;> wLiftPullCounter += 1
 	ld hl, wLiftPullCounter
 	inc [hl]
@@ -7623,7 +7626,7 @@ jr_000_205a:
 	ld a, [hl]
 	cp e
 ;>     return
-	jr c, jr_000_207b
+	jr c, .return
 
 ;> hMultiPurposeE = 0
 	xor a
@@ -7631,33 +7634,33 @@ jr_000_205a:
 ;> if obj in (0x8E, 0x20):                  # pots
 	ldh a, [hMultiPurpose0]
 	cp $8e
-	jr z, jr_000_2081
+	jr z, ResetLiftPull.liftRoomObject
 
 	cp $20
-	jr z, jr_000_2081
+	jr z, ResetLiftPull.liftRoomObject
 
 ;>@rk     LiftRoomObject()
 ;>@rk2     set_rom_bank(0x14)
-;>@rk3     Bank14_55AA()
+;>@rk3     ReleaseEntitiesUnderObject()
 ;>@rk4     return RestoreBank()
 ;> elif not wIsIndoor and obj == 0x5C:      # an overworld rock
 	ld a, [wIsIndoor]
 	and a
-	jr nz, jr_000_207b
+	jr nz, .return
 
 	ldh a, [hMultiPurpose0]
 	cp $5c
-	jr z, jr_000_208f
+	jr z, ResetLiftPull.setMultiPurposeE
 
 ;>@rk5     hMultiPurposeE = 1; return LiftRoomObject()   # by running on into it
 
-jr_000_207b:
+.return
 ;> return
 	ret
 
 
 ResetLiftPull:
-jr_000_207c:
+.setLiftPullCounter
 ;> # ResetLiftPull:
 ;> wLiftPullCounter = 0
 	xor a
@@ -7665,19 +7668,19 @@ jr_000_207c:
 	ret
 
 
-jr_000_2081:
+.liftRoomObject
 ;=@rk
 	call LiftRoomObject
 ;=@rk2
 	ld a, $14
 	ld [$2100], a
 ;=@rk3
-	call $55aa
+	call ReleaseEntitiesUnderObject
 ;=@rk4
 	jp RestoreBank
 
 
-jr_000_208f:
+.setMultiPurposeE
 ;=@rk5
 	ld a, $01
 	ldh [hMultiPurposeE], a
@@ -7701,7 +7704,7 @@ LiftRoomObject::
 ;> SpawnLiftedObject()
 	call SpawnLiftedObject
 
-Jump_000_20a5:
+.return
 ;> return
 	ret
 
@@ -7881,7 +7884,7 @@ UpdateDialog::
 ;> if state == 0: return
 	ret z
 
-;>@blank hBGTilesRequestCopy = 0x7F if wGameplayType == 1 else 0x7E   # the blank tile of the box
+;>@blank hMultiPurposeG = 0x7F if wGameplayType == 1 else 0x7E   # the blank tile of the box
 	ld e, a
 	ld a, [wGameplayType]
 	cp $01
@@ -7893,7 +7896,7 @@ UpdateDialog::
 
 .haveBlank
 ;=@blank
-	ldh [hBGTilesRequestCopy], a
+	ldh [hMultiPurposeG], a
 ;> slot = wDialogCharIndex
 	ld a, [wDialogCharIndexHigh]
 	and a
@@ -7947,7 +7950,7 @@ DialogStateOpenBox::
 	ld a, $14
 	ld [$2100], a
 ;> pass                                        # the box-opening code at 14:5924
-	jp $5924
+	jp DialogStepOpenBox
 
 
 ;@ def OpenDialogTable1(index: a)
@@ -8206,8 +8209,8 @@ DialogStateClearBox::
 ;> wDrawCommand[2] = 0x51                   # one tile repeated 18 times along the row
 	ld a, $51
 	ld [hli], a
-;> wDrawCommand[3] = hBGTilesRequestCopy    # the blank tile
-	ldh a, [hBGTilesRequestCopy]
+;> wDrawCommand[3] = hMultiPurposeG    # the blank tile
+	ldh a, [hMultiPurposeG]
 	ld [hli], a
 ;> wDrawCommand[4] = 0                      # end of the commands
 	ld [hl], $00
@@ -8237,12 +8240,12 @@ DialogStateEnd::
 ;> if wDialogKeepOpen: return
 	ld a, [wDialogKeepOpen]
 	and a
-	jr nz, jr_000_22af
+	jr nz, CloseDialog.return
 
 ;> if not hJoypadPressed & 0x30: return     # A or B
 	ldh a, [hJoypadPressed]
 	and $30
-	jr z, jr_000_22af
+	jr z, CloseDialog.return
 
 ;> CloseDialog()
 
@@ -8259,7 +8262,7 @@ CloseDialog::
 	or $0e
 	ld [wDialogState], a
 
-jr_000_22af:
+.return
 ;> return
 	ret
 
@@ -8380,19 +8383,19 @@ DialogStateClearCharTile::
 	and $1f
 	ld e, a
 	ld d, $00
-;> high = mem[0x4521 + t]                   # the tile's VRAM address (tables in bank $1C)
+;> high = mem[DialogCharTileHigh + t]                   # the tile's VRAM address (tables in bank $1C)
 	ld c, $01
 	ld b, $00
-	ld hl, $4521
+	ld hl, DialogCharTileHigh
 	add hl, de
 	ld a, [hl]
 ;> wDrawCommand[0] = high
 	ld hl, wDrawCommandsSize
 	add hl, bc
 	ld [hli], a
-;> wDrawCommand[1] = mem[0x4501 + t]        # low byte
+;> wDrawCommand[1] = mem[DialogCharTileLow + t]        # low byte
 	push hl
-	ld hl, $4501
+	ld hl, DialogCharTileLow
 	add hl, de
 	ld a, [hl]
 	pop hl
@@ -8434,9 +8437,9 @@ DialogStatePlaceChar::
 	ld b, $00
 	ld e, $01
 	ld d, $00
-;> high = u8(wBGOriginHigh + mem[0x4561 + i])
+;> high = u8(wBGOriginHigh + mem[DialogCharBGHigh + i])
 	ld a, [wBGOriginHigh]
-	ld hl, $4561
+	ld hl, DialogCharBGHigh
 	add hl, bc
 	add [hl]
 ;> wDrawCommand[0] = high
@@ -8445,9 +8448,9 @@ DialogStatePlaceChar::
 	ld [hli], a
 ;> wDialogCharBGHigh = high
 	ld [wDialogCharBGHigh], a
-;> t = mem[0x45A1 + i]                      # low byte of the place, relative to the screen
+;> t = mem[DialogCharBGLow + i]                      # low byte of the place, relative to the screen
 	push hl
-	ld hl, $45a1
+	ld hl, DialogCharBGLow
 	add hl, bc
 	ld a, [hl]
 ;> row_end = u8((t & 0xE0) + 0x20)
@@ -8481,8 +8484,8 @@ DialogStatePlaceChar::
 	ld a, [wDialogCharIndex]
 	and $1f
 	ld c, a
-;> wDrawCommand[3] = mem[0x4541 + t]        # the number of the text tile
-	ld hl, $4541
+;> wDrawCommand[3] = mem[DialogCharTileNumbers + t]        # the number of the text tile
+	ld hl, DialogCharTileNumbers
 	add hl, bc
 	ld a, [hl]
 	pop hl
@@ -8509,19 +8512,19 @@ DialogStateDrawChar::
 	and $1f
 	ld c, a
 	ld b, $00
-;> high = mem[0x4521 + t]                   # the text tile's VRAM address
+;> high = mem[DialogCharTileHigh + t]                   # the text tile's VRAM address
 	ld e, $05
 	ld d, $00
-	ld hl, $4521
+	ld hl, DialogCharTileHigh
 	add hl, bc
 	ld a, [hl]
 ;> wDrawCommand[4] = high
 	ld hl, wDrawCommandsSize
 	add hl, de
 	ld [hli], a
-;> wDrawCommand[5] = mem[0x4501 + t]        # low byte
+;> wDrawCommand[5] = mem[DialogCharTileLow + t]        # low byte
 	push hl
-	ld hl, $4501
+	ld hl, DialogCharTileLow
 	add hl, bc
 	ld a, [hl]
 	pop hl
@@ -8535,22 +8538,22 @@ DialogStateDrawChar::
 	ld d, a
 	ld a, [wDialogIndex]
 	ld e, a
-;> ptr = 0x4001 + 2 * n
+;> ptr = DialogPointers + 2 * n
 	sla e
 	rl d
-	ld hl, $4001
+	ld hl, DialogPointers
 	add hl, de
 ;> text = mem16[ptr]
 	ld a, [hli]
 	ld e, a
 	ld d, [hl]
 	push de
-;> entry = 0x46E1 + n
+;> entry = DialogBanks + n
 	ld a, [wDialogIndex]
 	ld e, a
 	ld a, [wDialogIndexHigh]
 	ld d, a
-	ld hl, $46e1
+	ld hl, DialogBanks
 	add hl, de
 ;> set_rom_bank(mem[entry] & 0x1F)          # the bank of the text
 	ld a, [hl]
@@ -8721,8 +8724,8 @@ DialogTypeChar::
 ;> set_rom_bank(0x1C)
 	ld a, $1c
 	ld [$2100], a
-;> glyph = mem[0x45E1 + char]               # the character's glyph in the font
-	ld hl, $45e1
+;> glyph = mem[DialogCharGlyphs + char]               # the character's glyph in the font
+	ld hl, DialogCharGlyphs
 	add hl, de
 	ld e, [hl]
 	ld d, $00
@@ -8738,8 +8741,8 @@ DialogTypeChar::
 	rl d
 ;> set_rom_bank(wCurrentBank)
 	call RestoreBank
-;> src = 0x5000 + offset                    # the font
-	ld hl, $5000
+;> src = FontTiles + offset                    # the font
+	ld hl, FontTiles
 	add hl, de
 	push hl
 	pop bc
@@ -8812,7 +8815,7 @@ DialogTypeChar::
 ;>@full if wDialogCharSlot == 0x1F: return NextDialogState()   # the box is full
 	ld a, [wDialogCharSlot]
 	cp $1f
-	jr z, jr_000_251a
+	jr z, DialogNextChar.full
 
 DialogNextChar:
 ;> wDialogState = (wDialogState & 0xF0) | 6   # type the next character
@@ -8826,7 +8829,7 @@ DialogNextChar:
 ;> return
 	ret
 
-jr_000_251a:
+.full
 ;=@full
 	jp NextDialogState
 
@@ -8896,8 +8899,8 @@ DialogStateBoxFull::
 	ld e, a
 	ld a, [wDialogIndexHigh]
 	ld d, a
-;>         if not mem[0x46E1 + n] & 0x80: return DialogCancel()   # B skips the rest of the text
-	ld hl, $46e1
+;>         if not mem[DialogBanks + n] & 0x80: return DialogCancel()   # B skips the rest of the text
+	ld hl, DialogBanks
 	add hl, de
 	bit 7, [hl]
 	jp z, DialogCancel
@@ -8928,8 +8931,8 @@ DialogStateBoxFull::
 ;> wDrawCommand[2] = 0x4F                   # the blank tile 16 times along the row
 	ld a, $4f
 	ld [wDrawCommand + 2], a
-;> wDrawCommand[3] = hBGTilesRequestCopy
-	ldh a, [hBGTilesRequestCopy]
+;> wDrawCommand[3] = hMultiPurposeG
+	ldh a, [hMultiPurposeG]
 	ld [wDrawCommand + 3], a
 ;> wDrawCommand[4] = 0
 	xor a
@@ -9009,11 +9012,11 @@ ScrollDialogRows::
 	ld l, a
 	ld a, [bc]
 	ld [hl], a
-;>     mem[(high << 8) | u8(col + 0x20)] = hBGTilesRequestCopy        # ... and is blanked
+;>     mem[(high << 8) | u8(col + 0x20)] = hMultiPurposeG        # ... and is blanked
 	ld a, l
 	add $20
 	ld l, a
-	ldh a, [hBGTilesRequestCopy]
+	ldh a, [hMultiPurposeG]
 	ld [hl], a
 	pop bc
 ;>     col = u8(col + 1)
@@ -9199,7 +9202,7 @@ DrawTransitionStrip::
 ;@ While the screen scrolls to a new room, draws the new room into the BG map one strip (a column or a row of
 ;@ objects, 16x16 pixels each, four tiles) every second frame: two draw commands, one per tile column / row
 ;@ of the strip, each 20 tiles long with the last 4 set to $EE (left as they are). The tiles of an object
-;@ come from bank 8 (4 per object: top left, top right, bottom left, bottom right; $498C overworld, $4D60
+;@ come from bank 8 (4 per object: top left, top right, bottom left, bottom right; $498C overworld, IndoorObjectTiles
 ;@ indoors). When all strips are drawn the transition moves on to its next state.
 QueueTransitionStrip::
 ;> if wTransitionDrawDelay != 0:
@@ -9290,14 +9293,14 @@ QueueTransitionStrip::
 	rl b
 	sla c
 	rl b
-;>@tb     tiles = (0x4D60 if wIsIndoor else 0x498C) + offset   # 4 tiles per object, in bank 8
-	ld hl, $498c
+;>@tb     tiles = (IndoorObjectTiles if wIsIndoor else OverworldObjectTiles) + offset   # 4 tiles per object, in bank 8
+	ld hl, OverworldObjectTiles
 	ld a, [wIsIndoor]
 	and a
 	jr z, .overworld
 
 ;=@tb
-	ld hl, $4d60
+	ld hl, IndoorObjectTiles
 
 .overworld
 ;=@tb
@@ -9724,7 +9727,7 @@ FillBGMap0With7E::
 ;> fill(0x9800, 0x7E, 0x400)
 	ld a, $7e
 	ld bc, $0400
-	jr jr_000_28ad
+	jr FillBGMapsWith7F.fill
 
 ;@ def FillBGMapsWith7F()
 ;@ path: gfx/bgmap
@@ -9735,7 +9738,7 @@ FillBGMapsWith7F::
 ;> count = 0x800
 	ld bc, $0800
 
-jr_000_28ad:
+.fill
 ;>@f fill(0x9800, tile, count)
 	ld d, a
 	ld hl, $9800
@@ -10075,7 +10078,7 @@ ExecuteDrawCommandSkipEE::
 ClearWRAM1600::
 ;> return ClearMemory(wOAMBuffer, 0x1600)
 	ld bc, $1600
-	jr jr_000_2996
+	jr ClearHRAMFromFF90.clearMemory
 
 ;@ def ClearWRAM1300()
 ;@ path: system/memory
@@ -10083,7 +10086,7 @@ ClearWRAM1600::
 ClearWRAM1300::
 ;> return ClearMemory(wOAMBuffer, 0x1300)
 	ld bc, $1300
-	jr jr_000_2996
+	jr ClearHRAMFromFF90.clearMemory
 
 ;@ def ClearHRAMPartAndWRAM()
 ;@ path: system/memory
@@ -10108,7 +10111,7 @@ ClearHRAMFromFF90:
 ;> count = 0x1F00
 	ld bc, $1f00
 
-jr_000_2996:
+.clearMemory
 ;> return ClearMemory(wOAMBuffer, count)      # WRAM from $C000
 	ld hl, wOAMBuffer
 
@@ -10142,8 +10145,8 @@ GetRoomInfo::
 ;> set_rom_bank(0x14)
 	ld a, $14
 	ld [$2100], a
-;> info = mem[0x4500 + room]
-	ld hl, $4500
+;> info = mem[RoomInfoOverworld + room]
+	ld hl, RoomInfoOverworld
 	add hl, de
 	ld a, [hl]
 ;> set_rom_bank(wCurrentBank)
@@ -10190,8 +10193,8 @@ GetObjectPhysics::
 ;> set_rom_bank(0x08)
 	ld a, $08
 	ld [$2100], a
-;> kind = mem[0x5110 + obj]
-	ld hl, $5110
+;> kind = mem[OverworldObjectPhysics + obj]
+	ld hl, OverworldObjectPhysics
 	add hl, de
 	ld a, [hl]
 ;> set_rom_bank(wCurrentBank)
@@ -10206,8 +10209,8 @@ GetObjectPhysicsBank3::
 ;> set_rom_bank(0x08)
 	ld a, $08
 	ld [$2100], a
-;> kind = mem[0x5110 + obj]
-	ld hl, $5110
+;> kind = mem[OverworldObjectPhysics + obj]
+	ld hl, OverworldObjectPhysics
 	add hl, de
 	ld a, [hl]
 ;> set_rom_bank(0x03)
@@ -10226,13 +10229,13 @@ LoadTileset1E::
 ;> set_rom_bank(0x13)
 	ld a, $13
 	ld [$2100], a
-;> CopyData(0x6800, 0x9000, 0x800)
-	ld hl, $6800
+;> CopyData(EndingTiles6800, 0x9000, 0x800)
+	ld hl, EndingTiles6800
 	ld de, $9000
 	ld bc, $0800
 	call CopyData
-;> CopyData(0x7000, 0x8800, 0x800)
-	ld hl, $7000
+;> CopyData(EndingTiles7000, 0x8800, 0x800)
+	ld hl, EndingTiles7000
 	ld de, $8800
 	ld bc, $0800
 	jp CopyData
@@ -10240,13 +10243,14 @@ LoadTileset1E::
 
 ;@ def LoadTileset1F()
 ;@ path: gfx/tilesets
-;@ Tile set request $1F (the ending starts with it): LoadTileset15, then $13:$7600 -> $8400 ($100 bytes).
+;@ Tile set request $1F (the ending starts with it): LoadTileset15, then $12:$7600 (EntityTilesF6) -> $8400 ($100
+;@ bytes; LoadTileset15 leaves bank $12 switched in).
 LoadTileset1F::
 ;> LoadTileset15()
 	call LoadTileset15
-;> CopyData(0x7600, 0x8400, 0x100)
+;> CopyData(EntityTilesF6, 0x8400, 0x100)
 	ld de, $8400
-	ld hl, $7600
+	ld hl, EntityTilesF6
 	ld bc, $0100
 	jp CopyData
 
@@ -10259,30 +10263,30 @@ LoadTileset15::
 ;> set_rom_bank(0x13)
 	ld a, $13
 	ld [$2100], a
-;> CopyData(0x4000, 0x8000, 0x1800)
-	ld hl, $4000
+;> CopyData(EndingTiles4000, 0x8000, 0x1800)
+	ld hl, EndingTiles4000
 	ld de, $8000
 	ld bc, $1800
 	call CopyData
 ;> set_rom_bank(0x0C)
 	ld a, $0c
 	ld [$2100], a
-;> CopyData(0x57E0, 0x97F0, 0x10)
-	ld hl, $57e0
+;> CopyData(OverworldTiles9200 + 0x5E0, 0x97F0, 0x10)
+	ld hl, OverworldTiles9200 + $5E0
 	ld de, $97f0
 	ld bc, $0010
 	call CopyData
 ;> set_rom_bank(0x12)
 	ld a, $12
 	ld [$2100], a
-;> CopyData(0x7500, 0x8000, 0x40)
-	ld hl, $7500
+;> CopyData(EntityTilesF5, 0x8000, 0x40)
+	ld hl, EntityTilesF5
 	ld de, $8000
 	ld bc, $0040
 	call CopyData
-;> CopyData(0x7500, 0x8D00, 0x200)
+;> CopyData(EntityTilesF5, 0x8D00, 0x200)
 	ld de, $8d00
-	ld hl, $7500
+	ld hl, EntityTilesF5
 	ld bc, $0200
 	jp CopyData
 
@@ -10294,24 +10298,24 @@ LoadTileset1D::
 ;> set_rom_bank(0x0C)
 	ld a, $0c
 	ld [$2100], a
-;> CopyData(0x5000, 0x9000, 0x800)
-	ld hl, $5000
+;> CopyData(Tiles0C5000, 0x9000, 0x800)
+	ld hl, Tiles0C5000
 	ld de, $9000
 	ld bc, $0800
 	call CopyData
 ;> set_rom_bank(0x12)
 	ld a, $12
 	ld [$2100], a
-;> CopyData(0x6000, 0x8000, 0x800)
-	ld hl, $6000
+;> CopyData(EntityTilesE0, 0x8000, 0x800)
+	ld hl, EntityTilesE0
 	ld de, $8000
 	ld bc, $0800
 	call CopyData
 ;> set_rom_bank(0x0F)
 	ld a, $0f
 	ld [$2100], a
-;> CopyData(0x6000, 0x8800, 0x800)
-	ld hl, $6000
+;> CopyData(OverworldTileset20, 0x8800, 0x800)
+	ld hl, OverworldTileset20
 	ld de, $8800
 	ld bc, $0800
 	jp CopyData
@@ -10320,32 +10324,32 @@ LoadTileset1D::
 ;@ def LoadTileset18()
 ;@ path: gfx/tilesets
 ;@ Tile set request $18: $13:$4000 -> $8000 ($800), then $13:$5800 -> $8800 ($1000) (the code of
-;@ LoadTileset16 from jr_000_2aa5 does it).
+;@ LoadTileset16 from LoadTileset16.copyData does it).
 LoadTileset18::
-;> set_rom_bank(0x13); CopyData(0x4000, 0x8000, 0x800)
-	ld hl, $4000
+;> set_rom_bank(0x13); CopyData(EndingTiles4000, 0x8000, 0x800)
+	ld hl, EndingTiles4000
 ;> return CopyData(0x5800, 0x8800, 0x1000)
-	jr jr_000_2aa5
+	jr LoadTileset16.copyData
 
 ;@ def LoadTileset17()
 ;@ path: gfx/tilesets
 ;@ Tile set request $17: $13:$4800 -> $8000 ($800), then $13:$5800 -> $8800 ($1000) (the code of
-;@ LoadTileset16 from jr_000_2aa5 does it).
+;@ LoadTileset16 from LoadTileset16.copyData does it).
 LoadTileset17::
-;> set_rom_bank(0x13); CopyData(0x4800, 0x8000, 0x800)
-	ld hl, $4800
+;> set_rom_bank(0x13); CopyData(EndingTiles4800, 0x8000, 0x800)
+	ld hl, EndingTiles4800
 ;> return CopyData(0x5800, 0x8800, 0x1000)
-	jr jr_000_2aa5
+	jr LoadTileset16.copyData
 
 ;@ def LoadTileset16()
 ;@ path: gfx/tilesets
 ;@ Tile set request $16: $13:$6000 -> $8000 ($800), then $13:$5800 -> $8800 ($1000). Requests $17 and $18
-;@ use the same code with another source for the first part (jr_000_2aa5).
+;@ use the same code with another source for the first part (LoadTileset16.copyData).
 LoadTileset16::
-;> src = 0x6000
-	ld hl, $6000
+;> src = EndingTiles6000
+	ld hl, EndingTiles6000
 
-jr_000_2aa5:
+.copyData
 ;> set_rom_bank(0x13)
 	ld a, $13
 	ld [$2100], a
@@ -10353,8 +10357,8 @@ jr_000_2aa5:
 	ld de, $8000
 	ld bc, $0800
 	call CopyData
-;> CopyData(0x5800, 0x8800, 0x1000)
-	ld hl, $5800
+;> CopyData(EndingTiles5800, 0x8800, 0x1000)
+	ld hl, EndingTiles5800
 	ld de, $8800
 	ld bc, $1000
 	jp CopyData
@@ -10367,8 +10371,8 @@ jr_000_2aa5:
 LoadTileset1B::
 ;> UpdateSound()
 	call UpdateSound
-;> LoadTilesetFromBank(0x10, 0x6800)
-	ld hl, $6800
+;> LoadTilesetFromBank(0x10, Tiles106800)
+	ld hl, Tiles106800
 	ld a, $10
 	call LoadTilesetFromBank
 ;> UpdateSound()
@@ -10376,8 +10380,8 @@ LoadTileset1B::
 ;> set_rom_bank(0x12)
 	ld a, $12
 	ld [$2100], a
-;> CopyData(0x6600, 0x8000, 0x80)
-	ld hl, $6600
+;> CopyData(EntityTilesE6, 0x8000, 0x80)
+	ld hl, EntityTilesE6
 	ld de, $8000
 	ld bc, $0080
 	call CopyData
@@ -10386,8 +10390,8 @@ LoadTileset1B::
 ;> set_rom_bank(0x0C)
 	ld a, $0c
 	ld [$2100], a
-;> CopyData(0x4220, 0x8100, 0x20)
-	ld hl, $4220
+;> CopyData(WorldSpriteTiles + 0x20, 0x8100, 0x20)
+	ld hl, WorldSpriteTiles + $20
 	ld de, $8100
 	ld bc, $0020
 	jp CopyData
@@ -10397,18 +10401,18 @@ LoadTileset1B::
 ;@ path: gfx/tilesets
 ;@ Tile set requests $1A and $1C: LoadTilesetFromBank($13, $7800).
 LoadTileset1A::
-;> return LoadTilesetFromBank(0x13, 0x7800)
-	ld hl, $7800
-	jr jr_000_2afa
+;> return LoadTilesetFromBank(0x13, EndingTiles7800)
+	ld hl, EndingTiles7800
+	jr LoadTileset19.loadTilesetFromBank
 
 ;@ def LoadTileset19()
 ;@ path: gfx/tilesets
 ;@ Tile set request $19: LoadTilesetFromBank($13, $4800).
 LoadTileset19::
-;> src = 0x4800
-	ld hl, $4800
+;> src = EndingTiles4800
+	ld hl, EndingTiles4800
 
-jr_000_2afa:
+.loadTilesetFromBank
 ;> return LoadTilesetFromBank(0x13, src)
 	ld a, $13
 
@@ -10426,13 +10430,13 @@ LoadTilesetFromBank::
 ;> set_rom_bank(0x13)
 	ld a, $13
 	ld [$2100], a
-;> CopyData(0x7000, 0x8800, 0x800)
-	ld hl, $7000
+;> CopyData(EndingTiles7000, 0x8800, 0x800)
+	ld hl, EndingTiles7000
 	ld de, $8800
 	ld bc, $0800
 	call CopyData
-;> CopyData(0x6800, 0x9000, 0x800)
-	ld hl, $6800
+;> CopyData(EndingTiles6800, 0x9000, 0x800)
+	ld hl, EndingTiles6800
 	ld de, $9000
 	ld bc, $0800
 	jp CopyData
@@ -10449,8 +10453,8 @@ GetDungeonRoomStatusAddress::
 	push bc
 	ld a, $14
 	ld [$2100], a
-;> grid = 0x4200
-	ld hl, $4200
+;> grid = DungeonLayouts
+	ld hl, DungeonLayouts
 ;> if hMapId < 0x0B:
 	ldh a, [hMapId]
 	cp $0b
@@ -10467,7 +10471,7 @@ GetDungeonRoomStatusAddress::
 	rl b
 ;>     grid += offset
 	add hl, bc
-;>@d7     if hMapId == 6 and wDungeon7Flags & 4: grid = 0x44C0   # dungeon 7's second layout
+;>@d7     if hMapId == 6 and wDungeon7Flags & 4: grid = EaglesTowerLayout2   # dungeon 7's second layout
 	ldh a, [hMapId]
 	cp $06
 	jr nz, .haveGrid
@@ -10477,7 +10481,7 @@ GetDungeonRoomStatusAddress::
 	jr z, .haveGrid
 
 ;=@d7
-	ld hl, $44c0
+	ld hl, EaglesTowerLayout2
 
 .haveGrid
 ;>     room = mem[grid + pos]
@@ -10497,7 +10501,7 @@ GetDungeonRoomStatusAddress::
 
 .firstGroup
 ;>     grid = wRoomStatus + 0x100 + room       # (the indoor groups start at $D900)
-	ld hl, $d900
+	ld hl, wRoomStatus + $100
 	add hl, de
 
 .done
@@ -10516,21 +10520,21 @@ LoadTileset03::
 ;> SwitchBank(0x0C)
 	ld a, $0c
 	call SwitchBank
-;> CopyData(0x4000, 0x8000, 0x400)
-	ld hl, $4000
+;> CopyData(MenuSpriteTiles, 0x8000, 0x400)
+	ld hl, MenuSpriteTiles
 	ld de, $8000
 	ld bc, $0400
 	call CopyData
 ;> SwitchBank(0x0C)
 	ld a, $0c
 	call SwitchBank
-;> CopyData(0x4800, 0x8800, 0x1000)
-	ld hl, $4800
+;> CopyData(CommonWorldTiles, 0x8800, 0x1000)
+	ld hl, CommonWorldTiles
 	ld de, $8800
 	ld bc, $1000
 	call CopyData
-;> CopyData(0x47A0, 0x8E00, 0x20)
-	ld hl, $47a0
+;> CopyData(MenuArrowTiles, 0x8E00, 0x20)
+	ld hl, MenuArrowTiles
 	ld de, $8e00
 	ld bc, $0020
 	call CopyData
@@ -10550,16 +10554,16 @@ LoadTileset04::
 ;> SwitchBank(0x0F)
 	ld a, $0f
 	call SwitchBank
-;> CopyData(0x4000, 0x8800, 0x400)
-	ld hl, $4000
+;> CopyData(FileMenuTiles, 0x8800, 0x400)
+	ld hl, FileMenuTiles
 	ld de, $8800
 	ld bc, $0400
 	call CopyData
 ;> SwitchBank(0x0F)
 	ld a, $0f
 	call SwitchBank
-;> CopyData(0x5000, 0x9000, 0x800)
-	ld hl, $5000
+;> CopyData(FontTiles, 0x9000, 0x800)
+	ld hl, FontTiles
 	ld de, $9000
 	ld bc, $0800
 	jp CopyData
@@ -10581,8 +10585,8 @@ LoadTileset06::
 	ld e, a
 	ld d, $00
 	push de
-;> src = mem[0x7F64 + map] << 8
-	ld hl, $7f64
+;> src = mem[IndoorTilePages9100 + map] << 8
+	ld hl, IndoorTilePages9100
 	add hl, de
 	ld h, [hl]
 	ld l, $00
@@ -10593,18 +10597,18 @@ LoadTileset06::
 	ld de, $9100
 	ld bc, $0100
 	call CopyData
-;> CopyData(0x4000, 0x9200, 0x600)
-	ld hl, $4000
+;> CopyData(IndoorCommonTiles, 0x9200, 0x600)
+	ld hl, IndoorCommonTiles
 	ld de, $9200
 	ld bc, $0600
 	call CopyData
 ;> set_rom_bank(0x01)
 	ld a, $01
 	ld [$2100], a
-;> src = mem[0x7F84 + map] << 8
+;> src = mem[IndoorTilePages9200 + map] << 8
 	pop de
 	push de
-	ld hl, $7f84
+	ld hl, IndoorTilePages9200
 	add hl, de
 	ld h, [hl]
 	ld l, $00
@@ -10617,8 +10621,8 @@ LoadTileset06::
 ;> set_rom_bank(0x0C)
 	ld a, $0c
 	ld [$2100], a
-;> CopyData(0x47C0, 0xDCC0, 0x40)
-	ld hl, $47c0
+;> CopyData(WorldRAMTiles, 0xDCC0, 0x40)
+	ld hl, WorldRAMTiles
 	ld de, $dcc0
 	ld bc, $0040
 	call CopyData
@@ -10627,9 +10631,9 @@ LoadTileset06::
 ;> set_rom_bank(0x01)
 	ld a, $01
 	ld [$2100], a
-;> src = mem[0x7FA4 + map] << 8
+;> src = mem[IndoorTilePages8F00 + map] << 8
 	pop de
-	ld hl, $7fa4
+	ld hl, IndoorTilePages8F00
 	add hl, de
 	ld h, [hl]
 	ld l, $00
@@ -10640,8 +10644,8 @@ LoadTileset06::
 	ld de, $8f00
 	ld bc, $0100
 	call CopyData
-;> src = 0x7D00
-	ld hl, $7d00
+;> src = DungeonTiles8C00
+	ld hl, DungeonTiles8C00
 ;> if hMapId >= 0x0A:                       # not a dungeon
 	ldh a, [hMapId]
 	cp $0a
@@ -10650,8 +10654,8 @@ LoadTileset06::
 ;>     SwitchBank(0x0C)
 	ld a, $0c
 	call SwitchBank
-;>     src = 0x4C00
-	ld hl, $4c00
+;>     src = WorldTiles8C00
+	ld hl, WorldTiles8C00
 
 .haveSrc
 ;> CopyData(src, 0x8C00, 0x300)
@@ -10713,13 +10717,13 @@ LoadTileset05::
 ;> SwitchBank(0x0C)
 	ld a, $0c
 	call SwitchBank
-;> CopyData(0x5200, 0x9200, 0x600)
-	ld hl, $5200
+;> CopyData(OverworldTiles9200, 0x9200, 0x600)
+	ld hl, OverworldTiles9200
 	ld de, $9200
 	ld bc, $0600
 	call CopyData
-;> CopyData(0x4C00, 0x8C00, 0x400)
-	ld hl, $4c00
+;> CopyData(WorldTiles8C00, 0x8C00, 0x400)
+	ld hl, WorldTiles8C00
 	ld de, $8c00
 	ld bc, $0400
 	call CopyData
@@ -10741,13 +10745,13 @@ LoadCommonWorldTiles::
 	ldh [hAnimatedTilesStep], a
 ;> RunAnimatedTiles()
 	call RunAnimatedTiles
-;> CopyData(0x4800, 0x8800, 0x800)
-	ld hl, $4800
+;> CopyData(CommonWorldTiles, 0x8800, 0x800)
+	ld hl, CommonWorldTiles
 	ld de, $8800
 	ld bc, $0800
 	call CopyData
-;> CopyData(0x4200, 0x8200, 0x100)
-	ld hl, $4200
+;> CopyData(WorldSpriteTiles, 0x8200, 0x100)
+	ld hl, WorldSpriteTiles
 	ld de, $8200
 	ld bc, $0100
 	call CopyData
@@ -10762,21 +10766,21 @@ LoadTileset10::
 ;> SwitchBank(0x01)
 	ld a, $01
 	call SwitchBank
-;> CopyData(0x7D31, 0x8700, 0x80)
-	ld hl, $7d31
+;> CopyData(IntroRainTiles, 0x8700, 0x80)
+	ld hl, IntroRainTiles
 	ld de, $8700
 	ld bc, $0080
 	call CopyData
 ;> SwitchBank(0x10)
 	ld a, $10
 	call SwitchBank
-;> CopyData(0x5400, 0x8000, 0x600)
-	ld hl, $5400
+;> CopyData(IntroSpriteTiles, 0x8000, 0x600)
+	ld hl, IntroSpriteTiles
 	ld de, $8000
 	ld bc, $0600
 	call CopyData
-;> CopyData(0x4000, 0x8800, 0x1000)
-	ld hl, $4000
+;> CopyData(IntroTiles, 0x8800, 0x1000)
+	ld hl, IntroTiles
 	ld de, $8800
 	ld bc, $1000
 	jp CopyData
@@ -10789,8 +10793,8 @@ LoadTileset11::
 ;> SwitchBank(0x0F)
 	ld a, $0f
 	call SwitchBank
-;> CopyData(0x4900, 0x8800, 0x700)
-	ld hl, $4900
+;> CopyData(TitleTiles, 0x8800, 0x700)
+	ld hl, TitleTiles
 	ld de, $8800
 	ld bc, $0700
 	jp CopyData
@@ -10803,13 +10807,13 @@ LoadTileset0B::
 ;> SwitchBank(0x0C)
 	ld a, $0c
 	call SwitchBank
-;> CopyData(0x7800, 0x8F00, 0x800)
-	ld hl, $7800
+;> CopyData(Tiles0C7800, 0x8F00, 0x800)
+	ld hl, Tiles0C7800
 	ld de, $8f00
 	ld bc, $0800
 	call CopyData
-;> CopyData(0x5000, 0x8200, 0x100)
-	ld hl, $5000
+;> CopyData(Tiles0C5000, 0x8200, 0x100)
+	ld hl, Tiles0C5000
 	ld de, $8200
 	ld bc, $0100
 	jp CopyData
@@ -10817,31 +10821,31 @@ LoadTileset0B::
 
 ;@ def LoadTileset14()
 ;@ path: gfx/tilesets
-;@ Tile set request $14: $10:$7000 -> $9000 ($800) (the code of LoadTileset12 from jr_000_2d2b).
+;@ Tile set request $14: $10:$7000 -> $9000 ($800) (the code of LoadTileset12 from LoadTileset12.switchBank).
 LoadTileset14::
 ;> SwitchBank(0x10)
-	ld hl, $7000
-;> return CopyData(0x7000, 0x9000, 0x800)
-	jr jr_000_2d2b
+	ld hl, Tiles107000
+;> return CopyData(Tiles107000, 0x9000, 0x800)
+	jr LoadTileset12.switchBank
 
 ;@ def LoadTileset20()
 ;@ path: gfx/tilesets
-;@ Tile set request $20: $10:$7800 -> $9000 ($800) (the code of LoadTileset12 from jr_000_2d2b).
+;@ Tile set request $20: $10:$7800 -> $9000 ($800) (the code of LoadTileset12 from LoadTileset12.switchBank).
 LoadTileset20::
 ;> SwitchBank(0x10)
-	ld hl, $7800
-;> return CopyData(0x7800, 0x9000, 0x800)
-	jr jr_000_2d2b
+	ld hl, Tiles107800
+;> return CopyData(Tiles107800, 0x9000, 0x800)
+	jr LoadTileset12.switchBank
 
 ;@ def LoadTileset12()
 ;@ path: gfx/tilesets
 ;@ Tile set request $12: $10:$5800 -> $9000 ($800). Requests $14 and $20 use the same code with another
-;@ source (jr_000_2d2b).
+;@ source (LoadTileset12.switchBank).
 LoadTileset12::
-;> src = 0x5800
-	ld hl, $5800
+;> src = Tiles105800
+	ld hl, Tiles105800
 
-jr_000_2d2b:
+.switchBank
 ;> SwitchBank(0x10)
 	ld a, $10
 	call SwitchBank
@@ -10858,13 +10862,13 @@ LoadTileset21::
 ;> set_rom_bank(0x13)
 	ld a, $13
 	ld [$2100], a
-;> CopyData(0x7C00, 0x8C00, 0x400)
-	ld hl, $7c00
+;> CopyData(EndingTiles7C00, 0x8C00, 0x400)
+	ld hl, EndingTiles7C00
 	ld de, $8c00
 	ld bc, $0400
 	call CopyData
-;> CopyData(0x6800, 0x9000, 0x400)
-	ld hl, $6800
+;> CopyData(EndingTiles6800, 0x9000, 0x400)
+	ld hl, EndingTiles6800
 	ld de, $9000
 	ld bc, $0400
 	jp CopyData
@@ -10877,13 +10881,13 @@ LoadTileset13::
 ;> SwitchBank(0x10)
 	ld a, $10
 	call SwitchBank
-;> CopyData(0x6700, 0x8400, 0x400)
-	ld hl, $6700
+;> CopyData(Tiles106700, 0x8400, 0x400)
+	ld hl, Tiles106700
 	ld de, $8400
 	ld bc, $0400
 	call CopyData
-;> CopyData(0x6000, 0x9000, 0x600)
-	ld hl, $6000
+;> CopyData(Tiles106000, 0x9000, 0x600)
+	ld hl, Tiles106000
 	ld de, $9000
 	ld bc, $0600
 	jp CopyData
@@ -10896,8 +10900,8 @@ LoadTileset0D::
 ;> SwitchBank(0x0F)
 	ld a, $0f
 	call SwitchBank
-;> CopyData(0x4400, 0x8800, 0x500)
-	ld hl, $4400
+;> CopyData(SaveMenuTiles, 0x8800, 0x500)
+	ld hl, SaveMenuTiles
 	ld de, $8800
 	ld bc, $0500
 	jp CopyData
@@ -10922,7 +10926,7 @@ LoadTileset09::
 ;> slot = 0
 	xor a
 
-Jump_000_2d89:
+.loop
 ;> while True:
 ;>     hMultiPurpose0 = slot
 	ldh [hMultiPurpose0], a
@@ -11032,7 +11036,7 @@ Jump_000_2d89:
 	inc a
 ;>     if slot == 4: break
 	cp $04
-	jp nz, Jump_000_2d89
+	jp nz, .loop
 
 ;> if not wIsIndoor:
 	ld de, $9000
@@ -11051,9 +11055,9 @@ Jump_000_2d89:
 	and a
 	jr z, .indoorRoom
 
-;>     src = 0x7000
-	ld hl, $7000
-;>@sv     if hMapId != 6 and (hMapId < 0x0A or hMapRoom == 0xE9): src = 0x7800
+;>     src = SideViewTiles
+	ld hl, SideViewTiles
+;>@sv     if hMapId != 6 and (hMapId < 0x0A or hMapRoom == 0xE9): src = DungeonSideViewTiles
 	ldh a, [hMapId]
 	cp $06
 	jr z, .sideViewSrc
@@ -11063,7 +11067,7 @@ Jump_000_2d89:
 
 .src7800
 ;=@sv
-	ld hl, $7800
+	ld hl, DungeonSideViewTiles
 	jr .sideViewSrc
 
 .checkRoom
@@ -11082,7 +11086,7 @@ Jump_000_2d89:
 
 .indoorRoom
 ;>@is if hWorldTileset != 0xFF: CopyData((hWorldTileset + 0x50) << 8, 0x9000, 0x100)
-	ld hl, $5000
+	ld hl, IndoorTileset00
 	ldh a, [hWorldTileset]
 	cp $ff
 	jr z, .noIndoorSet
@@ -11121,7 +11125,7 @@ Jump_000_2d89:
 ;@ def LoadTileset01()
 ;@ path: world/drawing
 ;@ Tile set request 1: draws the whole room into BG map 0 with the LCD off - each object of wRoomObjects
-;@ becomes its four tiles (from bank 8: $498C overworld, $4D60 indoors; top left, top right, bottom left,
+;@ becomes its four tiles (from bank 8: OverworldObjectTiles overworld, IndoorObjectTiles indoors; top left, top right, bottom left,
 ;@ bottom right), 10 objects per row. It walks 128 objects, so rows beyond the 8 of a room are drawn too
 ;@ (below the screen). Ends in bank 1 ($01:$7DC1).
 LoadTileset01::
@@ -11136,7 +11140,7 @@ LoadTileset01::
 	ld c, $80
 
 .object
-;>@tl     tiles = (0x4D60 if wIsIndoor else 0x498C) + mem[obj] * 4
+;>@tl     tiles = (IndoorObjectTiles if wIsIndoor else OverworldObjectTiles) + mem[obj] * 4
 	push de
 	push hl
 	push bc
@@ -11148,13 +11152,13 @@ LoadTileset01::
 	rl b
 	sla c
 	rl b
-	ld hl, $498c
+	ld hl, OverworldObjectTiles
 	ld a, [wIsIndoor]
 ;=@tl
 	and a
 	jr z, .overworld
 
-	ld hl, $4d60
+	ld hl, IndoorObjectTiles
 
 .overworld
 ;=@tl
@@ -11262,13 +11266,13 @@ LoadRoom::
 	ld [wWarpTimer], a
 ;> mem[0xDBC9] = 0
 	ld [$dbc9], a
-;> mem[0xC1A2] = 0
+;> wRoomEventCounter = 0
 	ld [wRoomEventCounter], a
-;> mem[0xC1C6] = 0
+;> wHookshotOut = 0
 	ld [wHookshotOut], a
 ;> mem[0xD6FA] = 0
 	ld [$d6fa], a
-;> mem[0xC50A] = 0
+;> wItemButtonsDisabled = 0
 	ld [wItemButtonsDisabled], a
 ;> hStairsState = 0
 	ldh [hStairsState], a
@@ -11278,7 +11282,7 @@ LoadRoom::
 	ld [$d460], a
 ;> wBossInRoom = 0
 	ld [wBossInRoom], a
-;> mem[0xC50E] = 0
+;> wRoomNoiseLoop = 0
 	ld [wRoomNoiseLoop], a
 ;> wMarinSinging = 0
 	ld [wMarinSinging], a
@@ -11286,7 +11290,7 @@ LoadRoom::
 	ld [wRoomEventJustDone], a
 ;> wCompassChimeDelay = 0
 	ld [wCompassChimeDelay], a
-;> mem[0xC3CD] = 0
+;> wRoomDarkness = 0
 	ld [wRoomDarkness], a
 ;> wWarpType = 0xFF                         # no warp record yet
 	ld a, $ff
@@ -11301,15 +11305,15 @@ LoadRoom::
 ;>     set_rom_bank(0x14)
 	ld a, $14
 	ld [$2100], a
-;>     hBGTilesRequestCopy = 0x14           # (scratch here: the bank in use)
-	ldh [hBGTilesRequestCopy], a
+;>     hMultiPurposeG = 0x14           # (scratch here: the bank in use)
+	ldh [hMultiPurposeG], a
 ;>     if hMapId < 0x0B:                    # a dungeon: the room number comes from its map grid
 	ldh a, [hMapId]
 	cp $0b
 	jr nc, .haveRoom
 
-;>@gr         grid = 0x4200 + hMapId * 64
-	ld hl, $4200
+;>@gr         grid = DungeonLayouts + hMapId * 64
+	ld hl, DungeonLayouts
 	swap a
 	ld e, a
 	ld d, $00
@@ -11319,7 +11323,7 @@ LoadRoom::
 	sla e
 	rl d
 	add hl, de
-;>@d7         if hMapId == 6 and wDungeon7Flags & 4: grid = 0x44C0   # dungeon 7's second layout
+;>@d7         if hMapId == 6 and wDungeon7Flags & 4: grid = EaglesTowerLayout2   # dungeon 7's second layout
 	ldh a, [hMapId]
 	cp $06
 	jr nz, .haveGrid
@@ -11329,7 +11333,7 @@ LoadRoom::
 	jr z, .haveGrid
 
 ;=@d7
-	ld hl, $44c0
+	ld hl, EaglesTowerLayout2
 
 .haveGrid
 ;>         hMapRoom = mem[grid + wIndoorRoom]
@@ -11356,8 +11360,8 @@ LoadRoom::
 	inc b
 
 .firstGroup
-;>     wRoomEvent = mem[0x4000 + room]      # the room's event (table in bank $14)
-	ld hl, $4000
+;>     wRoomEvent = mem[IndoorRoomEventsA + room]      # the room's event (table in bank $14)
+	ld hl, IndoorRoomEventsA
 	add hl, bc
 	ld a, [hl]
 	ld [wRoomEvent], a
@@ -11366,7 +11370,7 @@ LoadRoom::
 	ld [wRoomShutterDoors], a
 ;>     wRoomShutterDoorsCopy = 0
 	ld [wRoomShutterDoorsCopy], a
-;>     mem[0xC190] = 0
+;>     wRoomEventShuttersClosed = 0
 	ld [wRoomEventShuttersClosed], a
 ;>     wRoomEventDone = 0
 	ld [wRoomEventDone], a
@@ -11395,7 +11399,7 @@ LoadRoom::
 	jr z, .haveBase
 
 ;=@st
-	ld hl, $d900
+	ld hl, wRoomStatus + $100
 	ldh a, [hMapId]
 	cp $1a
 	jr nc, .haveBase
@@ -11404,7 +11408,7 @@ LoadRoom::
 	jr c, .haveBase
 
 ;=@st
-	ld hl, $da00
+	ld hl, wRoomStatus + $200
 
 .haveBase
 ;> status = base + hMapRoom
@@ -11436,8 +11440,8 @@ LoadRoom::
 ;>     set_rom_bank(0x0A)
 	ld a, $0a
 	ld [$2100], a
-;>     hBGTilesRequestCopy = 0x0A
-	ldh [hBGTilesRequestCopy], a
+;>     hMultiPurposeG = 0x0A
+	ldh [hMultiPurposeG], a
 ;>@lens     if hMapId == 0x1F and hMapRoom == 0xF5 and wTradeSequenceItem == 0x0E:
 	ldh a, [hMapId]
 	cp $1f
@@ -11452,13 +11456,13 @@ LoadRoom::
 	cp $0e
 	jr nz, .indoorTable
 
-;>         data = 0x7853                    # with the magnifying lens this room looks different
-	ld bc, $7853
+;>         data = IndoorARoomF5Alt                    # with the magnifying lens this room looks different
+	ld bc, IndoorARoomF5Alt
 	jp .readData
 
 .indoorTable
-;>     table = 0x4000
-	ld hl, $4000
+;>     table = IndoorARoomPointers
+	ld hl, IndoorARoomPointers
 ;>     if 0x06 <= hMapId < 0x1A:            # the second indoor group is in bank $0B
 	ldh a, [hMapId]
 	cp $1a
@@ -11470,95 +11474,95 @@ LoadRoom::
 ;>         set_rom_bank(0x0B)
 	ld a, $0b
 	ld [$2100], a
-;>         hBGTilesRequestCopy = 0x0B
-	ldh [hBGTilesRequestCopy], a
-;>         table = 0x4000
-	ld hl, $4000
+;>         hMultiPurposeG = 0x0B
+	ldh [hMultiPurposeG], a
+;>         table = IndoorBRoomPointers
+	ld hl, IndoorBRoomPointers
 	jr .readPointer
 
 .overworld
 ;> else:                                    # six overworld rooms change for good after their event
-;>@o1     if hMapRoom == 0x0E and wRoomStatus[0x0E] & 0x10: data = 0x47F0
+;>@o1     if hMapRoom == 0x0E and wRoomStatus[0x0E] & 0x10: data = OverworldRoom0EAlt
 	ldh a, [hMapRoom]
 	cp $0e
 	jr nz, .room8C
 
-	ld a, [$d80e]
+	ld a, [wRoomStatus + $E]
 	and $10
 	jr z, .normalOverworld
 
 ;=@o1
-	ld bc, $47f0
+	ld bc, OverworldRoom0EAlt
 	jr .checkHighRoom
 
 .room8C
-;>@o2     elif hMapRoom == 0x8C and wRoomStatus[0x8C] & 0x10: data = 0x4356
+;>@o2     elif hMapRoom == 0x8C and wRoomStatus[0x8C] & 0x10: data = OverworldRoom8CAlt
 	cp $8c
 	jr nz, .room79
 
-	ld a, [$d88c]
+	ld a, [wRoomStatus + $8C]
 	and $10
 	jr z, .normalOverworld
 
 ;=@o2
-	ld bc, $4356
+	ld bc, OverworldRoom8CAlt
 	jr .checkHighRoom
 
 .room79
-;>@o3     elif hMapRoom == 0x79 and wRoomStatus[0x79] & 0x10: data = 0x64FD
+;>@o3     elif hMapRoom == 0x79 and wRoomStatus[0x79] & 0x10: data = OverworldRoom79Alt
 	cp $79
 	jr nz, .room06
 
-	ld a, [$d879]
+	ld a, [wRoomStatus + $79]
 	and $10
 	jr z, .normalOverworld
 
 ;=@o3
-	ld bc, $64fd
+	ld bc, OverworldRoom79Alt
 	jr .checkHighRoom
 
 .room06
-;>@o4     elif hMapRoom == 0x06 and wRoomStatus[0x06] & 0x10: data = 0x4496
+;>@o4     elif hMapRoom == 0x06 and wRoomStatus[0x06] & 0x10: data = OverworldRoom06Alt
 	cp $06
 	jr nz, .room1B
 
-	ld a, [$d806]
+	ld a, [wRoomStatus + 6]
 	and $10
 	jr z, .normalOverworld
 
 ;=@o4
-	ld bc, $4496
+	ld bc, OverworldRoom06Alt
 	jr .checkHighRoom
 
 .room1B
-;>@o5     elif hMapRoom == 0x1B and wRoomStatus[0x2B] & 0x10: data = 0x4C13   # (room $2B's flag)
+;>@o5     elif hMapRoom == 0x1B and wRoomStatus[0x2B] & 0x10: data = OverworldRoom1BAlt   # (room $2B's flag)
 	cp $1b
 	jr nz, .room2B
 
-	ld a, [$d82b]
+	ld a, [wRoomStatus + $2B]
 	and $10
 	jr z, .normalOverworld
 
 ;=@o5
-	ld bc, $4c13
+	ld bc, OverworldRoom1BAlt
 	jr .checkHighRoom
 
 .room2B
-;>@o6     elif hMapRoom == 0x2B and wRoomStatus[0x2B] & 0x10: data = 0x50AC
+;>@o6     elif hMapRoom == 0x2B and wRoomStatus[0x2B] & 0x10: data = OverworldRoom2BAlt
 	cp $2b
 	jr nz, .normalOverworld
 
-	ld a, [$d82b]
+	ld a, [wRoomStatus + $2B]
 	and $10
 	jr z, .normalOverworld
 
 ;=@o6
-	ld bc, $50ac
+	ld bc, OverworldRoom2BAlt
 	jr .checkHighRoom
 
 .normalOverworld
-;>     table = 0x4000
-	ld hl, $4000
+;>     table = OverworldRoomPointers
+	ld hl, OverworldRoomPointers
 
 .readPointer
 ;> if data is None: data = mem16[table + offset]
@@ -11779,7 +11783,7 @@ LoadOverworldObject::
 	add $f5
 	push af
 	ld d, a
-;> if obj == 0xE9: mem[0xC50E] = obj
+;> if obj == 0xE9: wRoomNoiseLoop = obj
 	cp $e9
 	jr nz, .not_E9
 
@@ -11979,7 +11983,7 @@ LoadIndoorObject::
 	add $ec
 	ldh [hMultiPurpose9], a
 	push af
-;> if 0xCF <= obj < 0xD3: mem[0xC1A5] += 1
+;> if 0xCF <= obj < 0xD3: wScrollingFloorCount += 1
 	cp $cf
 	jr c, .not_CF
 
@@ -11994,7 +11998,7 @@ LoadIndoorObject::
 	cp $ab
 	jr nz, .not_AB
 
-;>     mem[0xC3CB] = 0
+;>     wRoomHasTorches = 0
 	xor a
 	ld [wRoomHasTorches], a
 ;>     if hMapRoom != 0xC4:
@@ -12006,9 +12010,9 @@ LoadIndoorObject::
 ;>         mem[0xDBC9] += 1
 	ld hl, $dbc9
 	inc [hl]
-;>         mem[0xC3CB] = obj
+;>         wRoomHasTorches = obj
 	ld [wRoomHasTorches], a
-;>         mem[0xC3CD] += 4
+;>         wRoomDarkness += 4
 	push af
 	ld a, [wRoomDarkness]
 	add $04
@@ -12925,7 +12929,7 @@ SetRoomStatusBits::
 
 .firstGroup
 ;> wRoomStatus[0x100 + room] |= bits
-	ld hl, $d900
+	ld hl, wRoomStatus + $100
 	add hl, de
 	pop af
 	or [hl]
@@ -13144,7 +13148,7 @@ IndoorMacroFDObjects::
 ;@ Indoor macro $FD: in room $D3 of the second indoor group, once $DB46 is set, a shutter door in the
 ;@ bottom wall; otherwise sets room status bit 0 and places IndoorMacroFDObjects.
 IndoorMacroFD::
-;>@d3 if 0x06 <= hMapId < 0x1A and hMapRoom == 0xD3 and mem[0xDB46]: return DoorShutterBottom(data)
+;>@d3 if 0x06 <= hMapId < 0x1A and hMapRoom == 0xD3 and wShopPunishThief: return DoorShutterBottom(data)
 	ldh a, [hMapId]
 	cp $1a
 	jr nc, .other
@@ -13245,8 +13249,8 @@ LoadRoomEntities::
 	ld b, $00
 	sla c
 	rl b
-;> table = 0x4000
-	ld hl, $4000
+;> table = OverworldEntityPointers
+	ld hl, OverworldEntityPointers
 ;> if wIsIndoor:
 	ld a, [wIsIndoor]
 	and a
@@ -13263,7 +13267,7 @@ LoadRoomEntities::
 	cp [hl]
 	jr nz, .indoorTable
 
-;>         slot = SpawnEntity(0xA8)
+;>         slot, full = SpawnEntity(bc, 0xA8)
 	ld a, $a8
 	call SpawnEntity
 ;>         wEntityX[slot] = wIronBallX
@@ -13287,8 +13291,8 @@ LoadRoomEntities::
 	ldh [hMultiPurposeD], a
 
 .indoorTable
-;>     table = 0x4200
-	ld hl, $4200
+;>     table = IndoorAEntityPointers
+	ld hl, IndoorAEntityPointers
 ;>@g2     if 0x06 <= hMapId < 0x1A: table = 0x4400
 	ldh a, [hMapId]
 	cp $1a
@@ -13440,7 +13444,7 @@ InitLoadedEntity::
 ;@ def ApplyIndoorRoomTemplate(template: a)
 ;@ path: world/rooms
 ;@ Builds the walls of an indoor room from one of its templates (PlaceIndoorWalls, high nibble of the room
-;@ data's second byte), then switches back to the bank of the room data (kept in hBGTilesRequestCopy by
+;@ data's second byte), then switches back to the bank of the room data (kept in hMultiPurposeG by
 ;@ LoadRoom). bc is kept.
 ApplyIndoorRoomTemplate::
 ;> set_rom_bank(0x14)
@@ -13452,8 +13456,8 @@ ApplyIndoorRoomTemplate::
 	push bc
 	call PlaceIndoorWalls
 	pop bc
-;> set_rom_bank(hBGTilesRequestCopy)
-	ldh a, [hBGTilesRequestCopy]
+;> set_rom_bank(hMultiPurposeG)
+	ldh a, [hMultiPurposeG]
 	ld [$2100], a
 ;> return
 	ret
@@ -13484,8 +13488,8 @@ GetEntityTypeByte14::
 ;> set_rom_bank(0x14)
 	ld a, $14
 	ld [$2100], a
-;> value = mem[0x56FF + type]
-	ld hl, $56ff
+;> value = mem[BowWowEdibleTypes + type]
+	ld hl, BowWowEdibleTypes
 	add hl, de
 	ld a, [hl]
 ;> set_rom_bank(0x05)
@@ -13498,6 +13502,7 @@ GetEntityTypeByte14::
 ;@ def ShatterThrownObject(slot: bc)
 ;@ path: object/liftable
 ;@ A thrown pot or rock breaks into pieces (DrawShatterPieces), for code in bank 3.
+;@ test: slot = rand(0, 15)
 ShatterThrownObject::
 ;> SwitchBank(0x19)
 	ld a, $19
@@ -13512,6 +13517,7 @@ ShatterThrownObject::
 ;@ def BreakThrownObjectFar(slot: bc)
 ;@ path: object/liftable
 ;@ BreakThrownObject (bank 3) called from bank 0.
+;@ test: slot = rand(0, 15)
 BreakThrownObjectFar::
 ;> set_rom_bank(0x03)
 	ld a, $03
@@ -13552,6 +13558,7 @@ OnRoomEnteredBank1::
 ;@ def InitEntityPropertiesFar(slot: bc)
 ;@ path: entity/spawn
 ;@ InitEntityProperties (bank 3) called from another bank.
+;@ test: slot = rand(0, 15)
 InitEntityPropertiesFar::
 ;> set_rom_bank(0x03)
 	ld a, $03
@@ -13649,10 +13656,10 @@ UpdateEntities::
 	add hl, de
 	ld a, [hl]
 	ld [wOAMNextIndex], a
-;> mem[0xC5A1] = mem[0xC5A0]
+;> wPodobooCountPrev = wPodobooCount
 	ld a, [wPodobooCount]
 	ld [wPodobooCountPrev], a
-;> mem[0xC5A0] = 0
+;> wPodobooCount = 0
 	xor a
 	ld [wPodobooCount], a
 ;> wRaccoonLoopsExit = 0
@@ -13667,7 +13674,7 @@ UpdateEntities::
 	ld [wLinkOnPlatform], a
 ;> wCarriedEntityType = 0
 	ld [wCarriedEntityType], a
-;> mem[0xD45E] = 0
+;> wLinkPulledByDevice = 0
 	ld [wLinkPulledByDevice], a
 ;> if not wDialogState: wCanTalkToEntity = 0
 	ld a, [wDialogState]
@@ -13722,6 +13729,7 @@ EntityStatusFreeHandler::
 ;@ def ResetEntityVariablesFrom3(slot: bc)
 ;@ path: entity/engine
 ;@ ResetEntityVariables (bank $15) for code in bank 3, which is switched back in.
+;@ test: slot = rand(0, 15)
 ResetEntityVariablesFrom3::
 ;> set_rom_bank(0x15)
 	ld a, $15
@@ -13742,6 +13750,7 @@ ResetEntityVariablesFrom3::
 ;@ while Link swims, in the other order, so they follow Link - runs the common checks of bank $14
 ;@ (UpdateEntityTimers), then the code for its status: the type's own handler (RunEntityHandler) when active
 ;@ (status 5), else EntityStatusHandlers in bank 3.
+;@ test: slot = rand(0, 15)
 UpdateEntity::
 ;> hActiveEntityType = wEntityType[slot]
 	ld hl, wEntityType
@@ -13825,6 +13834,7 @@ EntityStatusHandlers::
 ;@ def RunEntityHandlerFrom3(slot: bc)
 ;@ path: entity/engine
 ;@ RunEntityHandler for code in bank 3, which is switched back in afterwards.
+;@ test: slot = rand(0, 15)
 RunEntityHandlerFrom3::
 ;> RunEntityHandler(slot)
 	call RunEntityHandler
@@ -13839,11 +13849,11 @@ RunEntityHandlerFrom3::
 ;@ $03:$4000 (one byte per type; bank 3 must be switched in), its address from EntityHandlers.
 ;@ test: skip dispatches into the entity handlers of eight banks
 RunEntityHandler::
-;>@bk SwitchBank(mem[0x4000 + hActiveEntityType])
+;>@bk SwitchBank(mem[EntityHandlerBankTable + hActiveEntityType])
 	ldh a, [hActiveEntityType]
 	ld e, a
 	ld d, b
-	ld hl, $4000
+	ld hl, EntityHandlerBankTable
 	add hl, de
 	ld a, [hl]
 ;=@bk
@@ -14140,6 +14150,7 @@ LoadEntityHitbox::
 ;@ def SetEntitySpriteVariant(slot: bc, variant: a)
 ;@ path: entity/engine
 ;@ Sets the entity's sprite variant.
+;@ test: slot = rand(0, 15)
 SetEntitySpriteVariant::
 ;> wEntitySpriteVariant[slot] = variant
 	ld hl, wEntitySpriteVariant
@@ -14152,6 +14163,7 @@ SetEntitySpriteVariant::
 ;@ def IncrementEntityState(slot: bc)
 ;@ path: entity/engine
 ;@ Moves the entity's state machine on to its next state.
+;@ test: slot = rand(0, 15)
 IncrementEntityState::
 ;> wEntityState[slot] += 1
 	ld hl, wEntityState
@@ -14178,6 +14190,7 @@ BounceLinkBack::
 ;@ path: entity/collision
 ;@ EntityCheckWalls_03 from any bank: the entity stops at walls and solid room objects (its ground status is
 ;@ looked at and cleared).
+;@ test: slot = rand(0, 15)
 EntityCheckWalls::
 ;> set_rom_bank(0x03)
 	ld a, $03
@@ -14191,6 +14204,7 @@ EntityCheckWalls::
 ;@ def EntityCheckObjectCollision(slot: bc)
 ;@ path: entity/collision
 ;@ EntityCheckObjectCollision_03 from any bank: what the entity has run into in the room (wall, hole, water, ...).
+;@ test: slot = rand(0, 15)
 EntityCheckObjectCollision::
 ;> set_rom_bank(0x03)
 	ld a, $03
@@ -14204,6 +14218,7 @@ EntityCheckObjectCollision::
 ;@ def EntityCheckHits(slot: bc)
 ;@ path: entity/collision
 ;@ EntityCheckHits_03 from any bank: contact damage to Link and hits from Link's weapons.
+;@ test: slot = rand(0, 15)
 EntityCheckHits::
 ;> set_rom_bank(0x03)
 	ld a, $03
@@ -14217,6 +14232,7 @@ EntityCheckHits::
 ;@ def EntityCheckContactDamage(slot: bc)
 ;@ path: entity/collision
 ;@ EntityCheckContactDamage_03 from any bank: the entity hurts Link when it touches him.
+;@ test: slot = rand(0, 15)
 EntityCheckContactDamage::
 ;> set_rom_bank(0x03)
 	ld a, $03
@@ -14230,6 +14246,7 @@ EntityCheckContactDamage::
 ;@ def EntityCheckTouchLink(slot: bc)
 ;@ path: entity/collision
 ;@ ProjectileHitsLink from any bank: the entity hits Link when they touch (while Link walks on the ground).
+;@ test: slot = rand(0, 15)
 EntityCheckTouchLink::
 ;> set_rom_bank(0x03)
 	ld a, $03
@@ -14243,6 +14260,7 @@ EntityCheckTouchLink::
 ;@ def EntityTouchesLink(slot: bc) -> carry
 ;@ path: entity/collision
 ;@ EntityTouchesLink_03 from any bank: carry set when the entity touches Link.
+;@ test: slot = rand(0, 15)
 EntityTouchesLink::
 ;> set_rom_bank(0x03)
 	ld a, $03
@@ -14257,6 +14275,7 @@ EntityTouchesLink::
 ;@ def EntityCheckSwordClash(slot: bc)
 ;@ path: entity/collision
 ;@ EntityCheckSwordClash_03 from any bank: Link's sword against the entity's clash box (parrying).
+;@ test: slot = rand(0, 15)
 EntityCheckSwordClash::
 ;> set_rom_bank(0x03)
 	ld a, $03
@@ -14270,6 +14289,7 @@ EntityCheckSwordClash::
 ;@ def EntityCheckWeaponHits(slot: bc)
 ;@ path: entity/collision
 ;@ EntityCheckWeaponHits_03 from any bank: hits from Link's weapons only (no contact damage).
+;@ test: slot = rand(0, 15)
 EntityCheckWeaponHits::
 ;> set_rom_bank(0x03)
 	ld a, $03
@@ -14283,6 +14303,7 @@ EntityCheckWeaponHits::
 ;@ def EntityHitOtherEntities(slot: bc)
 ;@ path: entity/collision
 ;@ EntityHitOtherEntities_03 from any bank: the entity hits the other entities it touches.
+;@ test: slot = rand(0, 15)
 EntityHitOtherEntities::
 ;> set_rom_bank(0x03)
 	ld a, $03
@@ -14293,43 +14314,45 @@ EntityHitOtherEntities::
 	jp RestoreBank
 
 
-;@ def SpawnEntity(type: a) -> (de, carry)
+;@ def SpawnEntity(slot: bc, type: a) -> (de, carry)
 ;@ path: entity/spawn
 ;@ SpawnEntity_03 from any bank: a new entity of type `type` in the first free slot (de = the slot;
 ;@ carry set when none is free). The carry is kept across the bank switch back.
+;@ test: slot = rand(0, 15)
 SpawnEntity::
 ;> set_rom_bank(0x03)
 	push af
 	ld a, $03
 	ld [$2100], a
 	pop af
-;> slot, full = SpawnEntity_03(type)
+;> new, full = SpawnEntity_03(slot, type)
 	call SpawnEntity_03
 ;> set_rom_bank(wCurrentBank)              # (rr / rl l keep the carry)
 	rr l
 	call RestoreBank
 	rl l
-;> return slot, full
+;> return new, full
 	ret
 
 
-;@ def SpawnEntityFromSlot(type: a, last: e) -> (de, carry)
+;@ def SpawnEntityFromSlot(slot: bc, type: a, last: e) -> (de, carry)
 ;@ path: entity/spawn
 ;@ SpawnEntityFromSlot_03 from any bank: like SpawnEntity, but only slots 0-`last` are used (de = the
 ;@ slot; carry set when none is free).
+;@ test: slot = rand(0, 15)
 SpawnEntityFromSlot::
 ;> set_rom_bank(0x03)
 	push af
 	ld a, $03
 	ld [$2100], a
 	pop af
-;> slot, full = SpawnEntityFromSlot_03(type, last)
+;> new, full = SpawnEntityFromSlot_03(slot, type, last)
 	call SpawnEntityFromSlot_03
 ;> set_rom_bank(wCurrentBank)              # (rr / rl l keep the carry)
 	rr l
 	call RestoreBank
 	rl l
-;> return slot, full
+;> return new, full
 	ret
 
 
@@ -14337,6 +14360,7 @@ SpawnEntityFromSlot::
 ;@ path: entity/movement
 ;@ SetEntitySpeedTowardsLink_03 from any bank: sets the entity's x / y speed to move towards Link at `speed` (the vector
 ;@ is also left in hMultiPurpose0 / 1).
+;@ test: slot = rand(0, 15)
 SetEntitySpeedTowardsLink::
 ;> set_rom_bank(0x03)
 	ld hl, $2100
@@ -14351,6 +14375,7 @@ SetEntitySpeedTowardsLink::
 ;@ path: entity/movement
 ;@ GetVectorTowardsLink_03 from any bank: the speed vector from the entity towards Link at `speed`: y in
 ;@ hMultiPurpose0, x in hMultiPurpose1.
+;@ test: slot = rand(0, 15)
 GetVectorTowardsLink::
 ;> set_rom_bank(0x03)
 	ld hl, $2100
@@ -14425,7 +14450,7 @@ DrawEntity16x16::
 ;> if tile & 0x0F == 0x0F:                     # an empty half: moved off the screen
 	and $0f
 	cp $0f
-	jr nz, jr_000_3c83
+	jr nz, .next
 
 ;>     mem[oam + 1] = 0xF0
 	dec de
@@ -14433,7 +14458,7 @@ DrawEntity16x16::
 	ld [de], a
 	inc de
 
-jr_000_3c83:
+.next
 ;> mem[oam + 3] = mem[entry + 1] ^ hActiveEntityFlipAttribute
 	inc de
 	ld a, [hli]
@@ -14471,7 +14496,7 @@ jr_000_3c83:
 ;> if tile & 0x0F == 0x0F:
 	and $0f
 	cp $0f
-	jr nz, jr_000_3cb5
+	jr nz, .finishEntityDraw
 
 ;>     mem[oam + 5] = 0xF0
 	dec de
@@ -14479,7 +14504,7 @@ jr_000_3c83:
 	ld [de], a
 	inc de
 
-jr_000_3cb5:
+.finishEntityDraw
 ;> mem[oam + 7] = mem[entry + 3] ^ hActiveEntityFlipAttribute
 	inc de
 	ld a, [hl]
@@ -14504,7 +14529,7 @@ FinishEntityDraw::
 ;> ReserveEntityOAM_15(slot)
 	call ReserveEntityOAM_15
 
-jr_000_3cca:
+.drawEntityShadow
 ;> DrawEntityShadow_15(slot)
 	call DrawEntityShadow_15
 ;> set_rom_bank(wCurrentBank)
@@ -14543,14 +14568,14 @@ DrawEntity8x16::
 	ldh a, [hIsSideScrolling]
 	and a
 	ldh a, [hActiveEntityDrawY]
-	jr z, jr_000_3cf5
+	jr z, .setEntry
 
 ;>     y = u8(y - 4)
 	sub $04
 ;>     hActiveEntityDrawY = y
 	ldh [hActiveEntityDrawY], a
 
-jr_000_3cf5:
+.setEntry
 ;> mem[oam] = y
 	ld [de], a
 	inc de
@@ -14594,7 +14619,7 @@ DrawEntityShadow::
 	ld [$2100], a
 ;> DrawEntityShadow_15(slot)
 ;> set_rom_bank(wCurrentBank)
-	jr jr_000_3cca
+	jr FinishEntityDraw.drawEntityShadow
 
 ;@ def DrawEntitySpritesAtOAMStart(count: c, sprites: hl)
 ;@ path: entity/draw
@@ -14653,7 +14678,7 @@ DrawSpriteListToOAM::
 	ldh a, [hMultiPurpose0]
 	ld c, a
 
-jr_000_3d46:
+.setTile
 ;>     mem[oam] = u8(hActiveEntityDrawY + mem[sprites])
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
@@ -14682,7 +14707,7 @@ jr_000_3d46:
 	pop af
 ;>     if tile == 0xFF:                         # an unused sprite: moved off the screen
 	cp $ff
-	jr nz, jr_000_3d68
+	jr nz, .setOam
 
 ;>         mem[oam + 1] = 0
 	dec de
@@ -14690,7 +14715,7 @@ jr_000_3d46:
 	ld [de], a
 	inc de
 
-jr_000_3d68:
+.setOam
 ;>     mem[oam + 3] = hActiveEntityFlipAttribute ^ mem[sprites + 3]
 	pop bc
 	inc de
@@ -14701,7 +14726,7 @@ jr_000_3d68:
 ;>     oam += 4; sprites += 4
 	inc de
 	dec c
-	jr nz, jr_000_3d46
+	jr nz, .setTile
 
 ;> set_rom_bank(0x15)
 	ld a, [wActiveEntitySlot]
@@ -14736,20 +14761,20 @@ SkipDrawIfOffscreen::
 	push hl
 	ld a, [wRoomTransitionState]
 	and a
-	jr z, jr_000_3dad
+	jr z, .return2
 
 ;>     if u8(hActiveEntityX - 1) >= 0xC0:
 	ldh a, [hActiveEntityX]
 	dec a
 	cp $c0
-	jr nc, jr_000_3dac
+	jr nc, .return
 
 ;>@off         return_from_caller()
 ;>     elif u8(hActiveEntityDrawY - 1) >= 0x88:
 	ldh a, [hActiveEntityDrawY]
 	dec a
 	cp $88
-	jr nc, jr_000_3dac
+	jr nc, .return
 
 ;>@off         return_from_caller()
 ;>     elif wEntityPosXHigh[slot]:
@@ -14757,7 +14782,7 @@ SkipDrawIfOffscreen::
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr nz, jr_000_3dac
+	jr nz, .return
 
 ;>@off         return_from_caller()
 ;>     elif wEntityPosYHigh[slot]:
@@ -14765,14 +14790,14 @@ SkipDrawIfOffscreen::
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_000_3dad
+	jr z, .return2
 
 ;>@off         return_from_caller()
-jr_000_3dac:
+.return
 ;=@off
 	pop af
 
-jr_000_3dad:
+.return2
 ;> return
 	pop hl
 	ret
@@ -14851,6 +14876,7 @@ MiniMoldormInitFar::
 ;@ path: entity/init
 ;@ MoldormInit (bank 4) from any bank: set-up of a new Moldorm, an entry of the entity init table
 ;@ in bank 3.
+;@ test: slot = rand(0, 15)
 MoldormInitFar::
 ;> set_rom_bank(0x04)
 	ld hl, $2100
@@ -14864,6 +14890,7 @@ MoldormInitFar::
 ;@ path: entity/init
 ;@ FacadeInit (bank 4) from any bank: set-up of a new Facade, an entry of the entity init table in
 ;@ bank 3.
+;@ test: slot = rand(0, 15)
 FacadeInitFar::
 ;> set_rom_bank(0x04)
 	ld hl, $2100
@@ -14877,6 +14904,7 @@ FacadeInitFar::
 ;@ path: entity/init
 ;@ SlimeEyeInit (bank 4) from any bank: set-up of a new Slime Eye, an entry of the entity init
 ;@ table in bank 3.
+;@ test: slot = rand(0, 15)
 SlimeEyeInitFar::
 ;> set_rom_bank(0x04)
 	ld hl, $2100
@@ -14890,6 +14918,7 @@ SlimeEyeInitFar::
 ;@ path: entity/init
 ;@ GenieInit (bank 4) from any bank: set-up of a new Genie (entity $5C), an entry of the entity init
 ;@ table in bank 3.
+;@ test: slot = rand(0, 15)
 GenieInitFar::
 ;> set_rom_bank(0x04)
 	ld hl, $2100
@@ -14903,6 +14932,7 @@ GenieInitFar::
 ;@ path: entity/init
 ;@ SlimeEelInit (bank 5) from any bank: set-up of a new Slime Eel, an entry of the entity init table
 ;@ in bank 3.
+;@ test: slot = rand(0, 15)
 SlimeEelInitFar::
 ;> set_rom_bank(0x05)
 	ld hl, $2100
@@ -14943,6 +14973,7 @@ HideEntityWithFullHealthFar::
 ;@ def EvilEagleArenaSetupFar(slot: bc)
 ;@ path: entity/init
 ;@ EvilEagleArenaSetup (bank 5) from any bank: sets up the fight on top of Eagle's Tower again.
+;@ test: slot = rand(0, 15)
 EvilEagleArenaSetupFar::
 ;> set_rom_bank(0x05)
 	ld hl, $2100
@@ -14986,21 +15017,22 @@ CheckLinkLeavesRoomFar::
 
 ;@ def GhiniMoveFar(slot: bc)
 ;@ path: entity/init
-;@ The Ghini behaviour in bank 4 from any bank, entered at 04:5C5A inside GhiniCommon, after its hit
-;@ checks: position and height update, hovering and the rest of its movement.
-;@ test: skip enters bank 4 in the middle of GhiniCommon
+;@ GhiniMove (bank 4) from any bank: the movement part of the Ghini behaviour, after its hit checks
+;@ (position and height update, hovering and the rest of its movement).
+;@ test: skip switches ROM banks
 GhiniMoveFar::
 ;> set_rom_bank(0x04)
 	ld hl, $2100
 	ld [hl], $04
-;> pass                                        # GhiniCommon from 04:5C5A on (its movement part)
-	call $5c5a
+;> GhiniMove(slot)
+	call GhiniMove
 ;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 ;@ def BreakIntoPiecesFar(slot: bc)
 ;@ path: object/liftable
 ;@ BreakIntoPieces (bank 3) from any bank: the entity in `slot` is replaced by breaking pot pieces.
+;@ test: slot = rand(0, 15)
 BreakIntoPiecesFar::
 ;> set_rom_bank(0x03)
 	ld hl, $2100
@@ -15072,6 +15104,7 @@ GiveInventoryItemFar::
 ;@ path: item/instruments
 ;@ DrawInstrumentWarpEffect (bank 6) for the instrument entity in bank 3, which is switched back to afterwards:
 ;@ draws the 16 animated sprites around Link while an instrument warps him out of the dungeon.
+;@ test: slot = rand(0, 15)
 DrawInstrumentWarpEffectFrom3::
 ;> SwitchBank(0x06)
 	ld a, $06
@@ -15091,12 +15124,12 @@ ClearAllEntitySlots::
 	ld e, $10
 	ld hl, wEntityStatus
 
-jr_000_3eb2:
+.loop
 ;>     wEntityStatus[i] = 0
 	xor a
 	ld [hli], a
 	dec e
-	jr nz, jr_000_3eb2
+	jr nz, .loop
 
 	ret
 
@@ -15106,6 +15139,7 @@ jr_000_3eb2:
 ;@ For an entity sent flying by a hit with the Piece of Power (wEntityHitByPowerUp): every 4th frame
 ;@ (shifted by the slot number) leaves a visual effect of kind 8 at its draw position, shown for $0F
 ;@ frames.
+;@ test: slot = rand(0, 15)
 AddPowerHitTrailVfx::
 ;> if not wEntityHitByPowerUp[slot]: return
 	ld hl, wEntityHitByPowerUp
@@ -15149,13 +15183,13 @@ EndHitImmunityAtWall::
 	ld a, [hl]
 ;> if dx & 0x80:
 	bit 7, a
-	jr z, jr_000_3ee4
+	jr z, .setMultiPurpose0
 
 ;>     dx = u8(-dx)
 	cpl
 	inc a
 
-jr_000_3ee4:
+.setMultiPurpose0
 ;> hMultiPurpose0 = dx
 	ldh [hMultiPurpose0], a
 ;> dy = wEntityRecoilSpeedY[slot]
@@ -15164,35 +15198,35 @@ jr_000_3ee4:
 	ld a, [hl]
 ;> if dy & 0x80:
 	bit 7, a
-	jr z, jr_000_3ef1
+	jr z, .setWalls
 
 ;>     dy = u8(-dy)
 	cpl
 	inc a
 
-jr_000_3ef1:
+.setWalls
 ;> walls = 0x03 if dy < hMultiPurpose0 else 0x0C     # mostly sideways: the right / left wall bits
 	ld e, $03
 	ld hl, hMultiPurpose0
 	cp [hl]
-	jr c, jr_000_3efb
+	jr c, .checkWalls
 
 	ld e, $0c
 
-jr_000_3efb:
+.checkWalls
 ;> if walls & wEntityCollisions[slot]:
 	ld a, e
 	ld hl, wEntityCollisions
 	add hl, bc
 	and [hl]
-	jr z, jr_000_3f08
+	jr z, .return
 
 ;>     wEntityIgnoreHitsTimer[slot] = 0
 	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
 	ld [hl], b
 
-jr_000_3f08:
+.return
 ;> return
 	ret
 
@@ -15212,6 +15246,7 @@ BossIntroDialogs::
 ;@ it stays). If the screen fade is done by then (wTransitionSequenceCounter = 4), the boss's opening
 ;@ line is shown: dialog $DA for entity $87, $26 for entity $BC, else the one of the dungeon from
 ;@ BossIntroDialogs (none with option bit 2 or in map 5).
+;@ test: slot = rand(0, 15)
 StartBossMusic::
 ;> if wRoomTransitionState | wInventoryAppearing: return
 	ld hl, wInventoryAppearing
@@ -15222,7 +15257,7 @@ StartBossMusic::
 ;> if wBossMusicDelay:
 	ld a, [wBossMusicDelay]
 	and a
-	jr z, jr_000_3f25
+	jr z, .checkBossMusicStarted
 
 ;>     wBossMusicDelay -= 1
 	dec a
@@ -15231,7 +15266,7 @@ StartBossMusic::
 	ret
 
 
-jr_000_3f25:
+.checkBossMusicStarted
 ;> if wBossMusicStarted: return
 	ld a, [wBossMusicStarted]
 	and a
@@ -15247,11 +15282,11 @@ jr_000_3f25:
 	and $04
 ;> track = 0x50 if other else 0x19
 	ld a, $19
-	jr z, jr_000_3f3b
+	jr z, .setMusicTrackToPlay
 
 	ld a, $50
 
-jr_000_3f3b:
+.setMusicTrackToPlay
 ;> wMusicTrackToPlay = track
 	ld [wMusicTrackToPlay], a
 ;> hDefaultMusicTrackAlt = track
@@ -15264,48 +15299,48 @@ jr_000_3f3b:
 ;> if hActiveEntityType == 0x87:
 	ldh a, [hActiveEntityType]
 	cp $87
-	jr nz, jr_000_3f50
+	jr nz, .checkActiveEntityType
 
 ;>     dialog = 0xDA
 	ld a, $da
-	jr jr_000_3f6e
+	jr .openDialog
 
-jr_000_3f50:
+.checkActiveEntityType
 ;> elif hActiveEntityType == 0xBC:
 	cp $bc
-	jr nz, jr_000_3f58
+	jr nz, .checkEntityOptions1
 
 ;>     dialog = 0x26
 	ld a, $26
-	jr jr_000_3f6e
+	jr .openDialog
 
-jr_000_3f58:
+.checkEntityOptions1
 ;>@m5 elif wEntityOptions1[slot] & 0x04 or hMapId == 5:
 	ld hl, wEntityOptions1
 	add hl, bc
 	ld a, [hl]
 	and $04
-	jr nz, jr_000_3f71
+	jr nz, .return
 
 ;=@m5
 	ldh a, [hMapId]
 	cp $05
-	jr z, jr_000_3f71
+	jr z, .return
 
 ;>@rt     return
 ;> else:
-;>     dialog = BossIntroDialogs[hMapId]
+;>     dialog = mem[BossIntroDialogs + hMapId]
 	ld e, a
 	ld d, b
 	ld hl, BossIntroDialogs
 	add hl, de
 	ld a, [hl]
 
-jr_000_3f6e:
+.openDialog
 ;> OpenDialog(dialog)
 	call OpenDialog
 
-jr_000_3f71:
+.return
 ;=@rt
 	ret
 
@@ -15319,6 +15354,7 @@ RoomEntityBitMask2::
 ;@ path: entity/defeat
 ;@ Ends a defeated entity: mem[$C113] is set to 3, DropDefeatedEntityItem (bank 3) leaves its item,
 ;@ then DefeatEntity notes it as defeated and frees its slot.
+;@ test: slot = rand(0, 15)
 DefeatEntityWithDrop::
 ;> mem[0xC113] = 3
 	ld a, $03

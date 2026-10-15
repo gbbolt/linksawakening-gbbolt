@@ -5,19 +5,32 @@
 
 SECTION "ROM Bank $01f", ROMX[$4000], BANK[$1f]
 
+;@ def SoundEntryInit()
+;@ path: sound/sfx/engine
+;@ Entry point $4000 of the sound effect bank, called by Init at power-on: sets the sound engines up
+;@ (InitSoundEngine).
+;@ test: skip resets the whole sound state
+SoundEntryInit::
+;> return InitSoundEngine()
 	jp InitSoundEngine
 
 
 ;@ def SoundEntryStopAll()
 ;@ path: sound/sfx/engine
-;@ The entry points at the start of the sound effect bank: $4000 jumps to InitSoundEngine, $4003 (here) to
-;@ StopAllSound, $4006 to UpdateSoundEffects (once a frame).
+;@ Entry point $4003 of the sound effect bank: stops all music and sound effects (StopAllSound).
 ;@ test: skip resets the whole sound state
 SoundEntryStopAll::
 ;> return StopAllSound()
 	jp StopAllSound
 
-;> # ($4006: jp UpdateSoundEffects, the per-frame entry)
+
+;@ def SoundEntryUpdate()
+;@ path: sound/sfx/engine
+;@ Entry point $4006 of the sound effect bank, called once a frame by UpdateSound: plays the sound effects
+;@ on (UpdateSoundEffects).
+;@ test: skip runs the effect routines through their tables
+SoundEntryUpdate::
+;> return UpdateSoundEffects()
 	jp UpdateSoundEffects
 
 

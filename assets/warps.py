@@ -18,7 +18,7 @@ def build(ctx):
     rom = ctx.rom
     rd = _la.RoomData(rom)
     names = _la.Names(ctx)
-    rows = []
+    rows, recs = [], []
     for g in ('ow', 'A', 'B'):
         for r in range(256):
             bank, addr = rd.address(g, r)
@@ -30,7 +30,12 @@ def build(ctx):
                 dg = 'ow' if t == 0 else _la.group_of_map(mp)
                 rows.append([room_cell(g, r), {'text': label, 'code': label} if label else '-', t,
                              '-' if t == 0 else '${:02X}'.format(mp), room_cell(dg, room), x, y])
-    return [{'name': 'warps', 'type': 'table', 'title': 'Warps', 'subtitle': '{} warps'.format(len(rows)),
+                recs.append({'from_group': 'overworld' if g == 'ow' else 'indoor' + g, 'from_room': r,
+                             'data': label, 'type': t, 'map': mp, 'to_group': 'overworld' if dg == 'ow' else
+                             'indoor' + dg, 'to_room': room, 'x': x, 'y': y})
+    return [_la.export(ctx, 'warps', 'Warps (download)', recs,
+                       'Every warp record of the room data: the room it is in, its type, the destination map and '
+                       'room, and where Link appears (x, y in pixels).'), {'name': 'warps', 'type': 'table', 'title': 'Warps', 'subtitle': '{} warps'.format(len(rows)),
              'unit': 'OverworldRoomPointers',
              'columns': ['from room', 'room data', 'type', 'map', 'to room', 'x', 'y'], 'rows': rows,
              'doc': ['Every warp record of the room data ($E0-$E3 + 4 bytes, see OverworldRoomPointers): the room '

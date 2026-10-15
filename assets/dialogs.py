@@ -47,7 +47,7 @@ def lines(chars):
 def build(ctx):
     rom = ctx.rom
     names = _la.Names(ctx)
-    rows = []
+    rows, recs = [], []
     for i in range(COUNT):
         p = rom[_la.lin(0x1C, POINTERS + 2 * i)] | rom[_la.lin(0x1C, POINTERS + 2 * i + 1)] << 8
         flags = rom[_la.lin(0x1C, BANKS + i)]
@@ -63,7 +63,12 @@ def build(ctx):
             text += '\n[two answers]'
         rows.append(['${:03X}'.format(i), {'text': label, 'code': label} if label else loc,
                      'no' if flags & 0x80 else 'yes', size, text])
-    return [{'name': 'dialogs', 'type': 'table', 'title': 'Dialogs', 'unit': 'DialogPointers',
+        recs.append({'dialog': i, 'bank': bank, 'address': p, 'label': label, 'b_skips': not flags & 0x80,
+                     'bytes': size, 'two_answers': end == 0xFE, 'lines': lines(chars)})
+    out = [_la.export(ctx, 'dialogs', 'Dialogs (download)', recs,
+                      'All dialogs with their text address and bank, whether B hurries them, their size, whether they '
+                      'end in a choice of two answers, and the text in its 16-letter box lines.')]
+    return out + [{'name': 'dialogs', 'type': 'table', 'title': 'Dialogs', 'unit': 'DialogPointers',
              'subtitle': '{} dialogs'.format(COUNT),
              'columns': ['dialog', 'text data', 'B skips', 'bytes', 'text'], 'rows': rows,
              'doc': ['Every dialog of the game as the dialog box shows it. A dialog number (OpenDialog: $000-$0FF, '

@@ -119,7 +119,7 @@ ResetEntityVariables::
 	add hl, bc
 	ld [hl], b
 ;> wEntityLiftStep[slot] = 0
-	ld hl, $c490
+	ld hl, wEntityLiftStep
 	add hl, bc
 	ld [hl], b
 ;> wEntityFlashTimer[slot] = 0
@@ -175,7 +175,7 @@ CastleGateSwitchWait::
 	ld a, [wFloorSwitchPressedTimer]
 	and a
 	jr z, .done
-;>     IncrementEntityState()                            # next state
+;>     IncrementEntityState(slot)                            # next state
 	call IncrementEntityState
 ;>     wEntityTimer[slot] = 0x20
 	call GetEntityTimer
@@ -203,7 +203,7 @@ CastleGateSwitchPause::
 ;>     hNoiseSfx = 0x11                       # rumble
 	ld a, $11
 	ldh [hNoiseSfx], a
-;>     IncrementEntityState()                            # next state
+;>     IncrementEntityState(slot)                            # next state
 	call IncrementEntityState
 
 .done
@@ -264,14 +264,14 @@ LeverBlockSprites::
 ;@ holds the lever it stays put. Link cannot walk through it.
 ;@ test: skip jumps through a table
 LeverBlockDownHandler::
-;> DrawEntity16x16(LeverBlockSprites)              # draw it
+;> DrawEntity16x16(slot, LeverBlockSprites)              # draw it
 	ld de, LeverBlockSprites
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
-;> hBGTilesRequestCopy = 0                    # (scratch here) set when the block rests at its end
+;> hMultiPurposeG = 0                    # (scratch here) set when the block rests at its end
 	xor a
-	ldh [hBGTilesRequestCopy], a
+	ldh [hMultiPurposeG], a
 ;> LeverBlockDownStates[hActiveEntityState]()
 	ldh a, [hActiveEntityState]
 	rst $00
@@ -300,7 +300,7 @@ LeverBlockDownInit::
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], a
-;> IncrementEntityState()                                # next state
+;> IncrementEntityState(slot)                                # next state
 	jp IncrementEntityState
 
 
@@ -356,7 +356,7 @@ LeverBlockDownSlide::
 	cp [hl]
 ;=@eq
 	jr z, .atEnd
-;>@fw     hBGTilesRequestCopy += 1                # at the end
+;>@fw     hMultiPurposeG += 1                # at the end
 ;> else:
 ;>     count = wEntityPrivateCounter[slot]
 	ld hl, wEntityPrivateCounter
@@ -377,7 +377,7 @@ LeverBlockDownSlide::
 
 .atEnd
 ;=@fw
-	ld hl, hBGTilesRequestCopy
+	ld hl, hMultiPurposeG
 	inc [hl]
 ;> PushLinkOutOfLeverBlock(slot)              # falls through
 
@@ -389,7 +389,7 @@ LeverBlockDownSlide::
 ;@ ($46 down: not below it, $47 up: not above it).
 ;@ test: skip calls routines in other banks
 PushLinkOutOfLeverBlock::
-;> LoadEntityPosition()                                # active position copies
+;> LoadEntityPosition(slot)                                # active position copies
 	call LoadEntityPosition
 ;> _, dx = GetEntityXDistanceToLink_15(slot)
 	call GetEntityXDistanceToLink_15
@@ -435,11 +435,11 @@ PushLinkOutOfLeverBlock::
 ;> elif side == 2:                            # above
 	cp $02
 	jr nz, .below
-;>     if hActiveEntityType == 0x47 and hBGTilesRequestCopy: return
+;>     if hActiveEntityType == 0x47 and hMultiPurposeG: return
 	ldh a, [hActiveEntityType]
 	cp $47
 	jr nz, .pushUp
-	ldh a, [hBGTilesRequestCopy]
+	ldh a, [hMultiPurposeG]
 	and a
 	ret nz
 
@@ -453,11 +453,11 @@ PushLinkOutOfLeverBlock::
 
 .below
 ;> else:                                     # below
-;>     if hActiveEntityType == 0x46 and hBGTilesRequestCopy: return
+;>     if hActiveEntityType == 0x46 and hMultiPurposeG: return
 	ldh a, [hActiveEntityType]
 	cp $46
 	jr nz, .pushDown
-	ldh a, [hBGTilesRequestCopy]
+	ldh a, [hMultiPurposeG]
 	and a
 	ret nz
 
@@ -477,14 +477,14 @@ PushLinkOutOfLeverBlock::
 ;@ LeverBlockDownHandler; pulling the lever moves it back down).
 ;@ test: skip jumps through a table
 LeverBlockUpHandler::
-;> DrawEntity16x16(LeverBlockSprites)              # draw it
+;> DrawEntity16x16(slot, LeverBlockSprites)              # draw it
 	ld de, LeverBlockSprites
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
-;> hBGTilesRequestCopy = 0                    # (scratch here) set when the block rests at its end
+;> hMultiPurposeG = 0                    # (scratch here) set when the block rests at its end
 	xor a
-	ldh [hBGTilesRequestCopy], a
+	ldh [hMultiPurposeG], a
 ;> LeverBlockUpStates[hActiveEntityState]()
 	ldh a, [hActiveEntityState]
 	rst $00
@@ -513,7 +513,7 @@ LeverBlockUpInit::
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], a
-;> IncrementEntityState()                                # next state
+;> IncrementEntityState(slot)                                # next state
 	jp IncrementEntityState
 
 
@@ -570,7 +570,7 @@ LeverBlockUpSlide::
 	cp [hl]
 ;=@eq
 	jr z, .atEnd
-;>@fw     hBGTilesRequestCopy += 1                # at the end
+;>@fw     hMultiPurposeG += 1                # at the end
 ;> else:
 ;>     count = wEntityPrivateCounter[slot]
 	ld hl, wEntityPrivateCounter
@@ -591,7 +591,7 @@ LeverBlockUpSlide::
 
 .atEnd
 ;=@fw
-	ld hl, hBGTilesRequestCopy
+	ld hl, hMultiPurposeG
 	inc [hl]
 
 .push
@@ -606,14 +606,14 @@ LeverBlockUpSlide::
 ;@ LeverBlockDownHandler; pulling the lever moves it back left).
 ;@ test: skip jumps through a table
 LeverBlockRightHandler::
-;> DrawEntity16x16(LeverBlockSprites)              # draw it
+;> DrawEntity16x16(slot, LeverBlockSprites)              # draw it
 	ld de, LeverBlockSprites
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
-;> hBGTilesRequestCopy = 0                    # (scratch here) set when the block rests at its end
+;> hMultiPurposeG = 0                    # (scratch here) set when the block rests at its end
 	xor a
-	ldh [hBGTilesRequestCopy], a
+	ldh [hMultiPurposeG], a
 ;> LeverBlockRightStates[hActiveEntityState]()
 	ldh a, [hActiveEntityState]
 	rst $00
@@ -642,7 +642,7 @@ LeverBlockRightInit::
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], a
-;> IncrementEntityState()                                # next state
+;> IncrementEntityState(slot)                                # next state
 	jp IncrementEntityState
 
 
@@ -699,7 +699,7 @@ LeverBlockRightSlide::
 	cp [hl]
 ;=@eq
 	jr z, .atEnd
-;>@fw     hBGTilesRequestCopy += 1                # at the end
+;>@fw     hMultiPurposeG += 1                # at the end
 ;> else:
 ;>     count = wEntityPrivateCounter[slot]
 	ld hl, wEntityPrivateCounter
@@ -720,7 +720,7 @@ LeverBlockRightSlide::
 
 .atEnd
 ;=@fw
-	ld hl, hBGTilesRequestCopy
+	ld hl, hMultiPurposeG
 	inc [hl]
 
 .push
@@ -735,14 +735,14 @@ LeverBlockRightSlide::
 ;@ LeverBlockDownHandler; pulling the lever moves it back right).
 ;@ test: skip jumps through a table
 LeverBlockLeftHandler::
-;> DrawEntity16x16(LeverBlockSprites)              # draw it
+;> DrawEntity16x16(slot, LeverBlockSprites)              # draw it
 	ld de, LeverBlockSprites
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
-;> hBGTilesRequestCopy = 0                    # (scratch here) set when the block rests at its end
+;> hMultiPurposeG = 0                    # (scratch here) set when the block rests at its end
 	xor a
-	ldh [hBGTilesRequestCopy], a
+	ldh [hMultiPurposeG], a
 ;> LeverBlockLeftStates[hActiveEntityState]()
 	ldh a, [hActiveEntityState]
 	rst $00
@@ -771,7 +771,7 @@ LeverBlockLeftInit::
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], a
-;> IncrementEntityState()                                # next state
+;> IncrementEntityState(slot)                                # next state
 	jp IncrementEntityState
 
 
@@ -828,7 +828,7 @@ LeverBlockLeftSlide::
 	cp [hl]
 ;=@eq
 	jr z, .atEnd
-;>@fw     hBGTilesRequestCopy += 1                # at the end
+;>@fw     hMultiPurposeG += 1                # at the end
 ;> else:
 ;>     count = wEntityPrivateCounter[slot]
 	ld hl, wEntityPrivateCounter
@@ -849,7 +849,7 @@ LeverBlockLeftSlide::
 
 .atEnd
 ;=@fw
-	ld hl, hBGTilesRequestCopy
+	ld hl, hMultiPurposeG
 	inc [hl]
 
 .push
@@ -880,18 +880,18 @@ CrystalSwitchHandler::
 	rla
 	and $10
 	ldh [hActiveEntityFlipAttribute], a
-;> DrawEntity16x16(CrystalSwitchSprites)           # draw it
+;> DrawEntity16x16(slot, CrystalSwitchSprites)           # draw it
 	ld de, CrystalSwitchSprites
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
-;> DecrementEntityIgnoreHitsTimer()                                # count down the ignore-hits timer
+;> DecrementEntityIgnoreHitsTimer(slot)                                # count down the ignore-hits timer
 	call DecrementEntityIgnoreHitsTimer
-;> EntityCheckWeaponHits()                                # weapons hit it
+;> EntityCheckWeaponHits(slot)                                # weapons hit it
 	call EntityCheckWeaponHits
 ;> CheckLinkBumpsEntity_15(slot)              # Link cannot walk through it
 	call CheckLinkBumpsEntity_15
-;> EntityCheckWalls()                                # background collision
+;> EntityCheckWalls(slot)                                # background collision
 	call EntityCheckWalls
 ;> if wEntityFlashTimer[slot]:                # it was just hit
 	ld hl, wEntityFlashTimer
@@ -945,10 +945,10 @@ BouldersHandler::
 	ldh a, [hLinkY]
 	cp $18
 	ret c
-;> new = SpawnEntity(0x45)                      # spawn a boulder
+;> new, full = SpawnEntity(slot, 0x45)                      # spawn a boulder
 	ld a, $45
 	call SpawnEntity
-;> if new is None: return                    # no free slot
+;> if full: return                    # no free slot
 	ret c
 ;>@x wEntityX[new] = ((GetRandomByte() << 4) & 0x70) + 0x18
 	call GetRandomByte
@@ -1014,16 +1014,16 @@ BoulderBounceSpeedZ::
 ;@ the bottom.
 ;@ test: skip calls routines in other banks
 BoulderBouncing::
-;> DrawEntity16x16(BoulderSprites)                 # draw it
+;> DrawEntity16x16(slot, BoulderSprites)                 # draw it
 	ld de, BoulderSprites
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
-;> DecrementEntityIgnoreHitsTimer()                                # count down the ignore-hits timer
+;> DecrementEntityIgnoreHitsTimer(slot)                                # count down the ignore-hits timer
 	call DecrementEntityIgnoreHitsTimer
-;> EntityCheckHits()                                # contact with Link and his weapons
+;> EntityCheckHits(slot)                                # contact with Link and his weapons
 	call EntityCheckHits
-;> SetEntitySpriteVariant((hFrameCounter >> 3) & 3)        # rolling animation
+;> SetEntitySpriteVariant(slot, (hFrameCounter >> 3) & 3)        # rolling animation
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -1228,14 +1228,14 @@ FishHandler::
 ;>         hActiveEntitySpriteVariant = v - 5
 	sub $05
 	ldh [hActiveEntitySpriteVariant], a
-;>         DrawEntity8x16(FishSpritesSingle)
+;>         DrawEntity8x16(slot, FishSpritesSingle)
 	ld de, FishSpritesSingle
 	call DrawEntity8x16
 	jr .drawn
 
 .leaping
 ;>     else:
-;>         DrawEntity16x16(FishSpritesPair)
+;>         DrawEntity16x16(slot, FishSpritesPair)
 	ld de, FishSpritesPair
 	call DrawEntity16x16
 
@@ -1246,7 +1246,7 @@ FishHandler::
 	call ApplyRecoilIfNeeded_15
 ;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
-;> EntityCheckWalls()                                # background collision
+;> EntityCheckWalls(slot)                                # background collision
 	call EntityCheckWalls
 ;> FishStates[hActiveEntityState]()
 	ldh a, [hActiveEntityState]
@@ -1274,7 +1274,7 @@ FishInit::
 	and $7f
 	add $40
 	ld [hl], a
-;> IncrementEntityState()                                # next state
+;> IncrementEntityState(slot)                                # next state
 	jp IncrementEntityState
 
 
@@ -1284,7 +1284,7 @@ FishInit::
 ;@ twice as fast sideways, upward speed $18, drawn with a shadow, with a splash.
 ;@ test: skip calls routines in other banks
 FishSwim::
-;> EntityCheckContactDamage()                                # hurts Link on touch
+;> EntityCheckContactDamage(slot)                                # hurts Link on touch
 	call EntityCheckContactDamage
 ;> if wEntityTimer[slot]: return FishSwimTurn(slot)
 	call GetEntityTimer
@@ -1297,7 +1297,7 @@ FishSwim::
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], $18
-;> IncrementEntityState()                                # next state
+;> IncrementEntityState(slot)                                # next state
 	call IncrementEntityState
 ;> wEntitySpeedX[slot] <<= 1
 	ld hl, wEntitySpeedX
@@ -1358,7 +1358,7 @@ FishSwimTurn::
 	ld e, $05
 
 .set
-;> SetEntitySpriteVariant(frame)
+;> SetEntitySpriteVariant(slot, frame)
 	ld a, e
 	call SetEntitySpriteVariant
 	ret
@@ -1376,7 +1376,7 @@ FishStrayRet::
 ;@ next leap in 80-207 frames, half the speed, no shadow, back to state 1.
 ;@ test: skip calls routines in other banks
 FishLeap::
-;> EntityCheckHits()                                # contact with Link and his weapons
+;> EntityCheckHits(slot)                                # contact with Link and his weapons
 	call EntityCheckHits
 ;> AddEntityZSpeedToPos_15(slot)
 	call AddEntityZSpeedToPos_15
@@ -1437,7 +1437,7 @@ FishLeap::
 	inc e
 
 .rising
-;> SetEntitySpriteVariant(frame)
+;> SetEntitySpriteVariant(slot, frame)
 	ld a, e
 	call SetEntitySpriteVariant
 	ret
@@ -1500,7 +1500,7 @@ FinalNightmareExitStart::
 ;> wEntityTimer[slot] = 0xC0
 	call GetEntityTimer
 	ld [hl], $c0
-;> IncrementEntityState()                                # next step
+;> IncrementEntityState(slot)                                # next step
 	jp IncrementEntityState
 
 
@@ -1539,10 +1539,10 @@ FinalNightmareExitTalk::
 ;> hJingle = 0x2F
 	ld a, $2f
 	ldh [hJingle], a
-;> SetEntitySpriteVariant(0)
+;> SetEntitySpriteVariant(slot, 0)
 	ld a, $00
 	call SetEntitySpriteVariant
-;> IncrementEntityState()                                # next step
+;> IncrementEntityState(slot)                                # next step
 	jp IncrementEntityState
 
 
@@ -1594,7 +1594,7 @@ FinalNightmareExitWaitEnter::
 	ld a, [wIsLinkInTheAir]
 	and a
 	ret nz
-;> IncrementEntityState()                                # next step
+;> IncrementEntityState(slot)                                # next step
 	call IncrementEntityState
 ;> wEntityPrivate1[slot] = 0x30               # Link's y while he rises
 	ld hl, wEntityPrivate1
@@ -1729,7 +1729,7 @@ MoblinKingHandler::
 	call ReturnIfNonInteractive_15
 ;> ApplyRecoilIfNeeded_15(slot)
 	call ApplyRecoilIfNeeded_15
-;> EntityCheckHits()                                # contact with Link and his weapons
+;> EntityCheckHits(slot)                                # contact with Link and his weapons
 	call EntityCheckHits
 ;> wEntityOptions1[slot] |= 0x40
 	ld hl, wEntityOptions1
@@ -1741,7 +1741,7 @@ MoblinKingHandler::
 	res 7, [hl]
 ;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
-;> EntityCheckWalls()                                # background collision
+;> EntityCheckWalls(slot)                                # background collision
 	call EntityCheckWalls
 ;> AddEntityZSpeedToPos_15(slot)
 	call AddEntityZSpeedToPos_15
@@ -1751,13 +1751,13 @@ MoblinKingHandler::
 	dec [hl]
 	dec [hl]
 	dec [hl]
-;> hBGTilesRequestCopy = wEntityZ[slot] & 0x80   # (scratch here) nonzero = he has landed
+;> hMultiPurposeG = wEntityZ[slot] & 0x80   # (scratch here) nonzero = he has landed
 	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and $80
-	ldh [hBGTilesRequestCopy], a
-;> if hBGTilesRequestCopy:
+	ldh [hMultiPurposeG], a
+;> if hMultiPurposeG:
 	jr z, .states
 ;>     wEntityZ[slot] = 0
 	ld [hl], b
@@ -1800,9 +1800,9 @@ MoblinKingInit::
 ;> wMoblinKingHeadFrame = 0
 	xor a
 	ld [wMoblinKingHeadFrame], a
-;> SetEntitySpriteVariant(0)
+;> SetEntitySpriteVariant(slot, 0)
 	call SetEntitySpriteVariant
-;> IncrementEntityState()                                # next state
+;> IncrementEntityState(slot)                                # next state
 	call IncrementEntityState
 ;> MoblinKingFaceLink(slot)                   # falls through
 
@@ -1838,7 +1838,7 @@ MoblinKingIntro::
 ;> wDialogState &= ~0x80
 	ld hl, wDialogState
 	res 7, [hl]
-;> IncrementEntityState()                                # next state
+;> IncrementEntityState(slot)                                # next state
 	call IncrementEntityState
 ;> wEntityDropTimer[slot] = 0x30              # hops before the first charge
 	call GetEntityDropTimer
@@ -1850,7 +1850,7 @@ MoblinKingIntro::
 ;> wMoblinKingHeadFrame = 1
 	ld a, $01
 	ld [wMoblinKingHeadFrame], a
-;> SetEntitySpriteVariant(1)
+;> SetEntitySpriteVariant(slot, 1)
 	ld a, $01
 	call SetEntitySpriteVariant
 	ret
@@ -1900,10 +1900,10 @@ MoblinKingHop::
 ;>     if t == 0x0C:
 	cp $0c
 	jr nz, .throwPose
-;>         spear = SpawnEntity(0x0C)            # sets hMultiPurpose0-2 to our x, y, direction
+;>         spear, full = SpawnEntity(slot, 0x0C)            # sets hMultiPurpose0-2 to our x, y, direction
 	ld a, $0c
 	call SpawnEntity
-;>         if spear is not None:
+;>         if not full:
 	jr c, .throwPose
 ;>             hNoiseSfx = 0x0A
 	ld a, $0a
@@ -1956,7 +1956,7 @@ MoblinKingHop::
 	pop bc
 
 .throwPose
-;>@tp     SetEntitySpriteVariant(2 if wEntityTimer1[slot] >= 0x0C else 0)   # arm raised, then thrown
+;>@tp     SetEntitySpriteVariant(slot, 2 if wEntityTimer1[slot] >= 0x0C else 0)   # arm raised, then thrown
 	call GetEntityTimer1
 	ld e, $00
 	cp $0c
@@ -1967,7 +1967,7 @@ MoblinKingHop::
 ;=@tp
 	ld a, e
 	call SetEntitySpriteVariant
-;>     ClearEntitySpeed()                            # stands still while throwing
+;>     ClearEntitySpeed(slot)                            # stands still while throwing
 	call ClearEntitySpeed
 ;>     return
 	ret
@@ -1980,16 +1980,16 @@ MoblinKingHop::
 ;>     wEntityTimer[slot] = 0x30
 	call GetEntityTimer
 	ld [hl], $30
-;>     ClearEntitySpeed()                            # stop
+;>     ClearEntitySpeed(slot)                            # stop
 	call ClearEntitySpeed
-;>     return IncrementEntityState()                     # next state: wind-up
+;>     return IncrementEntityState(slot)                     # next state: wind-up
 	call IncrementEntityState
 	ret
 
 
 .hop
-;> if hBGTilesRequestCopy:                    # on the ground: next hop
-	ldh a, [hBGTilesRequestCopy]
+;> if hMultiPurposeG:                    # on the ground: next hop
+	ldh a, [hMultiPurposeG]
 	and a
 	jr z, .animate
 ;>     link_x = hLinkX
@@ -2004,7 +2004,7 @@ MoblinKingHop::
 	ldh a, [hLinkX]
 	add [hl]
 	ldh [hLinkX], a
-;>     SetEntitySpeedTowardsLink(0x0C)                        # speed $0C towards that spot
+;>     SetEntitySpeedTowardsLink(slot, 0x0C)                        # speed $0C towards that spot
 	ld a, $0c
 	call SetEntitySpeedTowardsLink
 ;>     hLinkX = link_x
@@ -2023,7 +2023,7 @@ MoblinKingHop::
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(frame)
+;> SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 ;> wMoblinKingHeadFrame = frame
 	ld [wMoblinKingHeadFrame], a
@@ -2065,7 +2065,7 @@ MoblinKingWindUp::
 	jr nz, .stamp
 ;>     wEntityTimer[slot] = 0x22
 	ld [hl], $22
-;>     ClearEntitySpeed()
+;>     ClearEntitySpeed(slot)
 	call ClearEntitySpeed
 ;>@cs     wEntitySpeedX[slot] = mem[MoblinKingChargeSpeed + wEntityDirection[slot]]
 	ld hl, wEntityDirection
@@ -2079,7 +2079,7 @@ MoblinKingWindUp::
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
-;>     return IncrementEntityState()                     # next state: charge
+;>     return IncrementEntityState(slot)                     # next state: charge
 	call IncrementEntityState
 	ret
 
@@ -2093,9 +2093,9 @@ MoblinKingWindUp::
 	ldh [hJingle], a
 
 .noStamp
-;> ClearEntitySpeed()
+;> ClearEntitySpeed(slot)
 	call ClearEntitySpeed
-;>@wp SetEntitySpriteVariant(2 + ((hFrameCounter >> 3) & 1))
+;>@wp SetEntitySpriteVariant(slot, 2 + ((hFrameCounter >> 3) & 1))
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -2153,7 +2153,7 @@ MoblinKingCharge::
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], $28
-;>     IncrementEntityState()                            # next state: dazed
+;>     IncrementEntityState(slot)                            # next state: dazed
 	call IncrementEntityState
 ;>     wEntityTimer[slot] = 0x60
 	call GetEntityTimer
@@ -2216,19 +2216,19 @@ MoblinKingStunned::
 ;>     wMoblinKingHeadFrame = 0
 	ld a, $00
 	ld [wMoblinKingHeadFrame], a
-;>     return SetEntitySpriteVariant(0)
+;>     return SetEntitySpriteVariant(slot, 0)
 	jp SetEntitySpriteVariant
 
 
 .dazed
-;> if hBGTilesRequestCopy: ClearEntitySpeed()        # landed: stop sliding
-	ldh a, [hBGTilesRequestCopy]
+;> if hMultiPurposeG: ClearEntitySpeed(slot)        # landed: stop sliding
+	ldh a, [hMultiPurposeG]
 	and a
 	jr z, .pose
 	call ClearEntitySpeed
 
 .pose
-;>@dp SetEntitySpriteVariant(0x0C + ((hFrameCounter >> 3) & 1))
+;>@dp SetEntitySpriteVariant(slot, 0x0C + ((hFrameCounter >> 3) & 1))
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -2325,12 +2325,12 @@ MoblinKingSlowDown::
 	ld a, [hl]
 	and $fe
 	jr nz, .brake
-;>     ClearEntitySpeed()
+;>     ClearEntitySpeed(slot)
 	call ClearEntitySpeed
 ;>     wEntityTimer[slot] = 0x40
 	call GetEntityTimer
 	ld [hl], $40
-;>     return IncrementEntityState()                     # next state: look around
+;>     return IncrementEntityState(slot)                     # next state: look around
 	jp IncrementEntityState
 
 
@@ -2354,7 +2354,7 @@ MoblinKingSlowDown::
 ;> wMoblinKingHeadFrame = 0
 	ld a, $00
 	ld [wMoblinKingHeadFrame], a
-;> SetEntitySpriteVariant(0)
+;> SetEntitySpriteVariant(slot, 0)
 	call SetEntitySpriteVariant
 	ret
 
@@ -2365,7 +2365,7 @@ MoblinKingSlowDown::
 ;@ hopping (MoblinKingResumeHopping).
 ;@ test: skip calls routines in other banks
 MoblinKingLookAround::
-;> ClearEntitySpeed()
+;> ClearEntitySpeed(slot)
 	call ClearEntitySpeed
 ;> if wEntityTimer[slot]: return MoblinKingTurnHead()
 	call GetEntityTimer
@@ -2412,7 +2412,7 @@ MoblinKingTurnHead::
 ;@ frames), invincible for $40 frames and loses one heart; then the king gloats ($60 frames).
 ;@ test: skip calls routines in other banks
 MoblinKingRamLink::
-;> IncrementEntityState()                                # next state: gloat
+;> IncrementEntityState(slot)                                # next state: gloat
 	call IncrementEntityState
 ;> wEntityTimer[slot] = 0x60
 	call GetEntityTimer
@@ -2444,7 +2444,7 @@ MoblinKingRamLink::
 ;@ Then back to hopping.
 ;@ test: skip calls routines in other banks
 MoblinKingGloat::
-;> ClearEntitySpeed()
+;> ClearEntitySpeed(slot)
 	call ClearEntitySpeed
 ;> t = wEntityTimer[slot]
 	call GetEntityTimer
@@ -2468,7 +2468,7 @@ MoblinKingGloat::
 	and $01
 
 .pose
-;> SetEntitySpriteVariant(frame)
+;> SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 ;> wMoblinKingHeadFrame = frame
 	ld [wMoblinKingHeadFrame], a
@@ -2574,7 +2574,7 @@ MoblinKingDraw::
 	ld hl, MoblinKingShadowSprites
 	ld c, $03
 	call DrawEntitySprites
-;>     LoadEntityPosition()                            # restore the active position copies
+;>     LoadEntityPosition(slot)                            # restore the active position copies
 	call LoadEntityPosition
 
 .done
@@ -2659,10 +2659,10 @@ PokeyHandler::
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	inc [hl]
-;>         part = SpawnEntity(0xE3)             # the knocked-off part
+;>         part, full = SpawnEntity(slot, 0xE3)             # the knocked-off part
 	ld a, $e3
 	call SpawnEntity
-;>         if part is not None:
+;>         if not full:
 	jr c, .move
 ;>             wEntityX[part] = hMultiPurpose0
 	ldh a, [hMultiPurpose0]
@@ -2678,7 +2678,7 @@ PokeyHandler::
 	ld hl, wEntityPrivate1
 	add hl, de
 	inc [hl]
-;>             GetVectorTowardsLink(0x20)                    # vector from the part to Link
+;>             GetVectorTowardsLink(slot, 0x20)                    # vector from the part to Link
 	push bc
 	push de
 	pop bc
@@ -2705,11 +2705,11 @@ PokeyHandler::
 	pop bc
 
 .move
-;> DecrementEntityIgnoreHitsTimer()
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
-;> EntityCheckHits()                                # contact with Link and his weapons
+;> EntityCheckHits(slot)                                # contact with Link and his weapons
 	call EntityCheckHits
-;>@sw SetEntitySpriteVariant((hFrameCounter >> 3) & 3)        # sway
+;>@sw SetEntitySpriteVariant(slot, (hFrameCounter >> 3) & 3)        # sway
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -2749,7 +2749,7 @@ PokeyHandler::
 .walk
 ;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
-;> EntityCheckWalls()                                # background collision
+;> EntityCheckWalls(slot)                                # background collision
 	call EntityCheckWalls
 	ret
 
@@ -2839,14 +2839,14 @@ PokeySegmentSprites::
 ;@ hurts Link (and can be hit). It bounces off walls; at the third bounce it bursts.
 ;@ test: skip calls routines in other banks
 PokeySegment::
-;> DrawEntity16x16(PokeySegmentSprites)            # draw it
+;> DrawEntity16x16(slot, PokeySegmentSprites)            # draw it
 	ld de, PokeySegmentSprites
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
 ;> ApplyRecoilIfNeeded_15(slot)
 	call ApplyRecoilIfNeeded_15
-;> if wEntityTimer[slot] == 0: EntityCheckHits()    # contact with Link and his weapons
+;> if wEntityTimer[slot] == 0: EntityCheckHits(slot)    # contact with Link and his weapons
 	call GetEntityTimer
 	jr nz, .fly
 	call EntityCheckHits
@@ -2854,7 +2854,7 @@ PokeySegment::
 .fly
 ;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
-;> EntityCheckWalls()                                # background collision
+;> EntityCheckWalls(slot)                                # background collision
 	call EntityCheckWalls
 ;> if wEntityCollisions[slot] & 3:            # a wall left or right
 	ld hl, wEntityCollisions
@@ -2945,10 +2945,10 @@ FlameShooterHandler::
 	ld a, [hl]
 	and a
 	jp nz, FlameShooterFlame
-;> DrawEntity16x16(FlameShooterSprites)            # draw it
+;> DrawEntity16x16(slot, FlameShooterSprites)            # draw it
 	ld de, FlameShooterSprites
 	call DrawEntity16x16
-;>@fp SetEntitySpriteVariant(1 if wEntityTimer1[slot] else 0)   # firing frame
+;>@fp SetEntitySpriteVariant(slot, 1 if wEntityTimer1[slot] else 0)   # firing frame
 	call GetEntityTimer1
 	ld e, $00
 	and a
@@ -2972,10 +2972,10 @@ FlameShooterHandler::
 ;> wEntityTimer1[slot] = 8
 	call GetEntityTimer1
 	ld [hl], $08
-;> flame = SpawnEntity(0xE2)
+;> flame, full = SpawnEntity(slot, 0xE2)
 	ld a, $e2
 	call SpawnEntity
-;> if flame is None: return
+;> if full: return
 	ret c
 ;> hNoiseSfx = 0x12
 	ld a, $12
@@ -3048,19 +3048,19 @@ FlameShooterFlame::
 	rla
 	and $10
 	ldh [hActiveEntityFlipAttribute], a
-;> DrawEntity16x16(FlameSprites)                   # draw it
+;> DrawEntity16x16(slot, FlameSprites)                   # draw it
 	ld de, FlameSprites
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
-;> DecrementEntityIgnoreHitsTimer()
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
-;> EntityCheckWeaponHits()                                # weapons hit it
+;> EntityCheckWeaponHits(slot)                                # weapons hit it
 	call EntityCheckWeaponHits
 ;> before = wInvincibilityCounter
 	ld a, [wInvincibilityCounter]
 	push af
-;> EntityTouchesLink()                                # touching Link hurts him
+;> EntityTouchesLink(slot)                                # touching Link hurts him
 	call EntityTouchesLink
 ;>@hit if wInvincibilityCounter != before and wInvincibilityCounter >= 0x20:   # Link was just hit
 	pop af
@@ -3074,7 +3074,7 @@ FlameShooterFlame::
 ;>     wInvincibilityCounter = 0x1F
 	ld a, $1f
 	ld [wInvincibilityCounter], a
-;>     GetVectorTowardsLink(0x30)                        # vector towards Link
+;>     GetVectorTowardsLink(slot, 0x30)                        # vector towards Link
 	ld a, $30
 	call GetVectorTowardsLink
 ;>     hLinkSpeedY = hMultiPurpose0           # push Link away vertically
@@ -3092,12 +3092,12 @@ FlameShooterFlame::
 	xor a
 
 .split
-;>         hBGTilesRequestCopy = i            # (scratch here)
-	ldh [hBGTilesRequestCopy], a
-;>         small = SpawnEntity(0xE2)
+;>         hMultiPurposeG = i            # (scratch here)
+	ldh [hMultiPurposeG], a
+;>         small, full = SpawnEntity(slot, 0xE2)
 	ld a, $e2
 	call SpawnEntity
-;>         if small is None: break
+;>         if full: break
 	jr c, .remove
 ;>         wEntityPrivate1[small] = 2         # a small flame
 	ld hl, wEntityPrivate1
@@ -3105,7 +3105,7 @@ FlameShooterFlame::
 	ld [hl], $02
 ;>         wEntitySpriteVariant[small] = i
 	push bc
-	ldh a, [hBGTilesRequestCopy]
+	ldh a, [hMultiPurposeG]
 	ld c, a
 	ld hl, wEntitySpriteVariant
 	add hl, de
@@ -3142,7 +3142,7 @@ FlameShooterFlame::
 	ld [hl], $20
 	pop bc
 ;=@sp
-	ldh a, [hBGTilesRequestCopy]
+	ldh a, [hMultiPurposeG]
 	inc a
 	cp $02
 	jr c, .split
@@ -3188,7 +3188,7 @@ FlameShooterSmallFlame::
 	rla
 	and $10
 	ldh [hActiveEntityFlipAttribute], a
-;> DrawEntity16x16(SmallFlameSprites)              # draw it
+;> DrawEntity16x16(slot, SmallFlameSprites)              # draw it
 	ld de, SmallFlameSprites
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
@@ -3237,12 +3237,12 @@ EvasiveStalfosHandler::
 	ld a, [hl]
 	and a
 	jr z, .stalfos
-;>     DrawEntity16x16(EvasiveStalfosBoneSprites)  # draw it
+;>     DrawEntity16x16(slot, EvasiveStalfosBoneSprites)  # draw it
 	ld de, EvasiveStalfosBoneSprites
 	call DrawEntity16x16
 ;>     ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
-;>     SetEntitySpriteVariant((hFrameCounter >> 3) & 1)    # spin
+;>     SetEntitySpriteVariant(slot, (hFrameCounter >> 3) & 1)    # spin
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -3251,7 +3251,7 @@ EvasiveStalfosHandler::
 	call SetEntitySpriteVariant
 ;>     UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
-;>     EntityCheckWalls()                            # background collision
+;>     EntityCheckWalls(slot)                            # background collision
 	call EntityCheckWalls
 ;>     broken = wEntityCollisions[slot]       # hit a wall
 	ld hl, wEntityCollisions
@@ -3260,7 +3260,7 @@ EvasiveStalfosHandler::
 	and a
 ;>     if not broken:
 	jp nz, .boneBreak
-;>         EntityCheckHits()                        # contact with Link and his weapons
+;>         EntityCheckHits(slot)                        # contact with Link and his weapons
 	call EntityCheckHits
 ;>         broken = wEntityIgnoreHitsTimer[slot]   # it hit something / was hit
 	ld hl, wEntityIgnoreHitsTimer
@@ -3301,14 +3301,14 @@ EvasiveStalfosHandler::
 
 
 .stalfos
-;> DrawEntity16x16(EvasiveStalfosSprites)          # draw it
+;> DrawEntity16x16(slot, EvasiveStalfosSprites)          # draw it
 	ld de, EvasiveStalfosSprites
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
 ;> ApplyRecoilIfNeeded_15(slot)
 	call ApplyRecoilIfNeeded_15
-;> if wEntityTimer[slot] == 0: EntityCheckHits()    # contact (not right after it jumped)
+;> if wEntityTimer[slot] == 0: EntityCheckHits(slot)    # contact (not right after it jumped)
 	call GetEntityTimer
 	jr nz, .throw
 	call EntityCheckHits
@@ -3322,10 +3322,10 @@ EvasiveStalfosHandler::
 	ldh a, [hMapId]
 	cp $03
 	ret c
-;>     bone = SpawnEntity(0x1E)
+;>     bone, full = SpawnEntity(slot, 0x1E)
 	ld a, $1e
 	call SpawnEntity
-;>     if bone is None: return
+;>     if full: return
 	ret c
 ;>     hNoiseSfx = 0x0A
 	ld a, $0a
@@ -3363,7 +3363,7 @@ EvasiveStalfosHandler::
 	ld hl, wEntityPrivate1
 	add hl, de
 	inc [hl]
-;>     SetEntitySpeedTowardsLink(0x18)                        # the bone flies at Link, speed $18
+;>     SetEntitySpeedTowardsLink(slot, 0x18)                        # the bone flies at Link, speed $18
 	push bc
 	push de
 	pop bc
@@ -3395,7 +3395,7 @@ EvasiveStalfosSteps::
 EvasiveStalfosWalk::
 ;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
-;> EntityCheckWalls()                                # background collision
+;> EntityCheckWalls(slot)                                # background collision
 	call EntityCheckWalls
 ;>@dodge if hJoypadPressed & 0x30:             # Link attacks (A or B)
 	ldh a, [hJoypadPressed]
@@ -3430,7 +3430,7 @@ EvasiveStalfosWalk::
 ;>             hJingle = 0x24
 	ld a, $24
 	ldh [hJingle], a
-;>             GetVectorTowardsLink(0x12)                    # vector towards Link
+;>             GetVectorTowardsLink(slot, 0x12)                    # vector towards Link
 	ld a, $12
 	call GetVectorTowardsLink
 ;>             wEntitySpeedY[slot] = u8(-hMultiPurpose0)   # away from him
@@ -3537,7 +3537,7 @@ EvasiveStalfosWalk::
 	add hl, bc
 	xor a
 	ld [hl], a
-;> SetEntitySpriteVariant((hFrameCounter >> 3) & 1)        # walking frames
+;> SetEntitySpriteVariant(slot, (hFrameCounter >> 3) & 1)        # walking frames
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -3563,7 +3563,7 @@ EvasiveStalfosDodgeJump::
 	ld a, [hl]
 	push hl
 	ld [hl], $01
-;> EntityCheckWalls()                                # background collision
+;> EntityCheckWalls(slot)                                # background collision
 	call EntityCheckWalls
 ;> wEntityIgnoreHitsTimer[slot] = 0
 	pop hl
@@ -3773,16 +3773,16 @@ NightmareIntroStart::
 ;=@clr
 	ld [wNightmareFacing], a
 ;=@clr
-	ld [$d21f], a
+	ld [wEntityWorkRAM3 + $1F], a
 ;=@clr
 	ld [wFinalNightmareHits], a
 ;=@clr
-	ld [$d221], a
+	ld [wEntityWorkRAM3 + $21], a
 ;=@clr
-	ld [$d222], a
+	ld [wEntityWorkRAM3 + $22], a
 ;=@clr
-	ld [$d223], a
-;> IncrementEntityState()
+	ld [wEntityWorkRAM3 + $23], a
+;> IncrementEntityState(slot)
 	call IncrementEntityState
 
 .done
@@ -3801,7 +3801,7 @@ NightmareIntroWait::
 	call GetEntityTimer
 ;> if t: return NightmareIntroCueMusic(t)
 	jr nz, NightmareIntroCueMusic
-;> IncrementEntityState()
+;> IncrementEntityState(slot)
 	call IncrementEntityState
 ;> PlayNightmareJingle()                      # falls through
 
@@ -3855,7 +3855,7 @@ NightmareIntroRise::
 ;>     wEntityTimer[slot] = 8
 	call GetEntityTimer
 	ld [hl], $08
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
 .move
@@ -3887,7 +3887,7 @@ NightmareIntroSlow::
 ;>     wEntityTimer[slot] = 0x80
 	call GetEntityTimer
 	ld [hl], $80
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
 .done
@@ -3926,7 +3926,7 @@ NightmareIntroGrow::
 ;> wEntityTimer[slot] = 0xC0
 	call GetEntityTimer
 	ld [hl], $c0
-;> IncrementEntityState()
+;> IncrementEntityState(slot)
 	call IncrementEntityState
 	ret
 
@@ -3944,7 +3944,7 @@ NightmareShadowPulseFrames::
 NightmareIntroPulse::
 ;> DrawNightmareShadowBody(slot)
 	call DrawNightmareShadowBody
-;>@pf SetEntitySpriteVariant(mem[NightmareShadowPulseFrames + ((hFrameCounter >> 4) & 3)])
+;>@pf SetEntitySpriteVariant(slot, mem[NightmareShadowPulseFrames + ((hFrameCounter >> 4) & 3)])
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -3963,7 +3963,7 @@ NightmareIntroPulse::
 	jr nz, .done
 ;>     wEntityTimer[slot] = 0x2F
 	ld [hl], $2f
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
 .done
@@ -3991,7 +3991,7 @@ NightmareIntroShrink::
 ;>     wFinalNightmareForm += 1               # the giant gel
 	ld hl, wFinalNightmareForm
 	inc [hl]
-;>     SetEntitySpriteVariant(0)
+;>     SetEntitySpriteVariant(slot, 0)
 	xor a
 	call SetEntitySpriteVariant
 ;>     wEntityState[slot] = 0
@@ -4006,7 +4006,7 @@ NightmareIntroShrink::
 
 
 .shrink
-;>@sf SetEntitySpriteVariant(mem[NightmareShadowShrinkFrames + ((t >> 3) & 0x0F)])
+;>@sf SetEntitySpriteVariant(slot, mem[NightmareShadowShrinkFrames + ((t >> 3) & 0x0F)])
 	rra
 	rra
 	rra
@@ -4032,7 +4032,7 @@ NightmareGel::
 	call DrawNightmareGel
 ;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
-;> DecrementEntityIgnoreHitsTimer()
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
 ;> NightmareGelStates[hActiveEntityState]()
 	ldh a, [hActiveEntityState]
@@ -4066,7 +4066,7 @@ NightmareGelInit::
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld [hl], b
-;> IncrementEntityState()
+;> IncrementEntityState(slot)
 	jp IncrementEntityState
 
 
@@ -4094,10 +4094,10 @@ NightmareGelCrouch::
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], $28
-;>     SetEntitySpeedTowardsLink(0x08)
+;>     SetEntitySpeedTowardsLink(slot, 0x08)
 	ld a, $08
 	call SetEntitySpeedTowardsLink
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
 .done
@@ -4113,11 +4113,11 @@ NightmareGelCrouch::
 NightmareGelJump::
 ;> CheckNightmareGelPowdered(slot)            # (ends this handler when powder hit it)
 	call CheckNightmareGelPowdered
-;> EntityCheckHits()
+;> EntityCheckHits(slot)
 	call EntityCheckHits
 ;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
-;> EntityCheckWalls()
+;> EntityCheckWalls(slot)
 	call EntityCheckWalls
 ;> AddEntityZSpeedToPos_15(slot)
 	call AddEntityZSpeedToPos_15
@@ -4166,7 +4166,7 @@ NightmareGelJump::
 ;>         wEntityTimer[slot] = 0x30
 	call GetEntityTimer
 	ld [hl], $30
-;>         IncrementEntityState()             # landed
+;>         IncrementEntityState(slot)             # landed
 	call IncrementEntityState
 
 .pose
@@ -4181,7 +4181,7 @@ NightmareGelJump::
 	inc e
 
 .setPose
-;> SetEntitySpriteVariant(frame)
+;> SetEntitySpriteVariant(slot, frame)
 	ld a, e
 	call SetEntitySpriteVariant
 	ret
@@ -4193,13 +4193,13 @@ NightmareGelJump::
 ;@ state 2).
 ;@ test: skip calls routines in other banks
 NightmareGelLanded::
-;> SetEntitySpriteVariant(5)                  # squashed
+;> SetEntitySpriteVariant(slot, 5)                  # squashed
 	ld a, $05
 	call SetEntitySpriteVariant
 ;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
 	jr nz, .checks
-;>     SetEntitySpeedTowardsLink(0x0C)
+;>     SetEntitySpeedTowardsLink(slot, 0x0C)
 	ld a, $0c
 	call SetEntitySpeedTowardsLink
 ;>     wEntitySpeedZ[slot] = 0x20
@@ -4214,7 +4214,7 @@ NightmareGelLanded::
 .checks
 ;> CheckNightmareGelPowdered(slot)
 	call CheckNightmareGelPowdered
-;> EntityCheckHits()
+;> EntityCheckHits(slot)
 	call EntityCheckHits
 	ret
 
@@ -4270,13 +4270,13 @@ NightmareNextForm::
 	ld [wFinalNightmareForm], a
 ;> LoadFinalNightmareFormTiles()
 	call LoadFinalNightmareFormTiles
-;> mem[0xD221] = 0
+;> wEntityWorkRAM3[0x21] = 0
 	xor a
-	ld [$d221], a
-;> mem[0xD222] = 0
-	ld [$d222], a
-;> mem[0xD223] = 0
-	ld [$d223], a
+	ld [wEntityWorkRAM3 + $21], a
+;> wEntityWorkRAM3[0x22] = 0
+	ld [wEntityWorkRAM3 + $22], a
+;> wEntityWorkRAM3[0x23] = 0
+	ld [wEntityWorkRAM3 + $23], a
 ;> wFinalNightmareHits = 0
 	ld [wFinalNightmareHits], a
 ;> wEntityZ[slot] = 0
@@ -4293,7 +4293,7 @@ NightmareNextForm::
 ;> wEntityTilesSlotB = 3
 	inc a
 	ld [wEntityTilesSlotB], a
-;> SetEntitySpriteVariant(0xFF)               # not drawn
+;> SetEntitySpriteVariant(slot, 0xFF)               # not drawn
 	ld a, $ff
 	call SetEntitySpriteVariant
 ;> wEntityTimer[slot] = 0x40
@@ -4356,12 +4356,12 @@ NightmareGelSink::
 	jr nz, .sink
 ;>     wEntityTimer[slot] = 0x80
 	ld [hl], $80
-;>     return IncrementEntityState()          # hidden
+;>     return IncrementEntityState(slot)          # hidden
 	jp IncrementEntityState
 
 
 .sink
-;>@sk SetEntitySpriteVariant(mem[NightmareGelSinkFrames + ((t >> 3) & 3)])
+;>@sk SetEntitySpriteVariant(slot, mem[NightmareGelSinkFrames + ((t >> 3) & 3)])
 	rra
 	rra
 	rra
@@ -4445,7 +4445,7 @@ NightmareGelPieceSpeedX::
 ;@ a splash sound, and is gone for $80 frames (state 4).
 ;@ test: skip calls routines in other banks
 NightmareGelSplit::
-;> SetEntitySpriteVariant(0xFF)               # gone
+;> SetEntitySpriteVariant(slot, 0xFF)               # gone
 	ld a, $ff
 	call SetEntitySpriteVariant
 ;> wEntityTimer[slot] = 0x80
@@ -4457,9 +4457,9 @@ NightmareGelSplit::
 ;> hWaveSfx = 0x21
 	ld a, $21
 	ldh [hWaveSfx], a
-;> SpawnNightmareGelPieces()                  # falls through
+;> SpawnNightmareGelPieces(slot)                  # falls through
 
-;@ def SpawnNightmareGelPieces()
+;@ def SpawnNightmareGelPieces(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ Spawns the 8 pieces of a burst gel (entity $E6 with wEntityPrivate5 = 1, see
 ;@ NightmareGelPiece) flying out in 8 directions from the boss's place and height, for $2F
@@ -4470,16 +4470,16 @@ SpawnNightmareGelPieces::
 	xor a
 
 .next
-;>     hBGTilesRequestCopy = i                # (scratch here)
-	ldh [hBGTilesRequestCopy], a
-;>     piece = SpawnEntity(0xE6)
+;>     hMultiPurposeG = i                # (scratch here)
+	ldh [hMultiPurposeG], a
+;>     piece, full = SpawnEntity(slot, 0xE6)
 	ld a, $e6
 	call SpawnEntity
-;>     if piece is None: return
+;>     if full: return
 	ret c
 ;>@px     wEntityX[piece] = u8(hMultiPurpose0 + mem[NightmareGelPieceOffsetX + i])
 	push bc
-	ldh a, [hBGTilesRequestCopy]
+	ldh a, [hMultiPurposeG]
 	ld c, a
 	ldh a, [hMultiPurpose0]
 	ld hl, NightmareGelPieceOffsetX
@@ -4531,7 +4531,7 @@ SpawnNightmareGelPieces::
 	inc [hl]
 	pop bc
 ;=@pc
-	ldh a, [hBGTilesRequestCopy]
+	ldh a, [hMultiPurposeG]
 	inc a
 	cp $08
 	jr nz, .next
@@ -4573,7 +4573,7 @@ NightmareGelPowdered::
 .quiver
 ;> t = wEntityTimer[slot]
 	call GetEntityTimer
-;>@wq if t: return SetEntitySpriteVariant(mem[NightmareGelWobbleFrames + ((t >> 1) & 3)])
+;>@wq if t: return SetEntitySpriteVariant(slot, mem[NightmareGelWobbleFrames + ((t >> 1) & 3)])
 	jr z, .counted
 	rra
 	nop
@@ -4605,7 +4605,7 @@ NightmareGelPowdered::
 
 
 .beaten
-;> SetEntitySpriteVariant(6)
+;> SetEntitySpriteVariant(slot, 6)
 	ld a, $06
 	call SetEntitySpriteVariant
 ;> wEntityTimer[slot] = 0x80
@@ -4732,7 +4732,7 @@ NightmareGelPieceMoveMasks::
 ;@ shrinking, and vanishes after $2F frames.
 ;@ test: skip calls routines in other banks
 NightmareGelPiece::
-;> DrawEntity16x16(NightmareGelPieceSprites)       # draw it
+;> DrawEntity16x16(slot, NightmareGelPieceSprites)       # draw it
 	ld de, NightmareGelPieceSprites
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
@@ -4748,7 +4748,7 @@ NightmareGelPiece::
 	and $07
 	ld e, a
 	ld d, b
-;> SetEntitySpriteVariant(mem[NightmareGelPieceFrames + step])
+;> SetEntitySpriteVariant(slot, mem[NightmareGelPieceFrames + step])
 	ld hl, NightmareGelPieceFrames
 	add hl, de
 	push de
@@ -4827,8 +4827,8 @@ DrawNightmareShadowTrail::
 	xor a
 
 .copy
-;>     hBGTilesRequestCopy = i                # (scratch here)
-	ldh [hBGTilesRequestCopy], a
+;>     hMultiPurposeG = i                # (scratch here)
+	ldh [hMultiPurposeG], a
 ;>@pa     past = (now - mem[NightmareTrailDelays + i]) & 0x7F
 	ld e, a
 	ld d, b
@@ -4853,7 +4853,7 @@ DrawNightmareShadowTrail::
 ;>     sprites = NightmareTrailLeadSprites
 	ld de, NightmareTrailLeadSprites
 ;>     if i != 0:
-	ldh a, [hBGTilesRequestCopy]
+	ldh a, [hMultiPurposeG]
 	cp $00
 	jr z, .draw
 ;>         if hActiveEntityDrawY == wEntityY[slot]: continue   # not risen yet
@@ -4869,7 +4869,7 @@ DrawNightmareShadowTrail::
 ;>     hActiveEntitySpriteVariant = 0
 	xor a
 	ldh [hActiveEntitySpriteVariant], a
-;>     DrawEntity16x16(sprites)
+;>     DrawEntity16x16(slot, sprites)
 	call DrawEntity16x16
 ;>     ReserveOAMEntriesFar(2)                           # reserve its 2 OAM entries
 	ld a, $02
@@ -4877,11 +4877,11 @@ DrawNightmareShadowTrail::
 
 .nextCopy
 ;=@cp
-	ldh a, [hBGTilesRequestCopy]
+	ldh a, [hMultiPurposeG]
 	inc a
 	cp $08
 	jr nz, .copy
-;> LoadEntityPosition()                                # back to the real position
+;> LoadEntityPosition(slot)                                # back to the real position
 	call LoadEntityPosition
 ;> DrawNightmareShadowBody(slot)
 	call DrawNightmareShadowBody
@@ -4999,9 +4999,9 @@ NightmareAgahnim::
 ;> if kind: return AgahnimBall(slot)          # an energy ball
 	and a
 	jp nz, AgahnimBall
-;> wSmasherBallSlot = slot                    # (scratch here: the balls find the boss by it)
+;> wEntityScratch1 = slot                    # (scratch here: the balls find the boss by it)
 	ld a, c
-	ld [wSmasherBallSlot], a
+	ld [wEntityScratch1], a
 ;> if not wFinalNightmareHidden: DrawNightmareAgahnim(slot)
 	ld a, [wFinalNightmareHidden]
 	and a
@@ -5040,7 +5040,7 @@ NightmareAgahnimStates::
 ;@ room; when it is within 3 pixels it starts to appear there (state 1, timer $50).
 ;@ test: skip calls routines in other banks
 NightmareAgahnimCenter::
-;> SetEntitySpriteVariant(0)
+;> SetEntitySpriteVariant(slot, 0)
 	xor a
 	call SetEntitySpriteVariant
 ;> DrawNightmareGel(slot)                     # the blob
@@ -5057,7 +5057,7 @@ NightmareAgahnimCenter::
 ;> hLinkY = 0x30
 	ld a, $30
 	ldh [hLinkY], a
-;> SetEntitySpeedTowardsLink(0x10)
+;> SetEntitySpeedTowardsLink(slot, 0x10)
 	ld a, $10
 	call SetEntitySpeedTowardsLink
 ;>@g1 if abs(hActiveEntityDrawY - 0x30) <= 2 and abs(hActiveEntityX - 0x50) <= 2:
@@ -5262,7 +5262,7 @@ NightmareAgahnimCharge::
 	ld [wNightmareChargeFrame], a
 ;>     wEntityTimer[slot] = 0x50
 	ld [hl], $50
-;>     _, ball = SpawnEntity(0xE6)            # (no check for a free slot)
+;>     _, ball = SpawnEntity(slot, 0xE6)            # (no check for a free slot)
 	ld a, $e6
 	call SpawnEntity
 ;>     wEntityPrivate4[ball] += 1             # it is a ball
@@ -5501,7 +5501,7 @@ NightmareAgahnimGlide::
 	ldh [hLinkY], a
 ;> t = GetEntityTimer(slot)
 	call GetEntityTimer
-;>@sp SetEntitySpeedTowardsLink(mem[AgahnimTeleportSpeeds + ((t >> 2) & 7)])
+;>@sp SetEntitySpeedTowardsLink(slot, mem[AgahnimTeleportSpeeds + ((t >> 2) & 7)])
 	rra
 	rra
 	and $07
@@ -5567,7 +5567,7 @@ NightmareAgahnimDefeated::
 ;>     wFinalNightmareHidden = 1
 	ld a, $01
 	ld [wFinalNightmareHidden], a
-;>     SetEntitySpriteVariant(6)
+;>     SetEntitySpriteVariant(slot, 6)
 	ld a, $06
 	call SetEntitySpriteVariant
 ;>     wEntityTimer[slot] = 0x50
@@ -5578,27 +5578,27 @@ NightmareAgahnimDefeated::
 	ret
 
 .spin
-;> if mem[0xD221] < 0x80: mem[0xD221] += 1    # spin faster
-	ld a, [$d221]
+;> if wEntityWorkRAM3[0x21] < 0x80: wEntityWorkRAM3[0x21] += 1    # spin faster
+	ld a, [wEntityWorkRAM3 + $21]
 	cp $80
 	jr nc, .turn
 	inc a
-	ld [$d221], a
+	ld [wEntityWorkRAM3 + $21], a
 
 .turn
-;> mem[0xD222], carry = add(mem[0xD222], mem[0xD221])
-	ld a, [$d221]
-	ld hl, $d222
+;> wEntityWorkRAM3[0x22], carry = add(wEntityWorkRAM3[0x22], wEntityWorkRAM3[0x21])
+	ld a, [wEntityWorkRAM3 + $21]
+	ld hl, wEntityWorkRAM3 + $22
 	add [hl]
 	ld [hl], a
-;> if carry: mem[0xD223] += 1                 # a quarter turn
+;> if carry: wEntityWorkRAM3[0x23] += 1                 # a quarter turn
 	jr nc, .face
-	ld hl, $d223
+	ld hl, wEntityWorkRAM3 + $23
 	inc [hl]
 
 .face
-;>@g10 wEntityDirection[slot] = mem[AgahnimSpinFacings + (mem[0xD223] & 3)]
-	ld a, [$d223]
+;>@g10 wEntityDirection[slot] = mem[AgahnimSpinFacings + (wEntityWorkRAM3[0x23] & 3)]
+	ld a, [wEntityWorkRAM3 + $23]
 	and $03
 	ld e, a
 	ld d, b
@@ -5634,7 +5634,7 @@ NightmareAgahnimShrink::
 	jp IncrementEntityState
 
 .shrink
-;>@g11 if t < 0x18: SetEntitySpriteVariant((t >> 3) & 3)
+;>@g11 if t < 0x18: SetEntitySpriteVariant(slot, (t >> 3) & 3)
 	cp $18
 	jr nc, .draw
 	rra
@@ -5671,7 +5671,7 @@ NightmareAgahnimLeave::
 ;> hLinkY = 0x30
 	ld a, $30
 	ldh [hLinkY], a
-;> SetEntitySpeedTowardsLink(0x10)
+;> SetEntitySpeedTowardsLink(slot, 0x10)
 	ld a, $10
 	call SetEntitySpeedTowardsLink
 ;>@g12 if abs(hActiveEntityDrawY - 0x30) <= 2 and abs(hActiveEntityX - 0x50) <= 2:
@@ -5847,7 +5847,7 @@ DrawAgahnimHandA::
 	jr nc, .side
 ;>     hActiveEntitySpriteVariant = frame
 	ldh [hActiveEntitySpriteVariant], a
-;>     DrawEntity16x16(AgahnimHandSprites)
+;>     DrawEntity16x16(slot, AgahnimHandSprites)
 	ld de, AgahnimHandSprites
 	call DrawEntity16x16
 	jr .reserve
@@ -6029,7 +6029,7 @@ DrawAgahnimChargeBallSprite::
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ldh [hActiveEntityDrawY], a
-;> DrawEntity16x16(AgahnimChargeSprites)
+;> DrawEntity16x16(slot, AgahnimChargeSprites)
 	ld de, AgahnimChargeSprites
 	call DrawEntity16x16
 ;> ReserveOAMEntriesFar(2)
@@ -6081,7 +6081,7 @@ AgahnimBall::
 	rla
 	and $50
 	ldh [hActiveEntityFlipAttribute], a
-;> DrawEntity16x16(AgahnimBallSprites)
+;> DrawEntity16x16(slot, AgahnimBallSprites)
 	ld de, AgahnimBallSprites
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
@@ -6110,7 +6110,7 @@ AgahnimBall::
 	ld e, $02
 
 .setVariant
-;>     SetEntitySpriteVariant(variant)
+;>     SetEntitySpriteVariant(slot, variant)
 	ld a, e
 	call SetEntitySpriteVariant
 ;>     return
@@ -6159,7 +6159,7 @@ AgahnimBallTrail::
 ;> if wEntityPrivateCounter[slot] & 3 == 0:
 	and $03
 	jr nz, .walls
-;>     full, spark = SpawnEntity(0xE6)
+;>     full, spark = SpawnEntity(slot, 0xE6)
 	ld a, $e6
 	call SpawnEntity
 ;>     if full: return
@@ -6222,7 +6222,7 @@ AgahnimBallReflected::
 ;> hNoiseSfx = 0x08
 	ld a, $08
 	ldh [hNoiseSfx], a
-;> GetVectorTowardsLink(0x18)                 # into hMultiPurpose0 (y), hMultiPurpose1 (x)
+;> GetVectorTowardsLink(slot, 0x18)                 # into hMultiPurpose0 (y), hMultiPurpose1 (x)
 	ld a, $18
 	call GetVectorTowardsLink
 ;> hLinkSpeedY = hMultiPurpose0               # Link is knocked back
@@ -6254,7 +6254,7 @@ AgahnimBallReflected::
 ;@ def AgahnimBallReturn(slot: c)
 ;@ path: boss/final_nightmare/agahnim
 ;@ Ball state 2: the struck ball flies on with its trail; if it comes within 16 pixels across
-;@ and 12 down of the visible shadow (slot in wSmasherBallSlot) it vanishes and knocks the
+;@ and 12 down of the visible shadow (slot in wEntityScratch1) it vanishes and knocks the
 ;@ shadow back at twice its speed: the shadow flashes, ignores hits for $12 frames, and counts
 ;@ the hit in wFinalNightmareHits. The fourth hit beats it (state 7, timer $C0, jingle $36).
 ;@ test: skip calls routines in other banks
@@ -6265,8 +6265,8 @@ AgahnimBallReturn::
 	ld a, [wFinalNightmareHidden]
 	and a
 	ret nz
-;> boss = wSmasherBallSlot
-	ld a, [wSmasherBallSlot]
+;> boss = wEntityScratch1
+	ld a, [wEntityScratch1]
 	ld e, a
 	ld d, b
 ;>@x if not -16 <= hActiveEntityX - wEntityX[boss] < 16: return
@@ -6363,7 +6363,7 @@ AgahnimBallBurstSpeedY::
 AgahnimSplitBall::
 ;> EntityCheckContactDamage(slot)
 	call EntityCheckContactDamage
-;>@va SetEntitySpriteVariant(3 + ((hFrameCounter >> 3) & 1))
+;>@va SetEntitySpriteVariant(slot, 3 + ((hFrameCounter >> 3) & 1))
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -6374,7 +6374,7 @@ AgahnimSplitBall::
 	call SetEntitySpriteVariant
 ;> t = GetEntityTimer(slot)
 	call GetEntityTimer
-;> if t and t & 1 == 0: SetEntitySpeedTowardsLink(0x18)
+;> if t and t & 1 == 0: SetEntitySpeedTowardsLink(slot, 0x18)
 	jr z, .walls
 	and $01
 	jr nz, .walls
@@ -6395,9 +6395,9 @@ AgahnimSplitBall::
 	xor a
 
 .shot
-;>     hBGTilesRequestCopy = i                # (scratch here)
-	ldh [hBGTilesRequestCopy], a
-;>     full, shot = SpawnEntity(0x7D)
+;>     hMultiPurposeG = i                # (scratch here)
+	ldh [hMultiPurposeG], a
+;>     full, shot = SpawnEntity(slot, 0x7D)
 	ld a, $7d
 	call SpawnEntity
 ;>     if full: break
@@ -6428,7 +6428,7 @@ AgahnimSplitBall::
 	add hl, de
 	ld [hl], a
 ;>@sx     wEntitySpeedX[shot] = mem[AgahnimBallBurstSpeedX + i]
-	ldh a, [hBGTilesRequestCopy]
+	ldh a, [hMultiPurposeG]
 	ld c, a
 	ld hl, AgahnimBallBurstSpeedX
 	add hl, bc
@@ -6446,7 +6446,7 @@ AgahnimSplitBall::
 	ld [hl], a
 ;=@lp
 	pop bc
-	ldh a, [hBGTilesRequestCopy]
+	ldh a, [hMultiPurposeG]
 	inc a
 	cp $04
 	jr nz, .shot
@@ -6698,7 +6698,7 @@ NightmareMoldormDying::
 ;@ State 1: checks weapon hits, draws the Moldorm and crawls one step. For a while after being
 ;@ hurt (wEntityTimer2) it crawls two steps a frame and its sounds play in their fast variant
 ;@ (wSfxFastVariant). Its crawling sound (jingle $38) plays every 12 frames, counted in
-;@ wSmasherSlot.
+;@ wEntityScratch2.
 ;@ test: skip calls routines in other banks
 NightmareMoldormActive::
 ;> NightmareCheckHitsIfActive(slot)
@@ -6731,15 +6731,15 @@ NightmareMoldormActive::
 	ld e, $0c
 
 .sound
-;> wSmasherSlot += 1                          # (scratch here: the sound counter)
-	ld hl, wSmasherSlot
+;> wEntityScratch2 += 1                          # (scratch here: the sound counter)
+	ld hl, wEntityScratch2
 	ld a, [hl]
 	inc a
 	ld [hl], a
-;> if wSmasherSlot >= period:
+;> if wEntityScratch2 >= period:
 	cp e
 	jr c, NightmareMoldormStep
-;>     wSmasherSlot = 0
+;>     wEntityScratch2 = 0
 	ld [hl], b
 ;>     hJingle = 0x38
 	ld a, $38
@@ -6775,7 +6775,7 @@ NightmareMoldormStep::
 	ld [hl], a
 ;> NightmareMoldormMove(slot)
 	call NightmareMoldormMove
-;>@hf SetEntitySpriteVariant(mem[NightmareMoldormBodyFrames + (wEntityPrivate1[slot] >> 1)])
+;>@hf SetEntitySpriteVariant(slot, mem[NightmareMoldormBodyFrames + (wEntityPrivate1[slot] >> 1)])
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld e, [hl]
@@ -6878,7 +6878,7 @@ DrawNightmareMoldorm::
 ;> hActiveEntitySpriteVariant = 0
 	ld a, $00
 	ldh [hActiveEntitySpriteVariant], a
-;> DrawEntity16x16(NightmareMoldormTailSprites)
+;> DrawEntity16x16(slot, NightmareMoldormTailSprites)
 	ld de, NightmareMoldormTailSprites
 	call DrawEntity16x16
 ;> i = (now - 0x18) & 0x7F                    # second segment
@@ -6900,7 +6900,7 @@ DrawNightmareMoldorm::
 ;> hActiveEntitySpriteVariant = 0
 	ld a, $00
 	ldh [hActiveEntitySpriteVariant], a
-;> DrawEntity16x16(NightmareMoldormTailSprites)
+;> DrawEntity16x16(slot, NightmareMoldormTailSprites)
 	ld de, NightmareMoldormTailSprites
 	call DrawEntity16x16
 ;> i = (now - 0x24) & 0x7F                    # third, smaller segment
@@ -6922,7 +6922,7 @@ DrawNightmareMoldorm::
 ;> hActiveEntitySpriteVariant = 1
 	ld a, $01
 	ldh [hActiveEntitySpriteVariant], a
-;> DrawEntity16x16(NightmareMoldormTailSprites)
+;> DrawEntity16x16(slot, NightmareMoldormTailSprites)
 	ld de, NightmareMoldormTailSprites
 	call DrawEntity16x16
 ;> i = (now - 0x2E) & 0x7F                    # the tail
@@ -6959,7 +6959,7 @@ DrawNightmareMoldorm::
 	xor [hl]
 ;=@fl
 	ld [hl], a
-;> DrawEntity16x16(NightmareMoldormTailSprites)
+;> DrawEntity16x16(slot, NightmareMoldormTailSprites)
 	ld de, NightmareMoldormTailSprites
 	call DrawEntity16x16
 ;> if hActiveEntityState >= 2: return         # already beaten
@@ -7088,7 +7088,7 @@ NightmareMoldormMove::
 	add hl, bc
 	ld e, [hl]
 	ld d, b
-;>     SetEntitySpriteVariant(mem[NightmareMoldormDirFrames + d])
+;>     SetEntitySpriteVariant(slot, mem[NightmareMoldormDirFrames + d])
 	ld hl, NightmareMoldormDirFrames
 	add hl, de
 	ld a, [hl]
@@ -7261,7 +7261,7 @@ NightmareGanonCenter::
 ;> hActiveEntitySpriteVariant = 0
 	xor a
 	ldh [hActiveEntitySpriteVariant], a
-;> SetEntitySpriteVariant(0)
+;> SetEntitySpriteVariant(slot, 0)
 	call SetEntitySpriteVariant
 ;> DrawNightmareGel(slot)
 	call DrawNightmareGel
@@ -7277,7 +7277,7 @@ NightmareGanonCenter::
 ;> hLinkY = 0x30
 	ld a, $30
 	ldh [hLinkY], a
-;> SetEntitySpeedTowardsLink(0x10)
+;> SetEntitySpeedTowardsLink(slot, 0x10)
 	ld a, $10
 	call SetEntitySpeedTowardsLink
 ;>@ar if abs(hActiveEntityDrawY - 0x30) <= 2 and abs(hActiveEntityX - 0x50) <= 2:
@@ -7341,7 +7341,7 @@ NightmareGanonAppear::
 ;>     wEntityTimer[slot] = 8
 	call GetEntityTimer
 	ld [hl], $08
-;>     SetEntitySpriteVariant(4)
+;>     SetEntitySpriteVariant(slot, 4)
 	ld a, $04
 	call SetEntitySpriteVariant
 ;>     PlayNightmareFormSfx()
@@ -7483,7 +7483,7 @@ NightmareGanonRaiseTrident::
 	add hl, de
 	ld a, [hl]
 	ld [wNightmareTridentFrame], a
-;> SetEntitySpriteVariant(mem[GanonRaiseFrames + i])
+;> SetEntitySpriteVariant(slot, mem[GanonRaiseFrames + i])
 	ld hl, GanonRaiseFrames
 	add hl, de
 	ld a, [hl]
@@ -7545,8 +7545,8 @@ NightmareGanonSpawnBats::
 ;> if wEntityDropTimer[slot] == 0:
 	call GetEntityDropTimer
 	jr nz, .spin
-;>     mem[0xD221] = 0                        # bats sent out
-	ld [$d221], a
+;>     wEntityWorkRAM3[0x21] = 0                        # bats sent out
+	ld [wEntityWorkRAM3 + $21], a
 ;>     wEntityTimer[slot] = 0x30
 	call GetEntityTimer
 	ld [hl], $30
@@ -7567,7 +7567,7 @@ NightmareGanonSpawnBats::
 ;> wNightmareTridentY = -18
 	ld a, $ee
 	ld [wNightmareTridentY], a
-;>@va SetEntitySpriteVariant((hFrameCounter >> 3) & 1)
+;>@va SetEntitySpriteVariant(slot, (hFrameCounter >> 3) & 1)
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -7604,11 +7604,11 @@ NightmareGanonSpawnBats::
 	ldh a, [hFrameCounter]
 	and $1f
 	jr nz, .done
-;> if mem[0xD221] >= 6: return               # all six are out
-	ld a, [$d221]
+;> if wEntityWorkRAM3[0x21] >= 6: return               # all six are out
+	ld a, [wEntityWorkRAM3 + $21]
 	cp $06
 	jr nc, .done
-;> full, bat = SpawnEntity(0xE6)
+;> full, bat = SpawnEntity(slot, 0xE6)
 	ld a, $e6
 	call SpawnEntity
 ;> if full: return
@@ -7636,10 +7636,10 @@ NightmareGanonSpawnBats::
 	pop bc
 	call LoadEntityHitbox
 	pop de
-;> n = mem[0xD221] if wNightmareFacing else mem[0xD221] ^ 7
+;> n = wEntityWorkRAM3[0x21] if wNightmareFacing else wEntityWorkRAM3[0x21] ^ 7
 	ld a, [wNightmareFacing]
 	and a
-	ld a, [$d221]
+	ld a, [wEntityWorkRAM3 + $21]
 	jr nz, .place
 	xor $07
 
@@ -7667,8 +7667,8 @@ NightmareGanonSpawnBats::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-;> mem[0xD221] += 1
-	ld hl, $d221
+;> wEntityWorkRAM3[0x21] += 1
+	ld hl, wEntityWorkRAM3 + $21
 	inc [hl]
 	pop bc
 
@@ -7730,7 +7730,7 @@ NightmareGanonThrowTrident::
 	ld [wNightmareTridentFrame], a
 ;>     IncrementEntityState(slot)
 	call IncrementEntityState
-;>     full, trident = SpawnEntity(0xE6)
+;>     full, trident = SpawnEntity(slot, 0xE6)
 	ld a, $e6
 	call SpawnEntity
 ;>     if not full:
@@ -7788,7 +7788,7 @@ NightmareGanonThrowTrident::
 	pop bc
 
 .frame
-;> SetEntitySpriteVariant(2)
+;> SetEntitySpriteVariant(slot, 2)
 	ld a, $02
 	call SetEntitySpriteVariant
 	ret
@@ -7817,7 +7817,7 @@ NightmareGanonAfterThrow::
 	call IncrementEntityState
 
 .frame
-;> SetEntitySpriteVariant(3)
+;> SetEntitySpriteVariant(slot, 3)
 	ld a, $03
 	call SetEntitySpriteVariant
 	ret
@@ -7845,7 +7845,7 @@ GanonGlideSpeeds::
 ;@ (GanonGlideSpeeds); within 3 pixels of it it waits for the trident (state 8).
 ;@ test: skip calls routines in other banks
 NightmareGanonGlide::
-;> SetEntitySpriteVariant(4)
+;> SetEntitySpriteVariant(slot, 4)
 	ld a, $04
 	call SetEntitySpriteVariant
 ;> link_x = hLinkX
@@ -7871,7 +7871,7 @@ NightmareGanonGlide::
 	ldh [hLinkY], a
 ;> t = GetEntityTimer(slot)
 	call GetEntityTimer
-;>@sp SetEntitySpeedTowardsLink(mem[GanonGlideSpeeds + ((t >> 1) & 0x0F)])
+;>@sp SetEntitySpeedTowardsLink(slot, mem[GanonGlideSpeeds + ((t >> 1) & 0x0F)])
 	rra
 	and $0f
 	ld e, a
@@ -7934,7 +7934,7 @@ NightmareGanonDefeated::
 	call NightmareBurstIntoPieces
 ;> IncrementEntityState(slot)
 	call IncrementEntityState
-;> SetEntitySpriteVariant(0)
+;> SetEntitySpriteVariant(slot, 0)
 	ld a, $00
 	call SetEntitySpriteVariant
 ;> wNightmareTridentFrame = 0
@@ -7990,7 +7990,7 @@ NightmareLanmola::
 	ldh a, [hFrameCounter]
 	and $01
 	jr nz, .hit
-;>     GetVectorTowardsLink(0x18)             # into hMultiPurpose0 (y), hMultiPurpose1 (x)
+;>     GetVectorTowardsLink(slot, 0x18)             # into hMultiPurpose0 (y), hMultiPurpose1 (x)
 	ld a, $18
 	call GetVectorTowardsLink
 ;>@sy     wEntitySpeedY[slot] += -1 if hMultiPurpose0 - wEntitySpeedY[slot] < 0 else 1
@@ -8054,7 +8054,7 @@ NightmareLanmola::
 ;> if wEntityPrivateCounter[slot] & 7: return
 	and $07
 	ret nz
-;> full, trail = SpawnEntity(0xE6)
+;> full, trail = SpawnEntity(slot, 0xE6)
 	ld a, $e6
 	call SpawnEntity
 ;> if full: return
@@ -8120,7 +8120,7 @@ NightmareGanonLeave::
 ;> hLinkY = 0x30
 	ld a, $30
 	ldh [hLinkY], a
-;> SetEntitySpeedTowardsLink(0x0C)
+;> SetEntitySpeedTowardsLink(slot, 0x0C)
 	ld a, $0c
 	call SetEntitySpeedTowardsLink
 ;>@ar if abs(hActiveEntityDrawY - 0x30) <= 2 and abs(hActiveEntityX - 0x50) <= 2:
@@ -8191,9 +8191,9 @@ NightmareGanonShrink::
 ;>     wEntityDropTimer[slot] = 0x90
 	call GetEntityDropTimer
 	ld [hl], $90
-;>     mem[0xD223] = 0
+;>     wEntityWorkRAM3[0x23] = 0
 	xor a
-	ld [$d223], a
+	ld [wEntityWorkRAM3 + $23], a
 ;>     wEntityTimer2[slot] = 0x3F
 	ld hl, wEntityTimer2
 	add hl, bc
@@ -8465,14 +8465,14 @@ GanonTridentSpinLeft::
 ;@ path: boss/final_nightmare/ganon
 ;@ The thrown trident (entity $E6 with wEntityPrivate1 = 1): spins with a whirring noise every
 ;@ 16 frames and hurts Link on contact. It flies straight for its $30-frame timer, then homes
-;@ back to 12 pixels above Ganon's shadow (slot in wSmasherBallSlot), steering its speed by 1
+;@ back to 12 pixels above Ganon's shadow (slot in wEntityScratch1), steering its speed by 1
 ;@ per frame towards $10. Within 3 pixels of that spot, if the shadow is waiting (state 8), the
 ;@ shadow catches it and raises it again (state 3, timer $4C). It vanishes once the shadow is
 ;@ beaten.
 ;@ test: skip calls routines in other banks
 GanonTrident::
-;> boss = wSmasherBallSlot
-	ld a, [wSmasherBallSlot]
+;> boss = wEntityScratch1
+	ld a, [wEntityScratch1]
 	ld e, a
 	ld d, b
 ;> if wEntityState[boss] >= 9: return ClearEntityStatus_15(slot)   # Ganon is beaten
@@ -8548,8 +8548,8 @@ GanonTrident::
 ;> link_y = hLinkY
 	ldh a, [hLinkY]
 	push af
-;> boss = wSmasherBallSlot
-	ld a, [wSmasherBallSlot]
+;> boss = wEntityScratch1
+	ld a, [wEntityScratch1]
 	ld e, a
 	ld d, b
 ;> hLinkX = wEntityX[boss]                    # aim at Ganon instead of Link
@@ -8563,7 +8563,7 @@ GanonTrident::
 	ld a, [hl]
 	sub $0c
 	ldh [hLinkY], a
-;> GetVectorTowardsLink(0x10)                 # into hMultiPurpose0 (y), hMultiPurpose1 (x)
+;> GetVectorTowardsLink(slot, 0x10)                 # into hMultiPurpose0 (y), hMultiPurpose1 (x)
 	ld a, $10
 	call GetVectorTowardsLink
 ;>@sy wEntitySpeedY[slot] += -1 if (hMultiPurpose0 - wEntitySpeedY[slot]) & 0x80 else 1
@@ -8609,7 +8609,7 @@ GanonTrident::
 	cp $06
 	jr nc, .restore
 ;>@ca     if wEntityState[boss] == 8:            # Ganon is waiting for it
-	ld a, [wSmasherBallSlot]
+	ld a, [wEntityScratch1]
 	ld e, a
 	ld d, b
 	ld hl, wEntityState
@@ -8655,7 +8655,7 @@ NightmareLanmolaTrailFrames::
 ;@ shrinks (NightmareLanmolaTrailFrames) and vanishes when its timer runs out.
 ;@ test: skip calls routines in other banks
 NightmareLanmolaTrail::
-;> DrawEntity16x16(NightmareLanmolaTrailSprites)
+;> DrawEntity16x16(slot, NightmareLanmolaTrailSprites)
 	ld de, NightmareLanmolaTrailSprites
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
@@ -8664,7 +8664,7 @@ NightmareLanmolaTrail::
 	call GetEntityTimer
 ;> if t == 0: return ClearEntityStatus_15(slot)
 	jp z, ClearEntityStatus_15
-;>@fr SetEntitySpriteVariant(mem[NightmareLanmolaTrailFrames + ((t >> 3) & 3)])
+;>@fr SetEntitySpriteVariant(slot, mem[NightmareLanmolaTrailFrames + ((t >> 3) & 3)])
 	rra
 	rra
 	rra
@@ -8698,7 +8698,7 @@ GanonBat::
 	rla
 	and $10
 	ldh [hActiveEntityFlipAttribute], a
-;> DrawEntity16x16(GanonBatSprites)
+;> DrawEntity16x16(slot, GanonBatSprites)
 	ld de, GanonBatSprites
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
@@ -8729,7 +8729,7 @@ GanonBatSpark::
 	jp IncrementEntityState
 
 .frame
-;>@g1 SetEntitySpriteVariant(0 if t >= 0x18 else 1)
+;>@g1 SetEntitySpriteVariant(slot, 0 if t >= 0x18 else 1)
 	ld e, $00
 	cp $18
 	jr nc, .set
@@ -8749,7 +8749,7 @@ GanonBatSpark::
 ;@ contact, and is gone once it leaves the room (x $A8 or more, y $88 or more).
 ;@ test: skip calls routines in other banks
 GanonBatFly::
-;>@va SetEntitySpriteVariant(2 + ((hFrameCounter >> 3) & 1))
+;>@va SetEntitySpriteVariant(slot, 2 + ((hFrameCounter >> 3) & 1))
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -8765,7 +8765,7 @@ GanonBatFly::
 ;>     hNoiseSfx = 0x28
 	ld a, $28
 	ldh [hNoiseSfx], a
-;>     SetEntitySpeedTowardsLink(0x30)
+;>     SetEntitySpeedTowardsLink(slot, 0x30)
 	ld a, $30
 	call SetEntitySpeedTowardsLink
 
@@ -8929,17 +8929,17 @@ NightmareDethIFight::
 	ret
 
 .alive
-;> if hFrameCounter & 0x0F == 0 and mem[0xD223] < 4:   # grow the arms
+;> if hFrameCounter & 0x0F == 0 and wEntityWorkRAM3[0x23] < 4:   # grow the arms
 	ldh a, [hFrameCounter]
 	and $0f
 	jr nz, .damage
-	ld a, [$d223]
+	ld a, [wEntityWorkRAM3 + $23]
 	cp $04
 	jr nc, .damage
-;>     mem[0xD223] += 1
+;>     wEntityWorkRAM3[0x23] += 1
 	inc a
-	ld [$d223], a
-;>     if mem[0xD223] == 1: wMusicTrackToPlay = 0x50
+	ld [wEntityWorkRAM3 + $23], a
+;>     if wEntityWorkRAM3[0x23] == 1: wMusicTrackToPlay = 0x50
 	cp $01
 	jr nz, .damage
 	ld hl, wMusicTrackToPlay
@@ -8993,7 +8993,7 @@ NightmareDethIFight::
 .beat
 ;> wSongShowTimer = beat
 	ld [wSongShowTimer], a
-;> SetEntitySpriteVariant(0)                  # eye shut
+;> SetEntitySpriteVariant(slot, 0)                  # eye shut
 	ld a, $00
 	call SetEntitySpriteVariant
 ;> if wEntityDropTimer[slot] == 0:
@@ -9032,7 +9032,7 @@ NightmareDethIFight::
 	ld hl, DethIEyeFrames
 	add hl, de
 	ld a, [hl]
-;>     SetEntitySpriteVariant(frame)
+;>     SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 ;>     if frame == 3: wEntityHitboxFlags[slot] &= ~0x80   # wide open: it can be hurt
 	cp $03
@@ -9065,7 +9065,7 @@ NightmareDethIFight::
 ;>     hLinkY = u8(hLinkY - 0x20)             # aim 32 pixels above Link
 	sub $20
 	ldh [hLinkY], a
-;>     GetVectorTowardsLink(0x08)             # into hMultiPurpose0 (y), hMultiPurpose1 (x)
+;>     GetVectorTowardsLink(slot, 0x08)             # into hMultiPurpose0 (y), hMultiPurpose1 (x)
 	ld a, $08
 	call GetVectorTowardsLink
 ;>@sy     wEntitySpeedY[slot] += -1 if (hMultiPurpose0 - wEntitySpeedY[slot]) & 0x80 else 1
@@ -9116,11 +9116,11 @@ NightmareDethIFight::
 	add e
 ;> wEntityPrivateCounter[slot] = u8(total)
 	ld [hl], a
-;> if total > 0xFF: mem[0xD221] += 1          # the first arm turns clockwise
+;> if total > 0xFF: wEntityWorkRAM3[0x21] += 1          # the first arm turns clockwise
 	jr nc, .armB
-	ld a, [$d221]
+	ld a, [wEntityWorkRAM3 + $21]
 	inc a
-	ld [$d221], a
+	ld [wEntityWorkRAM3 + $21], a
 
 .armB
 ;>@ab total = wEntityPrivate3[slot] + wEntityPrivate2[slot]
@@ -9134,11 +9134,11 @@ NightmareDethIFight::
 	add e
 ;> wEntityPrivate3[slot] = u8(total)
 	ld [hl], a
-;> if total > 0xFF: mem[0xD222] -= 1          # the second arm the other way
+;> if total > 0xFF: wEntityWorkRAM3[0x22] -= 1          # the second arm the other way
 	jr nc, .done
-	ld a, [$d222]
+	ld a, [wEntityWorkRAM3 + $22]
 	dec a
-	ld [$d222], a
+	ld [wEntityWorkRAM3 + $22], a
 
 .done
 	ret
@@ -9189,8 +9189,8 @@ NightmareDethIRetractArms::
 	call GetEntityTimer
 	and $0f
 	jr nz, .wait
-;> if mem[0xD223] == 0:
-	ld a, [$d223]
+;> if wEntityWorkRAM3[0x23] == 0:
+	ld a, [wEntityWorkRAM3 + $23]
 	cp $00
 	jr nz, .retract
 ;>     PlayClinkNoise()
@@ -9199,7 +9199,7 @@ NightmareDethIRetractArms::
 	call SpawnNightmareGelPieces
 ;>     ClearEntityStatus_15(slot)
 	call ClearEntityStatus_15
-;>     _, light = SpawnEntity(0xE6)
+;>     _, light = SpawnEntity(slot, 0xE6)
 	ld a, $e6
 	call SpawnEntity
 ;>     wEntityPrivate5[light] = 2             # the light after the fight
@@ -9222,9 +9222,9 @@ NightmareDethIRetractArms::
 	ret
 
 .retract
-;> else: mem[0xD223] -= 1                     # one ball less
+;> else: wEntityWorkRAM3[0x23] -= 1                     # one ball less
 	dec a
-	ld [$d223], a
+	ld [wEntityWorkRAM3 + $23], a
 
 .wait
 ;> return
@@ -9389,12 +9389,12 @@ DethIArmBallSprites::
 ;@ two arms on alternate frames.
 ;@ test: skip calls routines in other banks
 DrawDethIArms::
-;> if mem[0xD223] >= 4:
-	ld a, [$d223]
+;> if wEntityWorkRAM3[0x23] >= 4:
+	ld a, [wEntityWorkRAM3 + $23]
 	cp $04
 	jr c, .a3
-;>     a = mem[0xD221] & 0x1F
-	ld a, [$d221]
+;>     a = wEntityWorkRAM3[0x21] & 0x1F
+	ld a, [wEntityWorkRAM3 + $21]
 	and $1f
 	ld e, a
 	ld d, b
@@ -9410,17 +9410,17 @@ DrawDethIArms::
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ldh [hActiveEntityDrawY], a
-;>     DrawDethIArmBall(2)
+;>     DrawDethIArmBall(slot, 2)
 	ld a, $02
 	call DrawDethIArmBall
 
 .a3
-;> if mem[0xD223] >= 3:
-	ld a, [$d223]
+;> if wEntityWorkRAM3[0x23] >= 3:
+	ld a, [wEntityWorkRAM3 + $23]
 	cp $03
 	jr c, .a2
-;>     a = mem[0xD221] & 0x1F
-	ld a, [$d221]
+;>     a = wEntityWorkRAM3[0x21] & 0x1F
+	ld a, [wEntityWorkRAM3 + $21]
 	and $1f
 	ld e, a
 	ld d, b
@@ -9436,17 +9436,17 @@ DrawDethIArms::
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ldh [hActiveEntityDrawY], a
-;>     DrawDethIArmBall(1)
+;>     DrawDethIArmBall(slot, 1)
 	ld a, $01
 	call DrawDethIArmBall
 
 .a2
-;> if mem[0xD223] >= 2:
-	ld a, [$d223]
+;> if wEntityWorkRAM3[0x23] >= 2:
+	ld a, [wEntityWorkRAM3 + $23]
 	cp $02
 	jr c, .a1
-;>     a = mem[0xD221] & 0x1F
-	ld a, [$d221]
+;>     a = wEntityWorkRAM3[0x21] & 0x1F
+	ld a, [wEntityWorkRAM3 + $21]
 	and $1f
 	ld e, a
 	ld d, b
@@ -9462,17 +9462,17 @@ DrawDethIArms::
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ldh [hActiveEntityDrawY], a
-;>     DrawDethIArmBall(1)
+;>     DrawDethIArmBall(slot, 1)
 	ld a, $01
 	call DrawDethIArmBall
 
 .a1
-;> if mem[0xD223] >= 1:
-	ld a, [$d223]
+;> if wEntityWorkRAM3[0x23] >= 1:
+	ld a, [wEntityWorkRAM3 + $23]
 	cp $01
 	jr c, .b4
-;>@ia     if mem[0xD221] & 0x0F not in (7, 8, 9) or hFrameCounter & 1 == 0:
-	ld a, [$d221]
+;>@ia     if wEntityWorkRAM3[0x21] & 0x0F not in (7, 8, 9) or hFrameCounter & 1 == 0:
+	ld a, [wEntityWorkRAM3 + $21]
 	and $0f
 	cp $07
 	jr z, .blinkA
@@ -9489,8 +9489,8 @@ DrawDethIArms::
 	jr nz, .b4
 
 .drawA1
-;>         a = mem[0xD221] & 0x1F
-	ld a, [$d221]
+;>         a = wEntityWorkRAM3[0x21] & 0x1F
+	ld a, [wEntityWorkRAM3 + $21]
 	and $1f
 	ld e, a
 	ld d, b
@@ -9506,17 +9506,17 @@ DrawDethIArms::
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ldh [hActiveEntityDrawY], a
-;>         DrawDethIArmBall(0)
+;>         DrawDethIArmBall(slot, 0)
 	ld a, $00
 	call DrawDethIArmBall
 
 .b4
-;> if mem[0xD223] >= 4:                       # the second arm
-	ld a, [$d223]
+;> if wEntityWorkRAM3[0x23] >= 4:                       # the second arm
+	ld a, [wEntityWorkRAM3 + $23]
 	cp $04
 	jr c, .b3
-;>     a = mem[0xD222] & 0x1F
-	ld a, [$d222]
+;>     a = wEntityWorkRAM3[0x22] & 0x1F
+	ld a, [wEntityWorkRAM3 + $22]
 	and $1f
 	ld e, a
 	ld d, b
@@ -9532,17 +9532,17 @@ DrawDethIArms::
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ldh [hActiveEntityDrawY], a
-;>     DrawDethIArmBall(2)
+;>     DrawDethIArmBall(slot, 2)
 	ld a, $02
 	call DrawDethIArmBall
 
 .b3
-;> if mem[0xD223] >= 3:
-	ld a, [$d223]
+;> if wEntityWorkRAM3[0x23] >= 3:
+	ld a, [wEntityWorkRAM3 + $23]
 	cp $03
 	jr c, .b2
-;>     a = mem[0xD222] & 0x1F
-	ld a, [$d222]
+;>     a = wEntityWorkRAM3[0x22] & 0x1F
+	ld a, [wEntityWorkRAM3 + $22]
 	and $1f
 	ld e, a
 	ld d, b
@@ -9558,17 +9558,17 @@ DrawDethIArms::
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ldh [hActiveEntityDrawY], a
-;>     DrawDethIArmBall(1)
+;>     DrawDethIArmBall(slot, 1)
 	ld a, $01
 	call DrawDethIArmBall
 
 .b2
-;> if mem[0xD223] >= 2:
-	ld a, [$d223]
+;> if wEntityWorkRAM3[0x23] >= 2:
+	ld a, [wEntityWorkRAM3 + $23]
 	cp $02
 	jr c, .b1
-;>     a = mem[0xD222] & 0x1F
-	ld a, [$d222]
+;>     a = wEntityWorkRAM3[0x22] & 0x1F
+	ld a, [wEntityWorkRAM3 + $22]
 	and $1f
 	ld e, a
 	ld d, b
@@ -9584,17 +9584,17 @@ DrawDethIArms::
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ldh [hActiveEntityDrawY], a
-;>     DrawDethIArmBall(1)
+;>     DrawDethIArmBall(slot, 1)
 	ld a, $01
 	call DrawDethIArmBall
 
 .b1
-;> if mem[0xD223] >= 1:
-	ld a, [$d223]
+;> if wEntityWorkRAM3[0x23] >= 1:
+	ld a, [wEntityWorkRAM3 + $23]
 	cp $01
 	jr c, .done
-;>@ib     if mem[0xD222] & 0x0F not in (7, 8, 9) or hFrameCounter & 1:
-	ld a, [$d222]
+;>@ib     if wEntityWorkRAM3[0x22] & 0x0F not in (7, 8, 9) or hFrameCounter & 1:
+	ld a, [wEntityWorkRAM3 + $22]
 	and $0f
 	cp $07
 	jr z, .blinkB
@@ -9611,8 +9611,8 @@ DrawDethIArms::
 	jr z, .done
 
 .drawB1
-;>         a = mem[0xD222] & 0x1F
-	ld a, [$d222]
+;>         a = wEntityWorkRAM3[0x22] & 0x1F
+	ld a, [wEntityWorkRAM3 + $22]
 	and $1f
 	ld e, a
 	ld d, b
@@ -9628,7 +9628,7 @@ DrawDethIArms::
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ldh [hActiveEntityDrawY], a
-;>         DrawDethIArmBall(0)
+;>         DrawDethIArmBall(slot, 0)
 	ld a, $00
 	call DrawDethIArmBall
 
@@ -9646,7 +9646,7 @@ DrawDethIArms::
 DrawDethIArmBall::
 ;> hActiveEntitySpriteVariant = variant
 	ldh [hActiveEntitySpriteVariant], a
-;> DrawEntity16x16(DethIArmBallSprites)
+;> DrawEntity16x16(slot, DethIArmBallSprites)
 	ld de, DethIArmBallSprites
 	call DrawEntity16x16
 ;> ReserveOAMEntriesFar(2)
@@ -9674,7 +9674,7 @@ DrawDethIArmBall::
 ;>         wSubtractHealthBuffer = 8
 	ld a, $08
 	ld [wSubtractHealthBuffer], a
-;>         GetVectorTowardsLink(0x20)
+;>         GetVectorTowardsLink(slot, 0x20)
 	ld a, $20
 	call GetVectorTowardsLink
 ;>         hLinkSpeedY = hMultiPurpose0       # knocked away
@@ -9721,7 +9721,7 @@ SandCrabSpeedY::
 ;@ down, picking a new direction at random every 48-175 frames or when it walks into something.
 ;@ test: skip calls routines in other banks
 SandCrabHandler::
-;> DrawEntity16x16(SandCrabSprites)                # draw it
+;> DrawEntity16x16(slot, SandCrabSprites)                # draw it
 	ld de, SandCrabSprites
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
@@ -9730,11 +9730,11 @@ SandCrabHandler::
 	call ApplyRecoilIfNeeded_15
 ;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
-;> EntityCheckWalls()                                # background collision
+;> EntityCheckWalls(slot)                                # background collision
 	call EntityCheckWalls
-;> EntityCheckHits()                                # contact with Link and his weapons
+;> EntityCheckHits(slot)                                # contact with Link and his weapons
 	call EntityCheckHits
-;> SetEntitySpriteVariant((hFrameCounter >> 3) & 1)        # walk frames
+;> SetEntitySpriteVariant(slot, (hFrameCounter >> 3) & 1)        # walk frames
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -9819,13 +9819,13 @@ UrchinHandler::
 	ld de, UrchinCreditsSprites
 
 .draw
-;> DrawEntity16x16(sprites)                        # draw it
+;> DrawEntity16x16(slot, sprites)                        # draw it
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
 ;> ApplyRecoilIfNeeded_15(slot)
 	call ApplyRecoilIfNeeded_15
-;>@wb SetEntitySpriteVariant((hFrameCounter >> 4) & 3)        # wobble
+;>@wb SetEntitySpriteVariant(slot, (hFrameCounter >> 4) & 3)        # wobble
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -9857,7 +9857,7 @@ UrchinHandler::
 	set 7, [hl]
 
 .touch
-;> if EntityTouchesLink():                            # Link touches it
+;> if EntityTouchesLink(slot):                            # Link touches it
 	call EntityTouchesLink
 	jr nc, .weapons
 ;>     RestoreLinkPosition()
@@ -9896,7 +9896,7 @@ UrchinHandler::
 	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
 	ld [hl], $03
-;>     EntityCheckWalls()                            # walls stop it
+;>     EntityCheckWalls(slot)                            # walls stop it
 	call EntityCheckWalls
 ;>     wEntityIgnoreHitsTimer[slot] = 0
 	ld hl, wEntityIgnoreHitsTimer
@@ -9913,7 +9913,7 @@ UrchinHandler::
 	jr nz, .done
 
 .hit
-;>     EntityCheckWeaponHits()                            # weapons hit it
+;>     EntityCheckWeaponHits(slot)                            # weapons hit it
 	call EntityCheckWeaponHits
 
 .done
@@ -9951,7 +9951,7 @@ RollingBridgeHandler::
 	ld [hl], a
 ;> AddEntitySpeedToPosY_15(slot)
 	call AddEntitySpeedToPosY_15
-;> EntityCheckWalls()                                # (also finds the object under it)
+;> EntityCheckWalls(slot)                                # (also finds the object under it)
 	call EntityCheckWalls
 ;>@gr if hRoomObjectType != 0x9D and GetObjectPhysics(hRoomObjectType, 1) == 0:   # plain ground
 	ldh a, [hRoomObjectType]
@@ -10144,11 +10144,11 @@ BeetleSpawnerHandler::
 ;> if wEntityPrivateCounter[slot] & 0x3F: return   # every 64 frames
 	and $3f
 	jr nz, .done
-;> beetle = SpawnEntityFromSlot(0xB2, 4)               # a free slot from 4 on
+;> beetle, full = SpawnEntityFromSlot(slot, 0xB2, 4)               # a free slot from 4 on
 	ld a, $b2
 	ld e, $04
 	call SpawnEntityFromSlot
-;> if beetle is None: return
+;> if full: return
 	jr c, .done
 ;> wEntityX[beetle] = hMultiPurpose0
 	ldh a, [hMultiPurpose0]
@@ -10176,7 +10176,7 @@ BeetleSpawnerHandler::
 	ld hl, wEntityTimer1
 	add hl, de
 	ld [hl], $20
-;> SetEntitySpeedTowardsLink(0x08)                            # the beetle crawls towards Link
+;> SetEntitySpeedTowardsLink(slot, 0x08)                            # the beetle crawls towards Link
 	push bc
 	push de
 	pop bc
@@ -10211,14 +10211,14 @@ BeetleSprites::
 ;@ hurts Link on touch, and turns to a random one of 4 directions every 32-63 frames.
 ;@ test: skip calls routines in other banks
 BeetleSpawnerBeetle::
-;> DrawEntity16x16(BeetleSprites)                  # draw it
+;> DrawEntity16x16(slot, BeetleSprites)                  # draw it
 	ld de, BeetleSprites
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
 ;> ApplyRecoilIfNeeded_15(slot)
 	call ApplyRecoilIfNeeded_15
-;> SetEntitySpriteVariant((hFrameCounter >> 3) & 1)        # crawl
+;> SetEntitySpriteVariant(slot, (hFrameCounter >> 3) & 1)        # crawl
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -10227,13 +10227,13 @@ BeetleSpawnerBeetle::
 	call SetEntitySpriteVariant
 ;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
-;> if wEntityTimer1[slot] == 0: EntityCheckWalls()   # walls, once out of the nest
+;> if wEntityTimer1[slot] == 0: EntityCheckWalls(slot)   # walls, once out of the nest
 	call GetEntityTimer1
 	jr nz, .contact
 	call EntityCheckWalls
 
 .contact
-;> EntityCheckHits()                                # contact with Link and his weapons
+;> EntityCheckHits(slot)                                # contact with Link and his weapons
 	call EntityCheckHits
 ;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
@@ -10294,7 +10294,7 @@ LaserBeamPushLinkY::
 LaserBeamHandler::
 ;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
-;> if hActiveEntityState == 0: EntityCheckTouchLink()    # hits Link
+;> if hActiveEntityState == 0: EntityCheckTouchLink(slot)    # hits Link
 	ldh a, [hActiveEntityState]
 	and a
 	jr nz, .fly
@@ -10303,7 +10303,7 @@ LaserBeamHandler::
 .fly
 ;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
-;> EntityCheckObjectCollision()                                # what it ran into
+;> EntityCheckObjectCollision(slot)                                # what it ran into
 	call EntityCheckObjectCollision
 ;> if wEntityCollisions[slot]:
 	ld hl, wEntityCollisions
@@ -10428,7 +10428,7 @@ MonkeyHandler::
 ;=@dr
 	ld c, $03
 	call DrawEntitySprites
-;> DrawEntityShadow()                                # its shadow
+;> DrawEntityShadow(slot)                                # its shadow
 	call DrawEntityShadow
 ;>@bump if hActiveEntityState < 2 and wBumpShakeTimer and wDashBumpFrames:   # Link dashed into a tree
 	ldh a, [hActiveEntityState]
@@ -10516,7 +10516,7 @@ MonkeyInit::
 ;> wEntityTimer[slot] = 0x80
 	call GetEntityTimer
 	ld [hl], $80
-;> IncrementEntityState()
+;> IncrementEntityState(slot)
 	jp IncrementEntityState
 
 
@@ -10570,9 +10570,9 @@ MonkeyThrow::
 	ld a, $e0
 
 .throw
-;> nut = SpawnEntity(kind)
+;> nut, full = SpawnEntity(slot, kind)
 	call SpawnEntity
-;> if nut is None: return
+;> if full: return
 	ret c
 ;> wEntityX[nut] = hMultiPurpose0
 	ldh a, [hMultiPurpose0]
@@ -10645,7 +10645,7 @@ MonkeyThrow::
 ;@ hops ($20) and runs away (state 3) with a hop sound.
 ;@ test: skip calls routines in other banks
 MonkeyFall::
-;> SetEntitySpriteVariant(3)                  # upside down
+;> SetEntitySpriteVariant(slot, 3)                  # upside down
 	ld a, $03
 	call SetEntitySpriteVariant
 ;> UpdateEntityPosWithSpeed_15(slot)
@@ -10669,9 +10669,9 @@ MonkeyFall::
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], $20
-;> ClearEntitySpeed()                                # stop
+;> ClearEntitySpeed(slot)                                # stop
 	call ClearEntitySpeed
-;> IncrementEntityState()                     # run away
+;> IncrementEntityState(slot)                     # run away
 	call IncrementEntityState
 ;> MonkeyHopSound()                           # falls through
 
@@ -10694,7 +10694,7 @@ MonkeyHopSound::
 ;@ hop sound every 16 frames, until it leaves the screen.
 ;@ test: skip calls routines in other banks
 MonkeyRunAway::
-;> SetEntitySpriteVariant(0)
+;> SetEntitySpriteVariant(slot, 0)
 	ld a, $00
 	call SetEntitySpriteVariant
 ;> UpdateEntityPosWithSpeed_15(slot)
@@ -10721,7 +10721,7 @@ MonkeyRunAway::
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], a
-;>     GetVectorTowardsLink(0x10)                        # vector towards Link
+;>     GetVectorTowardsLink(slot, 0x10)                        # vector towards Link
 	ld a, $10
 	call GetVectorTowardsLink
 ;>     wEntitySpeedY[slot] = u8(-hMultiPurpose0)   # away from him
@@ -10781,14 +10781,14 @@ CoconutBounceSpeedX::
 ;@ in a random direction (height 16-31); the fourth landing ends it.
 ;@ test: skip calls routines in other banks
 MonkeyCoconut::
-;> DrawEntity16x16(CoconutSprites)                 # draw it
+;> DrawEntity16x16(slot, CoconutSprites)                 # draw it
 	ld de, CoconutSprites
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
 ;> ApplyRecoilIfNeeded_15(slot)
 	call ApplyRecoilIfNeeded_15
-;>@spn SetEntitySpriteVariant((hFrameCounter >> 4) & 1)   # spin
+;>@spn SetEntitySpriteVariant(slot, (hFrameCounter >> 4) & 1)   # spin
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -10797,7 +10797,7 @@ MonkeyCoconut::
 	and $01
 ;=@spn
 	call SetEntitySpriteVariant
-;> EntityCheckHits()                               # contact with Link and his weapons
+;> EntityCheckHits(slot)                               # contact with Link and his weapons
 	call EntityCheckHits
 ;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
@@ -10884,7 +10884,7 @@ RatHandler::
 	ldh [hActiveEntitySpriteVariant], a
 
 .draw
-;> DrawEntity16x16(RatSprites)                     # draw it
+;> DrawEntity16x16(slot, RatSprites)                     # draw it
 	ld de, RatSprites
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_15()
@@ -10896,13 +10896,13 @@ RatHandler::
 	add hl, bc
 	dec [hl]
 	dec [hl]
-;> hBGTilesRequestCopy = wEntityZ[slot] & 0x80   # (scratch here) nonzero = on the ground
+;> hMultiPurposeG = wEntityZ[slot] & 0x80   # (scratch here) nonzero = on the ground
 	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and $80
-	ldh [hBGTilesRequestCopy], a
-;> if hBGTilesRequestCopy:
+	ldh [hMultiPurposeG], a
+;> if hMultiPurposeG:
 	jr z, .states
 ;>     wEntityZ[slot] = 0
 	xor a
@@ -10973,12 +10973,12 @@ RatPause::
 	and $1f
 	add $30
 	ld [hl], a
-;>     return IncrementEntityState()          # hop
+;>     return IncrementEntityState(slot)          # hop
 	jp IncrementEntityState
 
 
 .look
-;> SetEntitySpriteVariant(1)                  # standing
+;> SetEntitySpriteVariant(slot, 1)                  # standing
 	ld a, $01
 	call SetEntitySpriteVariant
 ;> if hFrameCounter & 0x1F == 0:
@@ -11004,10 +11004,10 @@ RatPause::
 RatHop::
 ;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
-;> EntityCheckWalls()                                # background collision
+;> EntityCheckWalls(slot)                                # background collision
 	call EntityCheckWalls
-;> if hBGTilesRequestCopy:                    # on the ground
-	ldh a, [hBGTilesRequestCopy]
+;> if hMultiPurposeG:                    # on the ground
+	ldh a, [hMultiPurposeG]
 	and a
 	jr z, .pose
 ;>     if wEntityTimer[slot] == 0:
@@ -11033,7 +11033,7 @@ RatHop::
 	inc [hl]
 
 .pose
-;> SetEntitySpriteVariant(0)
+;> SetEntitySpriteVariant(slot, 0)
 	ld a, $00
 	call SetEntitySpriteVariant
 	ret
@@ -11132,7 +11132,7 @@ DrawEntityShadow_15::
 ;>@rpa     if hActiveEntityType == 2:              # a bomb: drawn 2 pixels higher
 ;>@rpb         hActiveEntityDrawY -= 2
 ;>@rpc         DrawEntityWaterRipple_15()
-;>@rpd         return LoadEntityPosition()                  # back to the real position copies
+;>@rpd         return LoadEntityPosition(slot)                  # back to the real position copies
 ;>@rpe     return DrawEntityWaterRipple_15()
 ;> if ground == 3: return DrawEntityGrassOverlay_15(slot)
 	cp $03
@@ -11332,7 +11332,7 @@ DrawEntityGrassOverlay_15::
 ;@ set and in a whether Link was dashing.
 ;@ test: skip calls routines in other banks
 CheckLinkBumpsEntity_15::
-;>@nt if not EntityTouchesLink(): return False        # Link does not touch the entity
+;>@nt if not EntityTouchesLink(slot): return False        # Link does not touch the entity
 	call EntityTouchesLink
 	jr nc, .noTouch
 ;> RestoreLinkPosition()                                # Link back to his previous position
@@ -11405,7 +11405,7 @@ UnusedAnimateByDirection_15::
 	rra
 	rra
 	rra
-;> SetEntitySpriteVariant(frame | base)                    # set the sprite variant
+;> SetEntitySpriteVariant(slot, frame | base)                    # set the sprite variant
 	pop hl
 	and $01
 	or [hl]
@@ -11454,7 +11454,7 @@ CheckLinkTalksToEntity_15::
 	ld hl, wIsLinkInTheAir
 	or [hl]
 ;> if busy or wDialogCooldown: return False
-	ld hl, $c134
+	ld hl, wDialogCooldown
 	or [hl]
 	jr nz, .no
 ;> if wWindowY != 0x80: return False          # a window is shown
@@ -11534,7 +11534,7 @@ ApplyRecoilIfNeeded_15::
 ;> wEntityIgnoreHitsTimer[slot] -= 1
 	dec a
 	ld [hl], a
-;> AddPowerHitTrailVfx()
+;> AddPowerHitTrailVfx(slot)
 	call AddPowerHitTrailVfx
 ;> speed_x = wEntitySpeedX[slot]               # keep its own speed
 	ld hl, wEntitySpeedX
@@ -11568,7 +11568,7 @@ ApplyRecoilIfNeeded_15::
 	ld a, [hl]
 	and $20
 	jr nz, .restore
-;>     EntityCheckWalls()                             # walls stop the recoil
+;>     EntityCheckWalls(slot)                             # walls stop the recoil
 	call EntityCheckWalls
 
 .restore
@@ -11905,7 +11905,7 @@ BossDefeatExplode_15::
 	jr nz, .explode
 ;>     PlayClinkNoise()                             # boss defeated sound, screen shake
 	call PlayClinkNoise
-;>     return DefeatEntityWithDrop()                      # the boss dies and leaves its reward
+;>     return DefeatEntityWithDrop(slot)                      # the boss dies and leaves its reward
 	jp DefeatEntityWithDrop
 
 
@@ -11978,7 +11978,7 @@ SpawnExplosionAtEntity_15::
 ;@ (in the side-view areas the speed is set on the old entity instead - a slip in the code).
 ;@ test: skip unused
 UnusedSpawnType36Drop_15::
-;> new = SpawnEntity(0x36)                      # spawn: hMultiPurpose0/1 = our position
+;> new, full = SpawnEntity(slot, 0x36)                      # spawn: hMultiPurpose0/1 = our position
 	ld a, $36
 	call SpawnEntity
 ;> wEntityX[new] = hMultiPurpose0

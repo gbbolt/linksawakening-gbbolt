@@ -235,8 +235,136 @@ def chest_content_name(c):
     return 'content ${:02X}'.format(c)
 
 
+def dialog_text(rom, n):
+    """Dialog n as one line of text (box lines joined with spaces)."""
+    p = rom[lin(0x1C, 0x4001 + 2 * n)] | rom[lin(0x1C, 0x4002 + 2 * n)] << 8
+    bank = rom[lin(0x1C, 0x46E1 + n)] & 0x1F
+    if p < 0x4000:
+        return ''
+    a, s = lin(bank, p), ''
+    for k in range(1200):
+        c = rom[a + k]
+        if c in (0xFE, 0xFF):
+            break
+        if k and k % 16 == 0:
+            s += ' '
+        s += "'" if c == 0x5E else chr(c) if 0x20 <= c < 0x7F else ''
+    return re.sub(' +', ' ', s.replace('#####', '[NAME]')).strip()
+
+
+class ChestNames:
+    """What each chest content is, from the dialog the game shows when it comes out (ChestItemTexts)."""
+    def __init__(self, ctx):
+        self.texts = table(ctx, 'ChestItemTexts', 0x22) or []
+        self.rom = ctx.rom
+
+    def text(self, c):
+        return dialog_text(self.rom, self.texts[c]) if c < len(self.texts) else ''
+
+    def name(self, c):
+        t = self.text(c)
+        if not t:
+            return chest_content_name(c)
+        first = re.split(r'(?<=[!.?])\s', t)[0]
+        return first if len(first) < 70 else first[:67] + '...'
+
+
+def export(ctx, name, title, records, text):
+    """Write records (a list of flat-ish dicts) as <name>.json and <name>.csv next to the site and return a
+    card that lists both files (group 'downloads')."""
+    import csv
+    import json
+    jpath, jurl = ctx.file(name + '.json')
+    with open(jpath, 'w', encoding='utf-8') as f:
+        json.dump(records, f, indent=1, ensure_ascii=False)
+    cpath, curl = ctx.file(name + '.csv')
+    cols = []
+    for r in records:
+        for k in r:
+            if k not in cols:
+                cols.append(k)
+    with open(cpath, 'w', encoding='utf-8', newline='') as f:
+        w = csv.writer(f)
+        w.writerow(cols)
+        for r in records:
+            w.writerow([json.dumps(v, ensure_ascii=False) if isinstance(v, (list, dict)) else v
+                        for v in (r.get(k, '') for k in cols)])
+    return {'name': 'download-' + name, 'type': 'card', 'group': 'downloads', 'title': title,
+            'subtitle': '{} records'.format(len(records)),
+            'sections': [{'title': 'Files', 'columns': ['file', 'format'],
+                          'rows': [[{'text': jurl, 'href': jurl}, 'JSON'], [{'text': curl, 'href': curl}, 'CSV']]},
+                         {'title': 'Columns', 'chips': cols, 'wide': True}],
+            'doc': [text + ' The same records as JSON ({}) and CSV ({}; lists and objects in a cell are written as '
+                    'JSON).'.format(jurl, curl)]}
+
+
+_SOUND_NAMES = []
+
+
+def music_cell(ctx, track):
+    """A table cell that plays music track `track` (with its name from src/sound.json)."""
+    if not track:
+        return '-'
+    if not _SOUND_NAMES:
+        import json
+        import build as engine
+        try:
+            cfg = json.load(open(os.path.join(engine.SRC, 'sound.json'), encoding='utf-8'))
+            _SOUND_NAMES.append(cfg.get('names', {}))
+        except Exception:  # noqa: BLE001
+            _SOUND_NAMES.append({})
+    name = _SOUND_NAMES[0].get('music %d' % track, ['', ''])[0]
+    return {'sound': 'music %d' % track, 'text': '${:02X} {}'.format(track, name).strip()}
+
+
 def find_chests(grid):
     return [(x, y) for y, row in enumerate(grid) for x, o in enumerate(row) if o == CHEST]
+
+
+# ---------------------------------------------------------------- the source: unit folders and code
+class Source:
+    """The units of the disassembly's source files: folder (;@ path), first line of the description and
+    the body lines (to find what a handler's code does, e.g. which dialogs it opens)."""
+    LABEL = re.compile(r'^([A-Za-z_]\w*)::')
+
+    def __init__(self):
+        import glob
+        import build as engine
+        self.units = {}
+        for f in sorted(glob.glob(os.path.join(engine.SRC, '*.asm'))):
+            head, cur = [], None
+            for line in open(f, encoding='utf-8', errors='replace'):
+                line = line.rstrip('\n')
+                mm = self.LABEL.match(line)
+                if mm:
+                    path = next((h[9:].strip() for h in head if h.startswith(';@ path:')), '')
+                    doc = ' '.join(h[3:].strip() for h in head if h.startswith(';@ ') and not re.match(
+                        r';@ (path|def|test|asset|reads|writes|sig)\b', h))
+                    cur = self.units[mm.group(1)] = {'path': path, 'doc': doc, 'body': [], 'file': os.path.basename(f)}
+                    head = []
+                elif line.startswith(';@'):
+                    head.append(line)
+                elif cur is not None:
+                    cur['body'].append(line)
+
+    def path(self, name):
+        u = self.units.get(name)
+        return u['path'] if u else ''
+
+    def folder_units(self, folder):
+        return [n for n, u in self.units.items() if u['path'] == folder or u['path'].startswith(folder + '/')]
+
+
+def table(ctx, label, count, size=1):
+    """count records of size bytes at a label (None when the label does not exist)."""
+    try:
+        import build as engine
+        a = engine.sym_linear(label, ctx.syms)
+    except Exception:  # noqa: BLE001
+        return None
+    if a is None:
+        return None
+    return [bytes(ctx.rom[a + size * i:a + size * (i + 1)]) if size > 1 else ctx.rom[a + i] for i in range(count)]
 
 
 # ---------------------------------------------------------------- names from the disassembly
@@ -264,6 +392,19 @@ class Names:
 
     def at(self, bank, addr):
         return self.by_lin.get(lin(bank, addr))
+
+    def extent(self, a):
+        """(label, start, end) of the labelled block holding linear address a (end = the next label)."""
+        import bisect
+        if not hasattr(self, '_sorted'):
+            self._sorted = sorted(self.by_lin)
+        i = bisect.bisect_right(self._sorted, a) - 1
+        if i < 0:
+            return None, a, a + 1
+        start = self._sorted[i]
+        end = self._sorted[i + 1] if i + 1 < len(self._sorted) else start + 0x4000
+        end = min(end, (start // 0x4000 + 1) * 0x4000)
+        return self.by_lin[start], start, end
 
     def entity_handler(self, t):
         rom = self.ctx.rom
