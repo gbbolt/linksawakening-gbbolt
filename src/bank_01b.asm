@@ -2096,7 +2096,7 @@ PitchDropOffCommand_1B::
 	xor a
 	jr PitchDropOnCommand_1B.store
 
-;@ def UpdatePitchDrop_1B(drop: de, reg: c)
+;@ def UpdatePitchDrop_1B(drop: de, reg: c, channel)
 ;@ path: sound/music/engine
 ;@ The pitch drop: in the first frame the note's own frequency, after that the one written last, goes
 ;@ down by 100 every frame (written without restarting the note).
@@ -2111,7 +2111,7 @@ UpdatePitchDrop_1B::
 ;>     mem[drop + 1] = 1
 	inc a
 	ld [de], a
-;>     f = GetNoteFrequency_1B(timer)
+;>     f = GetNoteFrequency_1B(channel)   # the channel record UpdateNoteEffects_1B pushed
 	pop hl
 	push hl
 	call GetNoteFrequency_1B
@@ -2506,7 +2506,8 @@ MusicUnusedWave_1B::
 	db $00, $22, $44, $55, $66, $66, $88, $88, $aa, $aa, $cc, $cc, $04, $84, $04, $84
 
 ;@ path: sound/music/songs
-;@ Music track $10: not started by the game.
+;@ Music track $10: Item fanfare.
+;@ Where: Collect_WithFanfare, heart pieces, keys, trade items, songs learned; starts hLastMusicTrack again.
 ;@ Entry 16 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music10::
 	db $00 ; transpose
@@ -2533,7 +2534,7 @@ Music10::
 	db $9b, $1e, $a0, $15, $9c, $a7, $01, $00
 
 ;@ path: sound/music/songs
-;@ Music track $40: not started by the game.
+;@ Music track $40: not requested directly.
 ;@ Entry 32 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music40::
 	db $04 ; transpose
@@ -2574,7 +2575,7 @@ Music40::
 	db $9b, $0b, $a4, $01, $9c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $3C: not started by the game.
+;@ Music track $3C: not requested directly.
 ;@ Entry 28 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music3C::
 	db $00 ; transpose
@@ -2635,7 +2636,7 @@ Music3C::
 	db $9b, $02, $ff, $ff, $15, $15, $9c, $ff, $ff, $15, $ff, $15, $ff, $ff, $15, $00
 
 ;@ path: sound/music/songs
-;@ Music track $37: not started by the game.
+;@ Music track $37: not requested directly.
 ;@ Entry 23 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music37::
 	db $00 ; transpose
@@ -2833,7 +2834,7 @@ Padding_1B_4E48::
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 
 ;@ path: sound/music/songs
-;@ Music track $38: not started by the game.
+;@ Music track $38: not requested directly.
 ;@ Entry 24 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music38::
 	db $00 ; transpose
@@ -2849,7 +2850,7 @@ Music38::
 	db $9a, $00
 
 ;@ path: sound/music/songs
-;@ Music track $01: not started by the game.
+;@ Music track $01: requested in bank $01.
 ;@ Entry 1 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music01::
 	db $00 ; transpose
@@ -2907,7 +2908,8 @@ Music01::
 	db $9b, $02, $a1, $50, $50, $a2, $50, $9c, $a1, $24, $24, $24, $26, $28, $2c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $02: not started by the game.
+;@ Music track $02: Indoor map $0F.
+;@ Where: SelectAreaMusic, IndoorMusicTracks (by hMapId): map $0F.
 ;@ Entry 2 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music02::
 	db $00 ; transpose
@@ -2939,7 +2941,8 @@ Music02::
 	db $99, $a7, $32, $a2, $32, $a3, $34, $32, $2e, $01, $00
 
 ;@ path: sound/music/songs
-;@ Music track $03: not started by the game.
+;@ Music track $03: Game over.
+;@ Where: GameOverWaitMusic.
 ;@ Entry 3 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music03::
 	db $00 ; transpose
@@ -2971,7 +2974,8 @@ Music03::
 	db $20, $00
 
 ;@ path: sound/music/songs
-;@ Music track $04: not started by the game.
+;@ Music track $04: Mabe Village.
+;@ Where: SelectAreaMusic, overworld table 02:4000: rows 8-B, columns 0-3 of the overworld (the village in the south-west).
 ;@ Entry 4 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music04::
 	db $00 ; transpose
@@ -3020,7 +3024,8 @@ Music04::
 	db $00
 
 ;@ path: sound/music/songs
-;@ Music track $05: not started by the game.
+;@ Music track $05: Overworld.
+;@ Where: SelectAreaMusic, overworld table 02:4000: most of the island; also after the sword is found (Sword_Hold) and while Marin follows.
 ;@ Entry 5 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music05::
 	db $00 ; transpose
@@ -3116,7 +3121,8 @@ Music05::
 	db $a3, $42, $aa, $2a, $2a, $2a, $a3, $1e, $aa, $4a, $4a, $4a, $a3, $4a, $aa, $1e
 	db $1e, $1e, $a3, $1e, $aa, $58, $58, $58, $5c, $38, $36, $32, $2e, $2c, $00
 ;@ path: sound/music/songs
-;@ Music track $06: not started by the game.
+;@ Music track $06: Tal Tal Mountains.
+;@ Where: SelectAreaMusic, overworld table 02:4000: the two top rows of the overworld.
 ;@ Entry 6 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music06::
 	db $00 ; transpose
@@ -3208,7 +3214,8 @@ Music06::
 	db $15, $15, $15, $15, $15, $9c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $07: not started by the game.
+;@ Music track $07: Shop.
+;@ Where: EntityInit_ShopOwner (when Link has a sword); SelectAreaMusic, IndoorMusicTracks (by hMapId): map $0E.
 ;@ Entry 7 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music07::
 	db $00 ; transpose
@@ -3236,7 +3243,8 @@ Music07::
 	db $a7, $01, $00
 
 ;@ path: sound/music/songs
-;@ Music track $08: not started by the game.
+;@ Music track $08: Overworld east.
+;@ Where: SelectAreaMusic, overworld table 02:4000: rows 4-7, columns C-F.
 ;@ Entry 8 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music08::
 	db $00 ; transpose
@@ -3278,7 +3286,8 @@ Music08::
 	db $ff, $a2, $29, $29, $00
 
 ;@ path: sound/music/songs
-;@ Music track $09: not started by the game.
+;@ Music track $09: Mysterious Forest.
+;@ Where: SelectAreaMusic, overworld table 02:4000: rows 4-7, columns 0-3, and room $80.
 ;@ Entry 9 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music09::
 	db $00 ; transpose
@@ -3328,7 +3337,8 @@ Music09::
 	db $9b, $05, $29, $9c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $0A: not started by the game.
+;@ Music track $0A: Indoor maps $10, $12, $1D.
+;@ Where: SelectAreaMusic, IndoorMusicTracks (by hMapId).
 ;@ Entry 10 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music0A::
 	db $04 ; transpose
@@ -3351,7 +3361,8 @@ Music0A::
 	db $40, $4a, $52, $a3, $62, $a2, $62, $a7, $7a, $32, $00
 
 ;@ path: sound/music/songs
-;@ Music track $0B: not started by the game.
+;@ Music track $0B: Animal Village.
+;@ Where: SelectAreaMusic, overworld table 02:4000: rooms $CC, $CD, $DC, $DD.
 ;@ Entry 11 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music0B::
 	db $00 ; transpose
@@ -3387,7 +3398,7 @@ Music0B::
 	db $a2, $29, $a1, $29, $29, $a2, $ff, $a1, $29, $29, $a1, $29, $29, $29, $29, $a2
 	db $ff, $1a, $00
 ;@ path: sound/music/songs
-;@ Music track $0C: not started by the game.
+;@ Music track $0C: not requested directly.
 ;@ Entry 12 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music0C::
 	db $00 ; transpose
@@ -3409,7 +3420,8 @@ Music0C::
 	db $a2, $30, $34, $3a, $40, $48, $4c, $52, $58, $60, $64, $6a, $70, $78, $7c, $82
 	db $88, $00
 ;@ path: sound/music/songs
-;@ Music track $0D: not started by the game.
+;@ Music track $0D: Intro.
+;@ Where: GameplayIntroHandler.
 ;@ Entry 13 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music0D::
 	db $00 ; transpose
@@ -3423,7 +3435,8 @@ Music0D::
 	dw MusicCommonData_1B.m01Pat6, Music01.pat5, $FFFF, .wave
 
 ;@ path: sound/music/songs
-;@ Music track $0E: not started by the game.
+;@ Music track $0E: Madam MeowMeow.
+;@ Where: EntityInit_MadamMeowMeow; bank $06.
 ;@ Entry 14 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music0E::
 	db $00 ; transpose
@@ -3447,7 +3460,8 @@ Music0E::
 	db $99, $a7, $28, $28, $a3, $28, $00
 
 ;@ path: sound/music/songs
-;@ Music track $0F: not started by the game.
+;@ Music track $0F: Sword fanfare.
+;@ Where: Collect_Sword; starts hLastMusicTrack again when it ends.
 ;@ Entry 15 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music0F::
 	db $00 ; transpose
@@ -3471,7 +3485,8 @@ Music0F::
 	db $58, $52, $a2, $36, $44, $4a, $4e, $56, $5c, $62, $66, $a8, $7e, $95, $00
 
 ;@ path: sound/music/songs
-;@ Music track $31: not started by the game.
+;@ Music track $31: Overworld (no intro).
+;@ Where: Sword_Hold, MarinFollowHandler: track $05 without its first pattern.
 ;@ Entry 17 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music31::
 	db $00 ; transpose
@@ -3500,7 +3515,7 @@ Music31::
 	db $52, $56, $58, $56, $52, $a3, $4e, $aa, $1e, $1e, $1e, $00
 
 ;@ path: sound/music/songs
-;@ Music track $32: not started by the game.
+;@ Music track $32: not requested directly.
 ;@ Entry 18 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music32::
 	db $00 ; transpose
@@ -3519,7 +3534,7 @@ Music32::
 	db $62, $a3, $56, $6a, $a5, $66, $a2, $01, $00
 
 ;@ path: sound/music/songs
-;@ Music track $33: not started by the game.
+;@ Music track $33: not requested directly.
 ;@ Entry 19 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music33::
 	db $00 ; transpose
@@ -3552,7 +3567,8 @@ Music33::
 	db $a3, $3c, $32, $a3, $01, $00
 
 ;@ path: sound/music/songs
-;@ Music track $34: not started by the game.
+;@ Music track $34: Tarin and the honeycomb.
+;@ Where: TarinHoneycomb_RaiseStick.
 ;@ Entry 20 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music34::
 	db $00 ; transpose
@@ -3596,7 +3612,8 @@ Music34::
 	db $a1, $01, $00
 
 ;@ path: sound/music/songs
-;@ Music track $35: not started by the game.
+;@ Music track $35: Frog's Song of Soul.
+;@ Where: MamuWaitBeforeSong.
 ;@ Entry 21 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music35::
 	db $00 ; transpose
@@ -3631,7 +3648,8 @@ Music35::
 	db $9b, $02, $a2, $4a, $a1, $40, $40, $9c, $9a, $ae, $4a, $00
 
 ;@ path: sound/music/songs
-;@ Music track $36: not started by the game.
+;@ Music track $36: Kiki eats.
+;@ Where: Kiki_Eat.
 ;@ Entry 22 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music36::
 	db $00 ; transpose
@@ -3665,7 +3683,8 @@ Music36::
 	db $20, $a1, $32, $38, $00
 
 ;@ path: sound/music/songs
-;@ Music track $39: not started by the game.
+;@ Music track $39: Turtle Rock wakes.
+;@ Where: TurtleRockWake.
 ;@ Entry 25 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music39::
 	db $00 ; transpose
@@ -3724,7 +3743,7 @@ Music39::
 	db $9b, $08, $a1, $15, $9c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $3A: not started by the game.
+;@ Music track $3A: not requested directly.
 ;@ Entry 26 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music3A::
 	db $00 ; transpose
@@ -3753,7 +3772,7 @@ Music3A::
 	db $9b, $04, $a1, $15, $9c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $3B: not started by the game.
+;@ Music track $3B: not requested directly.
 ;@ Entry 27 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music3B::
 	db $00 ; transpose
@@ -3773,7 +3792,8 @@ Music3B::
 	db $99, $a2, $30, $32, $34, $9a, $a8, $36, $00
 
 ;@ path: sound/music/songs
-;@ Music track $3D: not started by the game.
+;@ Music track $3D: Ending: the sky.
+;@ Where: SkyViewInit.
 ;@ Entry 29 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music3D::
 	db $00 ; transpose
@@ -3988,7 +4008,8 @@ Music3D::
 	db $a3, $1a, $a2, $1a, $a1, $1a, $1a, $a3, $1a, $01, $00
 
 ;@ path: sound/music/songs
-;@ Music track $3E: not started by the game.
+;@ Music track $3E: Indoor map $15.
+;@ Where: SelectAreaMusic, IndoorMusicTracks (by hMapId): map $15.
 ;@ Entry 30 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music3E::
 	db $00 ; transpose
@@ -4008,7 +4029,8 @@ Music3E::
 	db $a1, $48, $4a, $48, $46, $44, $42, $44, $46, $00
 
 ;@ path: sound/music/songs
-;@ Music track $3F: not started by the game.
+;@ Music track $3F: Ending: the instruments.
+;@ Where: EndingSpawnInstruments.
 ;@ Entry 31 of SongTable_1B. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1B).
 Music3F::
 	db $00 ; transpose

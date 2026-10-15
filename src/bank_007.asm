@@ -126,7 +126,7 @@ BushCrawlerHandler::
 	jr z, .notHit
 ;>     wEntityFlashTimer[slot] = 0
 	ld [hl], b
-;>     SetEntitySpriteVariant(wEntityPrivate4[slot] ^ 1)  # sprite variant of the plain object
+;>     SetEntitySpriteVariant(slot, wEntityPrivate4[slot] ^ 1)  # sprite variant of the plain object
 	ld hl, wEntityPrivate4
 	add hl, bc
 	ld a, [hl]
@@ -327,7 +327,7 @@ BushCrawler_Hidden::
 	ld hl, wEntityType
 	add hl, bc
 	ld [hl], $05
-;> SetEntitySpriteVariant(wEntityPrivate4[slot] ^ 1)
+;> SetEntitySpriteVariant(slot, wEntityPrivate4[slot] ^ 1)
 	ld hl, wEntityPrivate4
 	add hl, bc
 	ld a, [hl]
@@ -402,7 +402,7 @@ BushCrawler_Dash::
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld [hl], $04
-;>         SetEntitySpriteVariant((hFrameCounter >> 3) & 1)   # wiggle every 8 frames
+;>         SetEntitySpriteVariant(slot, (hFrameCounter >> 3) & 1)   # wiggle every 8 frames
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -435,7 +435,7 @@ BushCrawlerUncovered::
 	call ReturnIfNonInteractive
 ;> ApplyRecoilIfNeeded(slot)
 	call ApplyRecoilIfNeeded
-;> SetEntitySpriteVariant((hFrameCounter >> 3) & 1)
+;> SetEntitySpriteVariant(slot, (hFrameCounter >> 3) & 1)
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -598,7 +598,7 @@ Fisherman_Idle::
 ;>         OpenDialogTable1(0xE8)           # asks for the hook
 	ld a, $e8
 	call OpenDialogTable1
-;>         return IncrementEntityState()               # state 1: wait for the answer
+;>         return IncrementEntityState(slot)               # state 1: wait for the answer
 	jp IncrementEntityState
 
 .notHook
@@ -622,7 +622,7 @@ Fisherman_IdleAnimation:
 	jr z, .frame0
 	inc e
 .frame0
-;> return SetEntitySpriteVariant(frame)
+;> return SetEntitySpriteVariant(slot, frame)
 	ld a, e
 	jp SetEntitySpriteVariant
 
@@ -670,9 +670,9 @@ Fisherman_Fishing::
 ;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
-;> mem[0xC10B] = 1
+;> wMusicSpeed = 1
 	ld a, $01
-	ld [$c10b], a
+	ld [wMusicSpeed], a
 ;> t = wEntityTimer[slot]
 	call GetEntityTimer
 ;> if t == 0:
@@ -701,7 +701,7 @@ Fisherman_Fishing::
 	jr z, .setFrame
 	inc e
 .setFrame
-;> return SetEntitySpriteVariant(frame)
+;> return SetEntitySpriteVariant(slot, frame)
 	ld a, e
 	jp SetEntitySpriteVariant
 
@@ -719,8 +719,8 @@ Fisherman_PullOut::
 ;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
 	jr nz, .pulling
-;>     mem[0xC10B] = 0
-	ld [$c10b], a
+;>     wMusicSpeed = 0
+	ld [wMusicSpeed], a
 ;>     wEntityState[slot] += 1
 	call IncrementEntityState
 ;>     catch = SpawnEntity(0x54)
@@ -769,7 +769,7 @@ Fisherman_PullOut::
 	ld a, $0d
 	ldh [hBGChangeRequest], a
 .pulling
-;> SetEntitySpriteVariant(3)
+;> SetEntitySpriteVariant(slot, 3)
 	ld a, $03
 	call SetEntitySpriteVariant
 	ret
@@ -1088,7 +1088,7 @@ Mermaid_Init::
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], $30
-;> return IncrementEntityState()                  # wEntityState += 1
+;> return IncrementEntityState(slot)                  # wEntityState += 1
 	jp IncrementEntityState
 
 
@@ -1101,7 +1101,7 @@ Mermaid_Init::
 Mermaid_Wait::
 ;> dx, xdir = EntityLinkDiffX(slot)
 	call EntityLinkDiffX
-;> SetEntitySpriteVariant(xdir)                      # face Link
+;> SetEntitySpriteVariant(slot, xdir)                      # face Link
 	ld a, e
 	call SetEntitySpriteVariant
 ;> PushLinkOutOfEntity()                       # Link cannot walk through her
@@ -1161,7 +1161,7 @@ Mermaid_Wait::
 ;@ State 2: one frame, then state 3.
 ;@ test: c = rand(0, 15)
 Mermaid_StartDive::
-;> return IncrementEntityState()
+;> return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 
@@ -1186,7 +1186,7 @@ Mermaid_Dive::
 	call SpawnAppearEffectAtEntity
 ;>     wEntityState[slot] += 1
 	call IncrementEntityState
-;>     SetEntitySpriteVariant(0xFF)                  # hidden
+;>     SetEntitySpriteVariant(slot, 0xFF)                  # hidden
 	ld a, $ff
 	call SetEntitySpriteVariant
 ;>     return
@@ -1204,7 +1204,7 @@ Mermaid_Dive::
 	jr c, .setFrame
 	inc e
 .setFrame
-;> SetEntitySpriteVariant(frame)
+;> SetEntitySpriteVariant(slot, frame)
 	ld a, e
 	call SetEntitySpriteVariant
 .done
@@ -1367,7 +1367,7 @@ Mermaid_JumpStart::
 ;>     frame = hActiveEntitySpriteVariant + 4
 	ldh a, [hActiveEntitySpriteVariant]
 	add $04
-;>     SetEntitySpriteVariant(frame)
+;>     SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 ;>     speed = 0xF8 if frame == 4 else 0x08
 	ld e, $08
@@ -1436,10 +1436,10 @@ Mermaid_Splash::
 	jr nz, .diving
 ;>     wEntityTimer[slot] = 0x20
 	ld [hl], $20
-;>     SetEntitySpriteVariant(0xFF)
+;>     SetEntitySpriteVariant(slot, 0xFF)
 	ld a, $ff
 	call SetEntitySpriteVariant
-;>     return IncrementEntityState()
+;>     return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 .diving
@@ -1449,7 +1449,7 @@ Mermaid_Splash::
 	jr nc, .setFrame
 	inc e
 .setFrame
-;> SetEntitySpriteVariant(frame)
+;> SetEntitySpriteVariant(slot, frame)
 	ld a, e
 	call SetEntitySpriteVariant
 	ret
@@ -1477,7 +1477,7 @@ Mermaid_NextJump::
 ;> facing = GetRandomByte() & 1
 	call GetRandomByte
 	and $01
-;> SetEntitySpriteVariant(facing)
+;> SetEntitySpriteVariant(slot, facing)
 	call SetEntitySpriteVariant
 ;> dy = 0x10 if facing == 0 else 0xF0
 	ld e, $10
@@ -1580,7 +1580,7 @@ MermaidAfterTrade_Leap::
 	ld [hl], $fc
 ;> SpawnAppearEffectAtEntity()
 	call SpawnAppearEffectAtEntity
-;> return IncrementEntityState()
+;> return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 
@@ -1619,7 +1619,7 @@ MermaidAfterTrade_Jump::
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(frame)
+;> SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 	ret
 
@@ -1753,7 +1753,7 @@ PapahlHandler::
 	rra
 	rra
 	and $01
-;>     SetEntitySpriteVariant(frame)
+;>     SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 ;>     PushLinkOutOfEntity()
 	call PushLinkOutOfEntity
@@ -1869,7 +1869,7 @@ Papahl_Wait::
 ;>         wEntityState[slot] += 1
 	call IncrementEntityState
 .still
-;>     SetEntitySpriteVariant(0)
+;>     SetEntitySpriteVariant(slot, 0)
 	xor a
 	call SetEntitySpriteVariant
 ;>     return
@@ -1882,7 +1882,7 @@ Papahl_Wait::
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(frame)
+;> SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 	ret
 
@@ -1946,7 +1946,7 @@ Papahl_Eat::
 ;>     hBGChangeRequest = 0x0D
 	ld a, $0d
 	ldh [hBGChangeRequest], a
-;>     return IncrementEntityState()
+;>     return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 .eating
@@ -1970,7 +1970,7 @@ PapahlEatAnimation::
 	rra
 	and $01
 	add $02
-;> SetEntitySpriteVariant(frame)
+;> SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 	ret
 
@@ -2088,12 +2088,12 @@ BearHandler::
 ;> ReserveOAMEntriesFar(6)                             # bank $15 helper for the 8-sprite entity
 	ld a, $06
 	call ReserveOAMEntriesFar
-;> SetEntitySpriteVariant(0)
+;> SetEntitySpriteVariant(slot, 0)
 	xor a
 	call SetEntitySpriteVariant
 ;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
-;> SetEntitySpriteVariant(hFrameCounter & 0x20)          # turns his head every 32 frames
+;> SetEntitySpriteVariant(slot, hFrameCounter & 0x20)          # turns his head every 32 frames
 	ldh a, [hFrameCounter]
 	and $20
 	call SetEntitySpriteVariant
@@ -2135,7 +2135,7 @@ Bear_Wait::
 ;>     BearOpenDialog(0xCF)
 	ld a, $cf
 	call BearOpenDialog
-;>     return IncrementEntityState()                   # state 1: wait for the answer
+;>     return IncrementEntityState(slot)                   # state 1: wait for the answer
 	jp IncrementEntityState
 
 .noHoneycomb
@@ -2400,7 +2400,7 @@ Honeycomb_Wait::
 ;> if wSmasherSlot:
 	ld a, [wSmasherSlot]
 	and a
-;>     return IncrementEntityState()
+;>     return IncrementEntityState(slot)
 	jp nz, IncrementEntityState
 	ret
 
@@ -2416,7 +2416,7 @@ Honeycomb_SpawnBees::
 	add hl, bc
 	ld a, [hl]
 	cp $05
-;>     return IncrementEntityState()
+;>     return IncrementEntityState(slot)
 	jp z, IncrementEntityState
 ;> if hFrameCounter & 7 == 0:
 	ldh a, [hFrameCounter]
@@ -2521,7 +2521,7 @@ BeeHandler::
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(frame)
+;> SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 ;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
@@ -2620,7 +2620,7 @@ Bee_Buzz::
 ;> if wSmasherSlot:                           # the swarm goes after Tarin
 	ld a, [wSmasherSlot]
 	and a
-;>     return IncrementEntityState()
+;>     return IncrementEntityState(slot)
 	jp nz, IncrementEntityState
 	ret
 
@@ -2816,7 +2816,7 @@ TarinHoneycombStates::
 ;@ (text $C0, state 1).
 ;@ test: skip opens dialogue through another bank
 TarinHoneycomb_Wait::
-;> SetEntitySpriteVariant(2)
+;> SetEntitySpriteVariant(slot, 2)
 	ld a, $02
 	call SetEntitySpriteVariant
 ;> wEntityX[slot] = 0x60
@@ -2871,7 +2871,7 @@ TarinHoneycomb_Answer::
 ;>     hJingle = 1
 	ld a, $01
 	ldh [hJingle], a
-;>     return IncrementEntityState()
+;>     return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 .no
@@ -2920,7 +2920,7 @@ TarinHoneycomb_RaiseStick::
 	call DrawEntity16x16
 ;>     LoadEntityPosition(slot)
 	call LoadEntityPosition
-;>     return SetEntitySpriteVariant(8)
+;>     return SetEntitySpriteVariant(slot, 8)
 	ld a, $08
 	call SetEntitySpriteVariant
 	ret
@@ -2953,7 +2953,7 @@ TarinHoneycomb_RaiseStick::
 ;>         wEntityTimer[slot] = 0xC0
 	call GetEntityTimer
 	ld [hl], $c0
-;>         return IncrementEntityState()
+;>         return IncrementEntityState(slot)
 	call IncrementEntityState
 	ret
 
@@ -2979,7 +2979,7 @@ TarinHoneycomb_RaiseStick::
 	rra
 	and $01
 	add $02
-;> SetEntitySpriteVariant(frame)
+;> SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 	ret
 
@@ -3071,7 +3071,7 @@ TarinHoneycomb_Poke::
 	jr z, .setFrame
 	inc e
 .setFrame
-;> SetEntitySpriteVariant(frame)
+;> SetEntitySpriteVariant(slot, frame)
 	ld a, e
 	call SetEntitySpriteVariant
 	ret
@@ -3126,7 +3126,7 @@ TarinHoneycomb_Flee::
 	ld [hl], a
 ;>     if wEntityPrivateCounter[slot] == 0x0B:
 	cp $0b
-;>         return IncrementEntityState()
+;>         return IncrementEntityState(slot)
 	jp z, IncrementEntityState
 ;>     duration = TarinFleeDurations[wEntityPrivateCounter[slot] - 1]
 	ld e, a
@@ -3293,7 +3293,7 @@ HoleFillerHandler::
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(frame)
+;> SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 ;> return HoleFillerStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
@@ -3643,7 +3643,7 @@ Direction16Flat::
 
 ;@ def GetDirection16FromVector() -> a
 ;@ path: entity/helpers
-;@ Turns the vector (hMultiPurpose0 = x, hMultiPurpose1 = y; signed, length up to about $1F, as
+;@ Turns the vector (hMultiPurpose0 = y, hMultiPurpose1 = x; signed, length up to about $1F, as
 ;@ left by the aiming routine SetEntitySpeedTowardsLink) into a direction 0-15 using Direction16Steep /
 ;@ Direction16Flat.
 ;@ test: hMultiPurpose0 = rand(0xE1, 0x11E) & 0xFF; hMultiPurpose1 = rand(0xE1, 0x11E) & 0xFF
@@ -3799,7 +3799,7 @@ Pincer_Hidden::
 ;>         wEntityState[slot] += 1
 	call IncrementEntityState
 .done
-;> SetEntitySpriteVariant(0)
+;> SetEntitySpriteVariant(slot, 0)
 	xor a
 	call SetEntitySpriteVariant
 	ret
@@ -3816,7 +3816,7 @@ Pincer_Peek::
 	call GetEntityTimer
 ;> if t == 0:
 	jr nz, .waiting
-;>     SetEntitySpriteVariant(wEntityPrivate3[slot])          # the head, looking along the lunge
+;>     SetEntitySpriteVariant(slot, wEntityPrivate3[slot])          # the head, looking along the lunge
 	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
@@ -3828,7 +3828,7 @@ Pincer_Peek::
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	res 6, [hl]
-;>     return IncrementEntityState()
+;>     return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 .waiting
@@ -3849,7 +3849,7 @@ Pincer_Peek::
 	ld a, $18
 	call SetEntitySpeedTowardsLink
 .eyes
-;> SetEntitySpriteVariant(1)
+;> SetEntitySpriteVariant(slot, 1)
 	ld a, $01
 	call SetEntitySpriteVariant
 	ret
@@ -3937,7 +3937,7 @@ Pincer_Retract::
 	add hl, bc
 	ldh a, [hLinkY]
 	ld [hl], a
-;>     SetEntitySpriteVariant(0)
+;>     SetEntitySpriteVariant(slot, 0)
 	xor a
 	call SetEntitySpriteVariant
 ;>     wEntityState[slot] = 1
@@ -4901,7 +4901,7 @@ KikiIdleAnimation::
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(frame)
+;> SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 ;> if hFrameCounter & 0x1F == 0 and GetRandomByte() & 1 == 0:
 	ldh a, [hFrameCounter]
@@ -4992,7 +4992,7 @@ KikiBananasSprite::
 ;@ music ($36) starts and the bridge building takes $80 frames (wEntityDropTimer, state 4).
 ;@ test: skip opens dialogue through another bank
 Kiki_Eat::
-;> SetEntitySpriteVariant(3)
+;> SetEntitySpriteVariant(slot, 3)
 	ld a, $03
 	call SetEntitySpriteVariant
 ;> t = wEntityTimer[slot]
@@ -5007,7 +5007,7 @@ Kiki_Eat::
 ;>     wEntityDropTimer[slot] = 0x80
 	call GetEntityDropTimer
 	ld [hl], $80
-;>     return IncrementEntityState()
+;>     return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 .eating
@@ -5352,7 +5352,7 @@ KikiHopWait:
 ;> if GetEntityTimer1() != 0:
 	call GetEntityTimer1
 	jr z, .done
-;>     SetEntitySpriteVariant(4)
+;>     SetEntitySpriteVariant(slot, 4)
 	ld a, $04
 	call SetEntitySpriteVariant
 .done
@@ -5412,7 +5412,7 @@ Kiki_Hop::
 	add $30
 	ld [hl], a
 .inAir
-;> SetEntitySpriteVariant(3)
+;> SetEntitySpriteVariant(slot, 3)
 	ld a, $03
 	call SetEntitySpriteVariant
 	ret
@@ -5501,7 +5501,7 @@ Monkey_JumpToSpot::
 ;>     KikiFaceSpeed(slot)
 	call KikiFaceSpeed
 .frame
-;>@f SetEntitySpriteVariant(4 if wEntitySpeedY[slot] & 0x80 else 2)
+;>@f SetEntitySpriteVariant(slot, 4 if wEntitySpeedY[slot] & 0x80 else 2)
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
@@ -5532,7 +5532,7 @@ Monkey_Land::
 	dec [hl]
 	dec [hl]
 .move
-;> SetEntitySpriteVariant(3)
+;> SetEntitySpriteVariant(slot, 3)
 	ld a, $03
 	call SetEntitySpriteVariant
 ;> UpdateEntityPosWithSpeed(slot)
@@ -5598,7 +5598,7 @@ BlooperHandler::
 	add hl, bc
 	ld [hl], a
 .inWater
-;> SetEntitySpriteVariant(0)
+;> SetEntitySpriteVariant(slot, 0)
 	xor a
 	call SetEntitySpriteVariant
 ;> return BlooperStates[hActiveEntityState](slot)
@@ -5719,7 +5719,7 @@ Blooper_Swim::
 	add [hl]
 	ld [hl], a
 .frame
-;> SetEntitySpriteVariant(1)
+;> SetEntitySpriteVariant(slot, 1)
 	ld a, $01
 	call SetEntitySpriteVariant
 	ret
@@ -5944,7 +5944,7 @@ Pillar_Shake::
 ;> if t != 0:
 ;>     return SetScreenShakeFromTimer(t)
 	jr nz, SetScreenShakeFromTimer
-;> return IncrementEntityState()
+;> return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 
@@ -5990,8 +5990,8 @@ Pillar_Crumble::
 	ld [hl], a
 ;>     if wEntitySpriteVariant[slot] == 5:
 	cp $05
-;>         return Pillar_Gone(slot)
-	jp z, .gone
+;>         return PillarGone(slot)
+	jp z, PillarGone
 ;>     if GetRandomByte() & 3:
 	call GetRandomByte
 	and $03
@@ -6043,8 +6043,8 @@ Pillar_Crumble::
 .done
 	ret
 
-.gone
-;> wScreenShakeX = 0                            # (Pillar_Gone) the pillar is down
+PillarGone:
+;> wScreenShakeX = 0                            # PillarGone: the pillar is down
 	ld a, $00
 	ld [wScreenShakeX], a
 ;> wTowerPillarsDestroyed += 1
@@ -6226,7 +6226,7 @@ PillarDust::
 ;> if t == 4:
 	cp $04
 	jr nz, .done
-;>     SetEntitySpriteVariant(1)
+;>     SetEntitySpriteVariant(slot, 1)
 	ld a, $01
 	call SetEntitySpriteVariant
 .done
@@ -6372,7 +6372,7 @@ PillarDebris::
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
-;>     SetEntitySpriteVariant(r & 1)
+;>     SetEntitySpriteVariant(slot, r & 1)
 	ld a, e
 	and $01
 	call SetEntitySpriteVariant
@@ -6380,945 +6380,1260 @@ PillarDebris::
 	ret
 
 
+;@ path: object/iron_ball
+;@ The iron ball of Eagle's Tower, drawn by DrawEntity16x16: one frame of 4 bytes (tile and
+;@ attributes of the left half, then of the right half), tile $4E and its mirror image.
 IronBallSprites::
 	db $4e, $00, $4e, $20
 
+;@ def IronBallHandler(slot: c)
+;@ path: object/iron_ball
+;@ Entity $A8, the iron ball in Eagle's Tower (dungeon 7). Link lifts it with the power bracelet
+;@ and throws it; it hits enemies, bounces off walls and smashes the tower's pillars ($A7). It
+;@ keeps falling and bouncing (gravity 2; each bounce halves the speeds), and while carried it
+;@ follows Link from room to room (wIronBallRoom / X / Y remember where it is). States
+;@ (wEntityState): 0 lying, 1 carried, 2 thrown.
+;@ test: skip draws sprites and calls entity engine routines in bank 3
 IronBallHandler::
+;> if hActiveEntityStatus == 7:                 # carried by Link
 	ldh a, [hActiveEntityStatus]
 	cp $07
-	jr nz, jr_007_5daa
-
+	jr nz, .draw
+;>     if wLinkMotionState == 5:
 	ld a, [wLinkMotionState]
 	cp $05
-	jr nz, jr_007_5d99
-
+	jr nz, .follow
+;>         mem[0xC5AE] = 0x10
 	ld a, $10
 	ld [$c5ae], a
-
-jr_007_5d99:
+.follow
+;>     wEntityRoom[slot] = hMapRoom              # it comes along into the next room
 	ldh a, [hMapRoom]
 	ld hl, wEntityRoom
 	add hl, bc
 	ld [hl], a
+;>     wEntityPosXHigh[slot] = 0
 	ld hl, wEntityPosXHigh
 	add hl, bc
 	ld [hl], b
+;>     wEntityPosYHigh[slot] = 0
 	ld hl, wEntityPosYHigh
 	add hl, bc
 	ld [hl], b
-
-jr_007_5daa:
-	ld de, $5d83
+.draw
+;> DrawEntity16x16(IronBallSprites)
+	ld de, IronBallSprites
 	call DrawEntity16x16
+;> if wRoomTransitionState:
 	ld a, [wRoomTransitionState]
 	and a
+;>     return
 	ret nz
-
+;> wIronBallRoom = hMapRoom
 	ldh a, [hMapRoom]
 	ld [wIronBallRoom], a
+;> wIronBallX = hActiveEntityX
 	ldh a, [hActiveEntityX]
 	ld [wIronBallX], a
+;> wIronBallY = hActiveEntityY
 	ldh a, [hActiveEntityY]
 	ld [wIronBallY], a
+;> if wDialogState or hActiveEntityStatus == 2:
 	ld a, [wDialogState]
 	and a
 	ret nz
-
 	ldh a, [hActiveEntityStatus]
 	cp $02
+;>     return
 	ret z
-
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
+;> EntityCheckWeaponHits()
 	call EntityCheckWeaponHits
+;> UpdateEntityPosWithSpeed(slot)
 	call UpdateEntityPosWithSpeed
+;> AddEntityZSpeedToPos(slot)
 	call AddEntityZSpeedToPos
+;> wEntitySpeedZ[slot] -= 2
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	dec [hl]
 	dec [hl]
+;> hMultiPurposeH = wEntityZ[slot]
 	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurposeH], a
+;> landed = wEntityZ[slot] & 0x80
 	and $80
+;> hBGTilesRequestCopy = landed                 # (borrowed as a scratch flag for the states)
 	ldh [hBGTilesRequestCopy], a
-	jr z, jr_007_5e10
-
+;> if landed:
+	jr z, .walls
+;>     wEntityZ[slot] = 0
 	ld [hl], b
+;>     bounce = ~(wEntitySpeedZ[slot] >> 1) & 0xFF   # half the speed, upwards
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld a, [hl]
 	sra a
 	cpl
+;>     if bounce < 7:
 	cp $07
-	jr c, jr_007_5e02
-
+	jr c, .stop
+;>         hNoiseSfx = 0x17                     # thud
 	push af
 	ld a, $17
 	ldh [hNoiseSfx], a
 	pop af
-	jr jr_007_5e03
-
-jr_007_5e02:
+	jr .setBounce
+;>     else:
+.stop
+;>         bounce = 0
 	xor a
-
-jr_007_5e03:
+.setBounce
+;>     wEntitySpeedZ[slot] = bounce
 	ld [hl], a
+;>     wEntitySpeedX[slot] >>= 1                   # signed halving
 	ld hl, wEntitySpeedX
 	add hl, bc
 	sra [hl]
+;>     wEntitySpeedY[slot] >>= 1
 	ld hl, wEntitySpeedY
 	add hl, bc
 	sra [hl]
-
-jr_007_5e10:
+.walls
+;> wEntityIgnoreHitsTimer[slot] = 3
 	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
 	ld [hl], $03
+;> hActiveEntityFlipAttribute = 3                # (scratch: the wall check is done 3 pixels lower)
 	ld e, $03
 	ld a, e
 	ldh [hActiveEntityFlipAttribute], a
+;> wEntityY[slot] += 3
 	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	add e
 	ld [hl], a
+;> hActiveEntityY += 3
 	ldh a, [hActiveEntityY]
 	add e
 	ldh [hActiveEntityY], a
+;> EntityCheckWalls()
 	call EntityCheckWalls
+;>@y wEntityY[slot] -= hActiveEntityFlipAttribute
 	ldh a, [hActiveEntityFlipAttribute]
 	ld e, a
 	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	sub e
+;=@y
 	ld [hl], a
+;> hActiveEntityY -= hActiveEntityFlipAttribute
 	ldh a, [hActiveEntityY]
 	sub e
 	ldh [hActiveEntityY], a
+;> return IronBallStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
+;@ path: object/iron_ball
+;@ States of the iron ball (wEntityState), see IronBallHandler.
 IronBallStates::
 	dw IronBall_OnGround
 	dw IronBall_Held
 	dw IronBall_Thrown
 
+;@ def IronBall_OnGround(slot: c)
+;@ path: object/iron_ball
+;@ State 0: on the ground it slides to a stop (friction 1 per frame). Link touching it with the
+;@ power bracelet (item 3) and pressing its button lifts it (status 7, state 2 once thrown).
+;@ test: skip checks Link collision through bank 3
 IronBall_OnGround::
+;> if (hMultiPurposeH - 1) & 0x80:              # on the ground (height 0)
 	ldh a, [hMultiPurposeH]
 	dec a
 	and $80
 	jr z, IronBallTryLift
-
+;>     SlowDownEntitySpeed(wEntitySpeedY)
 	ld hl, wEntitySpeedY
 	call SlowDownEntitySpeed
+;>     SlowDownEntitySpeed(wEntitySpeedX)         # falls into the helper
 	ld hl, wEntitySpeedX
 
+;@ def SlowDownEntitySpeed(speeds: hl, slot: c)
+;@ path: object/iron_ball
+;@ Moves the speed speeds[slot] one step towards 0, then goes on with the lifting check
+;@ (IronBallTryLift) - so the first of IronBall_OnGround's two calls runs that check too.
+;@ test: skip continues into IronBallTryLift
 SlowDownEntitySpeed::
+;> if mem[speeds + slot] != 0:
 	add hl, bc
 	ld a, [hl]
 	and a
 	jr z, IronBallTryLift
-
+;>     mem[speeds + slot] += 1 if mem[speeds + slot] & 0x80 else -1
 	and $80
-	jr z, jr_007_5e5d
-
+	jr z, .down
 	inc [hl]
 	inc [hl]
-
-jr_007_5e5d:
+.down
 	dec [hl]
+;> IronBallTryLift(slot)                         # falls through
 
+;@ def IronBallTryLift(slot: c)
+;@ path: object/iron_ball
+;@ Link touching the ball with the power bracelet (item 3) and pressing its button lifts it:
+;@ status 7 (carried), state 2 (thrown when he lets go).
+;@ test: skip checks Link collision through bank 3
 IronBallTryLift::
+;> if not EntityTouchesLink() or wItemUsePoseTimer:
 	call EntityTouchesLink
-	jr nc, jr_007_5eb4
-
+	jr nc, .done
 	ld a, [wItemUsePoseTimer]
 	and a
-	jr nz, jr_007_5eb4
-
+;>     return
+	jr nz, .done
+;> if wItemB == 3:                             # power bracelet on B
 	ld a, [wItemB]
 	cp $03
-	jr nz, jr_007_5e78
-
+	jr nz, .tryA
+;>     if not hJoypadPressed & 0x20:
 	ldh a, [hJoypadPressed]
 	and $20
-	jr nz, jr_007_5e85
-
-	jr jr_007_5eb4
-
-jr_007_5e78:
+	jr nz, .lift
+;>         return
+	jr .done
+;> else:
+.tryA
+;>     if wItemA != 3 or not hJoypadPressed & 0x10:
 	ld a, [wItemA]
 	cp $03
-	jr nz, jr_007_5eb4
-
+	jr nz, .done
 	ldh a, [hJoypadPressed]
 	and $10
-	jr z, jr_007_5eb4
-
-jr_007_5e85:
+;>         return
+	jr z, .done
+.lift
+;> if wLinkIsCarrying:
 	ld a, [wLinkIsCarrying]
 	and a
-	jr nz, jr_007_5eb4
-
+;>     return
+	jr nz, .done
+;> wLinkIsCarrying = 1
 	inc a
 	ld [wLinkIsCarrying], a
+;> if hActiveEntityStatus == 7:
 	ldh a, [hActiveEntityStatus]
 	cp $07
-	jr z, jr_007_5eb4
-
+;>     return
+	jr z, .done
+;> wEntityState[slot] = 2                      # thrown once Link lets go
 	call IncrementEntityState
 	ld [hl], $02
+;> wEntityStatus[slot] = 7                     # carried
 	ld hl, wEntityStatus
 	add hl, bc
 	ld [hl], $07
+;> wEntityLiftStep[slot] = 0
 	ld hl, wEntityLiftStep
 	add hl, bc
 	ld [hl], b
+;> wLiftDirection = hLinkDirection
 	ldh a, [hLinkDirection]
 	ld [wLiftDirection], a
+;> wEntityTimer[slot] = 2
 	call GetEntityTimer
 	ld [hl], $02
+;> hWaveSfx = 2
 	ld hl, hWaveSfx
 	ld [hl], $02
-
-jr_007_5eb4:
+.done
 	ret
 
 
+;@ def IronBall_Held(slot: c)
+;@ path: object/iron_ball
+;@ State 1: nothing.
+;@ test: c = rand(0, 15)
 IronBall_Held::
+;> return
 	ret
 
 
+;@ def IronBall_Thrown(slot: c)
+;@ path: object/iron_ball
+;@ State 2, flying: it hits enemies (as weapon $0B) and every pillar it reaches. Hitting a wall it
+;@ bounces back at half speed (jingle 7); on landing it lies again (state 0).
+;@ test: skip calls entity engine routines in bank 3
 IronBall_Thrown::
+;> if hBGTilesRequestCopy:                    # landed this frame
 	ldh a, [hBGTilesRequestCopy]
 	and a
+;>     return IronBallStop(slot)
 	jr nz, IronBallStop
-
+;> if not wEntityCollisions[slot]:
 	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and a
+;>     return IronBall_Fly(slot)
 	jr z, IronBall_Fly
+;> IronBallBounceBack(slot)                    # hit a wall: falls through
 
+;@ def IronBallBounceBack(slot: c)
+;@ path: object/iron_ball
+;@ The ball rebounds: both speeds reversed and halved, jingle 7; then it lies still (IronBallStop:
+;@ $C5D0 + slot = $FF, state 0).
+;@ test: c = rand(0, 15)
 IronBallBounceBack::
+;> hJingle = 7
 	ld a, $07
 	ldh [hJingle], a
+;>@bx wEntitySpeedX[slot] = (-wEntitySpeedX[slot] & 0xFF) >> 1     # signed
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	cpl
 	inc a
 	sra a
+;=@bx
 	ld [hl], a
+;>@by wEntitySpeedY[slot] = (-wEntitySpeedY[slot] & 0xFF) >> 1
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 	cpl
 	inc a
 	sra a
+;=@by
 	ld [hl], a
-
 IronBallStop:
+;> mem[0xC5D0 + slot] = 0xFF
 	ld hl, $c5d0
 	add hl, bc
 	ld [hl], $ff
+;> wEntityState[slot] = 0
 	call IncrementEntityState
 	ld [hl], b
 	ret
 
 
+;@ def IronBall_Fly(slot: c)
+;@ path: object/iron_ball
+;@ The thrown ball in flight: it hits enemies (as weapon $0B) and checks every pillar ($A7) in the
+;@ room with IronBallCheckPillarHit.
+;@ test: skip calls entity engine routines in bank 3
 IronBall_Fly::
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;> wProjectileWeaponType = 0x0B
 	ld a, $0b
 	ld [wProjectileWeaponType], a
+;> EntityHitOtherEntities()
 	call EntityHitOtherEntities
+;>@loop for other in range(15, -1, -1):
 	ld e, $0f
 	ld d, b
-
-jr_007_5ef4:
+.scan
+;>@p     if wEntityStatus[other] and wEntityType[other] == 0xA7:   # a pillar
 	ld hl, wEntityStatus
 	add hl, de
 	ld a, [hl]
 	and a
-	jr z, jr_007_5f0a
-
+	jr z, .next
+;=@p
 	ld hl, wEntityType
 	add hl, de
 	ld a, [hl]
 	cp $a7
-	jr nz, jr_007_5f0a
-
+	jr nz, .next
+;>         IronBallCheckPillarHit(other)
 	push de
 	call IronBallCheckPillarHit
 	pop de
-
-jr_007_5f0a:
+.next
+;=@loop
 	dec e
 	ld a, e
 	cp $ff
-	jr nz, jr_007_5ef4
-
+	jr nz, .scan
 	ret
 
 
+;@ def IronBallCheckPillarHit(pillar: de, slot: c)
+;@ path: object/iron_ball
+;@ If the ball (not just bounced, its timer 0) is within 16 pixels across and close above or below
+;@ the pillar, it rebounds (noise $25, jingle $0B, $10 frames before the next hit) and a standing
+;@ pillar starts shaking (its state 1, timer $50).
+;@ test: skip
 IronBallCheckPillarHit::
+;> if wEntityTimer[slot] != 0:
 	call GetEntityTimer
-	jr nz, jr_007_5f4f
-
+;>     return
+	jr nz, .done
+;> if (hActiveEntityX - wEntityX[pillar] + 0x10) & 0xFF >= 0x20:
 	ld hl, wEntityX
 	add hl, de
 	ldh a, [hActiveEntityX]
 	sub [hl]
 	add $10
 	cp $20
-	jr nc, jr_007_5f4f
-
+;>     return
+	jr nc, .done
+;> if (hActiveEntityDrawY - wEntityY[pillar] + 0x18) & 0xFF >= 0x28:
 	ld hl, wEntityY
 	add hl, de
 	ldh a, [hActiveEntityDrawY]
 	sub [hl]
 	add $18
 	cp $28
-	jr nc, jr_007_5f4f
-
+;>     return
+	jr nc, .done
+;> IronBallBounceBack(slot)
 	call IronBallBounceBack
+;> hNoiseSfx = 0x25
 	ld a, $25
 	ldh [hNoiseSfx], a
+;> hJingle = 0x0B
 	ld a, $0b
 	ldh [hJingle], a
+;> wEntityTimer[slot] = 0x10
 	call GetEntityTimer
 	ld [hl], $10
+;> if wEntityState[pillar] == 0:
 	ld hl, wEntityState
 	add hl, de
 	ld a, [hl]
 	and a
-	jr nz, jr_007_5f4f
-
+	jr nz, .done
+;>     wEntityState[pillar] = 1                 # it starts to shake
 	inc [hl]
+;>     wEntityTimer[pillar] = 0x50
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $50
-
-jr_007_5f4f:
+.done
 	ret
 
 
+;@ path: object/side_view_platform
+;@ A weight of the side-view pulley, drawn by DrawEntity16x16: one frame of 4 bytes (tile and
+;@ attributes of the left half, then of the right half), tile $50 and its mirror image.
 SideViewWeightSprites::
 	db $50, $00, $50, $20
 
+;@ def SideViewWeightsHandler(slot: c)
+;@ path: object/side_view_platform
+;@ Entity $A6, one of two weights hanging on a pulley in a side-view room (the pair is found by
+;@ wEntityLoadOrder, which differs only in bit 0). Link standing on one makes it sink at speed $10
+;@ while the other rises at $F0 (it gets that speed in wEntityPrivate3); when he steps off both
+;@ slow to a stop. Moving down a weight lays chain (room object $4D, background tiles
+;@ $44/$54/$45/$55) at each tile, moving up it clears it again (object $04, tile $7E). A wall in
+;@ the way stops both.
+;@ test: skip draws sprites and edits the room through other banks
 SideViewWeightsHandler::
-	ld de, $5f50
+;> DrawEntity16x16(SideViewWeightSprites)
+	ld de, SideViewWeightSprites
 	call DrawEntity16x16
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;> CarryLinkOnPlatform(slot)
 	call CarryLinkOnPlatform
+;> target = wEntityPrivate3[slot]                 # speed the other weight asks for
 	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	ld e, a
+;> link_on = wEntityPrivate2[slot] != 0
 	and a
-	jr nz, jr_007_5f7c
-
+	jr nz, .approach
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_5fcd
-
+;> if target == 0 and link_on:                    # Link just stepped on: this one sinks
+	jr z, .release
+;>     other = FindOtherWeight(slot)
 	call FindOtherWeight
+;>     wEntityPrivate3[other] = 0xF0              # the other one rises
 	ld hl, wEntityPrivate3
 	add hl, de
 	ld [hl], $f0
+;>     target = 0x10
 	ld e, $10
-
-jr_007_5f7c:
+.approach
+;> if target != 0 or link_on:
+;>@ap     if hFrameCounter & 1 == 0 and wEntitySpeedY[slot] != target:
 	ldh a, [hFrameCounter]
 	and $01
-	jr nz, jr_007_5f91
-
+	jr nz, .probe
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
+;=@ap
 	sub e
-	jr z, jr_007_5f91
-
+	jr z, .probe
+;>         wEntitySpeedY[slot] += 1 if (wEntitySpeedY[slot] - target) & 0x80 else -1
 	and $80
-	jr z, jr_007_5f90
-
+	jr z, .down
 	inc [hl]
 	inc [hl]
-
-jr_007_5f90:
+.down
 	dec [hl]
-
-jr_007_5f91:
+.probe
+;>     wEntityHitboxFlags[slot] = 0x02            # probe the way it is going
 	ld hl, wEntityHitboxFlags
 	add hl, bc
 	ld [hl], $02
+;>     saved_speed = wEntitySpeedY[slot]
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 	push hl
 	push af
+;>     wEntitySpeedY[slot] = target
 	ld [hl], e
+;>     saved_y = wEntityY[slot]
 	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	push hl
 	push af
+;>     EntityCheckWalls()
 	call EntityCheckWalls
+;>     wEntityY[slot] = saved_y
 	pop af
 	pop hl
 	ld [hl], a
+;>     wEntitySpeedY[slot] = saved_speed
 	pop af
 	pop hl
 	ld [hl], a
+;>     wEntityHitboxFlags[slot] = 0x30
 	ld hl, wEntityHitboxFlags
 	add hl, bc
 	ld [hl], $30
+;>     if wEntityCollisions[slot]:                # blocked: both stop
 	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_5fcb
-
+	jr z, .moved
+;>         wEntitySpeedY[slot] = 0
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], b
+;>         other = FindOtherWeight(slot)
 	call FindOtherWeight
+;>         wEntitySpeedY[other] = 0
 	ld hl, wEntitySpeedY
 	add hl, de
 	ld [hl], $00
-
-jr_007_5fcb:
-	jr jr_007_5fe5
-
-jr_007_5fcd:
+.moved
+	jr .chain
+;> else:                                         # nobody on it: slow down
+.release
+;>     if wEntitySpeedY[slot] != 0:
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_5fdc
-
+	jr z, .stopped
+;>         wEntitySpeedY[slot] += 1 if wEntitySpeedY[slot] & 0x80 else -1
 	and $80
-	jr z, jr_007_5fdb
-
+	jr z, .slower
 	inc [hl]
 	inc [hl]
-
-jr_007_5fdb:
+.slower
 	dec [hl]
-
-jr_007_5fdc:
+.stopped
+;>     other = FindOtherWeight(slot)
 	call FindOtherWeight
+;>     wEntityPrivate3[other] = 0
 	ld hl, wEntityPrivate3
 	add hl, de
 	ld [hl], $00
-
-jr_007_5fe5:
+.chain
+;> if hActiveEntityY & 0x0F != 0:               # chain only on whole tiles
 	ldh a, [hActiveEntityY]
 	and $0f
 	cp $00
-	jr nz, jr_007_6047
-
+;>     return
+	jr nz, .done
+;> hBGPosY = hActiveEntityY - 0x10
 	ldh a, [hActiveEntityY]
 	sub $10
 	ldh [hBGPosY], a
+;> row = hBGPosY & 0xF0
 	and $f0
 	ld e, a
+;> hBGPosX = hActiveEntityX - 8
 	ldh a, [hActiveEntityX]
 	sub $08
 	ldh [hBGPosX], a
+;> tile = row | (hBGPosX >> 4)
 	swap a
 	and $0f
 	or e
 	ld e, a
 	ld d, b
+;> if wEntitySpeedY[slot] == 0:
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_6047
-
+;>     return
+	jr z, .done
+;> if not wEntitySpeedY[slot] & 0x80:            # moving down: lay chain
 	and $80
-	jr nz, jr_007_6048
-
+	jr nz, .up
+;>     wRoomObjects[tile] = 0x4D
 	ld hl, wRoomObjects
 	add hl, de
 	ld [hl], $4d
+;>     GetBGAddress()
 	call GetBGAddress
+;>     n = wDrawCommandsSize
 	ld hl, wDrawCommand
 	ld a, [wDrawCommandsSize]
 	ld e, a
+;>     wDrawCommandsSize = n + 10
 	add $0a
 	ld [wDrawCommandsSize], a
+;>     p = wDrawCommand + n
 	ld d, $00
 	add hl, de
+;>@c1     copy(p, [hBGAddrHigh, hBGAddrLow, 0x81, 0x44, 0x54])
 	ldh a, [hBGAddrHigh]
 	ld [hli], a
 	ldh a, [hBGAddrLow]
 	ld [hli], a
 	ld a, $81
 	ld [hli], a
+;=@c1
 	ld a, $44
 	ld [hli], a
 	ld a, $54
 	ld [hli], a
+;>@c2     copy(p + 5, [hBGAddrHigh, hBGAddrLow + 1, 0x81, 0x45, 0x55])
 	ldh a, [hBGAddrHigh]
 	ld [hli], a
 	ldh a, [hBGAddrLow]
 	inc a
 	ld [hli], a
 	ld a, $81
+;=@c2
 	ld [hli], a
 	ld a, $45
 	ld [hli], a
 	ld a, $55
 	ld [hli], a
+;>     mem[p + 10] = 0
 	ld [hl], b
-
-jr_007_6047:
+.done
 	ret
 
-
-jr_007_6048:
+;> else:                                         # moving up: clear it
+.up
+;>     wRoomObjects[tile] = 0x04
 	ld hl, wRoomObjects
 	add hl, de
 	ld [hl], $04
+;>     GetBGAddress()
 	call GetBGAddress
+;>     n = wDrawCommandsSize
 	ld hl, wDrawCommand
 	ld a, [wDrawCommandsSize]
 	ld e, a
+;>     wDrawCommandsSize = n + 10
 	add $0a
 	ld [wDrawCommandsSize], a
+;>     p = wDrawCommand + n
 	ld d, $00
 	add hl, de
+;>@c3     copy(p, [hBGAddrHigh, hBGAddrLow, 0x81, 0x7E, 0x7E])
 	ldh a, [hBGAddrHigh]
 	ld [hli], a
 	ldh a, [hBGAddrLow]
 	ld [hli], a
 	ld a, $81
 	ld [hli], a
+;=@c3
 	ld a, $7e
 	ld [hli], a
 	ld a, $7e
 	ld [hli], a
+;>@c4     copy(p + 5, [hBGAddrHigh, hBGAddrLow + 1, 0x81, 0x7E, 0x7E])
 	ldh a, [hBGAddrHigh]
 	ld [hli], a
 	ldh a, [hBGAddrLow]
 	inc a
 	ld [hli], a
 	ld a, $81
+;=@c4
 	ld [hli], a
 	ld a, $7e
 	ld [hli], a
 	ld a, $7e
 	ld [hli], a
+;>     mem[p + 10] = 0
 	ld [hl], b
 	ret
 
 
+;@ def FindOtherWeight(slot: c) -> de
+;@ path: object/side_view_platform
+;@ Returns in de the slot of the other weight of the pair: the active $A6 whose wEntityLoadOrder
+;@ is this one's with bit 0 flipped (de = 16 if there is none).
+;@ test: c = rand(0, 15)
 FindOtherWeight::
+;> hMultiPurpose0 = wEntityLoadOrder[slot] ^ 1
 	ld hl, wEntityLoadOrder
 	add hl, bc
 	ld a, [hl]
 	xor $01
 	ldh [hMultiPurpose0], a
+;>@loop for other in range(16):
 	ld e, b
 	ld d, b
-
-jr_007_608c:
+.scan
+;>@if     if wEntityStatus[other] and wEntityType[other] == 0xA6 and wEntityLoadOrder[other] == hMultiPurpose0:
 	ld hl, wEntityStatus
 	add hl, de
 	ld a, [hl]
 	and a
-	jr z, jr_007_60a6
-
+	jr z, .next
+;=@if
 	ld hl, wEntityType
 	add hl, de
 	ld a, [hl]
 	cp $a6
-	jr nz, jr_007_60a6
-
+	jr nz, .next
+;=@if
 	ld hl, wEntityLoadOrder
 	add hl, de
 	ldh a, [hMultiPurpose0]
 	cp [hl]
-	jr z, jr_007_60ac
-
-jr_007_60a6:
+;>         return other
+	jr z, .done
+.next
+;=@loop
 	inc e
 	ld a, e
 	cp $10
-	jr nz, jr_007_608c
-
-jr_007_60ac:
+	jr nz, .scan
+.done
 	ret
 
 
+;@ path: object/side_view_platform
+;@ The moving platform of side-view rooms: 4 sprites of 4 bytes (y offset, x offset, tile,
+;@ attributes) in a row from x 0 to +$18: tiles $50, $52, $52 mirrored, $50 mirrored.
 MovingPlatformSprites::
 	db $00, $00, $50, $00, $00, $08, $52, $00, $00, $10, $52, $20, $00, $18, $50, $20
 
+;@ def MovingPlatformHandler(slot: c)
+;@ path: object/side_view_platform
+;@ Entities $A3 (moving sideways) and $A4 (moving up and down), the moving platforms of side-view
+;@ rooms. Every 4 frames the speed swings one step towards +6 or -6; at the limit the platform turns
+;@ and pauses $6A frames. Link standing on it is carried along.
+;@ test: skip draws sprites and calls entity engine routines in bank 3
 MovingPlatformHandler::
-	ld hl, $60ad
+;> DrawEntitySprites(MovingPlatformSprites, 4)
+	ld hl, MovingPlatformSprites
 	ld c, $04
 	call DrawEntitySprites
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
 	ld e, a
+;> wEntityPrivateCounter[slot] += 1
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	inc [hl]
+;> if (wEntityPrivateCounter[slot] & 3) or t:
 	ld a, [hl]
 	and $03
 	or e
+;>     return CarryLinkOnPlatform(slot)
 	jr nz, CarryLinkOnPlatform
-
+;> if hActiveEntityType == 0xA4:
 	ldh a, [hActiveEntityType]
 	cp $a4
+;>     return MovingPlatformVertical(slot)
 	jp z, MovingPlatformVertical
-
+;> dir = wEntityPrivate1[slot]
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld e, [hl]
 	ld d, b
-	ld hl, $615c
+;>@sx wEntitySpeedX[slot] = (wEntitySpeedX[slot] + PlatformAccel[dir]) & 0xFF
+	ld hl, PlatformAccel
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedX
 	add hl, bc
 	add [hl]
+;=@sx
 	ld [hl], a
-	ld hl, $615e
+;> if wEntitySpeedX[slot] == PlatformSpeedLimits[dir]:
+	ld hl, PlatformSpeedLimits
 	add hl, de
 	cp [hl]
 	jr nz, CarryLinkOnPlatform
-
+;>     wEntityPrivate1[slot] ^= 1                  # turn
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	xor $01
 	ld [hl], a
+;>     wEntityTimer[slot] = 0x6A                   # and pause
 	call GetEntityTimer
 	ld [hl], $6a
+;> CarryLinkOnPlatform(slot)                       # falls through
 
+;@ def CarryLinkOnPlatform(slot: c)
+;@ path: object/side_view_platform
+;@ Moves the platform by its speed (stopped by walls) and, when Link stands on it (touching it from
+;@ above while not jumping up), keeps him on top and moves him along with it; then
+;@ wEntityPrivate2 = $10 and wLinkOnPlatform = 1.
+;@ test: skip checks Link collision through bank 3
 CarryLinkOnPlatform::
+;> wEntityPrivate2[slot] = 0
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld [hl], b
+;> x0 = hActiveEntityX
 	ldh a, [hActiveEntityX]
 	push af
+;> UpdateEntityPosWithSpeed(slot)
 	call UpdateEntityPosWithSpeed
+;> dx = wEntityX[slot] - x0
 	pop af
 	ld e, a
 	ld hl, wEntityX
 	add hl, bc
 	ld a, [hl]
 	sub e
+;> hBGTilesRequestCopy = dx                       # (scratch: how far it moved)
 	ldh [hBGTilesRequestCopy], a
+;> EntityCheckWalls()
 	call EntityCheckWalls
+;> if EntityTouchesLink() and not hLinkSpeedY & 0x80:
 	call EntityTouchesLink
-	jr nc, jr_007_615b
-
+	jr nc, .done
 	ldh a, [hLinkSpeedY]
 	and $80
-	jr nz, jr_007_615b
-
+	jr nz, .done
+;>     dy, ydir = EntityLinkDiffY(slot)
 	call EntityLinkDiffY
+;>     if (dy + 8) & 0x80:                         # Link is on top
 	add $08
 	bit 7, a
-	jr z, jr_007_615b
-
+	jr z, .done
+;>         hLinkY = wEntityY[slot] - 0x10
 	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	sub $10
 	ldh [hLinkY], a
+;>         saved = hLinkSpeedX
 	ldh a, [hLinkSpeedX]
 	push af
+;>         hLinkSpeedX = hBGTilesRequestCopy
 	ldh a, [hBGTilesRequestCopy]
 	ldh [hLinkSpeedX], a
+;>         hLinkX += hLinkSpeedX                   # ride along
 	ld hl, hLinkX
 	add [hl]
 	ld [hl], a
+;>         CheckLinkLeavesRoomFar()                             # Link's wall check for that move (bank 2)
 	push bc
 	call CheckLinkLeavesRoomFar
 	pop bc
+;>         hLinkSpeedX = saved
 	pop af
 	ldh [hLinkSpeedX], a
+;>         hLinkSpeedY = 2
 	ld a, $02
 	ldh [hLinkSpeedY], a
+;>         wLinkOnPlatform = 1
 	ld a, $01
 	ld [wLinkOnPlatform], a
+;>         wEntityPrivate2[slot] = 0x10
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld [hl], $10
-
-jr_007_615b:
+.done
 	ret
 
 
+;@ path: object/side_view_platform
+;@ Speed change per step for the platform's turn direction (wEntityPrivate1): +1, -1.
 PlatformAccel::
 	db $01, $ff
 
+;@ path: object/side_view_platform
+;@ The speed at which the platform turns, for turn direction 0 / 1: +6, -6.
 PlatformSpeedLimits::
 	db $06, $fa
 
+;@ def MovingPlatformVertical(slot: c)
+;@ path: object/side_view_platform
+;@ The $A4 platform's speed step: the same as MovingPlatformHandler, on the y speed.
+;@ test: skip checks Link collision through bank 3
 MovingPlatformVertical::
+;> dir = wEntityPrivate1[slot]
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld e, [hl]
 	ld d, b
-	ld hl, $615c
+;>@sy wEntitySpeedY[slot] = (wEntitySpeedY[slot] + PlatformAccel[dir]) & 0xFF
+	ld hl, PlatformAccel
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedY
 	add hl, bc
 	add [hl]
+;=@sy
 	ld [hl], a
-	ld hl, $615e
+;> if wEntitySpeedY[slot] == PlatformSpeedLimits[dir]:
+	ld hl, PlatformSpeedLimits
 	add hl, de
 	cp [hl]
-	jr nz, jr_007_6185
-
+	jr nz, .carry
+;>     wEntityPrivate1[slot] ^= 1
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	xor $01
 	ld [hl], a
+;>     wEntityTimer[slot] = 0x6A
 	call GetEntityTimer
 	ld [hl], $6a
-
-jr_007_6185:
+.carry
+;> return CarryLinkOnPlatform(slot)
 	jp CarryLinkOnPlatform
 
 
+;@ path: object/side_view_platform
+;@ The sinking platform, laid out like MovingPlatformSprites (tiles $50, $52, $52, $50).
 SinkingPlatformSprites::
 	db $00, $00, $50, $00, $00, $08, $52, $00, $00, $10, $52, $20, $00, $18, $50, $20
 
+;@ def SinkingPlatformHandler(slot: c)
+;@ path: object/side_view_platform
+;@ Entity $A5, a platform that sinks under Link (speed up to 4, one step every 4 frames, with a
+;@ creak - noise $11 - on the fourth frame). In room $3B it always sinks; elsewhere only while
+;@ Link carries something heavy, and then it flashes (wEntityTimer1, tiles offset by 4). Without
+;@ Link on it, it stops.
+;@ test: skip draws sprites and calls entity engine routines in bank 3
 SinkingPlatformHandler::
+;> if GetEntityTimer1():
 	call GetEntityTimer1
-	jr z, jr_007_61a1
-
+	jr z, .draw
+;>     hActiveEntityTileOffset = 4                 # flashing
 	ld a, $04
 	ldh [hActiveEntityTileOffset], a
-
-jr_007_61a1:
-	ld hl, $6188
+.draw
+;> DrawEntitySprites(SinkingPlatformSprites, 4)
+	ld hl, SinkingPlatformSprites
 	ld c, $04
 	call DrawEntitySprites
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;> CarryLinkOnPlatform(slot)
 	call CarryLinkOnPlatform
+;> sink = wEntityPrivate2[slot] != 0             # Link stands on it
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_61f0
-
+	jr z, .stop
+;> max_speed = 4
 	ld e, $04
+;> if sink and hMapRoom != 0x3B:
 	ldh a, [hMapRoom]
 	cp $3b
-	jr z, jr_007_61cc
-
+	jr z, .sink
+;>     wEntityTimer1[slot] = 8
 	call GetEntityTimer1
 	ld [hl], $08
+;>     sink = wLinkIsCarrying != 0               # only under a load
 	ld a, [wLinkIsCarrying]
 	and a
-	jr z, jr_007_61f0
-
+	jr z, .stop
+;>     max_speed = 4
 	ld e, $04
-
-jr_007_61cc:
+.sink
+;> if sink:
+;>     if wEntityPrivate4[slot] != 4:
 	ld hl, wEntityPrivate4
 	add hl, bc
 	ld a, [hl]
 	cp $04
-	jr z, jr_007_61de
-
+	jr z, .speed
+;>         wEntityPrivate4[slot] += 1
 	inc [hl]
+;>         if wEntityPrivate4[slot] == 4:         # creak
 	cp $03
-	jr nz, jr_007_61de
-
+	jr nz, .speed
+;>             hNoiseSfx = 0x11
 	ld a, $11
 	ldh [hNoiseSfx], a
-
-jr_007_61de:
+.speed
+;>@sp     if hFrameCounter & 3 == 0 and (wEntitySpeedY[slot] - max_speed) & 0x80:
 	ldh a, [hFrameCounter]
 	and $03
-	jr nz, jr_007_61ef
-
+	jr nz, .done
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
+;=@sp
 	sub e
 	and $80
-	jr z, jr_007_61ef
-
+	jr z, .done
+;>         wEntitySpeedY[slot] += 1
 	inc [hl]
-
-jr_007_61ef:
+.done
+;>     return
 	ret
 
-
-jr_007_61f0:
+.stop
+;> wEntitySpeedY[slot] = 0
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], b
+;> wEntityPrivate4[slot] = 0
 	ld hl, wEntityPrivate4
 	add hl, bc
 	ld [hl], b
 	ret
 
 
+;@ def PiranhaPlantHandler(slot: c)
+;@ path: enemy/piranha_plant
+;@ Entity $A2, the piranha plant of the side-view pipes. It hides in its pipe while Link stands
+;@ within 16 pixels across; otherwise it rises 32 pixels out of it, snaps for $80 frames and sinks
+;@ again. It cannot be knocked back. wEntityPrivate1 keeps the y of the pipe (taken on the first
+;@ frame, wEntityPrivate2 = 1). States (wEntityState): 0 hidden, 1 rise, 2 bite, 3 sink.
+;@ test: skip draws sprites and calls entity engine routines in bank 3
 PiranhaPlantHandler::
+;> wEntityRecoilSpeedX[slot] = 0
 	ld hl, wEntityRecoilSpeedX
 	add hl, bc
 	ld [hl], b
+;> wEntityRecoilSpeedY[slot] = 0
 	ld hl, wEntityRecoilSpeedY
 	add hl, bc
 	ld [hl], b
+;> DrawPiranhaPlant()
 	call DrawPiranhaPlant
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;> if wEntityPrivate2[slot] == 0:             # first frame
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr nz, jr_007_621b
-
+	jr nz, .update
+;>     wEntityPrivate2[slot] = 1
 	inc [hl]
+;>     wEntityPrivate1[slot] = hActiveEntityY  # the pipe
 	ldh a, [hActiveEntityY]
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], a
-
-jr_007_621b:
+.update
+;> ApplyRecoilIfNeeded(slot)
 	call ApplyRecoilIfNeeded
+;> return PiranhaPlantStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
+;@ path: enemy/piranha_plant
+;@ States of the piranha plant (wEntityState), see PiranhaPlantHandler.
 PiranhaPlantStates::
 	dw PiranhaPlant_Hidden
 	dw PiranhaPlant_Rise
 	dw PiranhaPlant_Bite
 	dw PiranhaPlant_Sink
 
+;@ def PiranhaPlant_Hidden(slot: c)
+;@ path: enemy/piranha_plant
+;@ State 0: every $40 frames it looks whether Link is at least 16 pixels away across; then it
+;@ rises (state 1, $40 frames).
+;@ test: c = rand(0, 15)
 PiranhaPlant_Hidden::
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_007_623c
-
+	jr nz, .done
+;>     wEntityTimer[slot] = 0x40
 	ld [hl], $40
+;>     if (EntityLinkDiffX(slot)[0] + 0x10) & 0xFF >= 0x20:   # Link not right above / below
 	call EntityLinkDiffX
 	add $10
 	cp $20
-	jr c, jr_007_623c
-
+	jr c, .done
+;>         wEntityState[slot] += 1
 	call IncrementEntityState
-
-jr_007_623c:
+.done
 	ret
 
 
+;@ path: enemy/piranha_plant
+;@ Sprite frame of the rising plant for each 8-frame step of the timer, read at (timer >> 3) & 7
+;@ while the timer counts down from $40 (so from the end of the table back to the start).
 PiranhaRiseFrames::
 	db $04, $04, $03, $02, $01, $00, $00, $00
 
+;@ path: enemy/piranha_plant
+;@ y offset from the pipe of the rising plant for the same steps (signed pixels; up to -$20).
 PiranhaRiseOffsets::
 	db $e0, $e0, $e8, $f0, $00, $00, $00, $00
 
+;@ def PiranhaPlant_Rise(slot: c)
+;@ path: enemy/piranha_plant
+;@ State 1: comes out of the pipe in steps (PiranhaRiseFrames / PiranhaRiseOffsets); then bites for
+;@ $80 frames (state 2).
+;@ test: skip checks Link collision through bank 3
 PiranhaPlant_Rise::
+;> EntityCheckHits()
 	call EntityCheckHits
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_007_625b
-
+;> if t == 0:
+	jr nz, .rising
+;>     wEntityTimer[slot] = 0x80
 	ld [hl], $80
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
+;>     return
 	ret
 
-
-jr_007_625b:
+.rising
+;> step = (t >> 3) & 7
 	rra
 	rra
 	rra
 	and $07
 	ld e, a
 	ld d, b
-	ld hl, $623d
+;> SetEntitySpriteVariant(slot, PiranhaRiseFrames[step])
+	ld hl, PiranhaRiseFrames
 	add hl, de
 	ld a, [hl]
 	call SetEntitySpriteVariant
-	ld hl, $6245
+;>@y wEntityY[slot] = wEntityPrivate1[slot] + PiranhaRiseOffsets[step]
+	ld hl, PiranhaRiseOffsets
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntityPrivate1
 	add hl, bc
 	add [hl]
+;=@y
 	ld hl, wEntityY
 	add hl, bc
 	ld [hl], a
 	ret
 
 
+;@ def PiranhaPlant_Bite(slot: c)
+;@ path: enemy/piranha_plant
+;@ State 2: out of the pipe it snaps its jaws (frames 4 and 5, $10 frames each); then it sinks
+;@ (state 3, $40 frames).
+;@ test: skip checks Link collision through bank 3
 PiranhaPlant_Bite::
+;> EntityCheckHits()
 	call EntityCheckHits
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_007_6287
-
+;> if t == 0:
+	jr nz, .bite
+;>     wEntityTimer[slot] = 0x40
 	ld [hl], $40
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
-
-jr_007_6287:
+.bite
+;> frame = 4 if t & 0x10 else 5
 	ld e, $04
 	and $10
-	jr nz, jr_007_628e
-
+	jr nz, .set
 	inc e
-
-jr_007_628e:
+.set
+;> SetEntitySpriteVariant(slot, frame)
 	ld a, e
 	call SetEntitySpriteVariant
 	ret
 
 
+;@ path: enemy/piranha_plant
+;@ Sprite frame of the sinking plant for each 8-frame step, read at (timer >> 3) & 7 (counting
+;@ down from $40).
 PiranhaSinkFrames::
 	db $00, $00, $00, $00, $01, $02, $03, $05
 
+;@ path: enemy/piranha_plant
+;@ y offset from the pipe of the sinking plant for the same steps (signed pixels).
 PiranhaSinkOffsets::
 	db $00, $00, $00, $00, $00, $f0, $e8, $e0
 
+;@ def PiranhaPlant_Sink(slot: c)
+;@ path: enemy/piranha_plant
+;@ State 3: goes back down into the pipe; then waits hidden (state 0, $40 frames).
+;@ test: skip checks Link collision through bank 3
 PiranhaPlant_Sink::
+;> EntityCheckHits()
 	call EntityCheckHits
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_007_62b2
-
+;> if t == 0:
+	jr nz, .sinking
+;>     wEntityTimer[slot] = 0x40
 	ld [hl], $40
+;>     wEntityState[slot] = 0
 	call IncrementEntityState
 	ld [hl], b
+;>     return
 	ret
 
-
-jr_007_62b2:
+.sinking
+;> step = (t >> 3) & 7
 	rra
 	rra
 	rra
 	and $07
 	ld e, a
 	ld d, b
-	ld hl, $6293
+;> SetEntitySpriteVariant(slot, PiranhaSinkFrames[step])
+	ld hl, PiranhaSinkFrames
 	add hl, de
 	ld a, [hl]
 	call SetEntitySpriteVariant
-	ld hl, $629b
+;>@y wEntityY[slot] = wEntityPrivate1[slot] + PiranhaSinkOffsets[step]
+	ld hl, PiranhaSinkOffsets
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntityPrivate1
 	add hl, bc
 	add [hl]
+;=@y
 	ld hl, wEntityY
 	add hl, bc
 	ld [hl], a
 	ret
 
 
+;@ path: enemy/piranha_plant
+;@ The piranha plant: 6 frames of 4 sprites, each sprite 4 bytes (y offset, x offset, tile,
+;@ attributes; y $FF = unused). 0 = nothing, 1 = leaves at the rim (tile $74, y -$10), 2 = the head
+;@ (tile $70), 3 = leaves above and below (tiles $74/$76), 4 = head open over the stem (tiles
+;@ $70/$72), 5 = head closed over the stem (tiles $78/$72). Each tile with its mirror image.
 PiranhaPlantSprites::
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $f0, $00, $74, $00, $f0, $08, $74, $20, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
@@ -7327,22 +7642,34 @@ PiranhaPlantSprites::
 	db $00, $00, $70, $00, $00, $08, $70, $20, $10, $00, $72, $00, $10, $08, $72, $20
 	db $00, $00, $78, $00, $00, $08, $78, $20, $10, $00, $72, $00, $10, $08, $72, $20
 
+;@ def DrawPiranhaPlant()
+;@ path: enemy/piranha_plant
+;@ Draws frame hActiveEntitySpriteVariant of PiranhaPlantSprites (4 sprites).
+;@ test: skip draws sprites through bank 0
 DrawPiranhaPlant::
+;> offset = (hActiveEntitySpriteVariant * 16) & 0xF0
 	ldh a, [hActiveEntitySpriteVariant]
 	rla
 	rla
 	rla
 	rla
 	and $f0
+;> frame = PiranhaPlantSprites + offset
 	ld e, a
 	ld d, b
-	ld hl, $62d1
+	ld hl, PiranhaPlantSprites
 	add hl, de
+;> DrawEntitySprites(frame, 4)
 	ld c, $04
 	call DrawEntitySprites
 	ret
 
 
+;@ path: enemy/goomba
+;@ Draw commands (for DrawCommands) that clear the background: 18 commands of 4 bytes, one per row
+;@ of the 20x18 screen in the BG map at $9800: address high, address low, $53 (20 tiles, all the
+;@ same), tile $7F.
+;@ asset: drawcommands
 ClearScreenRowCommands::
 	db $98, $00, $53, $7f, $98, $20, $53, $7f, $98, $40, $53, $7f, $98, $60, $53, $7f
 	db $98, $80, $53, $7f, $98, $a0, $53, $7f, $98, $c0, $53, $7f, $98, $e0, $53, $7f
@@ -7350,2467 +7677,3522 @@ ClearScreenRowCommands::
 	db $99, $80, $53, $7f, $99, $a0, $53, $7f, $99, $c0, $53, $7f, $99, $e0, $53, $7f
 	db $9a, $00, $53, $7f, $9a, $20, $53, $7f
 
+;@ def ClearScreenAndShowMapText(slot: c)
+;@ path: enemy/goomba
+;@ The $9F entity with wEntityPrivate1 set: resets the scroll and hides the window, clears the
+;@ background two rows per frame (ClearScreenRowCommands); then, when its timer is up, opens text
+;@ $50 + map number, sets the normal palette ($E4) and disappears.
+;@ test: skip queues draw commands and opens dialogue
 ClearScreenAndShowMapText::
+;> hBaseScrollX = 0
 	xor a
 	ldh [hBaseScrollX], a
+;> hBaseScrollY = 0
 	ldh [hBaseScrollY], a
+;> wBGOriginLow = 0
 	ld [wBGOriginLow], a
+;> wBGOriginHigh = 0
 	ld [wBGOriginHigh], a
+;> wLCDControl &= ~0x20                       # window off
 	ld hl, wLCDControl
 	res 5, [hl]
+;> if wEntityPrivateCounter[slot] != 9:      # rows still to clear (9 x 2 = 18)
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	cp $09
-	jr z, jr_007_63d2
-
+	jr z, .showText
+;>     n = wDrawCommandsSize
 	ld a, [wDrawCommandsSize]
 	ld e, a
+;>     wDrawCommandsSize = n + 8
 	add $08
 	ld [wDrawCommandsSize], a
+;>@src     src = ClearScreenRowCommands + wEntityPrivateCounter[slot] * 8     # two rows
 	ld d, b
 	push bc
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld c, [hl]
+;>     wEntityPrivateCounter[slot] += 1
 	inc [hl]
+;=@src
 	sla c
 	sla c
 	sla c
-	ld hl, $6345
+	ld hl, ClearScreenRowCommands
 	add hl, bc
+;=@src
 	push hl
 	pop bc
+;>     dst = wDrawCommand + n
 	ld hl, wDrawCommand
 	add hl, de
+;>     for i in range(8):
 	ld e, $08
-
-jr_007_63c9:
+.copy
+;>         mem[dst + i] = mem[src + i]
 	ld a, [bc]
 	inc bc
 	ld [hli], a
 	dec e
-	jr nz, jr_007_63c9
-
+	jr nz, .copy
+;>     mem[dst + 8] = 0
 	ld [hl], b
 	pop bc
+;>     return
 	ret
 
-
-jr_007_63d2:
+.showText
+;> if wEntityTimer[slot] != 0:
 	call GetEntityTimer
+;>     return
 	ret nz
-
+;> OpenDialogTable1(hMapId + 0x50)
 	ldh a, [hMapId]
 	add $50
 	call OpenDialogTable1
+;> wBGPalette = 0xE4
 	ld a, $e4
 	ld [wBGPalette], a
+;> return ClearEntityStatus(slot)
 	jp ClearEntityStatus
 
 
+;@ path: enemy/goomba
+;@ The goomba, drawn by DrawEntity16x16: 3 frames of 4 bytes (tile and attributes of the left
+;@ half, then of the right half): 0/1 = walking (tiles $4A/$4C, the second mirrored), 2 =
+;@ squashed flat (tile $4E).
+GoombaSprites::
 	db $4a, $00, $4c, $00, $4c, $20, $4a, $20, $4e, $00, $4e, $20
 
+;@ def GoombaHandler(slot: c)
+;@ path: enemy/goomba
+;@ Entity $9F, the goomba. In top view it wanders (pause, walk); in side view it walks towards Link
+;@ and falls with gravity, turning at walls. Jumped on it is squashed (state 2) and leaves a heart
+;@ ($2D). With wEntityPrivate1 set this entity instead clears the screen and shows a text
+;@ (ClearScreenAndShowMapText). States (wEntityState): 0 pause, 1 walk, 2 squashed.
+;@ test: skip draws sprites and calls entity engine routines in bank 3
 GoombaHandler::
+;> if wEntityPrivate1[slot] != 0:
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	and a
+;>     return ClearScreenAndShowMapText(slot)
 	jp nz, ClearScreenAndShowMapText
-
-	ld de, $63e5
+;> DrawEntity16x16(GoombaSprites)
+	ld de, GoombaSprites
 	call DrawEntity16x16
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;> ApplyRecoilIfNeeded(slot)
 	call ApplyRecoilIfNeeded
+;> if hIsSideScrolling:
 	ldh a, [hIsSideScrolling]
 	and a
+;>     return GoombaSideView(slot)
 	jp nz, GoombaSideView
-
+;> return GoombaStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
+;@ path: enemy/goomba
+;@ States of the top-view goomba (wEntityState), see GoombaHandler.
 GoombaStates::
 	dw Goomba_Pause
 	dw Goomba_Walk
 	dw Goomba_Squashed
 
-	db $08, $f8, $00, $00, $00, $00, $f8, $08
+;@ path: enemy/goomba
+;@ x speed of the walking goomba per direction (0 right, 1 left, 2 up, 3 down), 1/16 pixel per frame.
+GoombaSpeedX::
+	db $08, $f8, $00, $00
 
+;@ path: enemy/goomba
+;@ y speed of the walking goomba per direction.
+GoombaSpeedY::
+	db $00, $00, $f8, $08
+
+;@ def Goomba_Pause(slot: c)
+;@ path: enemy/goomba
+;@ State 0: stands; after the pause it walks $30-$6F frames in a random direction (every fourth
+;@ time towards Link).
+;@ test: skip draws on random numbers
 Goomba_Pause::
+;> EntityCheckWeaponHits()
 	call EntityCheckWeaponHits
+;> GoombaTouchLink()
 	call GoombaTouchLink
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_007_645f
-
+	jr nz, .animate
+;>     wEntityTimer[slot] = (GetRandomByte() & 0x3F) + 0x30
 	call GetRandomByte
 	and $3f
 	add $30
 	ld [hl], a
+;>     wEntityPrivateCounter[slot] += 1
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	inc a
 	ld [hl], a
+;>     if wEntityPrivateCounter[slot] == 4:
 	cp $04
-	jr nz, jr_007_6441
-
+	jr nz, .random
+;>         wEntityPrivateCounter[slot] = 0
 	ld [hl], b
+;>         dir = GetEntityDirectionToLink(slot)
 	call GetEntityDirectionToLink
-	jr jr_007_6447
-
-jr_007_6441:
+	jr .setDir
+;>     else:
+.random
+;>         dir = GetRandomByte() & 3
 	call GetRandomByte
 	and $03
 	ld e, a
-
-jr_007_6447:
+.setDir
+;>@sx     wEntitySpeedX[slot] = GoombaSpeedX[dir]
 	ld d, b
-	ld hl, $6415
+	ld hl, GoombaSpeedX
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedX
 	add hl, bc
+;=@sx
 	ld [hl], a
-	ld hl, $6419
+;>     wEntitySpeedY[slot] = GoombaSpeedY[dir]
+	ld hl, GoombaSpeedY
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
+.animate
+;> return GoombaWalkAnimation()
+	jr GoombaWalkAnimation
 
-jr_007_645f:
-	jr jr_007_6478
-
+;@ def Goomba_Walk(slot: c)
+;@ path: enemy/goomba
+;@ State 1: walks (stopped by walls); after the time it pauses $20 frames (state 0).
+;@ test: skip checks Link collision through bank 3
 Goomba_Walk::
+;> EntityCheckWeaponHits()
 	call EntityCheckWeaponHits
+;> GoombaTouchLink()
 	call GoombaTouchLink
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_007_6472
-
+	jr nz, .walk
+;>     wEntityTimer[slot] = 0x20
 	ld [hl], $20
+;>     wEntityState[slot] = 0
 	call IncrementEntityState
 	ld [hl], b
-
-jr_007_6472:
+.walk
+;> UpdateEntityPosWithSpeed(slot)
 	call UpdateEntityPosWithSpeed
+;> EntityCheckWalls()
 	call EntityCheckWalls
-
 GoombaWalkAnimation:
-jr_007_6478:
+;> frame = (hFrameCounter >> 4) & 1          # GoombaWalkAnimation: frames 0/1 every 16 frames
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	rra
 	and $01
+;> SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 	ret
 
 
+;@ def Goomba_Squashed(slot: c)
+;@ path: enemy/goomba
+;@ State 2: lies flat (frame 2, no collision with Link); when the time is up it dies (status 1,
+;@ dying for $0C frames) and leaves a heart (drop $2D).
+;@ test: c = rand(0, 15)
 Goomba_Squashed::
+;> wEntityPhysicsFlags[slot] = 0xC2
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $c2
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_007_64a7
-
+	jr nz, .flat
+;>     wEntityDropType[slot] = 0x2D             # a heart
 	ld hl, wEntityDropType
 	add hl, bc
 	ld [hl], $2d
+;>     wEntityDyingTimer[slot] = 0x0C
 	ld hl, wEntityDyingTimer
 	add hl, bc
 	ld [hl], $0c
+;>     wEntityStatus[slot] = 1                  # dying
 	ld hl, wEntityStatus
 	add hl, bc
 	ld [hl], $01
+;>     wEntityPhysicsFlags[slot] = 0x04
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $04
-
-jr_007_64a7:
+.flat
+;> SetEntitySpriteVariant(slot, 2)
 	ld a, $02
 	call SetEntitySpriteVariant
 	ret
 
 
+;@ def GoombaSideView(slot: c)
+;@ path: enemy/goomba
+;@ The goomba in a side-view room: squashed (state 2) as in top view; otherwise it can be hit, hurts
+;@ Link on touch, and runs GoombaSideViewStates (0 start, 1 walk).
+;@ test: skip calls entity engine routines in bank 3
 GoombaSideView::
+;> if hActiveEntityState == 2:
 	ldh a, [hActiveEntityState]
 	cp $02
+;>     return Goomba_Squashed(slot)
 	jr z, Goomba_Squashed
-
+;> EntityCheckWeaponHits()
 	call EntityCheckWeaponHits
+;> GoombaSideViewTouchLink()
 	call GoombaSideViewTouchLink
+;> return GoombaSideViewStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
+;@ path: enemy/goomba
+;@ States of the side-view goomba (wEntityState).
 GoombaSideViewStates::
 	dw GoombaSideView_Start
 	dw GoombaSideView_Walk
 
+;@ def GoombaSideView_Start(slot: c)
+;@ path: enemy/goomba
+;@ State 0: sets off towards Link at half a pixel per frame (state 1).
+;@ test: c = rand(0, 15)
 GoombaSideView_Start::
+;> dx, xdir = EntityLinkDiffX(slot)
 	call EntityLinkDiffX
+;>@s wEntitySpeedX[slot] = 0x08 if xdir != 1 else 0xF8
 	ld a, $08
 	dec e
-	jr nz, jr_007_64ca
-
+	jr nz, .set
 	ld a, $f8
-
-jr_007_64ca:
+.set
 	ld hl, wEntitySpeedX
 	add hl, bc
+;=@s
 	ld [hl], a
+;> return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 
+;@ def GoombaSideView_Walk(slot: c)
+;@ path: enemy/goomba
+;@ State 1: walks with gravity (+2 per frame); a wall turns it round; standing on the floor it is
+;@ put on the tile edge (+3) and walks (frames 0/1), in the air it shows frame 0.
+;@ test: skip checks walls through bank 3
 GoombaSideView_Walk::
+;> UpdateEntityPosWithSpeed(slot)
 	call UpdateEntityPosWithSpeed
+;> wEntitySpeedY[slot] += 2                     # gravity
 	ld hl, wEntitySpeedY
 	add hl, bc
 	inc [hl]
 	inc [hl]
+;> EntityCheckWalls()
 	call EntityCheckWalls
+;> if wEntityCollisions[slot] & 0x03:          # a wall left or right
 	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and $03
-	jr z, jr_007_64ef
-
+	jr z, .floor
+;>     wEntitySpeedX[slot] = -wEntitySpeedX[slot] & 0xFF
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	cpl
 	inc a
 	ld [hl], a
-
-jr_007_64ef:
+.floor
+;> if wEntityCollisions[slot] & 0x08:          # standing on the floor
 	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and $08
-	jr z, jr_007_650a
-
+	jr z, .inAir
+;>     wEntityY[slot] = (wEntityY[slot] & 0xF0) + 3
 	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	and $f0
 	add $03
 	ld [hl], a
+;>     wEntitySpeedY[slot] = 0
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], b
+;>     return GoombaWalkAnimation()
 	jp GoombaWalkAnimation
 
-
-jr_007_650a:
+.inAir
+;> return SetEntitySpriteVariant(slot, 0)
 	xor a
 	jp SetEntitySpriteVariant
 
 
+;@ def GoombaTouchLink()
+;@ path: enemy/goomba
+;@ The touch check with Link (EntityTouchesLink) unless Link is jumping 8 pixels or more above the
+;@ ground - so he can jump over it.
+;@ test: skip checks Link collision through bank 3
 GoombaTouchLink::
+;> if hLinkPositionZ == 0:
 	ldh a, [hLinkPositionZ]
 	and a
+;>     return EntityTouchesLink()
 	jp z, EntityTouchesLink
-
+;> if hLinkPositionZ < 8:
 	cp $08
+;>     return EntityTouchesLink()
 	jp c, EntityTouchesLink
-
 	ret
 
 
+;@ def GoombaSideViewTouchLink()
+;@ path: enemy/goomba
+;@ In side view the goomba always checks touching Link.
+;@ test: skip checks Link collision through bank 3
 GoombaSideViewTouchLink::
+;> return EntityTouchesLink()
 	jp EntityTouchesLink
 
-
+;@ path: enemy/peahat
+;@ The peahat, drawn by DrawEntity16x16: 2 frames of 4 bytes (tile and attributes of the left
+;@ half, then of the right half; each half is the mirror image of the other): tiles $40 and $42, the
+;@ two positions of its spinning leaves.
+PeahatSprites::
 	db $40, $00, $40, $20, $42, $00, $42, $20
 
-Call_07_6525::
-	ld de, $651d
+;@ def PeahatHandler(slot: c)
+;@ path: enemy/peahat
+;@ Entity $A0, the peahat: a flying plant that spins its leaves, rises 16 pixels and drifts in
+;@ slow curves, then lands and stops spinning. Only on the ground can it be hit: the handler sets
+;@ bit 7 of wEntityHitboxFlags and bit 6 of wEntityOptions1 every frame, and the landing state
+;@ clears them once it touches down. wEntityPrivate1 is the spin speed, wEntityPrivateCounter the
+;@ spin phase; in flight wEntityPrivate4 is its heading (0-15), wEntityPrivate2 the turn (+1/-1)
+;@ and wEntityPrivate3 counts the frames to the next turn step. States (wEntityState): 0 land,
+;@ 1 spin up, 2 fly.
+;@ test: skip draws sprites and calls entity engine routines in bank 3
+PeahatHandler::
+;> DrawEntity16x16(PeahatSprites)
+	ld de, PeahatSprites
 	call DrawEntity16x16
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;> ApplyRecoilIfNeeded(slot)
 	call ApplyRecoilIfNeeded
+;> EntityCheckHits()
 	call EntityCheckHits
+;> UpdateEntityPosWithSpeed(slot)
 	call UpdateEntityPosWithSpeed
+;> AddEntityZSpeedToPos(slot)
 	call AddEntityZSpeedToPos
+;> EntityCheckWalls()
 	call EntityCheckWalls
+;> wEntityHitboxFlags[slot] |= 0x80            # cannot be hit (cleared again on the ground)
 	ld hl, wEntityHitboxFlags
 	add hl, bc
 	set 7, [hl]
+;> wEntityOptions1[slot] |= 0x40
 	ld hl, wEntityOptions1
 	add hl, bc
 	set 6, [hl]
+;> return PeahatStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_07_654C::
-	dw Jump_07_6552
-	dw Jump_07_65AD
-	dw Jump_07_65F5
+;@ path: enemy/peahat
+;@ States of the peahat (wEntityState), see PeahatHandler.
+PeahatStates::
+	dw Peahat_Land
+	dw Peahat_SpinUp
+	dw Peahat_Fly
 
-Jump_07_6552::
+;@ def Peahat_Land(slot: c)
+;@ path: enemy/peahat
+;@ State 0: sinks 1 pixel every 8 frames; on the ground it can be hit. Every 8 frames its speed
+;@ slows by 1 towards 0, every 32 frames the spin slows by 1. When the drop timer is up it starts
+;@ to spin up (state 1).
+;@ test: skip calls entity engine routines in bank 3
+Peahat_Land::
+;> if wEntityZ[slot] != 0:
 	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_6563
-
+	jr z, .landed
+;>     if hFrameCounter & 7 == 0:
 	ldh a, [hFrameCounter]
 	and $07
-	jr nz, jr_007_656f
-
+	jr nz, .slowDown
+;>         wEntityZ[slot] -= 1
 	dec [hl]
-	jr jr_007_656f
-
-jr_007_6563:
+	jr .slowDown
+;> else:
+.landed
+;>     wEntityHitboxFlags[slot] &= ~0x80        # can be hit now
 	ld hl, wEntityHitboxFlags
 	add hl, bc
 	res 7, [hl]
+;>     wEntityOptions1[slot] &= ~0x40
 	ld hl, wEntityOptions1
 	add hl, bc
 	res 6, [hl]
-
-jr_007_656f:
+.slowDown
+;> if hFrameCounter & 7 == 0:
 	ldh a, [hFrameCounter]
 	and $07
-	jr nz, jr_007_6593
-
+	jr nz, .timer
+;>     if wEntitySpeedX[slot] != 0:
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_6584
-
+	jr z, .speedY
+;>         wEntitySpeedX[slot] += 1 if wEntitySpeedX[slot] & 0x80 else -1
 	and $80
-	jr z, jr_007_6583
-
+	jr z, .slowerX
 	inc [hl]
 	inc [hl]
-
-jr_007_6583:
+.slowerX
 	dec [hl]
-
-jr_007_6584:
+.speedY
+;>     if wEntitySpeedY[slot] != 0:
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_6593
-
+	jr z, .timer
+;>         wEntitySpeedY[slot] += 1 if wEntitySpeedY[slot] & 0x80 else -1
 	and $80
-	jr z, jr_007_6592
-
+	jr z, .slowerY
 	inc [hl]
 	inc [hl]
-
-jr_007_6592:
+.slowerY
 	dec [hl]
-
-jr_007_6593:
+.timer
+;> if wEntityDropTimer[slot] == 0:
 	call GetEntityDropTimer
-	jr nz, jr_007_659b
-
+	jr nz, .spin
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
-
-jr_007_659b:
+.spin
+;>@p if wEntityPrivate1[slot] != 0 and hFrameCounter & 0x1F == 0:
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_65aa
-
+	jr z, .animate
+;=@p
 	ldh a, [hFrameCounter]
 	and $1f
-	jr nz, jr_007_65aa
-
+	jr nz, .animate
+;>     wEntityPrivate1[slot] -= 1               # spin slower
 	dec [hl]
+.animate
+;> return PeahatSpin(slot)
+	jp PeahatSpin
 
-jr_007_65aa:
-	jp Call_07_65CB
 
-
-Jump_07_65AD::
+;@ def Peahat_SpinUp(slot: c)
+;@ path: enemy/peahat
+;@ State 1: the spin speeds up by 1 every 16 frames; at speed 8 it takes off (state 2) for $80-$9F
+;@ frames (drop timer).
+;@ test: skip draws on random numbers
+Peahat_SpinUp::
+;> if wEntityPrivate1[slot] >= 8:
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	cp $08
-	jr c, jr_007_65c4
-
+	jr c, .faster
+;>     wEntityDropTimer[slot] = (GetRandomByte() & 0x1F) + 0x80
 	call GetEntityDropTimer
 	call GetRandomByte
 	and $1f
 	add $80
 	ld [hl], a
+;>     return IncrementEntityState(slot)
 	jp IncrementEntityState
 
-
-jr_007_65c4:
+.faster
+;> if hFrameCounter & 0x0F == 0:
 	ldh a, [hFrameCounter]
 	and $0f
-	jr nz, Call_07_65CB
-
+	jr nz, PeahatSpin
+;>     wEntityPrivate1[slot] += 1
 	inc [hl]
+;> return PeahatSpin(slot)                      # runs on into it
 
-Call_07_65CB::
+;@ def PeahatSpin(slot: c)
+;@ path: enemy/peahat
+;@ Turns the leaves: adds the spin speed (wEntityPrivate1) to the phase (wEntityPrivateCounter);
+;@ bit 5 of the phase picks sprite frame 0 or 1.
+;@ test: c = rand(0, 15)
+PeahatSpin::
+;> phase = (wEntityPrivateCounter[slot] + wEntityPrivate1[slot]) & 0xFF
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	add [hl]
+;> wEntityPrivateCounter[slot] = phase
 	ld [hl], a
+;> frame = (phase >> 5) & 1
 	rra
 	rra
 	rra
 	rra
 	rra
 	and $01
+;> SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 	ret
 
 
+;@ path: enemy/peahat
+;@ A sine wave in 16 steps (signed, amplitude $0E), followed by the first 4 steps again so that
+;@ PeahatSine + 4 reads the cosine. The peahat's flight speed is y = PeahatSine[heading] / 2 and
+;@ x = PeahatSine[heading + 4] / 2.
+PeahatSine::
 	db $00, $05, $0a, $0d, $0e, $0d, $0a, $05, $00, $fb, $f6, $f3, $f2, $f3, $f6, $fb
 	db $00, $05, $0a, $0d
 
-Jump_07_65F5::
-	call Call_07_65CB
+;@ def Peahat_Fly(slot: c)
+;@ path: enemy/peahat
+;@ State 2: rises 1 pixel every 8 frames up to 16 pixels. Up there it flies a curve: every $18
+;@ frames the heading turns one step (wEntityPrivate2) and the speed follows PeahatSine; now and
+;@ then (1 in 8) the turn direction is picked again. When the drop timer is up it lands (state 0)
+;@ and keeps its last speed, which slows down there; the next flight comes after $60 frames.
+;@ test: skip draws on random numbers
+Peahat_Fly::
+;> PeahatSpin(slot)
+	call PeahatSpin
+;> if wEntityZ[slot] != 0x10:
 	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	cp $10
-	jr z, jr_007_6609
-
+	jr z, .high
+;>     if hFrameCounter & 7 == 0:
 	ldh a, [hFrameCounter]
 	and $07
-	jr nz, jr_007_6608
-
+	jr nz, .done
+;>         wEntityZ[slot] += 1
 	inc [hl]
-
-jr_007_6608:
+.done
+;>     return
 	ret
 
-
-jr_007_6609:
+.high
+;> if wEntityDropTimer[slot] == 0:
 	call GetEntityDropTimer
-	jr nz, jr_007_6614
-
+	jr nz, .steer
+;>     wEntityDropTimer[slot] = 0x60
 	ld [hl], $60
+;>     wEntityState[slot] = 0                   # land
 	call IncrementEntityState
 	ld [hl], b
-
-jr_007_6614:
+.steer
+;> wEntityPrivate3[slot] += 1
 	ld hl, wEntityPrivate3
 	add hl, bc
 	inc [hl]
+;> if wEntityPrivate3[slot] >= 0x18:
 	ld a, [hl]
 	cp $18
-	jr c, jr_007_665c
-
+	jr c, .return
+;>     wEntityPrivate3[slot] = 0
 	ld [hl], b
+;>@h     wEntityPrivate4[slot] = (wEntityPrivate4[slot] + wEntityPrivate2[slot]) & 0x0F
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntityPrivate4
 	add hl, bc
 	add [hl]
+;=@h
 	and $0f
 	ld [hl], a
+;>     heading = wEntityPrivate4[slot]
 	ld hl, wEntityPrivate4
 	add hl, bc
 	ld e, [hl]
 	ld d, b
-	ld hl, $65e1
+;>@sy     wEntitySpeedY[slot] = (PeahatSine[heading] >> 1) | (PeahatSine[heading] & 0x80)   # half, keeping the sign
+	ld hl, PeahatSine
 	add hl, de
 	ld a, [hl]
 	sra a
 	ld hl, wEntitySpeedY
 	add hl, bc
+;=@sy
 	ld [hl], a
-	ld hl, $65e5
+;>@sx     wEntitySpeedX[slot] = (PeahatSine[heading + 4] >> 1) | (PeahatSine[heading + 4] & 0x80)
+	ld hl, PeahatSine + 4
 	add hl, de
 	ld a, [hl]
 	sra a
 	ld hl, wEntitySpeedX
 	add hl, bc
+;=@sx
 	ld [hl], a
+;>     if GetRandomByte() & 7 == 0:
 	call GetRandomByte
 	and $07
-	jr nz, jr_007_665c
-
+	jr nz, .return
+;>         wEntityPrivate2[slot] = (GetRandomByte() & 2) - 1    # turn left or right
 	call GetRandomByte
 	and $02
 	dec a
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld [hl], a
-
-jr_007_665c:
+.return
+;> return
 	ret
 
 
+;@ path: enemy/snake
+;@ The snake, drawn by DrawEntity16x16: 4 frames of 4 bytes (tile and attributes of the left half,
+;@ then of the right half). Frames 0/1 face left (head tile $44, body $46 or $48 as it wriggles),
+;@ frames 2/3 are the same mirrored to face right. The facing (0 or 2, wEntityDirection) is added
+;@ to the animation frame.
+SnakeSprites::
 	db $44, $00, $46, $00, $44, $00, $48, $00, $46, $20, $44, $20, $48, $20, $44, $20
 
-Call_07_666D::
+;@ def SnakeHandler(slot: c)
+;@ path: enemy/snake
+;@ Entity $A1, the snake: it crawls about in short random runs, and when Link comes into its row or
+;@ column it darts at him at double speed. Running into a wall makes it stop and rest (state 0,
+;@ 8 frames) and look for Link only after $20 frames. States (wEntityState): 0 rest, 1 crawl,
+;@ 2 dart.
+;@ test: skip draws sprites and calls entity engine routines in bank 3
+SnakeHandler::
+;> hActiveEntitySpriteVariant += wEntityDirection[slot]      # facing
 	ld hl, wEntityDirection
 	add hl, bc
 	ldh a, [hActiveEntitySpriteVariant]
 	add [hl]
 	ldh [hActiveEntitySpriteVariant], a
-	ld de, $665d
+;> DrawEntity16x16(SnakeSprites)
+	ld de, SnakeSprites
 	call DrawEntity16x16
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;> ApplyRecoilIfNeeded(slot)
 	call ApplyRecoilIfNeeded
+;> EntityCheckHits()
 	call EntityCheckHits
+;> UpdateEntityPosWithSpeed(slot)
 	call UpdateEntityPosWithSpeed
+;> EntityCheckWalls()
 	call EntityCheckWalls
+;> if wEntityCollisions[slot] != 0:            # ran into a wall
 	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_66a1
-
+	jr z, .states
+;>     wEntityState[slot] = 0
 	call IncrementEntityState
 	ld [hl], b
+;>     wEntityTimer[slot] = 8
 	call GetEntityTimer
 	ld [hl], $08
+;>     wEntityTimer1[slot] = 0x20
 	call GetEntityTimer1
 	ld [hl], $20
-
-jr_007_66a1:
+.states
+;> return SnakeStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_07_66A4::
-	dw Jump_07_66B6
-	dw Jump_07_66F8
-	dw Jump_07_674B
+;@ path: enemy/snake
+;@ States of the snake (wEntityState), see SnakeHandler.
+SnakeStates::
+	dw Snake_Rest
+	dw Snake_Crawl
+	dw Snake_Dart
 
-	db $08, $f8, $00, $00, $00, $00, $f8, $08, $02, $00, $ff, $ff
+;@ path: enemy/snake
+;@ x speed of the snake per direction (0 right, 1 left, 2 up, 3 down), 1/16 pixel per frame.
+SnakeSpeedX::
+	db $08, $f8, $00, $00
 
-Jump_07_66B6::
+;@ path: enemy/snake
+;@ y speed of the snake per direction.
+SnakeSpeedY::
+	db $00, $00, $f8, $08
+
+;@ path: enemy/snake
+;@ Facing (wEntityDirection, added to the sprite frame) per direction: 2 = right, 0 = left, $FF =
+;@ up and down keep the facing it had.
+SnakeFacing::
+	db $02, $00, $ff, $ff
+
+;@ def Snake_Rest(slot: c)
+;@ path: enemy/snake
+;@ State 0: rests (SnakeStand) while the timer runs; then crawls (state 1) for $30-$4F frames in
+;@ the direction given by the low 2 bits of that time.
+;@ test: skip draws on random numbers
+Snake_Rest::
+;> if wEntityTimer[slot] != 0:
 	call GetEntityTimer
-	jr nz, jr_007_66f0
-
+;>     return SnakeStand(slot)
+	jr nz, SnakeStand
+;> wEntityState[slot] += 1
 	call IncrementEntityState
+;> t = (GetRandomByte() & 0x1F) + 0x30
 	call GetEntityTimer
 	call GetRandomByte
 	and $1f
 	add $30
+;> wEntityTimer[slot] = t
 	ld [hl], a
+;> dir = t & 3
 	and $03
 	ld e, a
+;> return SetSnakeDirection(slot, dir)          # runs on into it
 
-Call_07_66CC::
+;@ def SetSnakeDirection(slot: c, dir: e)
+;@ path: enemy/snake
+;@ Sets the snake's speed for direction dir (0 right, 1 left, 2 up, 3 down) from SnakeSpeedX /
+;@ SnakeSpeedY and, for left and right, its facing (SnakeFacing).
+;@ test: c = rand(0, 15); e = rand(0, 3)
+SetSnakeDirection::
+;>@sx wEntitySpeedX[slot] = SnakeSpeedX[dir]
 	ld d, b
-	ld hl, $66aa
+	ld hl, SnakeSpeedX
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedX
 	add hl, bc
+;=@sx
 	ld [hl], a
-	ld hl, $66ae
+;> wEntitySpeedY[slot] = SnakeSpeedY[dir]
+	ld hl, SnakeSpeedY
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
-	ld hl, $66b2
+;> if SnakeFacing[dir] != 0xFF:
+	ld hl, SnakeFacing
 	add hl, de
 	ld a, [hl]
 	cp $ff
-	jr z, jr_007_66ef
-
+	jr z, .done
+;>     wEntityDirection[slot] = SnakeFacing[dir]
 	ld hl, wEntityDirection
 	add hl, bc
 	ld [hl], a
-
-jr_007_66ef:
+.done
 	ret
 
 
-jr_007_66f0:
+;@ def SnakeStand(slot: c)
+;@ path: enemy/snake
+;@ The resting snake: stands still, keeps watching for Link and wriggles (SnakeCrawlAnimation).
+;@ test: skip checks Link position through other routines
+SnakeStand::
+;> ClearEntitySpeed()
 	call ClearEntitySpeed
-	call Call_07_6711
-	jr jr_007_6706
+;> SnakeLookForLink(slot)
+	call SnakeLookForLink
+;> return SnakeCrawlAnimation()
+	jr SnakeCrawlAnimation
 
-Jump_07_66F8::
+;@ def Snake_Crawl(slot: c)
+;@ path: enemy/snake
+;@ State 1: crawls in its direction; after the time it rests $18 frames (state 0). Meanwhile it
+;@ watches for Link.
+;@ test: skip checks Link position through other routines
+Snake_Crawl::
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_007_6703
-
+	jr nz, .look
+;>     wEntityTimer[slot] = 0x18
 	ld [hl], $18
+;>     wEntityState[slot] = 0
 	call IncrementEntityState
 	ld [hl], b
-
-jr_007_6703:
-	call Call_07_6711
-
-jr_007_6706:
+.look
+;> SnakeLookForLink(slot)
+	call SnakeLookForLink
+SnakeCrawlAnimation:
+;> frame = (hFrameCounter >> 3) & 1            # SnakeCrawlAnimation: wriggles every 8 frames
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
+;> SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 	ret
 
 
-Call_07_6711::
+;@ def SnakeLookForLink(slot: c)
+;@ path: enemy/snake
+;@ Unless it is still resting after a wall (wEntityTimer1), checks whether Link is within 8 pixels
+;@ of its column or row; if so it darts at him (state 2) at double speed for $30 frames.
+;@ test: skip checks Link position through other routines
+SnakeLookForLink::
+;> if wEntityTimer1[slot] != 0:
 	call GetEntityTimer1
-	jr nz, jr_007_673b
-
+;>     return
+	jr nz, SnakeLookReturn
+;> if (EntityLinkDiffX(slot)[0] + 8) & 0xFF < 0x10:          # Link in its column
 	call EntityLinkDiffX
 	add $08
 	cp $10
-	jr nc, jr_007_673c
-
+	jr nc, SnakeLookRow
+;>     dir = EntityLinkDiffY(slot)[1]                         # up or down at him
 	call EntityLinkDiffY
-
-jr_007_6722:
-	call Call_07_66CC
+SnakeDartAtLink:
+;>     SetSnakeDirection(slot, dir)                           # SnakeDartAtLink(slot, dir):
+	call SetSnakeDirection
+;>     wEntitySpeedX[slot] <<= 1
 	ld hl, wEntitySpeedX
 	add hl, bc
 	sla [hl]
+;>     wEntitySpeedY[slot] <<= 1
 	ld hl, wEntitySpeedY
 	add hl, bc
 	sla [hl]
+;>     wEntityState[slot] = 2
 	call IncrementEntityState
 	ld [hl], $02
+;>     wEntityTimer[slot] = 0x30
 	call GetEntityTimer
 	ld [hl], $30
-
-jr_007_673b:
+SnakeLookReturn:
+;>     return
 	ret
 
-
-jr_007_673c:
+SnakeLookRow:
+;> if (EntityLinkDiffY(slot)[0] + 8) & 0xFF < 0x10:          # Link in its row
 	call EntityLinkDiffY
 	add $08
 	cp $10
-	jr nc, jr_007_674a
-
+	jr nc, .done
+;>     dir = EntityLinkDiffX(slot)[1]                         # left or right at him
 	call EntityLinkDiffX
-	jr jr_007_6722
+;>     return SnakeDartAtLink(slot, dir)                      # the same dart as above
+	jr SnakeDartAtLink
 
-jr_007_674a:
+.done
 	ret
 
 
-Jump_07_674B::
+;@ def Snake_Dart(slot: c)
+;@ path: enemy/snake
+;@ State 2: darts at Link with its tongue flicking fast (frames every 4 frames); after the time it
+;@ rests $20 frames (state 0) and ignores Link for $40 frames.
+;@ test: c = rand(0, 15)
+Snake_Dart::
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_007_675b
-
+	jr nz, .animate
+;>     wEntityTimer[slot] = 0x20
 	ld [hl], $20
+;>     wEntityState[slot] = 0
 	call IncrementEntityState
 	ld [hl], b
+;>     wEntityTimer1[slot] = 0x40
 	call GetEntityTimer1
 	ld [hl], $40
-
-jr_007_675b:
+.animate
+;> frame = (hFrameCounter >> 2) & 1
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	and $01
+;> SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 	ret
 
 
+;@ path: world/angler_tunnel_entrance
+;@ Background tiles of the Angler's Tunnel entrance, 10 rows of 10 tiles (the object columns 2-6,
+;@ rows 0-4 of the room): the doorway at the top, the rock face and the ground below it. Drawn
+;@ row by row by AnglerTunnelOpening_Build, every other frame swapped with
+;@ AnglerTunnelBlankTiles so that the new row flickers into place.
+;@ asset: bgtiles 10x10
+AnglerTunnelEntranceTiles::
 	db $55, $56, $0a, $0b, $0c, $0d, $0e, $0f, $55, $56, $55, $56, $1a, $1b, $1c, $1d
 	db $1e, $1f, $55, $56, $55, $56, $04, $05, $64, $65, $06, $07, $55, $56, $55, $56
 	db $14, $15, $66, $67, $16, $17, $55, $56, $76, $76, $72, $73, $76, $76, $72, $73
 	db $68, $69, $76, $76, $73, $72, $76, $76, $73, $72, $77, $4b, $6c, $6c, $6c, $6c
 	db $76, $76, $76, $76, $72, $73, $6c, $6c, $6c, $6c, $76, $76, $76, $76, $73, $72
 	db $6d, $6d, $6c, $6c, $6c, $6c, $6c, $6c, $6c, $6c, $6d, $6d, $6c, $6c, $6c, $6c
-	db $6c, $6c, $6c, $6c, $55, $56, $6e, $6e, $6e, $6e, $6e, $6e, $55, $56, $55, $56
-	db $6e, $6e, $6e, $6e, $6e, $6e, $55, $56, $55, $56, $6e, $6e, $6e, $6e, $6e, $6e
-	db $55, $56, $55, $56, $6e, $6e, $6e, $6e, $6e, $6e, $55, $56, $6d, $6d, $6d, $6d
-	db $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d
-	db $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d
-	db $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d
-	db $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $3a, $d5, $d6, $d7, $3a, $3a, $cd, $e1
-	db $ce, $3a, $03, $09, $03, $09, $c6, $1b, $1b, $03, $03, $09, $0e, $1b, $1b, $1b
-	db $1b, $02, $12, $22, $32, $42, $00, $08, $10, $18, $20, $28, $30, $38, $40, $48
+	db $6c, $6c, $6c, $6c
 
-Jump_007_6855:
+;@ path: world/angler_tunnel_entrance
+;@ The same 10 x 10 tiles before the entrance appears: the plain wall (tile $6E between the edge
+;@ tiles $55/$56) and the ground (tile $6D).
+;@ asset: bgtiles 10x10
+AnglerTunnelBlankTiles::
+	db $55, $56, $6e, $6e, $6e, $6e, $6e, $6e, $55, $56, $55, $56, $6e, $6e, $6e, $6e
+	db $6e, $6e, $55, $56, $55, $56, $6e, $6e, $6e, $6e, $6e, $6e, $55, $56, $55, $56
+	db $6e, $6e, $6e, $6e, $6e, $6e, $55, $56, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d
+	db $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d
+	db $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d
+	db $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d, $6d
+	db $6d, $6d, $6d, $6d
+
+;@ path: world/angler_tunnel_entrance
+;@ The room objects of the entrance, 5 rows of 5 objects, written into wRoomObjects as the rows
+;@ appear (so the doorway can be entered and the rock is solid).
+AnglerTunnelEntranceObjects::
+	db $3a, $d5, $d6, $d7, $3a
+	db $3a, $cd, $e1, $ce, $3a
+	db $03, $09, $03, $09, $c6
+	db $1b, $1b, $03, $03, $09
+	db $0e, $1b, $1b, $1b, $1b
+
+;@ path: world/angler_tunnel_entrance
+;@ Index in wRoomObjects of the first object of each of the 5 rows (column 2, rows 0-4).
+AnglerTunnelObjectRows::
+	db $02, $12, $22, $32, $42
+
+;@ path: world/angler_tunnel_entrance
+;@ y (pixels) in the room of each of the 10 tile rows, read as AnglerTunnelRowY - 1 + row number
+;@ (1-10).
+AnglerTunnelRowY::
+	db $00, $08, $10, $18, $20, $28, $30, $38, $40, $48
+
+;@ def AnglerTunnelOpening(slot: c)
+;@ path: world/angler_tunnel_entrance
+;@ Entity $5F started with wEntityPrivate4 = $FF: the scene in overworld room $2B when Link has
+;@ the Angler Key (bank 2 spawns it). The ground rumbles, the music changes ($4C) and with the
+;@ screen shaking the Angler's Tunnel entrance rises out of the rock, one tile row every 32 frames.
+;@ Link cannot move meanwhile. States (wEntityState): 0 rumble, 1 music, 2 quake, 3 build.
+;@ test: skip plays sounds and edits the background
+AnglerTunnelOpening::
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
+;> wLinkFrozen = 2
 	ld [wLinkFrozen], a
+;> return AnglerTunnelOpeningStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_07_6862::
-	dw Jump_07_686A
-	dw Jump_07_6875
-	dw Jump_07_6881
-	dw Jump_07_688D
+;@ path: world/angler_tunnel_entrance
+;@ States of the Angler's Tunnel opening scene (wEntityState).
+AnglerTunnelOpeningStates::
+	dw AnglerTunnelOpening_Rumble
+	dw AnglerTunnelOpening_Music
+	dw AnglerTunnelOpening_Quake
+	dw AnglerTunnelOpening_Build
 
-Jump_07_686A::
+;@ def AnglerTunnelOpening_Rumble(slot: c)
+;@ path: world/angler_tunnel_entrance
+;@ State 0: a rumbling noise, then $28 frames of waiting (state 1).
+;@ test: skip plays a sound
+AnglerTunnelOpening_Rumble::
+;> PlayNoiseSfx04()
 	call PlayNoiseSfx04
+;> wEntityTimer[slot] = 0x28
 	call GetEntityTimer
 	ld [hl], $28
+;> return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 
-Jump_07_6875::
+;@ def AnglerTunnelOpening_Music(slot: c)
+;@ path: world/angler_tunnel_entrance
+;@ State 1: when the wait is over, starts music track $4C (state 2).
+;@ test: c = rand(0, 15)
+AnglerTunnelOpening_Music::
+;> if wEntityTimer[slot] != 0:
 	call GetEntityTimer
+;>     return
 	ret nz
-
+;> wMusicTrackToPlay = 0x4C
 	ld a, $4c
 	ld [wMusicTrackToPlay], a
+;> return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 
-Jump_07_6881::
+;@ def AnglerTunnelOpening_Quake(slot: c)
+;@ path: world/angler_tunnel_entrance
+;@ State 2: the quake sound ($1D), then $80 frames of shaking before the building starts (state 3).
+;@ test: c = rand(0, 15)
+AnglerTunnelOpening_Quake::
+;> hNoiseSfx = 0x1D
 	ld a, $1d
 	ldh [hNoiseSfx], a
+;> wEntityTimer[slot] = 0x80
 	call GetEntityTimer
 	ld [hl], $80
+;> return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 
-Jump_07_688D::
+;@ def AnglerTunnelOpening_Build(slot: c)
+;@ path: world/angler_tunnel_entrance
+;@ State 3: shakes the screen 2 pixels sideways (every 8 frames). Once the timer is up, every frame
+;@ it redraws the current tile row (wEntityPrivateCounter, 1-10) - from AnglerTunnelEntranceTiles
+;@ on even frames, AnglerTunnelBlankTiles on odd ones - and writes the matching row of room
+;@ objects; every 32 frames (wEntityPrivate1 counts the frames) it moves on to the next row.
+;@ After row 10 the shaking stops, Link can move, the area music returns and the entity is gone.
+;@ test: skip edits the background and the room objects
+AnglerTunnelOpening_Build::
+;>@sh wScreenShakeX = 2 if hFrameCounter & 8 else 0
 	ldh a, [hFrameCounter]
 	ld e, $00
 	and $08
-	jr z, jr_007_6897
-
+	jr z, .shake
 	ld e, $02
-
-jr_007_6897:
+.shake
+;=@sh
 	ld a, e
 	ld [wScreenShakeX], a
+;> if wEntityTimer[slot] != 0:
 	call GetEntityTimer
+;>     return
 	ret nz
-
+;> frames = wEntityPrivate1[slot]
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	ld e, a
+;> wEntityPrivate1[slot] = frames + 1
 	inc a
 	ld [hl], a
+;> hBGTilesRequestCopy = frames + 1          # used here as a scratch byte
 	ldh [hBGTilesRequestCopy], a
+;> if frames & 0x1F == 0:                     # next row
 	ld a, e
 	and $1f
-	jp nz, Jump_007_68bb
-
+	jp nz, .drawRow
+;>     if wEntityPrivateCounter[slot] == 10:
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	cp $0a
-	jp z, Jump_007_6940
-
+;>         return AnglerTunnelOpeningDone(slot)
+	jp z, AnglerTunnelOpeningDone
+;>     wEntityPrivateCounter[slot] += 1
 	inc a
 	ld [hl], a
-
-Jump_007_68bb:
+.drawRow
+;> row = wEntityPrivateCounter[slot]
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	push hl
 	ld a, [hl]
 	ld e, a
 	ld d, b
-	ld hl, $684a
+;> hBGPosY = AnglerTunnelRowY[row - 1]
+	ld hl, AnglerTunnelRowY - 1
 	add hl, de
 	ld a, [hl]
 	ldh [hBGPosY], a
+;> hBGPosX = 0x20
 	ld a, $20
 	ldh [hBGPosX], a
+;> GetBGAddress()
 	call GetBGAddress
+;>@o offset = (row - 1) * 10
 	pop hl
 	ld a, [hl]
 	dec a
 	ld e, a
 	sla a
 	sla a
+;=@o
 	sla a
 	add e
 	add e
 	ld e, a
 	ld d, b
-	ld hl, $6765
+;> tiles = AnglerTunnelBlankTiles if hBGTilesRequestCopy & 1 else AnglerTunnelEntranceTiles
+	ld hl, AnglerTunnelEntranceTiles
 	ldh a, [hBGTilesRequestCopy]
 	and $01
-	jr z, jr_007_68eb
-
-	ld hl, $67c9
-
-jr_007_68eb:
+	jr z, .tiles
+	ld hl, AnglerTunnelBlankTiles
+.tiles
+;> src = tiles + offset
 	add hl, de
 	push hl
+;> n = wDrawCommandsSize
 	ld a, [wDrawCommandsSize]
 	ld e, a
 	ld d, b
+;> wDrawCommandsSize = n + 13
 	add $0d
 	ld [wDrawCommandsSize], a
+;> p = wDrawCommand + n
 	ld hl, wDrawCommand
 	add hl, de
+;> p[0:3] = [hBGAddrHigh, hBGAddrLow, 0x09]  # 10 tiles in a row
 	ldh a, [hBGAddrHigh]
 	ld [hli], a
 	ldh a, [hBGAddrLow]
 	ld [hli], a
 	ld a, $09
 	ld [hli], a
+;> for i in range(10):
 	pop de
 	push bc
 	ld c, $0a
-
-jr_007_6908:
+.copyTiles
+;>     p[3 + i] = src[i]
 	ld a, [de]
 	inc de
 	ld [hli], a
 	dec c
-	jr nz, jr_007_6908
-
+	jr nz, .copyTiles
+;> p[13] = 0
 	ld [hl], b
 	pop bc
+;>@r r = ((row - 1) >> 1) & 7                   # object row
 	push bc
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	dec a
 	rra
+;=@r
 	and $07
 	push af
+;>@d dst = wRoomObjects + AnglerTunnelObjectRows[r]
 	ld e, a
 	ld d, b
-	ld hl, $6846
+	ld hl, AnglerTunnelObjectRows
 	add hl, de
 	ld e, [hl]
 	ld hl, wRoomObjects
+;=@d
 	add hl, de
 	push hl
 	pop bc
+;>@j objects = AnglerTunnelEntranceObjects + r * 5
 	pop af
 	ld e, a
 	sla a
 	sla a
 	add e
 	ld e, a
+;=@j
 	ld d, $00
-	ld hl, $682d
+	ld hl, AnglerTunnelEntranceObjects
 	add hl, de
+;> for i in range(5):
 	ld e, $05
-
-jr_007_6938:
+.copyObjects
+;>     dst[i] = objects[i]
 	ld a, [hli]
 	ld [bc], a
 	inc bc
 	dec e
-	jr nz, jr_007_6938
-
+	jr nz, .copyObjects
 	pop bc
+;> return
 	ret
 
-
-Jump_007_6940:
+AnglerTunnelOpeningDone:
+;> wScreenShakeX = 0                          # AnglerTunnelOpeningDone: the entrance is complete
 	xor a
 	ld [wScreenShakeX], a
+;> wLinkFrozen = 0
 	ld [wLinkFrozen], a
+;> SelectAreaMusicFar()
 	call SelectAreaMusicFar
+;> return ClearEntityStatus(slot)
 	jp ClearEntityStatus
 
 
-Call_07_694D::
+;@ def MasterStalfosHandler(slot: c)
+;@ path: boss/master_stalfos
+;@ Entity $5F, the Master Stalfos (mini-boss of dungeon 5), a big skeleton with sword and shield
+;@ built from separate parts (torso, legs, shield, sword; their frames and offsets are
+;@ wMasterStalfosSwordFrame..wMasterStalfosLegsY). He drops from the ceiling, walks at Link, slashes
+;@ when Link is close and leaps at him otherwise. A hit makes him collapse into a heap of bones;
+;@ hits on the heap count up (wEntityPrivateCounter), and after enough of them (2 or 3 depending on
+;@ the room) he says his line and flees through the ceiling. In the last room ($80) he never
+;@ flees and has to be beaten. With wEntityPrivate4 = $FF the entity is the Angler's Tunnel
+;@ opening scene instead (AnglerTunnelOpening). States (wEntityState): 0 wait on the ceiling,
+;@ 1 drop, 2 speak, 3 look around, 4 decide, 5 walk, 6 slash, 7 crouch, 8 leap, 9 knocked down,
+;@ 10 crumble, 11 rattle, 12 reassemble, 13 flee.
+;@ test: skip draws sprites and calls entity engine routines in bank 3
+MasterStalfosHandler::
+;> if wEntityPrivate4[slot] == 0xFF:
 	ld hl, wEntityPrivate4
 	add hl, bc
 	ld a, [hl]
 	cp $ff
-	jp z, Jump_007_6855
-
+;>     return AnglerTunnelOpening(slot)
+	jp z, AnglerTunnelOpening
+;> if wEntityPrivate4[slot] == 0:              # first frame
 	and a
-	jr nz, jr_007_695e
-
+	jr nz, .draw
+;>     wEntityPrivate4[slot] = 1
 	inc [hl]
-	call Call_07_6DE1
-
-jr_007_695e:
-	call Call_07_6EC2
+;>     MasterStalfosInit(slot)
+	call MasterStalfosInit
+.draw
+;> DrawMasterStalfos(slot)
+	call DrawMasterStalfos
+;> if hActiveEntityStatus != 5:               # defeated
 	ldh a, [hActiveEntityStatus]
 	cp $05
+;>     return BossDefeatedHandler(slot)
 	jp nz, BossDefeatedHandler
-
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;> ConfineLinkToArena()
 	call ConfineLinkToArena
+;> StartBossMusic()
 	call StartBossMusic
+;> if wEntityFlashTimer[slot] == 0x16:         # just hit
 	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld a, [hl]
 	cp $16
-	jr nz, jr_007_6995
-
+	jr nz, .physics
+;>     if hActiveEntityState < 9:              # standing: he collapses
 	ldh a, [hActiveEntityState]
 	cp $09
-	jr nc, jr_007_6990
-
+	jr nc, .heapHit
+;>         wEntityFlashTimer[slot] = 0
 	ld [hl], b
+;>         wEntitySpeedZ[slot] = 0
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], b
+;>         wEntityState[slot] = 9
 	call IncrementEntityState
 	ld a, $09
 	ld [hl], a
+;>         hActiveEntityState = 9
 	ldh [hActiveEntityState], a
-	jr jr_007_6995
-
-jr_007_6990:
+	jr .physics
+;>     else:
+.heapHit
+;>         wEntityPrivateCounter[slot] += 1    # a hit on the heap of bones
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	inc [hl]
-
-jr_007_6995:
+.physics
+;> ApplyRecoilIfNeeded(slot)
 	call ApplyRecoilIfNeeded
+;> AddEntityZSpeedToPos(slot)
 	call AddEntityZSpeedToPos
+;> wEntitySpeedZ[slot] -= 2                    # gravity
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	dec [hl]
 	dec [hl]
+;> landed = wEntityZ[slot] & 0x80             # kept in hBGTilesRequestCopy for the states
 	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and $80
 	ldh [hBGTilesRequestCopy], a
-	jr z, jr_007_69b2
-
+;> if landed:
+	jr z, .states
+;>     wEntityZ[slot] = 0
 	ld [hl], b
+;>     wEntitySpeedZ[slot] = 0
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], b
-
-jr_007_69b2:
+.states
+;> if hActiveEntityState < 9:
 	ldh a, [hActiveEntityState]
 	cp $09
-	jr nc, jr_007_69cc
-
+	jr nc, .run
+;>     EntityCheckSwordClash()                  # the shield blocks Link's sword
 	call EntityCheckSwordClash
+;>     if wLinkPushedTimer | wEntityIgnoreHitsTimer[slot] == 0:
 	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
 	ld a, [wLinkPushedTimer]
 	or [hl]
 	and a
-	jr nz, jr_007_69cc
-
+	jr nz, .run
+;>         EntityTouchesLink()
 	call EntityTouchesLink
+;>         EntityCheckWeaponHits()
 	call EntityCheckWeaponHits
-
-jr_007_69cc:
+.run
+;> return MasterStalfosStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_07_69CF::
-	dw Jump_07_69EB
-	dw Jump_07_6A01
-	dw Jump_07_6A22
-	dw Jump_07_6A74
-	dw Jump_07_6AD4
-	dw Jump_07_6B03
-	dw Jump_07_6B49
-	dw Jump_07_6C28
-	dw Jump_07_6C70
-	dw Jump_07_6C93
-	dw Jump_07_6CB4
-	dw Jump_07_6CEF
-	dw Jump_07_6D0D
-	dw Jump_07_6D6F
+;@ path: boss/master_stalfos
+;@ States of the Master Stalfos (wEntityState), see MasterStalfosHandler.
+MasterStalfosStates::
+	dw MasterStalfos_Wait
+	dw MasterStalfos_Drop
+	dw MasterStalfos_Speak
+	dw MasterStalfos_LookAround
+	dw MasterStalfos_Decide
+	dw MasterStalfos_Walk
+	dw MasterStalfos_Slash
+	dw MasterStalfos_Crouch
+	dw MasterStalfos_Leap
+	dw MasterStalfos_KnockedDown
+	dw MasterStalfos_Crumble
+	dw MasterStalfos_Rattle
+	dw MasterStalfos_Reassemble
+	dw MasterStalfos_Flee
 
-Jump_07_69EB::
+;@ def MasterStalfos_Wait(slot: c)
+;@ path: boss/master_stalfos
+;@ State 0: hidden high above the room (height $7F) until the timer is up; then he comes into view
+;@ at height $6F and hangs there $30 frames (state 1).
+;@ test: c = rand(0, 15)
+MasterStalfos_Wait::
+;> wEntitySpeedZ[slot] = 0
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], b
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_007_6a00
-
+	jr nz, .done
+;>     wEntityTimer[slot] = 0x30
 	ld [hl], $30
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
+;>     wEntityZ[slot] = 0x6F
 	ld hl, wEntityZ
 	add hl, bc
 	ld [hl], $6f
-
-jr_007_6a00:
+.done
 	ret
 
 
-Jump_07_6A01::
+;@ def MasterStalfos_Drop(slot: c)
+;@ path: boss/master_stalfos
+;@ State 1: hangs while the timer runs (the boss jingle 8 on its last frame), then falls; on
+;@ landing he speaks after $40 frames (state 2).
+;@ test: c = rand(0, 15)
+MasterStalfos_Drop::
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr z, jr_007_6a14
-
+;> if t != 0:
+	jr z, .falling
+;>     if t == 1:
 	cp $01
-	jr nz, jr_007_6a0e
-
+	jr nz, .hang
+;>         hJingle = 0x08
 	ld a, $08
 	ldh [hJingle], a
-
-jr_007_6a0e:
+.hang
+;>     wEntitySpeedZ[slot] = 0
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], b
+;>     return
 	ret
 
-
-jr_007_6a14:
+.falling
+;> if hBGTilesRequestCopy != 0:               # landed
 	ldh a, [hBGTilesRequestCopy]
 	and a
-	jr z, Call_07_6A21
-
+	jr z, MasterStalfosDoNothing
+;>     wEntityTimer[slot] = 0x40
 	call GetEntityTimer
 	ld [hl], $40
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
+;> return MasterStalfosDoNothing()            # runs on into it
 
-Call_07_6A21::
+;@ def MasterStalfosDoNothing()
+;@ path: boss/master_stalfos
+;@ Just returns.
+;@ test: c = 0
+MasterStalfosDoNothing::
+;> return
 	ret
 
 
-Jump_07_6A22::
+;@ def MasterStalfos_Speak(slot: c)
+;@ path: boss/master_stalfos
+;@ State 2: crouched from the fall, he straightens up after $20 frames. Just before the end he
+;@ speaks: text $12 in rooms $92 and $84, text $14 in room $80, nothing elsewhere. Then he looks
+;@ around for $A0 frames in room $95, $20 frames elsewhere (state 3).
+;@ test: skip opens dialogue
+MasterStalfos_Speak::
+;> if wEntityTimer[slot] == 1:
 	call GetEntityTimer
 	cp $01
-	jr nz, jr_007_6a3f
-
+	jr nz, .timer
+;>     text = 0x12
 	ld e, $12
+;>@room     if hMapRoom in (0x92, 0x84, 0x80):
 	ldh a, [hMapRoom]
 	cp $92
-	jr z, jr_007_6a3b
-
+	jr z, .say
 	cp $84
-	jr z, jr_007_6a3b
-
+	jr z, .say
+;=@room
 	cp $80
-	jr nz, jr_007_6a3f
-
+	jr nz, .timer
+;>         text = 0x14 if hMapRoom == 0x80 else text
 	ld e, $14
-
-jr_007_6a3b:
+.say
+;>         OpenDialogTable1(text)
 	ld a, e
 	call OpenDialogTable1
-
-jr_007_6a3f:
+.timer
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_007_6a51
-
+;> if t == 0:
+	jr nz, .stance
+;>     wEntityTimer[slot] = 0xA0 if hMapRoom == 0x95 else 0x20
 	ld [hl], $a0
 	ldh a, [hMapRoom]
 	cp $95
-	jr z, jr_007_6a4e
-
+	jr z, .next
 	ld [hl], $20
-
-jr_007_6a4e:
+.next
+;>     return IncrementEntityState(slot)
 	jp IncrementEntityState
 
-
-jr_007_6a51:
-	ld hl, $d20e
+.stance
+;> wMasterStalfosTorsoY = 0xF0
+	ld hl, wMasterStalfosTorsoY
 	ld [hl], $f0
-	ld hl, $d20b
+;> wMasterStalfosShieldY = 0xF8
+	ld hl, wMasterStalfosShieldY
 	ld [hl], $f8
-	ld hl, $d20d
+;> wMasterStalfosSwordY = 0xF0
+	ld hl, wMasterStalfosSwordY
 	ld [hl], $f0
+;> if t >= 0x20:                               # still crouched, 2 pixels lower
 	cp $20
-	jr c, jr_007_6a73
-
-	ld hl, $d20e
+	jr c, .done
+;>     wMasterStalfosTorsoY = 0xF2
+	ld hl, wMasterStalfosTorsoY
 	ld [hl], $f2
-	ld hl, $d20b
+;>     wMasterStalfosShieldY = 0xFA
+	ld hl, wMasterStalfosShieldY
 	ld [hl], $fa
-	ld hl, $d20d
+;>     wMasterStalfosSwordY = 0xF2
+	ld hl, wMasterStalfosSwordY
 	ld [hl], $f2
-
-jr_007_6a73:
+.done
 	ret
 
 
-Jump_07_6A74::
+;@ def MasterStalfos_LookAround(slot: c)
+;@ path: boss/master_stalfos
+;@ State 3: turns to face left and right in turns (64 frames each) until the timer is up; then the
+;@ fight starts (state 4, $20 frames).
+;@ test: c = rand(0, 15)
+MasterStalfos_LookAround::
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_007_6a7e
-
+;> if t == 0:
+	jr nz, .look
+;>     wEntityTimer[slot] = 0x20
 	ld [hl], $20
+;>     return IncrementEntityState(slot)
 	jp IncrementEntityState
 
-
-jr_007_6a7e:
+.look
+;> t & 0x3F                                    # (has no effect)
 	and $3f
-	jr nz, jr_007_6a82
-
-jr_007_6a82:
+	jr nz, .turn
+.turn
+;> if wEntityTimer[slot] & 0x40:
 	call GetEntityTimer
 	and $40
-	jr z, Call_07_6AAF
+;>     return MasterStalfosPoseRight()
+	jr z, MasterStalfosPoseRight
+;> return MasterStalfosPoseLeft()               # runs on into it
 
-Call_07_6A89::
-	call Call_07_6E01
-	ld hl, $d208
+;@ def MasterStalfosPoseLeft()
+;@ path: boss/master_stalfos
+;@ Puts the parts in the stance facing left: torso frame 1, shield in front (x -16, y -8), sword
+;@ held up behind (frame 0 at x +16, y -13).
+;@ test: c = 0
+MasterStalfosPoseLeft::
+;> MasterStalfosResetParts()
+	call MasterStalfosResetParts
+;> wMasterStalfosTorsoFrame = 1
+	ld hl, wMasterStalfosTorsoFrame
 	ld [hl], $01
-	ld hl, $d209
+;> wMasterStalfosLegsFrame = 0
+	ld hl, wMasterStalfosLegsFrame
 	ld [hl], b
-	ld hl, $d20a
+;> wMasterStalfosShieldX = 0xF0
+	ld hl, wMasterStalfosShieldX
 	ld [hl], $f0
-	ld hl, $d20b
+;> wMasterStalfosShieldY = 0xF8
+	ld hl, wMasterStalfosShieldY
 	ld [hl], $f8
-	ld hl, $d20d
+;> wMasterStalfosSwordY = 0xF3
+	ld hl, wMasterStalfosSwordY
 	ld [hl], $f3
-	ld hl, $d20c
+;> wMasterStalfosSwordX = 0x10
+	ld hl, wMasterStalfosSwordX
 	ld [hl], $10
-	ld hl, $d207
+;> wMasterStalfosSwordFrame = 0
+	ld hl, wMasterStalfosSwordFrame
 	ld [hl], $00
 	ret
 
 
-Call_07_6AAF::
-	call Call_07_6E01
-	ld hl, $d208
+;@ def MasterStalfosPoseRight()
+;@ path: boss/master_stalfos
+;@ Puts the parts in the stance facing right: torso frame 0, shield at x -8, y -8, sword frame 0
+;@ at x +16, y -16.
+;@ test: c = 0
+MasterStalfosPoseRight::
+;> MasterStalfosResetParts()
+	call MasterStalfosResetParts
+;> wMasterStalfosTorsoFrame = 0
+	ld hl, wMasterStalfosTorsoFrame
 	ld [hl], b
-	ld hl, $d209
+;> wMasterStalfosLegsFrame = 0
+	ld hl, wMasterStalfosLegsFrame
 	ld [hl], b
-	ld hl, $d20a
+;> wMasterStalfosShieldX = 0xF8
+	ld hl, wMasterStalfosShieldX
 	ld [hl], $f8
-	ld hl, $d20b
+;> wMasterStalfosShieldY = 0xF8
+	ld hl, wMasterStalfosShieldY
 	ld [hl], $f8
-	ld hl, $d20d
+;> wMasterStalfosSwordY = 0xF0
+	ld hl, wMasterStalfosSwordY
 	ld [hl], $f0
-	ld hl, $d20c
+;> wMasterStalfosSwordX = 0x10
+	ld hl, wMasterStalfosSwordX
 	ld [hl], $10
-	ld hl, $d207
+;> wMasterStalfosSwordFrame = 0
+	ld hl, wMasterStalfosSwordFrame
 	ld [hl], $00
 	ret
 
 
-Jump_07_6AD4::
-	call Call_07_6DB1
+;@ def MasterStalfos_Decide(slot: c)
+;@ path: boss/master_stalfos
+;@ State 4: MasterStalfosCheckLeap may start a leap. When the timer is up he walks at Link (speed
+;@ 8) for $30-$4F frames (state 5). He always turns to face Link.
+;@ test: skip draws on random numbers
+MasterStalfos_Decide::
+;> MasterStalfosCheckLeap(slot)
+	call MasterStalfosCheckLeap
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_007_6b02
-
+	jr nz, MasterStalfosSetPose.done
+;>     wEntityTimer[slot] = (GetRandomByte() & 0x1F) + 0x30
 	call GetRandomByte
 	and $1f
 	add $30
 	ld [hl], a
+;>     SetEntitySpeedTowardsLink(8)
 	ld a, $08
 	call SetEntitySpeedTowardsLink
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
+;>     return MasterStalfosFaceLink(slot)       # runs on into it
 
-Call_07_6AEC::
+;@ def MasterStalfosFaceLink(slot: c)
+;@ path: boss/master_stalfos
+;@ Turns towards Link (wEntityDirection = 0 if Link is to the right, 1 to the left) and takes the
+;@ matching stance.
+;@ test: c = rand(0, 15)
+MasterStalfosFaceLink::
+;> wEntityDirection[slot] = EntityLinkDiffX(slot)[1]
 	call EntityLinkDiffX
 	ld hl, wEntityDirection
 	add hl, bc
 	ld [hl], e
+;> return MasterStalfosSetPose(slot)          # runs on into it
 
-Call_07_6AF4::
-	call Call_07_6A89
+;@ def MasterStalfosSetPose(slot: c)
+;@ path: boss/master_stalfos
+;@ Takes the stance for his facing (wEntityDirection): MasterStalfosPoseRight for 0, else
+;@ MasterStalfosPoseLeft.
+;@ test: c = rand(0, 15)
+MasterStalfosSetPose::
+;> MasterStalfosPoseLeft()
+	call MasterStalfosPoseLeft
+;> if wEntityDirection[slot] == 0:
 	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr nz, jr_007_6b02
-
-	call Call_07_6AAF
-
-jr_007_6b02:
+	jr nz, .done
+;>     MasterStalfosPoseRight()
+	call MasterStalfosPoseRight
+.done
 	ret
 
 
-Jump_07_6B03::
-	call Call_07_6DB1
+;@ def MasterStalfos_Walk(slot: c)
+;@ path: boss/master_stalfos
+;@ State 5: walks at Link (legs frame toggled every 16 frames). MasterStalfosCheckLeap may start a
+;@ leap; when Link is within 32 pixels across and 28 up or down he slashes (state 6, $30 frames);
+;@ when the walking time is up he decides again (state 4) after $10-$1F frames.
+;@ test: skip draws on random numbers
+MasterStalfos_Walk::
+;> MasterStalfosCheckLeap(slot)
+	call MasterStalfosCheckLeap
+;>@near if (EntityLinkDiffX(slot)[0] + 0x20) & 0xFF < 0x40 and (EntityLinkDiffY(slot)[0] + 0x1C) & 0xFF < 0x38:
 	call EntityLinkDiffX
 	add $20
 	cp $40
-	jr nc, jr_007_6b23
-
+	jr nc, .walk
+;=@near
 	call EntityLinkDiffY
 	add $1c
 	cp $38
-	jr nc, jr_007_6b23
-
+	jr nc, .walk
+;>     wEntityState[slot] = 6
 	call IncrementEntityState
 	ld [hl], $06
+;>     wEntityTimer[slot] = 0x30
 	call GetEntityTimer
 	ld [hl], $30
+;>     return
 	ret
 
-
-jr_007_6b23:
+.walk
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_007_6b36
-
+;> if t == 0:
+	jr nz, .step
+;>     wEntityTimer[slot] = (GetRandomByte() & 0x0F) + 0x10
 	call GetRandomByte
 	and $0f
 	add $10
 	ld [hl], a
+;>     wEntityState[slot] = 4
 	call IncrementEntityState
 	ld [hl], $04
+;>     return
 	ret
 
-
-jr_007_6b36:
+.step
+;> if t & 0x0F == 0:
 	and $0f
-	jr nz, Call_07_6B42
-
-	ld a, [$d209]
+	jr nz, MasterStalfosMove
+;>     wMasterStalfosLegsFrame ^= 1
+	ld a, [wMasterStalfosLegsFrame]
 	xor $01
-	ld [$d209], a
+	ld [wMasterStalfosLegsFrame], a
+;> return MasterStalfosMove(slot)              # runs on into it
 
-Call_07_6B42::
+;@ def MasterStalfosMove(slot: c)
+;@ path: boss/master_stalfos
+;@ Moves him by his speed, stopped by walls.
+;@ test: skip checks walls through bank 3
+MasterStalfosMove::
+;> UpdateEntityPosWithSpeed(slot)
 	call UpdateEntityPosWithSpeed
+;> EntityCheckWalls()
 	call EntityCheckWalls
 	ret
 
 
-Jump_07_6B49::
+;@ def MasterStalfos_Slash(slot: c)
+;@ path: boss/master_stalfos
+;@ State 6: a sword stroke towards Link over $30 frames: until timer $18 the sword is raised, at
+;@ $17 it comes down with a swish (noise $27) and the blade sweep (wEntityTimer2 = $10,
+;@ DrawMasterStalfosSlash) that hurts Link, below $10 the sword rests low in front. Then
+;@ MasterStalfosRecover.
+;@ test: skip plays sounds
+MasterStalfos_Slash::
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_007_6b65
+;> if t != 0: return MasterStalfosSwing(slot)
+	jr nz, MasterStalfosSwing
+;> return MasterStalfosRecover(slot)            # runs on into it
 
-Call_07_6B4E::
+;@ def MasterStalfosRecover(slot: c)
+;@ path: boss/master_stalfos
+;@ Back to deciding (state 4, $20 frames), with bit 7 of wEntityHitboxFlags set and bit 6 of
+;@ wEntityOptions1 cleared.
+;@ test: c = rand(0, 15)
+MasterStalfosRecover::
+;> wEntityTimer[slot] = 0x20
 	call GetEntityTimer
 	ld [hl], $20
+;> wEntityState[slot] = 4
 	call IncrementEntityState
 	ld [hl], $04
+;> wEntityHitboxFlags[slot] |= 0x80
 	ld hl, wEntityHitboxFlags
 	add hl, bc
 	set 7, [hl]
+;> wEntityOptions1[slot] &= ~0x40
 	ld hl, wEntityOptions1
 	add hl, bc
 	res 6, [hl]
 	ret
 
 
-jr_007_6b65:
+;@ def MasterStalfosSwing(slot: c)
+;@ path: boss/master_stalfos
+;@ The stroke of MasterStalfos_Slash for the current timer, on his facing side: sword raised
+;@ (timer $18 and up), the downward stroke with the sweep ($10-$17; at $17 noise $27 and
+;@ wEntityTimer2 = $10), then the sword low in front (below $10).
+;@ test: skip plays sounds
+MasterStalfosSwing::
+;> if wEntityDirection[slot] == 0:             # facing right
 	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr nz, jr_007_6bc8
-
+	jr nz, .left
+;>     t = wEntityTimer[slot]
 	call GetEntityTimer
+;>     if t >= 0x18:                           # sword raised
 	cp $18
-	jr c, jr_007_6b87
-
-	call Call_07_6AAF
+	jr c, .rightDown
+;>         MasterStalfosPoseRight()
+	call MasterStalfosPoseRight
+;>         wMasterStalfosSwordX = 0x08
 	ld a, $08
-	ld [$d20c], a
+	ld [wMasterStalfosSwordX], a
+;>         wMasterStalfosSwordY = 0xE0
 	ld a, $e0
-	ld [$d20d], a
+	ld [wMasterStalfosSwordY], a
+;>         wMasterStalfosSwordFrame = 1
 	ld a, $01
-	ld [$d207], a
+	ld [wMasterStalfosSwordFrame], a
+;>         return
 	ret
 
-
-jr_007_6b87:
+.rightDown
+;>     if t >= 0x10:                           # the stroke
 	cp $10
-	jr c, jr_007_6bae
-
+	jr c, .rightLow
+;>         if t == 0x17:
 	cp $17
-	jr nz, jr_007_6b99
-
+	jr nz, .rightSweep
+;>             hNoiseSfx = 0x27
 	ld a, $27
 	ldh [hNoiseSfx], a
+;>             wEntityTimer2[slot] = 0x10
 	ld hl, wEntityTimer2
 	add hl, bc
 	ld [hl], $10
-
-jr_007_6b99:
+.rightSweep
+;>         wMasterStalfosSwordFrame = 0xFF     # only the sweep is drawn
 	ld a, $ff
-	ld [$d207], a
+	ld [wMasterStalfosSwordFrame], a
+;>         wMasterStalfosShieldX = 0xF0
 	ld a, $f0
-	ld [$d20a], a
+	ld [wMasterStalfosShieldX], a
+;>         wMasterStalfosShieldY = 0xF4
 	ld a, $f4
-	ld [$d20b], a
+	ld [wMasterStalfosShieldY], a
+;>         wMasterStalfosTorsoFrame = 1
 	ld a, $01
-	ld [$d208], a
+	ld [wMasterStalfosTorsoFrame], a
+;>         return
 	ret
 
-
-jr_007_6bae:
+.rightLow
+;>     wMasterStalfosSwordFrame = 3             # sword low in front
 	ld a, $03
-	ld [$d207], a
+	ld [wMasterStalfosSwordFrame], a
+;>     wMasterStalfosSwordX = 0xF8
 	ld a, $f8
-	ld [$d20c], a
+	ld [wMasterStalfosSwordX], a
+;>     wMasterStalfosSwordY = 0x08
 	ld a, $08
-	ld [$d20d], a
+	ld [wMasterStalfosSwordY], a
+;>     wMasterStalfosShieldX = 0xF0
 	ld a, $f0
-	ld [$d20a], a
+	ld [wMasterStalfosShieldX], a
+;>     wMasterStalfosShieldY = 0xF0
 	ld a, $f0
-	ld [$d20b], a
+	ld [wMasterStalfosShieldY], a
+;>     return
 	ret
 
-
-jr_007_6bc8:
+.left
+;> else:                                       # facing left
+;>     t = wEntityTimer[slot]
 	call GetEntityTimer
+;>     if t >= 0x18:
 	cp $18
-	jr c, jr_007_6be7
-
-	call Call_07_6A89
+	jr c, .leftDown
+;>         MasterStalfosPoseLeft()
+	call MasterStalfosPoseLeft
+;>         wMasterStalfosLegsFrame = 1
 	ld a, $01
-	ld [$d209], a
+	ld [wMasterStalfosLegsFrame], a
+;>         wMasterStalfosSwordX = 0xF8
 	ld a, $f8
-	ld [$d20c], a
+	ld [wMasterStalfosSwordX], a
+;>         wMasterStalfosSwordY = 0xE8
 	ld a, $e8
-	ld [$d20d], a
+	ld [wMasterStalfosSwordY], a
+;>         wMasterStalfosSwordFrame = 0
 	ld a, $00
-	ld [$d207], a
+	ld [wMasterStalfosSwordFrame], a
+;>         return
 	ret
 
-
-jr_007_6be7:
+.leftDown
+;>     if t >= 0x10:
 	cp $10
-	jr c, jr_007_6c0e
-
+	jr c, .leftLow
+;>         if t == 0x17:
 	cp $17
-	jr nz, jr_007_6bf9
-
+	jr nz, .leftSweep
+;>             hNoiseSfx = 0x27
 	ld a, $27
 	ldh [hNoiseSfx], a
+;>             wEntityTimer2[slot] = 0x10
 	ld hl, wEntityTimer2
 	add hl, bc
 	ld [hl], $10
-
-jr_007_6bf9:
+.leftSweep
+;>         wMasterStalfosSwordFrame = 0xFF
 	ld a, $ff
-	ld [$d207], a
+	ld [wMasterStalfosSwordFrame], a
+;>         wMasterStalfosShieldX = 0xF0
 	ld a, $f0
-	ld [$d20a], a
+	ld [wMasterStalfosShieldX], a
+;>         wMasterStalfosShieldY = 0xF0
 	ld a, $f0
-	ld [$d20b], a
+	ld [wMasterStalfosShieldY], a
+;>         wMasterStalfosTorsoFrame = 0
 	ld a, $00
-	ld [$d208], a
+	ld [wMasterStalfosTorsoFrame], a
+;>         return
 	ret
 
-
-jr_007_6c0e:
+.leftLow
+;>     wMasterStalfosSwordFrame = 2
 	ld a, $02
-	ld [$d207], a
+	ld [wMasterStalfosSwordFrame], a
+;>     wMasterStalfosSwordX = 0x10
 	ld a, $10
-	ld [$d20c], a
+	ld [wMasterStalfosSwordX], a
+;>     wMasterStalfosSwordY = 0x08
 	ld a, $08
-	ld [$d20d], a
+	ld [wMasterStalfosSwordY], a
+;>     wMasterStalfosShieldX = 0xF0
 	ld a, $f0
-	ld [$d20a], a
+	ld [wMasterStalfosShieldX], a
+;>     wMasterStalfosShieldY = 0xEC
 	ld a, $ec
-	ld [$d20b], a
+	ld [wMasterStalfosShieldY], a
 	ret
 
 
-Jump_07_6C28::
-	call Call_07_6AF4
+;@ def MasterStalfos_Crouch(slot: c)
+;@ path: boss/master_stalfos
+;@ State 7: faces Link, crouched 2 pixels, until the timer is up; then leaps (state 8, jingle $24):
+;@ straight at Link (height speed $28, speed $18), or - when Link is close above him
+;@ (wEntityPrivate1) - higher (height speed $30) at speed 8 and upwards on screen.
+;@ test: skip plays sounds
+MasterStalfos_Crouch::
+;> MasterStalfosSetPose(slot)
+	call MasterStalfosSetPose
+;> if wEntityTimer[slot] != 0:
 	call GetEntityTimer
-	jr nz, Call_07_6C57
-
+;>     return MasterStalfosLowerParts()
+	jr nz, MasterStalfosLowerParts
+;> wEntityState[slot] += 1
 	call IncrementEntityState
+;> PlayJingle24()
 	call PlayJingle24
+;> wEntitySpeedZ[slot] = 0x30
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], $30
+;> if wEntityPrivate1[slot] == 0:
 	and a
-	jr nz, jr_007_6c4b
-
+	jr nz, .upwards
+;>     wEntitySpeedZ[slot] = 0x28
 	ld [hl], $28
+;>     return SetEntitySpeedTowardsLink(0x18)
 	ld a, $18
 	jp SetEntitySpeedTowardsLink
 
-
-jr_007_6c4b:
+.upwards
+;> SetEntitySpeedTowardsLink(8)
 	ld a, $08
 	call SetEntitySpeedTowardsLink
+;> wEntitySpeedY[slot] = 0xF0
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], $f0
 	ret
 
 
-Call_07_6C57::
-	ld a, [$d20e]
+;@ def MasterStalfosLowerParts()
+;@ path: boss/master_stalfos
+;@ Moves torso, shield and sword 2 pixels down (crouching).
+;@ test: c = 0
+MasterStalfosLowerParts::
+;> wMasterStalfosTorsoY += 2
+	ld a, [wMasterStalfosTorsoY]
 	add $02
-	ld [$d20e], a
-	ld a, [$d20b]
+	ld [wMasterStalfosTorsoY], a
+;> wMasterStalfosShieldY += 2
+	ld a, [wMasterStalfosShieldY]
 	add $02
-	ld [$d20b], a
-	ld a, [$d20d]
+	ld [wMasterStalfosShieldY], a
+;> wMasterStalfosSwordY += 2
+	ld a, [wMasterStalfosSwordY]
 	add $02
-	ld [$d20d], a
+	ld [wMasterStalfosSwordY], a
 	ret
 
 
-Jump_07_6C70::
+;@ def MasterStalfos_Leap(slot: c)
+;@ path: boss/master_stalfos
+;@ State 8: flies through the air; on landing he crouches for $10 frames, then decides again
+;@ (MasterStalfosRecover).
+;@ test: skip checks walls through bank 3
+MasterStalfos_Leap::
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr z, jr_007_6c82
-
+;> if t != 0:                                  # landed, crouching
+	jr z, .inAir
+;>     if t == 1:
 	dec a
-	jr nz, jr_007_6c7b
-
-	call Call_07_6B4E
-
-jr_007_6c7b:
-	call Call_07_6AF4
-	call Call_07_6C57
+	jr nz, .crouch
+;>         MasterStalfosRecover(slot)
+	call MasterStalfosRecover
+.crouch
+;>     MasterStalfosSetPose(slot)
+	call MasterStalfosSetPose
+;>     MasterStalfosLowerParts()
+	call MasterStalfosLowerParts
 	ret
 
-
-jr_007_6c82:
-	call Call_07_6B42
+.inAir
+;> MasterStalfosMove(slot)
+	call MasterStalfosMove
+;> if hBGTilesRequestCopy != 0:                # landed
 	ldh a, [hBGTilesRequestCopy]
 	and a
-	jr z, jr_007_6c92
-
+	jr z, .done
+;>     wEntityTimer[slot] = 0x10
 	call GetEntityTimer
 	ld [hl], $10
-	call Call_07_6A21
-
-jr_007_6c92:
+;>     MasterStalfosDoNothing()
+	call MasterStalfosDoNothing
+.done
 	ret
 
 
-Jump_07_6C93::
+;@ def MasterStalfos_KnockedDown(slot: c)
+;@ path: boss/master_stalfos
+;@ State 9: hit, he drops to the ground; there he falls apart (state 10, $20 frames, jingle $28),
+;@ and from now on his bones can be hit (bit 7 of wEntityHitboxFlags cleared, bit 6 of
+;@ wEntityOptions1 set).
+;@ test: skip checks walls through bank 3
+MasterStalfos_KnockedDown::
+;> if hBGTilesRequestCopy != 0:                # on the ground
 	ldh a, [hBGTilesRequestCopy]
 	and a
-	jr z, jr_007_6cb0
-
+	jr z, .move
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
+;>     wEntityTimer[slot] = 0x20
 	call GetEntityTimer
 	ld [hl], $20
+;>     wEntityHitboxFlags[slot] &= ~0x80
 	ld hl, wEntityHitboxFlags
 	add hl, bc
 	res 7, [hl]
+;>     wEntityOptions1[slot] |= 0x40
 	ld hl, wEntityOptions1
 	add hl, bc
 	set 6, [hl]
+;>     hJingle = 0x28
 	ld a, $28
 	ldh [hJingle], a
-
-jr_007_6cb0:
-	call Call_07_6B42
+.move
+;> MasterStalfosMove(slot)
+	call MasterStalfosMove
 	ret
 
 
-Jump_07_6CB4::
+;@ def MasterStalfos_Crumble(slot: c)
+;@ path: boss/master_stalfos
+;@ State 10: shield and sword sink to the floor (y offset 3, 1 pixel per frame); in the last $14
+;@ frames the torso sinks onto the legs (y offset towards 0, which hides the legs). Then he lies
+;@ as a heap for $C0 frames (state 11).
+;@ test: c = rand(0, 15)
+MasterStalfos_Crumble::
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_007_6cbf
-
+	jr nz, .crumble
+;>     wEntityTimer[slot] = 0xC0
 	ld [hl], $c0
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
+;>     return
 	ret
 
-
-jr_007_6cbf:
-	ld hl, $d20b
+.crumble
+;> if wMasterStalfosShieldY != 3:
+	ld hl, wMasterStalfosShieldY
 	ld a, [hl]
 	sub $03
-	jr z, jr_007_6cce
-
+	jr z, .sword
+;>     wMasterStalfosShieldY += 1 if (wMasterStalfosShieldY - 3) & 0x80 else -1
 	bit 7, a
-	jr z, jr_007_6ccd
-
+	jr z, .shieldDown
 	inc [hl]
 	inc [hl]
-
-jr_007_6ccd:
+.shieldDown
 	dec [hl]
-
-jr_007_6cce:
-	ld hl, $d20d
+.sword
+;> if wMasterStalfosSwordY != 3:
+	ld hl, wMasterStalfosSwordY
 	ld a, [hl]
 	sub $03
-	jr z, jr_007_6cdd
-
+	jr z, .torso
+;>     wMasterStalfosSwordY += 1 if (wMasterStalfosSwordY - 3) & 0x80 else -1
 	bit 7, a
-	jr z, jr_007_6cdc
-
+	jr z, .swordDown
 	inc [hl]
 	inc [hl]
-
-jr_007_6cdc:
+.swordDown
 	dec [hl]
-
-jr_007_6cdd:
+.torso
+;> if wEntityTimer[slot] < 0x14 and wMasterStalfosTorsoY != 0:
 	call GetEntityTimer
 	cp $14
-	jr nc, jr_007_6cee
-
-	ld a, [$d20e]
+	jr nc, .done
+	ld a, [wMasterStalfosTorsoY]
 	and a
-	jr z, jr_007_6cee
-
+	jr z, .done
+;>     wMasterStalfosTorsoY += 1
 	inc a
-	ld [$d20e], a
-
-jr_007_6cee:
+	ld [wMasterStalfosTorsoY], a
+.done
 	ret
 
 
-Jump_07_6CEF::
+;@ def MasterStalfos_Rattle(slot: c)
+;@ path: boss/master_stalfos
+;@ State 11: lies as a heap of bones; at the very end the torso jerks up and down (every 4
+;@ frames). Then he pulls himself together (state 12, $30 frames).
+;@ test: c = rand(0, 15)
+MasterStalfos_Rattle::
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_007_6cfa
-
+;> if t == 0:
+	jr nz, .rattle
+;>     wEntityTimer[slot] = 0x30
 	ld [hl], $30
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
+;>     return
 	ret
 
-
-jr_007_6cfa:
+.rattle
+;> if t < 0x30 and t & 3 == 0:
 	cp $30
-	jr nc, jr_007_6d0c
-
+	jr nc, .done
 	and $03
-	jr nz, jr_007_6d0c
-
-	ld a, [$d20e]
+	jr nz, .done
+;>     wMasterStalfosTorsoY = -(wMasterStalfosTorsoY + 2) & 0xFF
+	ld a, [wMasterStalfosTorsoY]
 	add $02
 	cpl
 	inc a
-	ld [$d20e], a
-
-jr_007_6d0c:
+	ld [wMasterStalfosTorsoY], a
+.done
 	ret
 
 
-Jump_07_6D0D::
-	ld a, [$d20e]
+;@ def MasterStalfos_Reassemble(slot: c)
+;@ path: boss/master_stalfos
+;@ State 12: the torso rises back to 16 pixels above the legs, shield and sword go back up (in
+;@ the last $24 frames). When the time is up: if his bones were hit fewer times than the room's
+;@ limit (2, 3 in room $95, unlimited in room $80) he fights on (MasterStalfosRecover); otherwise
+;@ he cannot be hit any more, says text $13 and flees (state 13).
+;@ test: skip opens dialogue
+MasterStalfos_Reassemble::
+;> if wMasterStalfosTorsoY != 0xF0:
+	ld a, [wMasterStalfosTorsoY]
 	cp $f0
-	jr z, jr_007_6d18
-
+	jr z, .timer
+;>     wMasterStalfosTorsoY -= 1
 	dec a
-	ld [$d20e], a
-
-jr_007_6d18:
+	ld [wMasterStalfosTorsoY], a
+.timer
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_007_6d4c
-
+;> if t == 0:
+	jr nz, .rise
+;>@lim     limit = 0xFF if hMapRoom == 0x80 else 3 if hMapRoom == 0x95 else 2
 	ld e, $ff
 	ldh a, [hMapRoom]
 	cp $80
-	jr z, jr_007_6d2d
-
+	jr z, .check
 	ld e, $03
 	cp $95
-	jr z, jr_007_6d2d
-
+;=@lim
+	jr z, .check
 	ld e, $02
-
-jr_007_6d2d:
+.check
+;>     if wEntityPrivateCounter[slot] < limit:
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	cp e
-	jr c, jr_007_6d49
-
+;>         return MasterStalfosRecover(slot)
+	jr c, .fightOn
+;>     wEntityHitboxFlags[slot] |= 0x80
 	ld hl, wEntityHitboxFlags
 	add hl, bc
 	set 7, [hl]
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
+;>     OpenDialogTable1(0x13)
 	ld a, $13
 	call OpenDialogTable1
+;>     wEntityTimer[slot] = 4
 	call GetEntityTimer
 	ld [hl], $04
+;>     return
 	ret
 
+.fightOn
+	jp MasterStalfosRecover
 
-jr_007_6d49:
-	jp Call_07_6B4E
-
-
-jr_007_6d4c:
+.rise
+;> if t < 0x24:
 	cp $24
-	jr nc, jr_007_6d6e
-
-	ld hl, $d20b
+	jr nc, .done
+;>     if wMasterStalfosShieldY != 0xF8:
+	ld hl, wMasterStalfosShieldY
 	ld a, [hl]
 	sub $f8
-	jr z, jr_007_6d5f
-
+	jr z, .sword
+;>         wMasterStalfosShieldY += 1 if (wMasterStalfosShieldY - 0xF8) & 0x80 else -1
 	bit 7, a
-	jr z, jr_007_6d5e
-
+	jr z, .shieldUp
 	inc [hl]
 	inc [hl]
-
-jr_007_6d5e:
+.shieldUp
 	dec [hl]
-
-jr_007_6d5f:
-	ld hl, $d20d
+.sword
+;>     if wMasterStalfosSwordY != 0xF0:
+	ld hl, wMasterStalfosSwordY
 	ld a, [hl]
 	sub $f0
-	jr z, jr_007_6d6e
-
+	jr z, .done
+;>         wMasterStalfosSwordY += 1 if (wMasterStalfosSwordY - 0xF0) & 0x80 else -1
 	bit 7, a
-	jr z, jr_007_6d6d
-
+	jr z, .swordUp
 	inc [hl]
 	inc [hl]
-
-jr_007_6d6d:
+.swordUp
 	dec [hl]
-
-jr_007_6d6e:
+.done
 	ret
 
 
-Jump_07_6D6F::
-	call Call_07_6AF4
+;@ def MasterStalfos_Flee(slot: c)
+;@ path: boss/master_stalfos
+;@ State 13: crouches for a moment (noise $3F), then jumps up out of the room; above height $78 the
+;@ area music returns, the entity is gone and the room is marked as done (MarkRoomEventDone).
+;@ test: skip plays sounds and changes the room status
+MasterStalfos_Flee::
+;> MasterStalfosSetPose(slot)
+	call MasterStalfosSetPose
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr z, jr_007_6d82
-
+;> if t != 0:
+	jr z, .jump
+;>     if t == 1:
 	dec a
-	jr nz, jr_007_6d7e
-
+	jr nz, .crouch
+;>         hNoiseSfx = 0x3F
 	ld a, $3f
 	ldh [hNoiseSfx], a
-
-jr_007_6d7e:
-	call Call_07_6C57
+.crouch
+;>     MasterStalfosLowerParts()
+	call MasterStalfosLowerParts
+;>     return
 	ret
 
-
-jr_007_6d82:
+.jump
+;> wEntitySpeedZ[slot] = 0x30
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], $30
+;> if wEntityZ[slot] >= 0x78:
 	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	cp $78
-	jr c, jr_007_6db0
-
+	jr c, MarkRoomEventDone.done
+;>     SelectAreaMusicFar()
 	call SelectAreaMusicFar
+;>     ClearEntityStatus(slot)
 	call ClearEntityStatus
+;>     return MarkRoomEventDone()                # runs on into it
 
+;@ def MarkRoomEventDone()
+;@ path: world/room_status
+;@ Sets bit 5 (event done) in the status byte of the current indoor room (wRoomStatus + $100 +
+;@ room; the second indoor group, + $200, for maps 6-$19) and in hRoomStatus.
+;@ test: c = 0
 MarkRoomEventDone::
-	ld hl, $d900
+;> p = wRoomStatus + 0x100 + hMapRoom
+	ld hl, wRoomStatus + $100
 	ldh a, [hMapRoom]
 	ld e, a
 	ld d, b
+;> if 6 <= hMapId < 0x1A:
 	ldh a, [hMapId]
 	cp $1a
-	jr nc, jr_007_6da9
-
+	jr nc, .add
 	cp $06
-	jr c, jr_007_6da9
-
+	jr c, .add
+;>     p += 0x100
 	inc d
-
-jr_007_6da9:
+.add
+;> mem[p] |= 0x20
 	add hl, de
 	ld a, [hl]
 	or $20
 	ld [hl], a
+;> hRoomStatus = mem[p]
 	ldh [hRoomStatus], a
-
-jr_007_6db0:
+.done
 	ret
 
 
-Call_07_6DB1::
+;@ def MasterStalfosCheckLeap(slot: c)
+;@ path: boss/master_stalfos
+;@ Starts a leap (state 7, crouching $20 frames, facing Link) when Link is more than 48 pixels
+;@ away on either axis, or close and above him (then wEntityPrivate1 = 1 for the higher jump).
+;@ Close with Link below him nothing happens.
+;@ test: skip checks Link position through other routines
+MasterStalfosCheckLeap::
+;> wEntityPrivate1[slot] = 0
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], b
+;>@n if (EntityLinkDiffX(slot)[0] + 0x30) & 0xFF < 0x60 and (EntityLinkDiffY(slot)[0] + 0x30) & 0xFF < 0x60:
 	call EntityLinkDiffX
 	add $30
 	cp $60
-	jr nc, jr_007_6dd3
-
+	jr nc, .leap
+;=@n
 	call EntityLinkDiffY
 	add $30
 	cp $60
-	jr nc, jr_007_6dd3
-
+	jr nc, .leap
+;>     if EntityLinkDiffY(slot)[1] != 2: return    # Link close below: no leap
 	ld a, e
 	cp $02
-	jr nz, jr_007_6de0
-
+	jr nz, .done
+;>     wEntityPrivate1[slot] = 1
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], $01
-
-jr_007_6dd3:
+.leap
+;> wEntityState[slot] = 7
 	call IncrementEntityState
 	ld [hl], $07
+;> wEntityTimer[slot] = 0x20
 	call GetEntityTimer
 	ld [hl], $20
-	call Call_07_6AEC
-
-jr_007_6de0:
+;> MasterStalfosFaceLink(slot)
+	call MasterStalfosFaceLink
+.done
 	ret
 
 
-Call_07_6DE1::
+;@ def MasterStalfosInit(slot: c)
+;@ path: boss/master_stalfos
+;@ First frame: high above the room (height $7F) for $80 frames, the room's music saved in
+;@ wEntityPrivate5, health $FF ($C0 in room $80), parts in the starting stance.
+;@ test: c = rand(0, 15)
+MasterStalfosInit::
+;> wEntityZ[slot] = 0x7F
 	ld hl, wEntityZ
 	add hl, bc
 	ld [hl], $7f
+;> wEntityTimer[slot] = 0x80
 	call GetEntityTimer
 	ld [hl], $80
+;> wEntityPrivate5[slot] = hDefaultMusicTrack
 	ldh a, [hDefaultMusicTrack]
 	ld hl, wEntityPrivate5
 	add hl, bc
 	ld [hl], a
+;> wEntityHealth[slot] = 0xFF
 	ld hl, wEntityHealth
 	add hl, bc
 	ld [hl], $ff
+;> if hMapRoom == 0x80:
 	ldh a, [hMapRoom]
 	cp $80
-	jr nz, Call_07_6E01
-
+	jr nz, MasterStalfosResetParts
+;>     wEntityHealth[slot] = 0xC0
 	ld [hl], $c0
+;> return MasterStalfosResetParts()            # runs on into it
 
-Call_07_6E01::
+;@ def MasterStalfosResetParts()
+;@ path: boss/master_stalfos
+;@ The starting stance of the parts: shield at x -8, y -8, torso 16 pixels above the legs, all
+;@ frames 0, sword at x +16, y -16.
+;@ test: c = 0
+MasterStalfosResetParts::
+;> wMasterStalfosShieldX = 0xF8
 	ld a, $f8
-	ld [$d20a], a
+	ld [wMasterStalfosShieldX], a
+;> wMasterStalfosShieldY = 0xF8
 	ld a, $f8
-	ld [$d20b], a
+	ld [wMasterStalfosShieldY], a
+;> wMasterStalfosTorsoY = 0xF0
 	ld a, $f0
-	ld [$d20e], a
+	ld [wMasterStalfosTorsoY], a
+;> wMasterStalfosSwordFrame = 0
 	ld a, $00
-	ld [$d207], a
-	ld [$d208], a
-	ld [$d209], a
+	ld [wMasterStalfosSwordFrame], a
+;> wMasterStalfosTorsoFrame = 0
+	ld [wMasterStalfosTorsoFrame], a
+;> wMasterStalfosLegsFrame = 0
+	ld [wMasterStalfosLegsFrame], a
+;> wMasterStalfosSwordX = 0x10
 	ld a, $10
-	ld [$d20c], a
+	ld [wMasterStalfosSwordX], a
+;> wMasterStalfosSwordY = 0xF0
 	ld a, $f0
-	ld [$d20d], a
+	ld [wMasterStalfosSwordY], a
 	ret
 
 
-	db $70, $00, $70, $20, $00, $f8, $60, $00, $00, $00, $62, $00, $00, $08, $64, $00
-	db $00, $10, $66, $00, $00, $f8, $66, $20, $00, $00, $64, $20, $00, $08, $62, $20
-	db $00, $10, $60, $20, $00, $f8, $68, $00, $00, $00, $6a, $00, $00, $08, $6c, $00
-	db $00, $10, $6e, $00, $00, $f8, $6e, $20, $00, $00, $6c, $20, $00, $08, $6a, $20
-	db $00, $10, $68, $20, $00, $00, $72, $00, $f8, $08, $74, $00, $f8, $00, $74, $20
-	db $00, $08, $72, $20, $00, $00, $72, $40, $08, $08, $74, $40, $08, $00, $74, $60
-	db $00, $08, $72, $60, $10, $00, $76, $00, $10, $08, $78, $00, $10, $10, $7a, $00
-	db $08, $18, $7c, $00, $f8, $18, $7e, $00, $10, $08, $76, $20, $10, $00, $78, $20
-	db $10, $f8, $7a, $20, $08, $f0, $7c, $20, $f8, $f0, $7e, $20, $0c, $fb, $26, $00
-	db $0c, $01, $26, $00, $0c, $07, $26, $00, $0c, $0d, $26, $00
+;@ path: boss/master_stalfos
+;@ The shield, drawn by DrawEntity16x16: one frame of 4 bytes (tile $70 and its mirror image).
+MasterStalfosShieldSprites::
+	db $70, $00, $70, $20
 
-Call_07_6EC2::
+;@ path: boss/master_stalfos
+;@ The torso (skull, ribs and arms): 2 frames of 4 sprites, each sprite 4 bytes (y offset, x
+;@ offset, tile, attributes), side by side from x -8 to +16. Frame 0 = tiles $60-$66, frame 1 the
+;@ same mirrored.
+MasterStalfosTorsoSprites::
+	db $00, $f8, $60, $00, $00, $00, $62, $00, $00, $08, $64, $00, $00, $10, $66, $00
+	db $00, $f8, $66, $20, $00, $00, $64, $20, $00, $08, $62, $20, $00, $10, $60, $20
+
+;@ path: boss/master_stalfos
+;@ The legs, same format: frame 0 = tiles $68-$6E, frame 1 the same mirrored (the walking step).
+MasterStalfosLegsSprites::
+	db $00, $f8, $68, $00, $00, $00, $6a, $00, $00, $08, $6c, $00, $00, $10, $6e, $00
+	db $00, $f8, $6e, $20, $00, $00, $6c, $20, $00, $08, $6a, $20, $00, $10, $68, $20
+
+;@ path: boss/master_stalfos
+;@ The sword: 4 frames of 2 sprites (y offset, x offset, tile, attributes), blade tile $72 and
+;@ hilt tile $74: 0 = pointing up-left, 1 = up-right (mirrored), 2/3 = the same flipped upside down.
+MasterStalfosSwordSprites::
+	db $00, $00, $72, $00, $f8, $08, $74, $00, $f8, $00, $74, $20, $00, $08, $72, $20
+	db $00, $00, $72, $40, $08, $08, $74, $40, $08, $00, $74, $60, $00, $08, $72, $60
+
+;@ path: boss/master_stalfos
+;@ The sweep of the sword stroke to the right: 5 sprites (y offset, x offset, tile, attributes),
+;@ tiles $76-$7E in an arc in front of him.
+MasterStalfosSlashRightSprites::
+	db $10, $00, $76, $00, $10, $08, $78, $00, $10, $10, $7a, $00, $08, $18, $7c, $00
+	db $f8, $18, $7e, $00
+
+;@ path: boss/master_stalfos
+;@ The same sweep to the left (mirrored).
+MasterStalfosSlashLeftSprites::
+	db $10, $08, $76, $20, $10, $00, $78, $20, $10, $f8, $7a, $20, $08, $f0, $7c, $20
+	db $f8, $f0, $7e, $20
+
+;@ path: boss/master_stalfos
+;@ His shadow while in the air: 4 sprites of tile $26 in a row, 12 pixels down.
+MasterStalfosShadowSprites::
+	db $0c, $fb, $26, $00, $0c, $01, $26, $00, $0c, $07, $26, $00, $0c, $0d, $26, $00
+
+;@ def DrawMasterStalfos(slot: c)
+;@ path: boss/master_stalfos
+;@ Draws nothing while he is above height $70 (out of sight); otherwise sword, sword sweep, shield,
+;@ torso and legs, and in the air his shadow.
+;@ test: skip draws sprites through bank 0
+DrawMasterStalfos::
+;> if wEntityZ[slot] >= 0x70:
 	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	cp $70
-	jr nc, jr_007_6f27
-
-	call Call_07_6EF8
-	call Call_07_6F28
-	call Call_07_6F4F
-	call Call_07_6F84
-	call Call_07_6FA5
+;>     return
+	jr nc, DrawMasterStalfosSword.done
+;> DrawMasterStalfosSword()
+	call DrawMasterStalfosSword
+;> DrawMasterStalfosSlash(slot)
+	call DrawMasterStalfosSlash
+;> DrawMasterStalfosShield()
+	call DrawMasterStalfosShield
+;> DrawMasterStalfosTorso()
+	call DrawMasterStalfosTorso
+;> DrawMasterStalfosLegs()
+	call DrawMasterStalfosLegs
+;> if wEntityZ[slot] != 0:
 	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_6ef5
-
+	jr z, .done
+;>     hActiveEntityDrawY = hActiveEntityY - 2
 	ldh a, [hActiveEntityY]
 	sub $02
 	ldh [hActiveEntityDrawY], a
-	ld hl, $6eb2
+;>     DrawEntitySprites(MasterStalfosShadowSprites, 4)
+	ld hl, MasterStalfosShadowSprites
 	ld c, $04
 	call DrawEntitySprites
+;>     ReserveOAMEntriesFar(4)
 	ld a, $04
 	call ReserveOAMEntriesFar
-
-jr_007_6ef5:
+.done
+;> return LoadEntityPosition()
 	jp LoadEntityPosition
 
 
-Call_07_6EF8::
-	ld a, [$d20c]
+;@ def DrawMasterStalfosSword()
+;@ path: boss/master_stalfos
+;@ Draws the sword (frame wMasterStalfosSwordFrame, $FF = none) at its offset
+;@ (wMasterStalfosSwordX/Y).
+;@ test: skip draws sprites through bank 0
+DrawMasterStalfosSword::
+;> hActiveEntityX += wMasterStalfosSwordX
+	ld a, [wMasterStalfosSwordX]
 	ld hl, hActiveEntityX
 	add [hl]
 	ld [hl], a
-	ld a, [$d20d]
+;> hActiveEntityDrawY += wMasterStalfosSwordY
+	ld a, [wMasterStalfosSwordY]
 	ld hl, hActiveEntityDrawY
 	add [hl]
 	ld [hl], a
-	ld a, [$d207]
+;> if wMasterStalfosSwordFrame != 0xFF:
+	ld a, [wMasterStalfosSwordFrame]
 	cp $ff
-	jr z, jr_007_6f24
-
+	jr z, .none
+;>@f     frame = MasterStalfosSwordSprites + (wMasterStalfosSwordFrame * 8) & 0xF8
 	rla
 	rla
 	rla
 	and $f8
 	ld e, a
 	ld d, b
-	ld hl, $6e6a
+;=@f
+	ld hl, MasterStalfosSwordSprites
 	add hl, de
+;>     DrawEntitySprites(frame, 2)
 	ld c, $02
 	call DrawEntitySprites
+;>     return FinishMasterStalfosPart(2)
 	ld a, $02
-	jp Jump_007_6f48
+	jp FinishMasterStalfosPart
 
-
-jr_007_6f24:
+.none
+;> LoadEntityPosition()
 	call LoadEntityPosition
-
-jr_007_6f27:
+.done
 	ret
 
 
-Call_07_6F28::
+;@ def DrawMasterStalfosSlash(slot: c)
+;@ path: boss/master_stalfos
+;@ While wEntityTimer2 runs (just after a stroke): checks the sweep against Link
+;@ (MasterStalfosSlashHitsLink) and draws it on his facing side.
+;@ test: skip draws sprites through bank 0
+DrawMasterStalfosSlash::
+;> if wEntityTimer2[slot] == 0:
 	ld hl, wEntityTimer2
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_6f4e
-
-	call Call_07_6FCC
+;>     return
+	jr z, FinishMasterStalfosPart.done
+;> MasterStalfosSlashHitsLink(slot)
+	call MasterStalfosSlashHitsLink
+;>@s sprites = MasterStalfosSlashRightSprites if wEntityDirection[slot] == 0 else MasterStalfosSlashLeftSprites
 	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
-	ld hl, $6e8a
+	ld hl, MasterStalfosSlashRightSprites
 	and a
-	jr z, jr_007_6f41
-
-	ld hl, $6e9e
-
-jr_007_6f41:
+	jr z, .draw
+;=@s
+	ld hl, MasterStalfosSlashLeftSprites
+.draw
+;> DrawEntitySprites(sprites, 5)
 	ld c, $05
 	call DrawEntitySprites
+;> count = 5
 	ld a, $05
+;> return FinishMasterStalfosPart(count)      # runs on into it
 
-Jump_007_6f48:
+;@ def FinishMasterStalfosPart(count: a)
+;@ path: boss/master_stalfos
+;@ After drawing a part: reserves its count of OAM entries and restores the entity position for
+;@ the next part.
+;@ test: skip draws sprites through bank 0
+FinishMasterStalfosPart::
+;> ReserveOAMEntriesFar(count)
 	call ReserveOAMEntriesFar
+;> LoadEntityPosition()
 	call LoadEntityPosition
-
-jr_007_6f4e:
+.done
 	ret
 
 
-Call_07_6F4F::
-	ld a, [$d20a]
+;@ def DrawMasterStalfosShield()
+;@ path: boss/master_stalfos
+;@ Draws the shield at its offset (wMasterStalfosShieldX/Y) and puts the sword clash box there
+;@ (centre +12/+8, half size 8 x 6), so Link's sword bounces off it.
+;@ test: skip draws sprites through bank 0
+DrawMasterStalfosShield::
+;> hActiveEntityX += wMasterStalfosShieldX
+	ld a, [wMasterStalfosShieldX]
 	ld hl, hActiveEntityX
 	add [hl]
 	ld [hl], a
-	ld a, [$d20a]
+;> wClashBoxX = wMasterStalfosShieldX + 0x0C
+	ld a, [wMasterStalfosShieldX]
 	add $0c
 	ld [wClashBoxX], a
-	ld a, [$d20b]
+;> hActiveEntityDrawY += wMasterStalfosShieldY
+	ld a, [wMasterStalfosShieldY]
 	ld hl, hActiveEntityDrawY
 	add [hl]
 	ld [hl], a
-	ld a, [$d20b]
+;> wClashBoxY = wMasterStalfosShieldY + 8
+	ld a, [wMasterStalfosShieldY]
 	add $08
 	ld [wClashBoxY], a
+;> wClashBoxHalfWidth = 8
 	ld a, $08
 	ld [wClashBoxHalfWidth], a
+;> wClashBoxHalfHeight = 6
 	ld a, $06
 	ld [wClashBoxHalfHeight], a
-	ld de, $6e26
+;> DrawEntity16x16(MasterStalfosShieldSprites)
+	ld de, MasterStalfosShieldSprites
 	call DrawEntity16x16
+;> return FinishMasterStalfosPart(2)
 	ld a, $02
-	jp Jump_007_6f48
+	jp FinishMasterStalfosPart
 
 
-Call_07_6F84::
-	ld a, [$d20e]
+;@ def DrawMasterStalfosTorso()
+;@ path: boss/master_stalfos
+;@ Draws the torso (frame wMasterStalfosTorsoFrame) wMasterStalfosTorsoY pixels above the legs.
+;@ test: skip draws sprites through bank 0
+DrawMasterStalfosTorso::
+;> hActiveEntityDrawY += wMasterStalfosTorsoY
+	ld a, [wMasterStalfosTorsoY]
 	ld hl, hActiveEntityDrawY
 	add [hl]
 	ld [hl], a
-	ld a, [$d208]
+;>@t frame = MasterStalfosTorsoSprites + (wMasterStalfosTorsoFrame * 16) & 0xF0
+	ld a, [wMasterStalfosTorsoFrame]
 	rla
 	rla
 	rla
 	rla
 	and $f0
+;=@t
 	ld e, a
 	ld d, b
-	ld hl, $6e2a
+	ld hl, MasterStalfosTorsoSprites
 	add hl, de
+;> DrawEntitySprites(frame, 4)
 	ld c, $04
 	call DrawEntitySprites
+;> return FinishMasterStalfosPart(4)
 	ld a, $04
-	jp Jump_007_6f48
+	jp FinishMasterStalfosPart
 
 
-Call_07_6FA5::
-	ld a, [$d20e]
+;@ def DrawMasterStalfosLegs()
+;@ path: boss/master_stalfos
+;@ Draws the legs (frame wMasterStalfosLegsFrame) at wMasterStalfosLegsY - not while the torso has
+;@ sunk onto them (wMasterStalfosTorsoY = 0, the heap of bones).
+;@ test: skip draws sprites through bank 0
+DrawMasterStalfosLegs::
+;> if wMasterStalfosTorsoY == 0:
+	ld a, [wMasterStalfosTorsoY]
 	cp $00
+;>     return
 	ret z
-
-	ld a, [$d20f]
+;> hActiveEntityDrawY += wMasterStalfosLegsY
+	ld a, [wMasterStalfosLegsY]
 	ld hl, hActiveEntityDrawY
 	add [hl]
 	ld [hl], a
-	ld a, [$d209]
+;>@l frame = MasterStalfosLegsSprites + (wMasterStalfosLegsFrame * 16) & 0xF0
+	ld a, [wMasterStalfosLegsFrame]
 	rla
 	rla
 	rla
 	rla
 	and $f0
+;=@l
 	ld e, a
 	ld d, b
-	ld hl, $6e4a
+	ld hl, MasterStalfosLegsSprites
 	add hl, de
+;> DrawEntitySprites(frame, 4)
 	ld c, $04
 	call DrawEntitySprites
+;> return FinishMasterStalfosPart(4)
 	ld a, $04
-	jp Jump_007_6f48
+	jp FinishMasterStalfosPart
 
 
-Call_07_6FCC::
+;@ def MasterStalfosSlashHitsLink(slot: c)
+;@ path: boss/master_stalfos
+;@ Unless Link is in the air or invincible: if Link is inside the sweep (in front of him, 8 pixels
+;@ to his facing side, within 26 across and 12 up or down of the blade's line 24 below his drawn
+;@ y), Link is thrown back away from him (speed $28, into the air with height speed $13), takes
+;@ 8 damage and is invincible for $20 frames.
+;@ test: skip changes Link's state
+MasterStalfosSlashHitsLink::
+;> if wInvincibilityCounter | wIsLinkInTheAir != 0:
 	ld hl, wIsLinkInTheAir
 	ld a, [wInvincibilityCounter]
 	or [hl]
-	jr nz, jr_007_7026
-
+;>     return
+	jr nz, .done
+;> line = (hActiveEntityDrawY + 0x18) & 0xFF
 	ldh a, [hActiveEntityDrawY]
 	add $18
 	ld e, a
+;>@y if (hLinkY - hLinkPositionZ + 8 - line + 0x0C) & 0xFF >= 0x18: return
 	ldh a, [hLinkY]
 	ld hl, hLinkPositionZ
 	sub [hl]
 	add $08
 	sub e
 	add $0c
+;=@y
 	cp $18
-	jr nc, jr_007_7026
-
+	jr nc, .done
+;>@side side = 8 if wEntityDirection[slot] == 0 else 0xF8
 	ld hl, wEntityDirection
 	add hl, bc
 	ld e, $08
 	ld a, [hl]
 	and a
-	jr z, jr_007_6ff5
-
+	jr z, .side
+;=@side
 	ld e, $f8
-
-jr_007_6ff5:
+.side
+;> if (hActiveEntityX + side - hLinkX + 0x1A) & 0xFF >= 0x34:
 	ldh a, [hActiveEntityX]
 	add e
 	ld hl, hLinkX
 	sub [hl]
 	add $1a
 	cp $34
-	jr nc, jr_007_7026
-
+;>     return
+	jr nc, .done
+;> GetVectorTowardsLink(0x28)
 	ld a, $28
 	call GetVectorTowardsLink
+;> hLinkSpeedY = hMultiPurpose0
 	ldh a, [hMultiPurpose0]
 	ldh [hLinkSpeedY], a
+;> hLinkSpeedX = hMultiPurpose1
 	ldh a, [hMultiPurpose1]
 	ldh [hLinkSpeedX], a
+;> wIsLinkInTheAir = 2
 	ld a, $02
 	ld [wIsLinkInTheAir], a
+;> hLinkSpeedZ = 0x13
 	ld a, $13
 	ldh [hLinkSpeedZ], a
+;> wSubtractHealthBuffer = 8
 	ld a, $08
 	ld [wSubtractHealthBuffer], a
+;> wInvincibilityCounter = 0x20
 	ld a, $20
 	ld [wInvincibilityCounter], a
+;> hWaveSfx = 3
 	ld a, $03
 	ldh [hWaveSfx], a
-
-jr_007_7026:
+.done
 	ret
 
 
+;@ path: object/fireball_shooter
+;@ Speed of the shots for each map 0-9 (the dungeons), meant to be passed to
+;@ SetEntitySpeedTowardsLink. Never read: FireballShooterHandler compares the constant $14
+;@ instead of the map number, so every shot flies at speed $14.
+FireballShooterSpeeds::
 	db $12, $14, $16, $18, $19, $1a, $1a, $1a, $1a, $1a
 
-Call_07_7031::
+;@ def FireballShooterHandler(slot: c)
+;@ path: object/fireball_shooter
+;@ Entity $9E, an invisible shooter on a statue of the room: every 128 frames, while any ordinary
+;@ enemy is still alive in the room (not another shooter, not a shot $7D, not type $82, not an
+;@ entity with physics bit 7) and the room's event is not done, it fires a shot ($7D, the
+;@ Goponga flower's fireball) at Link. It holds fire while Link is within 32 pixels.
+;@ wEntitySpriteVariant serves as its frame counter.
+;@ test: skip spawns entities
+FireballShooterHandler::
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;>@near if (EntityLinkDiffX(slot)[0] + 0x20) & 0xFF < 0x40 and (EntityLinkDiffY(slot)[0] + 0x20) & 0xFF < 0x40:
 	call EntityLinkDiffX
 	add $20
 	cp $40
-	jr nc, jr_007_7046
-
+	jr nc, .count
+;=@near
 	call EntityLinkDiffY
 	add $20
 	cp $40
-	jr c, jr_007_70ac
-
-jr_007_7046:
+;>     return                                  # Link too close
+	jr c, FireballShooterReturn
+.count
+;> wEntitySpriteVariant[slot] += 1
 	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	inc a
 	ld [hl], a
+;> if wEntitySpriteVariant[slot] & 0x7F != 0:
 	and $7f
+;>     return
 	ret nz
-
+;>@for for e in range(15, -1, -1):             # any enemy left?
 	ld e, $0f
 	ld d, b
-
-jr_007_7053:
+.loop
+;>@skip     if wEntityType[e] in (0x82, 0x9E, 0x7D):
 	ld hl, wEntityType
 	add hl, de
 	ld a, [hl]
 	cp $82
-	jr z, jr_007_7076
-
+	jr z, .next
 	cp $9e
-	jr z, jr_007_7076
-
+;=@skip
+	jr z, .next
 	cp $7d
-	jr z, jr_007_7076
-
+	jr z, .next
+;>         continue
+;>     if wEntityPhysicsFlags[e] & 0x80:
 	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld a, [hl]
 	and $80
-	jr nz, jr_007_7076
-
+	jr nz, .next
+;>         continue
+;>     if wEntityStatus[e] == 5:
 	ld hl, wEntityStatus
 	add hl, de
 	ld a, [hl]
 	cp $05
-	jr z, jr_007_707d
-
-jr_007_7076:
+;>         return FireballShooterFire(slot)
+	jr z, FireballShooterFire
+.next
+;=@for
 	dec e
 	ld a, e
 	cp $ff
-	jr nz, jr_007_7053
-
+	jr nz, .loop
+;> return
 	ret
 
-
-jr_007_707d:
+FireballShooterFire:
+;> if wRoomEventDone:                          # FireballShooterFire: shoot at Link
 	ld a, [wRoomEventDone]
 	and a
+;>     return
 	ret nz
-
+;> shot = SpawnEntity(0x7D)
 	ld a, $7d
 	call SpawnEntity
-	jr c, jr_007_70ac
-
+;> if carry: return
+	jr c, FireballShooterReturn
+;> wEntityX[shot] = hMultiPurpose0              # at the shooter
 	ldh a, [hMultiPurpose0]
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
+;> wEntityY[shot] = hMultiPurpose1
 	ldh a, [hMultiPurpose1]
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
+;>@sp speed = 0x14                             # (FireballShooterSpeeds[hMapId] is never used)
 	push bc
 	push de
 	pop bc
 	ldh a, [hMapId]
 	ld e, a
 	ld a, $14
+;=@sp
 	cp $0a
-	jr nc, jr_007_70a8
-
-	ld hl, $7027
+	jr nc, .aim
+	ld hl, FireballShooterSpeeds
 	add hl, de
 	ld a, [hl]
-
-jr_007_70a8:
+.aim
+;> SetEntitySpeedTowardsLink(speed)            # for the shot (its slot in bc meanwhile)
 	call SetEntitySpeedTowardsLink
 	pop bc
-
-jr_007_70ac:
+FireballShooterReturn:
 	ret
 
 
-Call_07_70AD::
+;@ def HiddenSwordMoblinHandler(slot: c)
+;@ path: enemy/sword_moblin
+;@ Entity $94, invisible, sitting on a pot-like object of the room. Once a hit knocks it
+;@ (wEntityIgnoreHitsTimer set), the object shatters like a pot (BreakIntoPiecesFar), the room
+;@ object under it becomes $91 (background tiles $08-$0B) and a sword moblin ($14) jumps out, 8
+;@ pixels lower, carrying its drop ($3C). If the room's bit 4 is set it is already gone.
+;@ test: skip spawns entities and edits the room
+HiddenSwordMoblinHandler::
+;> if wEntityLoadOrder[slot] == 0:              # first frame
 	ld hl, wEntityLoadOrder
 	add hl, bc
 	ld a, [hl]
 	cp $00
-	jr nz, jr_007_70c9
-
+	jr nz, .active
+;>     if hRoomStatus & 0x10:
 	ldh a, [hRoomStatus]
 	and $10
+;>         return ClearEntityStatus(slot)
 	jp nz, ClearEntityStatus
-
+;>     wEntityLoadOrder[slot] = 0xFF
 	ld hl, wEntityLoadOrder
 	add hl, bc
 	ld [hl], $ff
+;>     wEntityDropType[slot] = 0x3C
 	ld hl, wEntityDropType
 	add hl, bc
 	ld [hl], $3c
-
-jr_007_70c9:
+.active
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;> wEntitySpriteVariant[slot] = 0
 	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld [hl], b
+;> if wEntityIgnoreHitsTimer[slot] == 0:
 	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_7149
-
+;>     return
+	jr z, HiddenMoblinDrawColumn.done
+;> moblin = SpawnEntity(0x14)
 	ld a, $14
 	call SpawnEntity
-	jr c, jr_007_7149
-
+;> if carry: return
+	jr c, HiddenMoblinDrawColumn.done
+;> wEntityDropType[moblin] = wEntityDropType[slot]
 	ld hl, wEntityDropType
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntityDropType
 	add hl, de
 	ld [hl], a
+;> wEntityX[moblin] = hMultiPurpose0
 	ldh a, [hMultiPurpose0]
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
+;> wEntityY[moblin] = hMultiPurpose1 + 8
 	ldh a, [hMultiPurpose1]
 	ld hl, wEntityY
 	add hl, de
 	add $08
 	ld [hl], a
+;> BreakIntoPiecesFar()
 	call BreakIntoPiecesFar
+;> hBGPosX = hActiveEntityX - 8
 	ldh a, [hActiveEntityX]
 	sub $08
 	ldh [hBGPosX], a
+;> hBGPosY = hActiveEntityY - 0x10
 	ldh a, [hActiveEntityY]
 	sub $10
 	ldh [hBGPosY], a
+;>@t tile = (hBGPosY & 0xF0) | (hBGPosX >> 4)
 	ldh a, [hBGPosX]
 	swap a
 	and $0f
 	ld e, a
 	ldh a, [hBGPosY]
 	and $f0
+;=@t
 	or e
 	ld e, a
 	ld d, b
+;> wRoomObjects[tile] = 0x91
 	ld hl, wRoomObjects
 	add hl, de
 	ld [hl], $91
+;> GetBGAddress()
 	call GetBGAddress
+;> n = wDrawCommandsSize
 	ld a, [wDrawCommandsSize]
 	ld e, a
 	ld d, $00
+;> p = wDrawCommand + n
 	ld hl, wDrawCommand
 	add hl, de
+;> wDrawCommandsSize = n + 10
 	add $0a
 	ld [wDrawCommandsSize], a
+;> p = HiddenMoblinDrawColumn(p, 0x08)             # left column: tiles $08/$0A
 	ld e, $08
-	call Call_07_7136
+	call HiddenMoblinDrawColumn
+;> return HiddenMoblinDrawColumn(p, 0x09)          # right column: tiles $09/$0B; runs on into it
 	ld e, $09
 
-Call_07_7136::
+;@ def HiddenMoblinDrawColumn(p: hl, tile: e) -> hl
+;@ path: enemy/sword_moblin
+;@ Writes a draw command at p for one column of a room object: 2 tiles downwards (tile, tile + 2)
+;@ at hBGAddrHigh/hBGAddrLow, which then moves on by one tile; ends the list with 0 (overwritten
+;@ by a following command).
+;@ test: skip writes draw commands
+HiddenMoblinDrawColumn::
+;> p[0] = hBGAddrHigh
 	ldh a, [hBGAddrHigh]
 	ld [hli], a
+;> p[1] = hBGAddrLow
 	ldh a, [hBGAddrLow]
 	ld [hli], a
+;> hBGAddrLow += 1
 	inc a
 	ldh [hBGAddrLow], a
+;> p[2] = 0x81                                  # 2 tiles downwards
 	ld a, $81
 	ld [hli], a
+;> p[3] = tile
 	ld a, e
 	ld [hli], a
+;> p[4] = tile + 2
 	inc a
 	inc a
 	ld [hli], a
+;> p[5] = 0
 	xor a
 	ld [hl], a
-
-jr_007_7149:
+.done
+;> return p + 5
 	ret
 
 
+;@ path: enemy/star
+;@ The star, drawn by DrawEntity16x16: 5 frames of 4 bytes (tile and attributes of the left
+;@ half, then of the right half). Frames 0-3 (tiles $74-$7A) are the spinning star, frame 4 (tile
+;@ $7C) is not used.
+StarSprites::
 	db $74, $00, $74, $20, $76, $00, $78, $00, $7a, $00, $7a, $20, $78, $20, $76, $20
 	db $7c, $00, $7c, $00
 
-Call_07_715E::
-	ld de, $714a
+;@ def StarHandler(slot: c)
+;@ path: enemy/star
+;@ Entity $9C, the star: flies in a straight line and bounces off walls, turning over (frames 0-3,
+;@ every 8 frames).
+;@ test: skip draws sprites and calls entity engine routines in bank 3
+StarHandler::
+;> DrawEntity16x16(StarSprites)
+	ld de, StarSprites
 	call DrawEntity16x16
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;> ApplyRecoilIfNeeded(slot)
 	call ApplyRecoilIfNeeded
+;> EntityCheckHits()
 	call EntityCheckHits
+;> UpdateEntityPosWithSpeed(slot)
 	call UpdateEntityPosWithSpeed
+;> EntityCheckWalls()
 	call EntityCheckWalls
+;> bounce_x = wEntityCollisions[slot] & 0x03 != 0               # wall left or right
 	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and $03
-	jr nz, jr_007_7183
-
+	jr nz, .bounceX
+;> bounce_y = not bounce_x and wEntityCollisions[slot] & 0x0C != 0   # wall above or below
 	ld a, [hl]
 	and $0c
-	jr nz, jr_007_718d
-
-	jr jr_007_7195
-
-jr_007_7183:
+	jr nz, .bounceY
+	jr .animate
+.bounceX
+;> if bounce_x:
+;>     wEntitySpeedX[slot] = -wEntitySpeedX[slot] & 0xFF
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	cpl
 	inc a
 	ld [hl], a
-	jr jr_007_7195
-
-jr_007_718d:
+;>     pass                                     # on to the animation
+	jr .animate
+.bounceY
+;> if bounce_y:
+;>     wEntitySpeedY[slot] = -wEntitySpeedY[slot] & 0xFF
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 	cpl
 	inc a
 	ld [hl], a
-
-jr_007_7195:
+.animate
+;> frame = (hFrameCounter >> 3) & 3
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $03
+;> SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 	ret
 
 
+;@ path: enemy/hiding_zol
+;@ The zol, drawn by DrawEntity16x16: 4 frames of 4 bytes (tile and attributes of the left half,
+;@ then of the right half; each half the mirror image of the other). Frames 0 and 1 are empty
+;@ ($FF; frame 1 is drawn by HidingZolSmallSprites instead), 2 = coming out (tile $54), 3 = the
+;@ whole zol (tile $52).
+HidingZolSprites::
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $54, $00, $54, $20, $52, $00, $52, $20
+;@ path: enemy/hiding_zol
+;@ Frame 1 of the zol, a small bump in the ground, drawn by DrawEntity8x16 (tile and attributes of
+;@ one 8x16 sprite per frame; frames 0 and 1 both tile $56).
+HidingZolSmallSprites::
 	db $56, $00, $56, $00
 
-Call_07_71B4::
+;@ def HidingZolHandler(slot: c)
+;@ path: enemy/hiding_zol
+;@ Entity $9B, a zol hidden in the floor. When Link comes within 32 pixels it rises out and hops
+;@ at him 3 to 6 times (wEntityPrivate1), quivering between hops, then sinks back into the floor
+;@ for $50 frames. It falls with gravity (2 per frame); the landed flag goes to
+;@ hBGTilesRequestCopy for the states. States (wEntityState): 0 hidden, 1 emerge, 2 land, 3
+;@ quiver, 4 hop, 5 in the air, 6 sink.
+;@ test: skip draws sprites and calls entity engine routines in bank 3
+HidingZolHandler::
+;> if hActiveEntitySpriteVariant == 1:
 	ldh a, [hActiveEntitySpriteVariant]
 	cp $01
-	jr nz, jr_007_71c2
-
-	ld de, $71b0
+	jr nz, .big
+;>     DrawEntity8x16(HidingZolSmallSprites)
+	ld de, HidingZolSmallSprites
 	call DrawEntity8x16
-	jr jr_007_71c8
-
-jr_007_71c2:
-	ld de, $71a0
+	jr .update
+;> else:
+.big
+;>     DrawEntity16x16(HidingZolSprites)
+	ld de, HidingZolSprites
 	call DrawEntity16x16
-
-jr_007_71c8:
+.update
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;> ApplyRecoilIfNeeded(slot)
 	call ApplyRecoilIfNeeded
+;> AddEntityZSpeedToPos(slot)
 	call AddEntityZSpeedToPos
+;> wEntitySpeedZ[slot] -= 2                     # gravity
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	dec [hl]
 	dec [hl]
+;> landed = wEntityZ[slot] & 0x80
 	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and $80
 	ldh [hBGTilesRequestCopy], a
-	jr z, jr_007_71e8
-
+;> if landed:
+	jr z, .states
+;>     wEntityZ[slot] = 0
 	ld [hl], b
+;>     wEntitySpeedZ[slot] = 0
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], b
-
-jr_007_71e8:
+.states
+;> return HidingZolStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_07_71EB::
-	dw Jump_07_71F9
-	dw Jump_07_7225
-	dw Jump_07_7256
-	dw Jump_07_7264
-	dw Jump_07_7286
-	dw Jump_07_72AB
-	dw Jump_07_72E3
+;@ path: enemy/hiding_zol
+;@ States of the hiding zol (wEntityState), see HidingZolHandler.
+HidingZolStates::
+	dw HidingZol_Hidden
+	dw HidingZol_Emerge
+	dw HidingZol_Land
+	dw HidingZol_Quiver
+	dw HidingZol_Hop
+	dw HidingZol_InAir
+	dw HidingZol_Sink
 
-Jump_07_71F9::
+;@ def HidingZol_Hidden(slot: c)
+;@ path: enemy/hiding_zol
+;@ State 0: once its timer is up, waits for Link to come within 32 pixels; then it comes out
+;@ ($20 frames, state 1) and will hop 3-6 times.
+;@ test: skip draws on random numbers
+HidingZol_Hidden::
+;> if wEntityTimer[slot] != 0:
 	call GetEntityTimer
-	jr nz, jr_007_7224
-
+;>     return
+	jr nz, .done
+;>@near if (EntityLinkDiffX(slot)[0] + 0x20) & 0xFF < 0x40 and (EntityLinkDiffY(slot)[0] + 0x20) & 0xFF < 0x40:
 	call EntityLinkDiffX
 	add $20
 	cp $40
-	jr nc, jr_007_7224
-
+	jr nc, .done
+;=@near
 	call EntityLinkDiffY
 	add $20
 	cp $40
-	jr nc, jr_007_7224
-
+	jr nc, .done
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
+;>     wEntityTimer[slot] = 0x20
 	call GetEntityTimer
 	ld [hl], $20
+;>     wEntityPrivate1[slot] = (GetRandomByte() & 3) + 3      # hops
 	call GetRandomByte
 	and $03
 	add $03
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], a
-
-jr_007_7224:
+.done
+;> return
 	ret
 
 
-Jump_07_7225::
+;@ def HidingZol_Emerge(slot: c)
+;@ path: enemy/hiding_zol
+;@ State 1: shows the bump (frame 1) and then the zol half out (frame 2, last $10 frames); then it
+;@ jumps out (height 8, height speed 8, frame 3, physics flags $12, jingle $24) and waits to land
+;@ (state 2).
+;@ test: skip plays sounds
+HidingZol_Emerge::
+;> if wEntityTimer[slot] != 0:
 	call GetEntityTimer
-	jr nz, jr_007_7249
-
+;>     return HidingZolEmergeFrame(slot)
+	jr nz, HidingZolEmergeFrame
+;> wEntityZ[slot] = 8
 	ld hl, wEntityZ
 	add hl, bc
 	ld [hl], $08
+;> wEntitySpeedZ[slot] = 8
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], $08
+;> wEntityPhysicsFlags[slot] = 0x12
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $12
+;> SetEntitySpriteVariant(slot, 3)
 	ld a, $03
 	call SetEntitySpriteVariant
+;> wEntityState[slot] += 1
 	call IncrementEntityState
+;> return PlayJingle24()                         # runs on into it
 
+;@ def PlayJingle24()
+;@ path: sound/jingle
+;@ Requests jingle $24 (a jump).
+;@ test: c = 0
 PlayJingle24::
+;> hJingle = 0x24
 	ld a, $24
 	ldh [hJingle], a
 	ret
 
 
-jr_007_7249:
+;@ def HidingZolEmergeFrame(slot: c, timer: a)
+;@ path: enemy/hiding_zol
+;@ Frame 1 (the bump) while the timer is $10 or more, frame 2 (half out) below.
+;@ test: a = rand(1, 32); c = rand(0, 15)
+HidingZolEmergeFrame::
+;> frame = 1 if timer >= 0x10 else 2
 	ld e, $01
 	cp $10
-	jr nc, jr_007_7251
-
+	jr nc, .set
 	ld e, $02
-
-jr_007_7251:
+.set
+;> SetEntitySpriteVariant(slot, frame)
 	ld a, e
 	call SetEntitySpriteVariant
 	ret
 
 
-Jump_07_7256::
+;@ def HidingZol_Land(slot: c)
+;@ path: enemy/hiding_zol
+;@ State 2: once landed, quivers $20 frames (state 3).
+;@ test: c = rand(0, 15)
+HidingZol_Land::
+;> if hBGTilesRequestCopy != 0:                 # landed
 	ldh a, [hBGTilesRequestCopy]
 	and a
-	jr z, jr_007_7263
-
+	jr z, .done
+;>     wEntityTimer[slot] = 0x20
 	call GetEntityTimer
 	ld [hl], $20
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
-
-jr_007_7263:
+.done
 	ret
 
 
-Jump_07_7264::
+;@ def HidingZol_Quiver(slot: c)
+;@ path: enemy/hiding_zol
+;@ State 3: can be hit; jiggles left and right (half a pixel, switching every 4 frames); then it
+;@ stops and hops after $10 frames (state 4).
+;@ test: skip checks weapon hits through bank 3
+HidingZol_Quiver::
+;> EntityCheckWeaponHits()
 	call EntityCheckWeaponHits
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_007_7275
-
+;> if t == 0:
+	jr nz, .jiggle
+;>     wEntityTimer[slot] = 0x10
 	ld [hl], $10
+;>     ClearEntitySpeed()
 	call ClearEntitySpeed
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
+;>     return
 	ret
 
-
-jr_007_7275:
+.jiggle
+;>@j wEntitySpeedX[slot] = 0xF8 if t & 4 else 0x08
 	ld e, $08
 	and $04
-	jr z, jr_007_727d
-
+	jr z, .set
 	ld e, $f8
-
-jr_007_727d:
+.set
 	ld hl, wEntitySpeedX
 	add hl, bc
+;=@j
 	ld [hl], e
+;> AddEntitySpeedToPosX(slot)
 	call AddEntitySpeedToPosX
 	ret
 
 
-Jump_07_7286::
+;@ def HidingZol_Hop(slot: c)
+;@ path: enemy/hiding_zol
+;@ State 4: when the timer is up it hops at Link (speed $0C, height speed $18, jingle $24; state 5).
+;@ Frame 3.
+;@ test: skip checks Link collision through bank 3
+HidingZol_Hop::
+;> EntityCheckHits()
 	call EntityCheckHits
+;> UpdateEntityPosWithSpeed(slot)
 	call UpdateEntityPosWithSpeed
-	call Call_07_7305
+;> HidingZolCheckWalls(slot)
+	call HidingZolCheckWalls
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_007_72a5
-
+	jr nz, .frame
+;>     SetEntitySpeedTowardsLink(0x0C)
 	ld a, $0c
 	call SetEntitySpeedTowardsLink
+;>     wEntitySpeedZ[slot] = 0x18
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], $18
+;>     PlayJingle24()
 	call PlayJingle24
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
-
-jr_007_72a5:
+.frame
+;> SetEntitySpriteVariant(slot, 3)
 	ld a, $03
 	call SetEntitySpriteVariant
 	ret
 
 
-Jump_07_72AB::
+;@ def HidingZol_InAir(slot: c)
+;@ path: enemy/hiding_zol
+;@ State 5: in the air (frame 2). On landing it stops; after $20 frames it hops again (state 4),
+;@ or after the last hop it sinks into the floor (state 6, $30 frames, physics flags $D2).
+;@ test: skip checks Link collision through bank 3
+HidingZol_InAir::
+;> EntityCheckHits()
 	call EntityCheckHits
+;> UpdateEntityPosWithSpeed(slot)
 	call UpdateEntityPosWithSpeed
-	call Call_07_7305
+;> HidingZolCheckWalls(slot)
+	call HidingZolCheckWalls
+;> if hBGTilesRequestCopy != 0:                 # landed
 	ldh a, [hBGTilesRequestCopy]
 	and a
-	jr z, jr_007_72dd
-
+	jr z, .frame
+;>     ClearEntitySpeed()
 	call ClearEntitySpeed
+;>     wEntityState[slot] = 4
 	call IncrementEntityState
 	ld [hl], $04
+;>     wEntityTimer[slot] = 0x20
 	call GetEntityTimer
 	ld [hl], $20
+;>     wEntityPrivate1[slot] -= 1
 	ld hl, wEntityPrivate1
 	add hl, bc
 	dec [hl]
-	jr nz, jr_007_72dd
-
+;>     if wEntityPrivate1[slot] == 0:          # last hop
+	jr nz, .frame
+;>         wEntityState[slot] = 6
 	call IncrementEntityState
 	ld [hl], $06
+;>         wEntityTimer[slot] = 0x30
 	call GetEntityTimer
 	ld [hl], $30
+;>         wEntityPhysicsFlags[slot] = 0xD2
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $d2
-
-jr_007_72dd:
+.frame
+;> SetEntitySpriteVariant(slot, 2)
 	ld a, $02
 	call SetEntitySpriteVariant
 	ret
 
 
-Jump_07_72E3::
+;@ def HidingZol_Sink(slot: c)
+;@ path: enemy/hiding_zol
+;@ State 6: sinks into the floor (frames 3, 2, 1 for $10 frames each); then lies hidden (state 0,
+;@ frame 0) and stays put for $50 frames.
+;@ test: c = rand(0, 15)
+HidingZol_Sink::
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_007_72f3
-
+;> if t == 0:
+	jr nz, .sinking
+;>     wEntityTimer[slot] = 0x50
 	ld [hl], $50
+;>     wEntityState[slot] = 0
 	call IncrementEntityState
 	ld [hl], b
+;>     return SetEntitySpriteVariant(slot, 0)
 	xor a
 	call SetEntitySpriteVariant
 	ret
 
-
-jr_007_72f3:
+.sinking
+;>@f frame = 3 if t >= 0x20 else 2 if t >= 0x10 else 1
 	ld e, $03
 	cp $20
-	jr nc, jr_007_7300
-
+	jr nc, .set
 	ld e, $01
 	cp $10
-	jr c, jr_007_7300
-
+	jr c, .set
+;=@f
 	inc e
-
-jr_007_7300:
+.set
+;> SetEntitySpriteVariant(slot, frame)
 	ld a, e
 	call SetEntitySpriteVariant
 	ret
 
 
-Call_07_7305::
+;@ def HidingZolCheckWalls(slot: c)
+;@ path: enemy/hiding_zol
+;@ The wall check with wEntityIgnoreHitsTimer set to 3 for its duration (then 0).
+;@ test: skip checks walls through bank 3
+HidingZolCheckWalls::
+;> wEntityIgnoreHitsTimer[slot] = 3
 	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
 	ld [hl], $03
+;> EntityCheckWalls()
 	call EntityCheckWalls
+;> wEntityIgnoreHitsTimer[slot] = 0
 	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
 	ld [hl], b
 	ret
 
 
-Call_07_7314::
+;@ def FlyingTilesHandler(slot: c)
+;@ path: enemy/flying_tiles
+;@ Entity $9A, the invisible starter of a flying floor tiles trap: one after another 16 floor
+;@ tiles lift off and fly at Link (each a Facade entity $5A in its flying tile form,
+;@ wEntityPrivate1 = 2), in the order of one of 8 patterns (FlyingTilesOrder), picked by the
+;@ starter's x position. The pattern start is kept in wSmasherBallSlot (shared scratch).
+;@ States (wEntityState): 0 start, 1 launch.
+;@ test: skip spawns entities
+FlyingTilesHandler::
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;> return FlyingTilesStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_07_731A::
-	dw Jump_07_731E
-	dw Jump_07_73B7
+;@ path: enemy/flying_tiles
+;@ States of the flying tiles starter (wEntityState), see FlyingTilesHandler.
+FlyingTilesStates::
+	dw FlyingTiles_Start
+	dw FlyingTiles_Launch
 
-Jump_07_731E::
+;@ def FlyingTiles_Start(slot: c)
+;@ path: enemy/flying_tiles
+;@ State 0: the pattern is (x & $70) / 16, i.e. the 16-byte block of FlyingTilesOrder at x & $70;
+;@ the first tile flies after $80 frames (state 1).
+;@ test: c = rand(0, 15)
+FlyingTiles_Start::
+;> wSmasherBallSlot = hActiveEntityX & 0x70     # start of the pattern in FlyingTilesOrder
 	ldh a, [hActiveEntityX]
 	and $70
 	ld [wSmasherBallSlot], a
+;> wEntityTimer[slot] = 0x80
 	call GetEntityTimer
 	ld [hl], $80
+;> wEntityState[slot] += 1
 	call IncrementEntityState
 	ret
 
 
+;@ path: enemy/flying_tiles
+;@ 8 patterns of 16 floor tiles, the order in which the tiles fly; each byte is the tile's place
+;@ in the room, $YX (high nibble = row, low nibble = column of 16-pixel tiles). Patterns 3-7 are
+;@ all the same as pattern 0.
+FlyingTilesOrder::
 	db $23, $56, $26, $53, $32, $47, $42, $37, $33, $46, $43, $36, $24, $55, $25, $54
 	db $21, $28, $53, $56, $34, $45, $35, $44, $31, $48, $38, $41, $14, $66, $15, $63
 	db $31, $45, $38, $44, $13, $56, $16, $53, $27, $42, $47, $22, $65, $33, $64, $36
@@ -9819,800 +11201,1101 @@ Jump_07_731E::
 	db $23, $56, $26, $53, $32, $47, $42, $37, $33, $46, $43, $36, $24, $55, $25, $54
 	db $23, $56, $26, $53, $32, $47, $42, $37, $33, $46, $43, $36, $24, $55, $25, $54
 	db $23, $56, $26, $53, $32, $47, $42, $37, $33, $46, $43, $36, $24, $55, $25, $54
+;@ path: enemy/flying_tiles
+;@ Frames between two flying tiles for each map 0-8 (the dungeons): $30, in maps 7 and 8 $28.
+FlyingTilesDelays::
 	db $30, $30, $30, $30, $30, $30, $30, $28, $28
 
-Jump_07_73B7::
+;@ def FlyingTiles_Launch(slot: c)
+;@ path: enemy/flying_tiles
+;@ State 1: every FlyingTilesDelays[map] frames the next tile (wEntityPrivateCounter, 0-15) flies:
+;@ a Facade entity in its tile form at the tile's place (x = column * 16 + 8, y = row * 16 + 16),
+;@ physics flags $12, no hitbox flags, options or health group. Its wEntityPrivate4 gets the
+;@ starter's row ((y - 16) & $F0, if not 0); the last tile of pattern 0 gets 1 there instead when
+;@ the room's event is of kind 3. After 16 tiles the starter is gone.
+;@ test: skip spawns entities
+FlyingTiles_Launch::
+;> if wEntityPrivateCounter[slot] == 0x10:
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	cp $10
+;>     return ClearEntityStatus(slot)
 	jp z, ClearEntityStatus
-
+;> if wEntityTimer[slot] != 0:
 	call GetEntityTimer
-	jr nz, jr_007_743b
-
+;>     return
+	jr nz, .done
+;>@d wEntityTimer[slot] = FlyingTilesDelays[hMapId]
 	push hl
 	ldh a, [hMapId]
 	ld e, a
 	ld d, b
-	ld hl, $73ae
+	ld hl, FlyingTilesDelays
 	add hl, de
+;=@d
 	ld a, [hl]
 	pop hl
 	ld [hl], a
+;> tile = SpawnEntity(0x5A)
 	ld a, $5a
 	call SpawnEntity
-	jr c, jr_007_743b
-
+;> if carry: return
+	jr c, .done
+;> wEntityPrivate1[tile] = 2                     # flying tile form
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $02
+;>@i i = wSmasherBallSlot + wEntityPrivateCounter[slot]
 	push bc
 	ld a, [wSmasherBallSlot]
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	add [hl]
+;> wEntityPrivateCounter[slot] += 1
 	inc [hl]
+;=@i
 	ld c, a
+;> row = (hActiveEntityY - 0x10) & 0xF0
 	ld hl, wEntityPrivate4
 	add hl, de
 	ldh a, [hActiveEntityY]
 	sub $10
 	and $f0
-	jr z, jr_007_73f7
-
+;> if row != 0:
+	jr z, .last
+;>     wEntityPrivate4[tile] = row
 	ld [hl], a
-
-jr_007_73f7:
+.last
+;>@l if i == 0x0F and wRoomEvent & 0x1F == 3:
 	ld a, c
 	cp $0f
-	jr nz, jr_007_7407
-
+	jr nz, .place
 	ld a, [wRoomEvent]
 	and $1f
 	cp $03
-	jr nz, jr_007_7407
-
+;=@l
+	jr nz, .place
+;>     wEntityPrivate4[tile] = 1
 	ld [hl], $01
-
-jr_007_7407:
-	ld hl, $732e
+.place
+;> place = FlyingTilesOrder[i]
+	ld hl, FlyingTilesOrder
 	add hl, bc
 	ld a, [hl]
 	push af
+;> wEntityX[tile] = ((place << 4) & 0xF0) | 8
 	swap a
 	and $f0
 	or $08
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
+;> wEntityY[tile] = (place & 0xF0) + 0x10
 	pop af
 	and $f0
 	add $10
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
+;> wEntityPhysicsFlags[tile] = 0x12
 	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], $12
+;> wEntityHitboxFlags[tile] = 0
 	ld hl, wEntityHitboxFlags
 	add hl, de
 	ld [hl], $00
+;> wEntityOptions1[tile] = 0
 	ld hl, wEntityOptions1
 	add hl, de
 	ld [hl], $00
+;> wEntityHealthGroup[tile] = 0
 	ld hl, wEntityHealthGroup
 	add hl, de
 	ld [hl], $00
 	pop bc
-
-jr_007_743b:
+.done
 	ret
 
 
+;@ path: enemy/water_tektite
+;@ The water tektite, drawn by DrawEntity16x16: 2 frames of 4 bytes (tile and attributes of the
+;@ left half, then of the right half; each half the mirror image of the other), tiles $70 and $72.
+WaterTektiteSprites::
 	db $70, $00, $70, $20, $72, $00, $72, $20
 
-Call_07_7444::
-	ld de, $743c
+;@ def WaterTektiteHandler(slot: c)
+;@ path: enemy/water_tektite
+;@ Entity $99, the water tektite: skates over the water in spurts - it speeds up for $20 frames in
+;@ a random diagonal (wEntityPrivate1/2 = +1 or -1 per axis), then glides to a stop and pauses $10
+;@ frames. Hitting the edge of the water (any wall) stops it at once. Its legs move every 16
+;@ frames. States (wEntityState): 0 pause, 1 speed up, 2 slow down.
+;@ test: skip draws sprites and calls entity engine routines in bank 3
+WaterTektiteHandler::
+;> DrawEntity16x16(WaterTektiteSprites)
+	ld de, WaterTektiteSprites
 	call DrawEntity16x16
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;> ApplyRecoilIfNeeded(slot)
 	call ApplyRecoilIfNeeded
+;>@v SetEntitySpriteVariant(slot, (hFrameCounter >> 4) & 1)
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	rra
 	and $01
+;=@v
 	call SetEntitySpriteVariant
+;> UpdateEntityPosWithSpeed(slot)
 	call UpdateEntityPosWithSpeed
+;> EntityCheckWalls()
 	call EntityCheckWalls
+;> if wEntityCollisions[slot] & 0x0F:            # at the edge
 	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and $0f
-	jr z, jr_007_7479
-
+	jr z, .hits
+;>     wEntityTimer[slot] = 0x10
 	call GetEntityTimer
 	ld [hl], $10
+;>     ClearEntitySpeed()
 	call ClearEntitySpeed
+;>     wEntityState[slot] = 0
 	call IncrementEntityState
 	xor a
 	ld [hl], a
+;>     hActiveEntityState = 0
 	ldh [hActiveEntityState], a
-
-jr_007_7479:
+.hits
+;> EntityCheckHits()
 	call EntityCheckHits
+;> return WaterTektiteStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_07_747F::
-	dw Jump_07_7485
-	dw Jump_07_74A6
-	dw Jump_07_74C7
+;@ path: enemy/water_tektite
+;@ States of the water tektite (wEntityState), see WaterTektiteHandler.
+WaterTektiteStates::
+	dw WaterTektite_Pause
+	dw WaterTektite_SpeedUp
+	dw WaterTektite_SlowDown
 
-Jump_07_7485::
+;@ def WaterTektite_Pause(slot: c)
+;@ path: enemy/water_tektite
+;@ State 0: after the pause it picks a random diagonal and speeds up for $20 frames (state 1).
+;@ test: skip draws on random numbers
+WaterTektite_Pause::
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_007_74a5
-
+	jr nz, .done
+;>     wEntityTimer[slot] = 0x20
 	ld [hl], $20
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
+;>@p1     wEntityPrivate1[slot] = (GetRandomByte() & 2) - 1
 	call GetRandomByte
 	and $02
 	dec a
 	ld hl, wEntityPrivate1
 	add hl, bc
+;=@p1
 	ld [hl], a
+;>@p2     wEntityPrivate2[slot] = (GetRandomByte() & 2) - 1
 	call GetRandomByte
 	and $02
 	dec a
 	ld hl, wEntityPrivate2
 	add hl, bc
+;=@p2
 	ld [hl], a
-
-jr_007_74a5:
+.done
 	ret
 
 
-Jump_07_74A6::
+;@ def WaterTektite_SpeedUp(slot: c)
+;@ path: enemy/water_tektite
+;@ State 1: every other frame adds wEntityPrivate1 to the x speed and wEntityPrivate2 to the y
+;@ speed; when the time is up it slows down (state 2).
+;@ test: c = rand(0, 15)
+WaterTektite_SpeedUp::
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
+;> if t == 0:
+;>     return IncrementEntityState(slot)
 	jp z, IncrementEntityState
-
+;> if t & 1 == 0:
 	and $01
-	jr nz, jr_007_74c6
-
+	jr nz, .done
+;>@x     wEntitySpeedX[slot] += wEntityPrivate1[slot]
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntitySpeedX
 	add hl, bc
 	add [hl]
+;=@x
 	ld [hl], a
+;>@y     wEntitySpeedY[slot] += wEntityPrivate2[slot]
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntitySpeedY
 	add hl, bc
 	add [hl]
+;=@y
 	ld [hl], a
-
-jr_007_74c6:
+.done
 	ret
 
 
-Jump_07_74C7::
+;@ def WaterTektite_SlowDown(slot: c)
+;@ path: enemy/water_tektite
+;@ State 2: every other frame both speeds step 1 towards 0; once the x speed is 0 it pauses $10
+;@ frames (state 0).
+;@ test: c = rand(0, 15)
+WaterTektite_SlowDown::
+;> if hFrameCounter & 1:
 	ldh a, [hFrameCounter]
 	and $01
-	jr nz, jr_007_74ee
-
+;>     return
+	jr nz, WaterTektiteStepToZero.done
+;> if wEntitySpeedX[slot] == 0:
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr nz, jr_007_74df
-
+	jr nz, .slow
+;>     wEntityState[slot] = 0
 	call IncrementEntityState
 	ld [hl], b
+;>     wEntityTimer[slot] = 0x10
 	call GetEntityTimer
 	ld [hl], $10
+;>     return
 	ret
 
-
-jr_007_74df:
-	call Call_07_74E7
+.slow
+;> WaterTektiteStepToZero(wEntitySpeedX, slot)
+	call WaterTektiteStepToZero
+;> return WaterTektiteStepToZero(wEntitySpeedY, slot)          # runs on into it
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 
-Call_07_74E7::
+;@ def WaterTektiteStepToZero(p: hl, value: a)
+;@ path: enemy/water_tektite
+;@ mem[p] += 1 if value is negative, else -= 1 (so a speed of 0 becomes -1).
+;@ test: skip writes through a pointer
+WaterTektiteStepToZero::
+;> mem[p] += 1 if value & 0x80 else -1
 	bit 7, a
-	jr z, jr_007_74ed
-
+	jr z, .down
 	inc [hl]
 	inc [hl]
-
-jr_007_74ed:
+.down
 	dec [hl]
-
-jr_007_74ee:
+.done
 	ret
 
 
+;@ path: object/horse_head
+;@ A horse head statue piece, drawn by DrawEntity16x16: 5 frames of 4 bytes (tile and attributes
+;@ of the left half, then of the right half): 0 = standing upright (tiles $60/$62), 1 = lying on
+;@ its side (tiles $64/$66), 2 = upside down (frame 0 flipped both ways), 3 = frame 1 flipped
+;@ both ways, 4 = lying on the other side (frame 1 mirrored). Frames 0-3 make the tumble.
+HorseHeadSprites::
 	db $60, $00, $62, $00, $64, $00, $66, $00, $62, $60, $60, $60, $66, $60, $64, $60
 	db $66, $20, $64, $20
 
-Call_07_7503::
+;@ def HorseHeadHandler(slot: c)
+;@ path: object/horse_head
+;@ Entity $98, one of the two horse head pieces in the Face Shrine (dungeon 6) room: Link lifts
+;@ and throws them; a thrown piece bounces and tumbles about, then comes to rest showing a random
+;@ side. Only when both stand upright (frame 0) does the room's event happen; otherwise a buzzer
+;@ sounds and after $40 frames they topple over (frame 1) and can be thrown again. The second
+;@ piece (wEntityLoadOrder != 0) keeps its slot in wSmasherBallSlot so that the first one can
+;@ check it. Height falls with gravity (2 per frame); landing bounces it back up with half the
+;@ speed (less than 7 is dropped); the landing speed is kept in hMultiPurposeH and the height in
+;@ hBGTilesRequestCopy. States (wEntityState): 0/1 lying, 2 tumbling, 3 at rest, 4 judged.
+;@ test: skip draws sprites and calls entity engine routines in bank 3
+HorseHeadHandler::
+;> if wEntityLoadOrder[slot] != 0:
 	ld hl, wEntityLoadOrder
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_750f
-
+	jr z, .draw
+;>     wSmasherBallSlot = slot                    # the second piece
 	ld a, c
 	ld [wSmasherBallSlot], a
-
-jr_007_750f:
-	ld de, $74ef
+.draw
+;> DrawEntity16x16(HorseHeadSprites)
+	ld de, HorseHeadSprites
 	call DrawEntity16x16
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;> UpdateEntityPosWithSpeed(slot)
 	call UpdateEntityPosWithSpeed
+;> AddEntityZSpeedToPos(slot)
 	call AddEntityZSpeedToPos
+;> EntityCheckWalls()
 	call EntityCheckWalls
+;> wEntitySpeedZ[slot] -= 2
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	dec [hl]
 	dec [hl]
+;> hBGTilesRequestCopy = wEntityZ[slot]
 	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	ldh [hBGTilesRequestCopy], a
+;> if (wEntityZ[slot] - 1) & 0x80:              # on the ground
 	dec a
 	and $80
-	jr z, jr_007_7544
-
+	jr z, .states
+;>     wEntityZ[slot] = 0
 	ld [hl], b
+;>     hMultiPurposeH = wEntitySpeedZ[slot]
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurposeH], a
+;>     bounce = ~((wEntitySpeedZ[slot] >> 1) | (wEntitySpeedZ[slot] & 0x80)) & 0xFF
 	sra a
 	cpl
+;>     wEntitySpeedZ[slot] = bounce if bounce >= 7 else 0
 	cp $07
-	jr nc, jr_007_7543
-
+	jr nc, .bounce
 	xor a
-
-jr_007_7543:
+.bounce
 	ld [hl], a
-
-jr_007_7544:
+.states
+;> return HorseHeadStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_07_7547::
-	dw Jump_07_7551
-	dw Jump_07_7551
-	dw Jump_07_7569
-	dw Jump_07_7602
-	dw Jump_07_763B
+;@ path: object/horse_head
+;@ States of a horse head piece (wEntityState), see HorseHeadHandler.
+HorseHeadStates::
+	dw HorseHead_Lying
+	dw HorseHead_Lying
+	dw HorseHead_Tumble
+	dw HorseHead_AtRest
+	dw HorseHead_Judged
 
-Jump_07_7551::
-	call Call_07_764B
+;@ def HorseHead_Lying(slot: c)
+;@ path: object/horse_head
+;@ States 0 and 1: waits to be picked up (HorseHeadCheckLift).
+;@ test: skip checks Link collision through bank 3
+HorseHead_Lying::
+;> HorseHeadCheckLift(slot)
+	call HorseHeadCheckLift
 	ret
 
 
-	db $00, $0c, $10, $0c, $00, $f4, $f0, $f4, $f0, $f4, $00, $0c, $10, $0c, $00, $f4
+;@ path: object/horse_head
+;@ x speed of a tumbling piece for each of 8 directions (0 = up, then clockwise in 45 degree
+;@ steps), 1/16 pixel per frame.
+HorseHeadSpeedX::
+	db $00, $0c, $10, $0c, $00, $f4, $f0, $f4
+
+;@ path: object/horse_head
+;@ y speed for the same 8 directions.
+HorseHeadSpeedY::
+	db $f0, $f4, $00, $0c, $10, $0c, $00, $f4
+;@ path: object/horse_head
+;@ The side a piece comes to rest on, picked at random: frame 0 (upright) with chance 2 in 4, frame
+;@ 1 or frame 4 (on one side or the other) 1 in 4 each.
+HorseHeadRestFrames::
 	db $00, $01, $04, $00
 
-Jump_07_7569::
+;@ def HorseHead_Tumble(slot: c)
+;@ path: object/horse_head
+;@ State 2 (thrown): tumbles (frames 0-3, every 8 frames). On the ground it turns one step left
+;@ or right at random (at once after a hard landing, otherwise every 8 frames) and takes the
+;@ speed of its new direction. A wall turns it round with half the speed and halves the time
+;@ left. When the time is up it stops on a random side (HorseHeadRestFrames, state 3).
+;@ test: skip draws on random numbers
+HorseHead_Tumble::
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_007_7584
-
+;> if t == 0:
+	jr nz, .tumble
+;>     ClearEntitySpeed()
 	call ClearEntitySpeed
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
+;>@rest     SetEntitySpriteVariant(slot, HorseHeadRestFrames[GetRandomByte() & 3])
 	call GetRandomByte
 	and $03
 	ld e, a
 	ld d, b
-	ld hl, $7565
+	ld hl, HorseHeadRestFrames
 	add hl, de
+;=@rest
 	ld a, [hl]
 	call SetEntitySpriteVariant
+;>     return
 	ret
 
-
-jr_007_7584:
+.tumble
+;> if t & 7 == 0:
 	and $07
-	jr nz, jr_007_7591
-
+	jr nz, .ground
+;>     wEntitySpriteVariant[slot] = (wEntitySpriteVariant[slot] + 1) & 3
 	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	inc a
 	and $03
 	ld [hl], a
-
-jr_007_7591:
+.ground
+;> if (hBGTilesRequestCopy - 1) & 0x80:         # on the ground
 	ldh a, [hBGTilesRequestCopy]
 	dec a
 	and $80
-	jr z, jr_007_75d6
-
-	call Call_07_75FB
+	jr z, .walls
+;>     HorseHeadMark(slot)
+	call HorseHeadMark
+;>@hard     if (hMultiPurposeH - 0xFC) & 0x80 == 0 and hFrameCounter & 7 != 0:     # soft landing: not every frame
 	ldh a, [hMultiPurposeH]
 	sub $fc
 	and $80
-	jr nz, jr_007_75a9
-
+	jr nz, .turn
 	ldh a, [hFrameCounter]
 	and $07
-	jr nz, jr_007_75d6
-
-jr_007_75a9:
+;=@hard
+	jr nz, .walls
+;>         pass
+.turn
+;>     else:
+;>         turn = 1 if GetRandomByte() & 1 == 0 else 0xFF
 	call GetRandomByte
 	and $01
 	ld e, $01
-	jr z, jr_007_75b4
-
+	jr z, .dir
 	ld e, $ff
-
-jr_007_75b4:
+.dir
+;>         dir = (wEntityDirection[slot] + turn) & 7
 	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
 	add e
 	and $07
+;>         wEntityDirection[slot] = dir
 	ld [hl], a
+;>@sx         wEntitySpeedX[slot] = HorseHeadSpeedX[dir]
 	ld e, a
 	ld d, b
-	ld hl, $7555
+	ld hl, HorseHeadSpeedX
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedX
+;=@sx
 	add hl, bc
 	ld [hl], a
-	ld hl, $755d
+;>         wEntitySpeedY[slot] = HorseHeadSpeedY[dir]
+	ld hl, HorseHeadSpeedY
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
-	call Call_07_75FB
-
-jr_007_75d6:
+;>         HorseHeadMark(slot)
+	call HorseHeadMark
+.walls
+;> if wEntityCollisions[slot] != 0:
 	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_7601
-
+;>     return
+	jr z, HorseHeadMark.done
+;> wEntityDirection[slot] ^= 4                   # turn round
 	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
 	xor $04
 	ld [hl], a
+;> wEntityTimer[slot] >>= 1
 	call GetEntityTimer
 	srl [hl]
+;> HorseHeadTurnSpeed(wEntitySpeedX, slot)
 	ld hl, wEntitySpeedX
-	call Call_07_75F4
+	call HorseHeadTurnSpeed
+;> return HorseHeadTurnSpeed(wEntitySpeedY, slot)       # runs on into it
 	ld hl, wEntitySpeedY
 
-Call_07_75F4::
+;@ def HorseHeadTurnSpeed(array: hl, slot: c)
+;@ path: object/horse_head
+;@ array[slot] = (~array[slot] >> 1 (signed)) + 1 - turns a speed round at about half of it - and
+;@ then HorseHeadMark.
+;@ test: skip writes through a pointer
+HorseHeadTurnSpeed::
+;> p = array + slot
 	add hl, bc
+;> mem[p] = ((((~mem[p] & 0xFF) >> 1) | (~mem[p] & 0x80)) + 1) & 0xFF
 	ld a, [hl]
 	cpl
 	sra a
 	inc a
 	ld [hl], a
+;> return HorseHeadMark(slot)                   # runs on into it
 
-Call_07_75FB::
-	ld hl, $c5d0
+;@ def HorseHeadMark(slot: c)
+;@ path: object/horse_head
+;@ Sets the piece's wEntityLedgeDirection to $FF.
+;@ test: c = rand(0, 15)
+HorseHeadMark::
+;> wEntityLedgeDirection[slot] = 0xFF
+	ld hl, wEntityLedgeDirection
 	add hl, bc
 	ld [hl], $ff
-
-jr_007_7601:
+.done
 	ret
 
 
-Jump_07_7602::
+;@ def HorseHead_AtRest(slot: c)
+;@ path: object/horse_head
+;@ State 3: the first piece waits until the second (slot wSmasherBallSlot) is at rest too; then
+;@ both are judged (state 4). Both upright: TriggerRoomEvent. Otherwise both wait $40 frames and
+;@ the buzzer sounds.
+;@ test: skip triggers the room event
+HorseHead_AtRest::
+;> if wEntityLoadOrder[slot] != 0:              # only the first piece judges
 	ld hl, wEntityLoadOrder
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr nz, jr_007_763a
-
+;>     return
+	jr nz, .done
+;> other = wSmasherBallSlot
 	ld a, [wSmasherBallSlot]
 	ld e, a
 	ld d, b
+;> if wEntityState[other] != 3:
 	ld hl, wEntityState
 	add hl, de
 	ld a, [hl]
 	cp $03
-	jr nz, jr_007_763a
-
+;>     return
+	jr nz, .done
+;> wEntityState[other] += 1
 	inc [hl]
+;> wEntityState[slot] += 1
 	call IncrementEntityState
+;>@up if hActiveEntitySpriteVariant == 0 and wEntitySpriteVariant[other] == 0:
 	ldh a, [hActiveEntitySpriteVariant]
 	cp $00
-	jr nz, jr_007_762c
-
+	jr nz, .wrong
 	ld hl, wEntitySpriteVariant
 	add hl, de
 	ld a, [hl]
+;=@up
 	cp $00
+;>     return TriggerRoomEvent()
 	jp z, TriggerRoomEvent
-
-jr_007_762c:
+.wrong
+;> wEntityTimer[other] = 0x40
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $40
+;> wEntityTimer[slot] = 0x40
 	call GetEntityTimer
 	ld [hl], $40
+;> return PlayNoAmmoSound()                      # the buzzer
 	jp PlayNoAmmoSound
 
-
-jr_007_763a:
+.done
 	ret
 
 
-Jump_07_763B::
+;@ def HorseHead_Judged(slot: c)
+;@ path: object/horse_head
+;@ State 4: on the last frame of the wait the piece falls over (frame 1); it can be picked up
+;@ again.
+;@ test: skip checks Link collision through bank 3
+HorseHead_Judged::
+;> if wEntityTimer[slot] == 1:
 	call GetEntityTimer
 	cp $01
-	jr nz, jr_007_7647
-
+	jr nz, .lift
+;>     SetEntitySpriteVariant(slot, 1)
 	ld a, $01
 	call SetEntitySpriteVariant
-
-jr_007_7647:
-	call Call_07_764B
+.lift
+;> HorseHeadCheckLift(slot)
+	call HorseHeadCheckLift
 	ret
 
 
-Call_07_764B::
+;@ def HorseHeadCheckLift(slot: c)
+;@ path: object/horse_head
+;@ When Link touches the piece and presses the button of the power bracelet (item 3 on B or A),
+;@ not already carrying something and not in an item pose: he lifts it (status 7 = carried,
+;@ state 2 for when it is thrown, wLinkIsCarrying = 1, wLiftDirection = his direction, lift sound).
+;@ test: skip checks Link collision through bank 3
+HorseHeadCheckLift::
+;> if not EntityTouchesLink():
 	call EntityTouchesLink
-	jr nc, jr_007_769b
-
+;>     return
+	jr nc, .done
+;> if wItemUsePoseTimer:
 	ld a, [wItemUsePoseTimer]
 	and a
-	jr nz, jr_007_769b
-
+;>     return
+	jr nz, .done
+;> if wItemB == 3:                               # power bracelet on B
 	ld a, [wItemB]
 	cp $03
-	jr nz, jr_007_7665
-
+	jr nz, .itemA
+;>     if not hJoypadPressed & 0x20: return      # B not pressed
 	ldh a, [hJoypadPressed]
 	and $20
-	jr nz, jr_007_7672
-
-	jr jr_007_769b
-
-jr_007_7665:
+	jr nz, .lift
+	jr .done
+.itemA
+;> else:
+;>@a     if wItemA != 3 or not hJoypadPressed & 0x10: return
 	ld a, [wItemA]
 	cp $03
-	jr nz, jr_007_769b
-
+	jr nz, .done
 	ldh a, [hJoypadPressed]
 	and $10
-	jr z, jr_007_769b
-
-jr_007_7672:
+;=@a
+	jr z, .done
+.lift
+;> if wLinkIsCarrying:
 	ld a, [wLinkIsCarrying]
 	and a
-	jr nz, jr_007_769b
-
+;>     return
+	jr nz, .done
+;> wLinkIsCarrying = 1
 	inc a
 	ld [wLinkIsCarrying], a
+;> wEntityState[slot] = 2
 	call IncrementEntityState
 	ld [hl], $02
+;> wEntityStatus[slot] = 7                       # carried
 	ld hl, wEntityStatus
 	add hl, bc
 	ld [hl], $07
+;> wEntityLiftStep[slot] = 0
 	ld hl, wEntityLiftStep
 	add hl, bc
 	ld [hl], b
+;> wLiftDirection = hLinkDirection
 	ldh a, [hLinkDirection]
 	ld [wLiftDirection], a
+;> wEntityTimer[slot] = 2
 	call GetEntityTimer
 	ld [hl], $02
+;> hWaveSfx = 2
 	ld hl, hWaveSfx
 	ld [hl], $02
-
-jr_007_769b:
+.done
 	ret
 
 
+;@ path: enemy/spiked_beetle
+;@ The spiked beetle, drawn by DrawEntity16x16: 4 frames of 4 bytes (tile and attributes of the
+;@ left half, then of the right half; each half the mirror image of the other): 0/1 = walking
+;@ (tiles $70/$72), 2/3 = lying on its back, kicking (tiles $74/$76).
+SpikedBeetleSprites::
 	db $70, $00, $70, $20, $72, $00, $72, $20, $74, $00, $74, $20, $76, $00, $76, $20
+;@ path: enemy/spiked_beetle
+;@ The same 4 frames with the tiles used in map 3 (tiles $60-$66).
+SpikedBeetleSpritesMap3::
 	db $60, $00, $60, $20, $62, $00, $62, $20, $64, $00, $64, $20, $66, $00, $66, $20
 
-Call_07_76BC::
-	ld de, $769c
+;@ def SpikedBeetleHandler(slot: c)
+;@ path: enemy/spiked_beetle
+;@ Entity $2C, the spiked beetle: wanders, and when Link comes in line with it (within 6 pixels of
+;@ its row or column) it charges at him. Its spiked front cannot be hurt (hitbox flags $80,
+;@ options $48); turned on its back (state 3, e.g. by a shield bash) it kicks helplessly and can
+;@ be hit, then flips back onto its feet with a hop. Knocked back it stops. It falls with gravity
+;@ (2 per frame); on its back it bounces when landing. States (wEntityState): 0 pause, 1 walk,
+;@ 2 charge, 3 on its back.
+;@ test: skip draws sprites and calls entity engine routines in bank 3
+SpikedBeetleHandler::
+;> sprites = SpikedBeetleSpritesMap3 if hMapId == 3 else SpikedBeetleSprites
+	ld de, SpikedBeetleSprites
 	ldh a, [hMapId]
 	cp $03
-	jr nz, jr_007_76c8
-
-	ld de, $76ac
-
-jr_007_76c8:
+	jr nz, .draw
+	ld de, SpikedBeetleSpritesMap3
+.draw
+;> DrawEntity16x16(sprites)
 	call DrawEntity16x16
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;> if wEntityIgnoreHitsTimer[slot] != 0:         # knocked back
 	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_76d9
-
+	jr z, .recoil
+;>     ClearEntitySpeed()
 	call ClearEntitySpeed
-
-jr_007_76d9:
+.recoil
+;> ApplyRecoilIfNeeded(slot)
 	call ApplyRecoilIfNeeded
+;> EntityCheckHits()
 	call EntityCheckHits
+;> UpdateEntityPosWithSpeed(slot)
 	call UpdateEntityPosWithSpeed
+;> AddEntityZSpeedToPos(slot)
 	call AddEntityZSpeedToPos
+;> EntityCheckWalls()
 	call EntityCheckWalls
+;> wEntitySpeedZ[slot] -= 2                      # gravity
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	dec [hl]
 	dec [hl]
+;>@g if wEntityZ[slot] & 0x80 or wEntityZ[slot] == 0:      # on the ground
 	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	bit 7, a
-	jr nz, jr_007_76fa
-
+	jr nz, .ground
 	and a
-	jr nz, jr_007_7727
-
-jr_007_76fa:
+;=@g
+	jr nz, .states
+.ground
+;>     wEntityZ[slot] = 0
 	ld [hl], b
+;>     if hActiveEntityState == 3:               # on its back: bounce
 	ldh a, [hActiveEntityState]
 	cp $03
-	jr nz, jr_007_7722
-
+	jr nz, .stopZ
+;>         wEntitySpeedX[slot] = (wEntitySpeedX[slot] >> 1) | (wEntitySpeedX[slot] & 0x80)
 	ld hl, wEntitySpeedX
 	add hl, bc
 	sra [hl]
+;>         wEntitySpeedY[slot] = (wEntitySpeedY[slot] >> 1) | (wEntitySpeedY[slot] & 0x80)
 	ld hl, wEntitySpeedY
 	add hl, bc
 	sra [hl]
+;>         wEntitySpeedZ[slot] = ~((wEntitySpeedZ[slot] >> 1) | (wEntitySpeedZ[slot] & 0x80)) & 0xFF
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld a, [hl]
 	sra a
 	cpl
 	ld [hl], a
+;>         if wEntitySpeedZ[slot] < 7:           # too weak: lies still
 	cp $07
-	jr nc, jr_007_7720
-
+	jr nc, .bounce
+;>             wEntitySpeedZ[slot] = 0
 	ld [hl], b
+;>             ClearEntitySpeed()
 	call ClearEntitySpeed
-	jr jr_007_7727
-
-jr_007_7720:
-	jr jr_007_7727
-
-jr_007_7722:
+	jr .states
+.bounce
+	jr .states
+;>     else:
+.stopZ
+;>         wEntitySpeedZ[slot] = 0
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], b
-
-jr_007_7727:
+.states
+;> if hActiveEntityState >= 4:
 	ldh a, [hActiveEntityState]
 	cp $04
-	jr c, jr_007_772e
-
+	jr c, .run
+;>     return
 	ret
 
-
-jr_007_772e:
+.run
+;> return SpikedBeetleStates[hActiveEntityState](slot)
 	rst $00
 
-JumpTable_07_772F::
-	dw Jump_07_773F
-	dw Jump_07_777B
-	dw Jump_07_77C0
-	dw Jump_07_7809
+;@ path: enemy/spiked_beetle
+;@ States of the spiked beetle (wEntityState), see SpikedBeetleHandler.
+SpikedBeetleStates::
+	dw SpikedBeetle_Pause
+	dw SpikedBeetle_Walk
+	dw SpikedBeetle_Charge
+	dw SpikedBeetle_OnBack
 
-	db $06, $fa, $00, $00, $00, $00, $fa, $06
+;@ path: enemy/spiked_beetle
+;@ x speed of the walking beetle per direction (0 right, 1 left, 2 up, 3 down), 1/16 pixel per frame.
+SpikedBeetleSpeedX::
+	db $06, $fa, $00, $00
 
-Jump_07_773F::
+;@ path: enemy/spiked_beetle
+;@ y speed of the walking beetle per direction.
+SpikedBeetleSpeedY::
+	db $00, $00, $fa, $06
+
+;@ def SpikedBeetle_Pause(slot: c)
+;@ path: enemy/spiked_beetle
+;@ State 0: stands; then walks for $30-$4F frames (state 1) in a random direction, 1 time in 4
+;@ towards Link. Watches for Link (SpikedBeetleLookForLink).
+;@ test: skip draws on random numbers
+SpikedBeetle_Pause::
+;> ClearEntitySpeed()
 	call ClearEntitySpeed
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_007_7779
-
+	jr nz, .look
+;>     wEntityTimer[slot] = (GetRandomByte() & 0x1F) + 0x30
 	call GetRandomByte
 	and $1f
 	add $30
 	ld [hl], a
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
+;>     if GetRandomByte() & 6 == 0:
 	call GetRandomByte
 	and $06
-	jr nz, jr_007_775e
-
+	jr nz, .random
+;>         dir = GetEntityDirectionToLink(slot)
 	call GetEntityDirectionToLink
-	jr jr_007_7764
-
-jr_007_775e:
+	jr .setDir
+;>     else:
+.random
+;>         dir = GetRandomByte() & 3
 	call GetRandomByte
 	and $03
 	ld e, a
-
-jr_007_7764:
+.setDir
+;>@sx     wEntitySpeedX[slot] = SpikedBeetleSpeedX[dir]
 	ld d, b
-	ld hl, $7737
+	ld hl, SpikedBeetleSpeedX
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedX
 	add hl, bc
+;=@sx
 	ld [hl], a
-	ld hl, $773b
+;>     wEntitySpeedY[slot] = SpikedBeetleSpeedY[dir]
+	ld hl, SpikedBeetleSpeedY
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
+.look
+;> return SpikedBeetleLookForLink(slot)
+	jr SpikedBeetleLookForLink
 
-jr_007_7779:
-	jr jr_007_7789
-
-Jump_07_777B::
+;@ def SpikedBeetle_Walk(slot: c)
+;@ path: enemy/spiked_beetle
+;@ State 1: walks; after the time it pauses $18 frames (state 0). Watches for Link: when Link is
+;@ within 6 pixels of its column or row it charges at him (state 2, timer $FF).
+;@ test: skip checks Link position through other routines
+SpikedBeetle_Walk::
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_007_7786
-
+	jr nz, .walk
+;>     wEntityTimer[slot] = 0x18
 	ld [hl], $18
+;>     wEntityState[slot] = 0
 	call IncrementEntityState
 	ld [hl], b
-
-jr_007_7786:
-	call Call_07_77FD
-
-jr_007_7789:
+.walk
+;> SpikedBeetleWalkFrame()
+	call SpikedBeetleWalkFrame
+SpikedBeetleLookForLink:
+;> wEntityHitboxFlags[slot] = 0x80               # SpikedBeetleLookForLink: spikes to the front
 	ld hl, wEntityHitboxFlags
 	add hl, bc
 	ld [hl], $80
+;> wEntityOptions1[slot] = 0x48
 	ld hl, wEntityOptions1
 	add hl, bc
 	ld [hl], $48
+;>@line if (EntityLinkDiffX(slot)[0] + 6) & 0xFF < 0x0A or (EntityLinkDiffY(slot)[0] + 6) & 0xFF < 0x0A:
 	call EntityLinkDiffX
 	add $06
 	cp $0a
-	jr c, jr_007_77a7
-
+	jr c, .charge
+;=@line
 	call EntityLinkDiffY
 	add $06
 	cp $0a
-	jr nc, jr_007_77b7
-
-jr_007_77a7:
+	jr nc, .done
+.charge
+;>     wEntityDirection[slot] = GetEntityDirectionToLink(slot)
 	call GetEntityDirectionToLink
 	ld hl, wEntityDirection
 	add hl, bc
 	ld [hl], e
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
+;>     wEntityTimer[slot] = 0xFF
 	call GetEntityTimer
 	ld [hl], $ff
-
-jr_007_77b7:
+.done
 	ret
 
 
-	db $18, $e8, $00, $00, $00, $00, $e8, $18
+;@ path: enemy/spiked_beetle
+;@ Top speed of the charge per direction (0 right, 1 left, 2 up, 3 down): x speeds.
+SpikedBeetleChargeSpeedX::
+	db $18, $e8, $00, $00
 
-Jump_07_77C0::
+;@ path: enemy/spiked_beetle
+;@ Top speed of the charge per direction: y speeds.
+SpikedBeetleChargeSpeedY::
+	db $00, $00, $e8, $18
+
+;@ def SpikedBeetle_Charge(slot: c)
+;@ path: enemy/spiked_beetle
+;@ State 2: speeds up by 1 per frame towards the charge speed in its direction until it hits a
+;@ wall or the time runs out; then it pauses (state 0).
+;@ test: c = rand(0, 15)
+SpikedBeetle_Charge::
+;> if wEntityTimer[slot] != 0:
 	call GetEntityTimer
-	jr z, jr_007_77f9
-
+	jr z, .stop
+;>     dir = wEntityDirection[slot]
 	ld hl, wEntityDirection
 	add hl, bc
 	ld e, [hl]
 	ld d, b
-	ld hl, $77b8
+;>     target = SpikedBeetleChargeSpeedX[dir]
+	ld hl, SpikedBeetleChargeSpeedX
 	add hl, de
 	ld a, [hl]
+;>     if target != wEntitySpeedX[slot]:
 	ld hl, wEntitySpeedX
 	add hl, bc
 	sub [hl]
-	jr z, jr_007_77de
-
+	jr z, .speedY
+;>         wEntitySpeedX[slot] += 1 if not (target - wEntitySpeedX[slot]) & 0x80 else -1
 	and $80
-	jr nz, jr_007_77dd
-
+	jr nz, .slowerX
 	inc [hl]
 	inc [hl]
-
-jr_007_77dd:
+.slowerX
 	dec [hl]
-
-jr_007_77de:
-	ld hl, $77bc
+.speedY
+;>@ty     if SpikedBeetleChargeSpeedY[dir] != wEntitySpeedY[slot]:
+	ld hl, SpikedBeetleChargeSpeedY
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedY
 	add hl, bc
 	sub [hl]
-	jr z, jr_007_77f1
-
+;=@ty
+	jr z, .wall
+;>         wEntitySpeedY[slot] += 1 if not (SpikedBeetleChargeSpeedY[dir] - wEntitySpeedY[slot]) & 0x80 else -1
 	and $80
-	jr nz, jr_007_77f0
-
+	jr nz, .slowerY
 	inc [hl]
 	inc [hl]
-
-jr_007_77f0:
+.slowerY
 	dec [hl]
-
-jr_007_77f1:
+.wall
+;>     if wEntityCollisions[slot] == 0:
 	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, Call_07_77FD
-
-jr_007_77f9:
+;>         return SpikedBeetleWalkFrame()
+	jr z, SpikedBeetleWalkFrame
+.stop
+;> wEntityState[slot] = 0
 	call IncrementEntityState
 	ld [hl], b
+;> return SpikedBeetleWalkFrame()               # runs on into it
 
-Call_07_77FD::
+;@ def SpikedBeetleWalkFrame(slot: c)
+;@ path: enemy/spiked_beetle
+;@ Walking frames 0/1, switching every 16 frames.
+;@ test: c = rand(0, 15)
+SpikedBeetleWalkFrame::
+;>@wf SetEntitySpriteVariant(slot, (hFrameCounter >> 4) & 1)
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	rra
 	and $01
+;=@wf
 	call SetEntitySpriteVariant
 	ret
 
 
-Jump_07_7809::
+;@ def SpikedBeetle_OnBack(slot: c)
+;@ path: enemy/spiked_beetle
+;@ State 3: on its back it can be hurt (options $08, no hitbox flags) and kicks its legs (frames
+;@ 2/3). In the last $60 frames it wriggles left and right (switching every 4 frames; the wall
+;@ check runs with wEntityIgnoreHitsTimer set to 1). When the time is up it hops back onto its
+;@ feet (height speed $18) and pauses (state 0).
+;@ test: skip checks walls through bank 3
+SpikedBeetle_OnBack::
+;> wEntityOptions1[slot] = 0x08
 	ld hl, wEntityOptions1
 	add hl, bc
 	ld [hl], $08
+;> wEntityHitboxFlags[slot] = 0
 	ld hl, wEntityHitboxFlags
 	add hl, bc
 	ld [hl], $00
+;>@f SetEntitySpriteVariant(slot, ((hFrameCounter >> 4) & 1) + 2)
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	rra
 	and $01
+;=@f
 	inc a
 	inc a
 	call SetEntitySpriteVariant
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_007_7837
-
+;> if t == 0:
+	jr nz, .struggle
+;>     wEntityState[slot] = 0
 	call IncrementEntityState
 	ld [hl], b
+;>     wEntitySpeedZ[slot] = 0x18                # hop
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], $18
+;>     wEntitySpeedX[slot] = 0
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], b
+;>     return
 	ret
 
-
-jr_007_7837:
+.struggle
+;> if t < 0x60:
 	cp $60
-	jr nc, jr_007_7848
-
+	jr nc, .walls
+;>@w     wEntitySpeedX[slot] = 0x08 if t & 4 else 0xF8
 	and $04
 	ld a, $08
-	jr nz, jr_007_7843
-
+	jr nz, .set
 	ld a, $f8
-
-jr_007_7843:
+.set
 	ld hl, wEntitySpeedX
 	add hl, bc
+;=@w
 	ld [hl], a
-
-jr_007_7848:
+.walls
+;> saved = wEntityIgnoreHitsTimer[slot]
 	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
 	ld a, [hl]
 	push af
+;> wEntityIgnoreHitsTimer[slot] = 1
 	ld [hl], $01
+;> EntityCheckWalls()
 	call EntityCheckWalls
+;> wEntityIgnoreHitsTimer[slot] = saved
 	pop af
 	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
@@ -10620,537 +12303,761 @@ jr_007_7848:
 	ret
 
 
+;@ path: unused
+;@ A copy of WalkBaseFrames (base sprite frame per direction) that nothing reads.
+UnusedWalkBaseFrames::
 	db $06, $04, $02, $00
 
-Call_07_785E::
+;@ def SwordMoblinHandler(slot: c)
+;@ path: enemy/sword_moblin
+;@ Entity $14, the moblin with a sword (and shield, which Link's sword bounces off). It patrols
+;@ left and right; when it notices Link (close and not facing away, or a sword clash, or a hit)
+;@ it charges at him. In the moblins' hideout (map $15) it only appears while Bow-Wow is held
+;@ there (wIsBowWowFollowingLink = $80), is on guard at once, and on entering its room speaks (text
+;@ $190). States (wEntityState): 0 pause, 1 patrol, 2 charge.
+;@ test: skip draws sprites and calls entity engine routines in bank 3
+SwordMoblinHandler::
+;> if hMapId == 0x15 and wIsBowWowFollowingLink != 0x80:
 	ldh a, [hMapId]
 	cp $15
-	jr nz, jr_007_786c
-
+	jr nz, .draw
 	ld a, [wIsBowWowFollowingLink]
 	cp $80
+;>     return ClearEntityStatus(slot)
 	jp nz, ClearEntityStatus
-
-jr_007_786c:
-	call Call_07_79D5
+.draw
+;> DrawSwordMoblin(slot)
+	call DrawSwordMoblin
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;>@al if hMapId == 0x15 or wEntityIgnoreHitsTimer[slot] != 0:
 	ldh a, [hMapId]
 	cp $15
-	jr z, jr_007_7880
-
+	jr z, .alert
 	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
 	ld a, [hl]
+;=@al
 	and a
-	jr z, jr_007_7883
-
-jr_007_7880:
-	call Call_07_7975
-
-jr_007_7883:
+	jr z, .checks
+.alert
+;>     SwordMoblinAlert(slot)
+	call SwordMoblinAlert
+.checks
+;> ApplyRecoilIfNeeded(slot)
 	call ApplyRecoilIfNeeded
+;> EntityCheckSwordClash()
 	call EntityCheckSwordClash
+;> EntityCheckHits()
 	call EntityCheckHits
+;> return SwordMoblinStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_07_788F::
-	dw Jump_07_789D
-	dw Jump_07_78D2
-	dw Jump_07_78F5
+;@ path: enemy/sword_moblin
+;@ States of the sword moblin (wEntityState), see SwordMoblinHandler.
+SwordMoblinStates::
+	dw SwordMoblin_Pause
+	dw SwordMoblin_Patrol
+	dw SwordMoblin_Charge
 
-	db $06, $fa, $00, $00, $00, $00, $fa, $06
+;@ path: enemy/sword_moblin
+;@ x speed of the patrol per direction (0 right, 1 left, 2 up, 3 down), 1/16 pixel per frame.
+SwordMoblinSpeedX::
+	db $06, $fa, $00, $00
 
-Jump_07_789D::
+;@ path: enemy/sword_moblin
+;@ y speed of the patrol per direction.
+SwordMoblinSpeedY::
+	db $00, $00, $fa, $06
+
+;@ def SwordMoblin_Pause(slot: c)
+;@ path: enemy/sword_moblin
+;@ State 0: stands and looks out for Link; then turns round and patrols $80 frames (state 1).
+;@ test: skip checks Link position through other routines
+SwordMoblin_Pause::
+;> EntityCheckWalls()
 	call EntityCheckWalls
+;> wEntityPrivateCounter[slot] = 0
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld [hl], $00
-	call Call_07_794D
+;> SwordMoblinLookForLink(slot)
+	call SwordMoblinLookForLink
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_007_78d1
-
+	jr nz, SwordMoblinTurnAround.done
+;>     wEntityTimer[slot] = 0x80
 	ld [hl], $80
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
+;>     return SwordMoblinTurnAround(slot)       # runs on into it
 
-Call_07_78B3::
+;@ def SwordMoblinTurnAround(slot: c)
+;@ path: enemy/sword_moblin
+;@ Turns to the other direction (bit 0 of wEntityDirection) and takes its patrol speed.
+;@ test: c = rand(0, 15)
+SwordMoblinTurnAround::
+;> dir = wEntityDirection[slot] ^ 1
 	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
 	xor $01
+;> wEntityDirection[slot] = dir
 	ld [hl], a
+;>@sx wEntitySpeedX[slot] = SwordMoblinSpeedX[dir]
 	ld e, a
 	ld d, b
-	ld hl, $7895
+	ld hl, SwordMoblinSpeedX
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedX
+;=@sx
 	add hl, bc
 	ld [hl], a
-	ld hl, $7899
+;> wEntitySpeedY[slot] = SwordMoblinSpeedY[dir]
+	ld hl, SwordMoblinSpeedY
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
-
-jr_007_78d1:
+.done
+;> return
 	ret
 
 
-Jump_07_78D2::
-	call Call_07_794D
+;@ def SwordMoblin_Patrol(slot: c)
+;@ path: enemy/sword_moblin
+;@ State 1: walks to and fro (turning at walls) and looks out for Link; after the time it pauses
+;@ $30 frames (state 0).
+;@ test: skip checks walls through bank 3
+SwordMoblin_Patrol::
+;> SwordMoblinLookForLink(slot)
+	call SwordMoblinLookForLink
+;> if wEntityCollisions[slot] != 0:
 	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_78e0
-
-	call Call_07_78B3
-
-jr_007_78e0:
+	jr z, .walk
+;>     SwordMoblinTurnAround(slot)
+	call SwordMoblinTurnAround
+.walk
+;> UpdateEntityPosWithSpeed(slot)
 	call UpdateEntityPosWithSpeed
+;> EntityCheckWalls()
 	call EntityCheckWalls
+;> UpdateWalkFrame(slot)
 	call UpdateWalkFrame
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_007_78f4
-
+	jr nz, SwordMoblinResetState.done
+;>     wEntityTimer[slot] = 0x30
 	ld [hl], $30
+;>     return SwordMoblinResetState()           # runs on into it
 
-Call_07_78F0::
+;@ def SwordMoblinResetState(slot: c)
+;@ path: enemy/sword_moblin
+;@ Back to state 0.
+;@ test: c = rand(0, 15)
+SwordMoblinResetState::
+;> wEntityState[slot] = 0
 	call IncrementEntityState
 	ld [hl], b
-
-jr_007_78f4:
+.done
 	ret
 
 
-Jump_07_78F5::
+;@ def SwordMoblin_Charge(slot: c)
+;@ path: enemy/sword_moblin
+;@ State 2: after noticing Link it stands facing him for $10 frames (wEntityTimer1; in the
+;@ hideout, once the room scroll has finished, it says text $190 the first time,
+;@ wEntityPrivate3). Then it runs at Link with fast steps, aiming again every 16 frames
+;@ (speed $0A), for $80 frames; then it pauses $18 frames (state 0).
+;@ test: skip opens dialogue
+SwordMoblin_Charge::
+;>@talk if wEntityTimer1[slot] != 0 and wTransitionSequenceCounter == 4 and hMapId == 0x15:
 	call GetEntityTimer1
-	jr z, jr_007_7917
-
+	jr z, .standing
 	ld a, [wTransitionSequenceCounter]
 	cp $04
-	jr nz, jr_007_7917
-
+	jr nz, .standing
 	ldh a, [hMapId]
+;=@talk
 	cp $15
-	jr nz, jr_007_7917
-
+	jr nz, .standing
+;>     if wEntityPrivate3[slot] == 0:
 	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr nz, jr_007_793d
-
+	jr nz, SwordMoblinFaceLink
+;>         wEntityPrivate3[slot] = 1
 	inc [hl]
+;>         OpenDialogTable1(0x90)
 	ld a, $90
 	call OpenDialogTable1
-	jr jr_007_793d
+;>     return SwordMoblinFaceLink(slot)
+	jr SwordMoblinFaceLink
 
-jr_007_7917:
+.standing
+;> if wEntityTimer1[slot] != 0:                  # still standing
 	ld a, [hl]
 	and a
-	jr nz, jr_007_793d
-
+;>     return SwordMoblinFaceLink(slot)
+	jr nz, SwordMoblinFaceLink
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_007_7925
-
+	jr nz, .run
+;>     wEntityTimer[slot] = 0x18
 	ld [hl], $18
-	call Call_07_78F0
-
-jr_007_7925:
+;>     SwordMoblinResetState()
+	call SwordMoblinResetState
+.run
+;> UpdateWalkFrame(slot)
 	call UpdateWalkFrame
+;> UpdateWalkFrame(slot)
 	call UpdateWalkFrame
+;> UpdateEntityPosWithSpeed(slot)
 	call UpdateEntityPosWithSpeed
+;> EntityCheckWalls()
 	call EntityCheckWalls
+;> if (hFrameCounter ^ slot) & 0x0F != 0:
 	ldh a, [hFrameCounter]
 	xor c
 	and $0f
-	jr nz, jr_007_7948
-
+;>     return
+	jr nz, SwordMoblinFaceLink.done
+;> SetEntitySpeedTowardsLink(0x0A)
 	ld a, $0a
 	call SetEntitySpeedTowardsLink
-
-jr_007_793d:
+SwordMoblinFaceLink:
+;> wEntityDirection[slot] = GetEntityDirectionToLink(slot)       # SwordMoblinFaceLink: turn to Link
 	call GetEntityDirectionToLink
 	ld hl, wEntityDirection
 	add hl, bc
 	ld [hl], a
+;> UpdateWalkFrame(slot)
 	call UpdateWalkFrame
-
-jr_007_7948:
+.done
 	ret
 
 
+;@ path: enemy/sword_moblin
+;@ The opposite of each direction (0 right, 1 left, 2 up, 3 down).
+SwordMoblinOppositeDirections::
 	db $01, $00, $03, $02
 
-Call_07_794D::
+;@ def SwordMoblinLookForLink(slot: c)
+;@ path: enemy/sword_moblin
+;@ The moblin notices Link (SwordMoblinAlert) after a sword clash (wClinkTimer), or when Link is
+;@ within 48 pixels on both axes unless the moblin faces straight away from him.
+;@ test: skip checks Link position through other routines
+SwordMoblinLookForLink::
+;> if wClinkTimer:
 	ld a, [wClinkTimer]
 	and a
-	jr nz, Call_07_7975
-
+;>     return SwordMoblinAlert(slot)
+	jr nz, SwordMoblinAlert
+;>@near if (EntityLinkDiffX(slot)[0] + 0x30) & 0xFF >= 0x60 or (EntityLinkDiffY(slot)[0] + 0x30) & 0xFF >= 0x60: return
 	call EntityLinkDiffX
 	add $30
 	cp $60
-	jr nc, jr_007_798c
-
+	jr nc, SwordMoblinAlert.done
+;=@near
 	call EntityLinkDiffY
 	add $30
 	cp $60
-	jr nc, jr_007_798c
-
+	jr nc, SwordMoblinAlert.done
+;>@away if SwordMoblinOppositeDirections[GetEntityDirectionToLink(slot)] == wEntityDirection[slot]: return   # facing away
 	call GetEntityDirectionToLink
 	ld d, b
-	ld hl, $7949
+	ld hl, SwordMoblinOppositeDirections
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntityDirection
+;=@away
 	add hl, bc
 	cp [hl]
-	jr z, jr_007_798c
+	jr z, SwordMoblinAlert.done
+;> return SwordMoblinAlert(slot)                 # runs on into it
 
-Call_07_7975::
+;@ def SwordMoblinAlert(slot: c)
+;@ path: enemy/sword_moblin
+;@ Starts the charge (state 2, $80 frames); coming from another state it first stands $10 frames
+;@ (wEntityTimer1).
+;@ test: c = rand(0, 15)
+SwordMoblinAlert::
+;> if wEntityState[slot] != 2:
 	ld hl, wEntityState
 	add hl, bc
 	ld a, [hl]
 	cp $02
-	jr z, jr_007_7985
-
+	jr z, .charge
+;>     wEntityTimer1[slot] = 0x10
 	push hl
 	call GetEntityTimer1
 	ld [hl], $10
 	pop hl
-
-jr_007_7985:
+.charge
+;> wEntityState[slot] = 2
 	ld [hl], $02
+;> wEntityTimer[slot] = 0x80
 	call GetEntityTimer
 	ld [hl], $80
-
-jr_007_798c:
+.done
 	ret
 
 
-	db $00, $00, $f9, $f9, $f8, $f2, $08, $0e, $08, $0e, $f8, $f2, $00, $00, $00, $00
-	db $02, $02, $06, $06, $04, $04, $00, $00, $0c, $0c, $04, $04, $fc, $fc, $14, $14
-	db $14, $14, $fc, $fc, $0c, $0c, $0c, $0c, $60, $00, $62, $00, $62, $20, $60, $20
-	db $64, $00, $66, $00, $66, $20, $64, $20, $68, $00, $6a, $00, $6c, $00, $6e, $00
-	db $6a, $20, $68, $20, $6e, $20, $6c, $20
+;@ path: enemy/sword_moblin
+;@ x offset of the sword for each sprite frame (0/1 down, 2/3 up, 4/5 left, 6/7 right; the second
+;@ frame of each pair thrusts it further).
+SwordMoblinSwordX::
+	db $00, $00, $f9, $f9, $f8, $f2, $08, $0e
 
-Call_07_79D5::
+;@ path: enemy/sword_moblin
+;@ y offset of the sword for each sprite frame.
+SwordMoblinSwordY::
+	db $08, $0e, $f8, $f2, $00, $00, $00, $00
+;@ path: enemy/sword_moblin
+;@ Sword sprite (frame of SwordSpriteTiles, as for Link's sword) for each sprite frame.
+SwordMoblinSwordFrames::
+	db $02, $02, $06, $06, $04, $04, $00, $00
+
+;@ path: enemy/sword_moblin
+;@ x of the sword's clash box (relative to the moblin) for each sprite frame.
+SwordMoblinClashX::
+	db $0c, $0c, $04, $04, $fc, $fc, $14, $14
+;@ path: enemy/sword_moblin
+;@ y of the sword's clash box for each sprite frame.
+SwordMoblinClashY::
+	db $14, $14, $fc, $fc, $0c, $0c, $0c, $0c
+
+;@ path: enemy/sword_moblin
+;@ The moblin's body, drawn by DrawEntity16x16: 8 frames of 4 bytes (tile and attributes of the
+;@ left half, then of the right half): 0/1 facing down (tiles $60/$62, the step mirrored), 2/3
+;@ facing up ($64/$66), 4/5 facing left ($68-$6E), 6/7 facing right (the same mirrored).
+SwordMoblinSprites::
+	db $60, $00, $62, $00, $62, $20, $60, $20, $64, $00, $66, $00, $66, $20, $64, $20
+	db $68, $00, $6a, $00, $6c, $00, $6e, $00, $6a, $20, $68, $20, $6e, $20, $6c, $20
+
+;@ def DrawSwordMoblin(slot: c)
+;@ path: enemy/sword_moblin
+;@ Draws the moblin: facing down also its sword hilt sprite (DrawSwordMoblinHilt), then the sword
+;@ (DrawSpritePair, 2 sprites at the offset for its frame) with a 4x4 clash box on it, then the
+;@ body.
+;@ test: skip draws sprites through bank 0
+DrawSwordMoblin::
+;> SkipDrawIfOffscreen()
 	call SkipDrawIfOffscreen
+;> frame = hActiveEntitySpriteVariant
 	ldh a, [hActiveEntitySpriteVariant]
+;> if frame < 2:                                  # facing down
 	cp $02
-	jr nc, jr_007_79e1
-
-	call Call_07_7A39
-
-jr_007_79e1:
+	jr nc, .sword
+;>     DrawSwordMoblinHilt(frame)
+	call DrawSwordMoblinHilt
+.sword
+;> hMultiPurpose0 = hActiveEntityDrawY
 	push bc
 	ldh a, [hActiveEntityDrawY]
 	ldh [hMultiPurpose0], a
+;> hMultiPurpose1 = hActiveEntityX
 	ldh a, [hActiveEntityX]
 	ldh [hMultiPurpose1], a
+;>@cx wClashBoxX = SwordMoblinClashX[frame]
 	ldh a, [hActiveEntitySpriteVariant]
 	ld e, a
 	ld d, b
-	ld hl, $79a5
+	ld hl, SwordMoblinClashX
 	add hl, de
 	ld a, [hl]
+;=@cx
 	ld [wClashBoxX], a
-	ld hl, $79ad
+;> wClashBoxY = SwordMoblinClashY[frame]
+	ld hl, SwordMoblinClashY
 	add hl, de
 	ld a, [hl]
 	ld [wClashBoxY], a
+;> wClashBoxHalfWidth = 2
 	ld a, $02
 	ld [wClashBoxHalfWidth], a
+;> wClashBoxHalfHeight = 2
 	ld [wClashBoxHalfHeight], a
-	ld hl, $799d
+;> hMultiPurpose2 = SwordMoblinSwordFrames[frame]
+	ld hl, SwordMoblinSwordFrames
 	add hl, de
 	ld a, [hl]
 	ldh [hMultiPurpose2], a
-	ld hl, $7995
+;>@o offset = (SwordMoblinSwordY[frame] << 8) | SwordMoblinSwordX[frame]
+	ld hl, SwordMoblinSwordY
 	add hl, de
 	ld a, [hl]
-	ld hl, $798d
+	ld hl, SwordMoblinSwordX
 	add hl, de
 	ld l, [hl]
+;=@o
 	ld h, a
 	push hl
+;>@oam oam = wOAMBuffer + wOAMNextIndex
 	ld a, [wOAMNextIndex]
 	ld e, a
 	ld d, $00
-	ld hl, $c030
+	ld hl, wOAMBuffer + $30
 	add hl, de
 	push hl
+;=@oam
 	pop bc
+;> hMultiPurpose3 = 0
 	xor a
 	ldh [hMultiPurpose3], a
+;> DrawSpritePair(oam, offset)
 	pop hl
 	call DrawSpritePair
 	pop bc
+;> ReserveOAMEntriesFar(2)
 	ld a, $02
 	call ReserveOAMEntriesFar
-	ld de, $79b5
+;> DrawEntity16x16(SwordMoblinSprites)
+	ld de, SwordMoblinSprites
 	call DrawEntity16x16
 	ret
 
 
-Call_07_7A39::
+;@ def DrawSwordMoblinHilt(frame: a)
+;@ path: enemy/sword_moblin
+;@ One sprite (tile $86, palette 1) at the moblin's x - 2 and its drawn y + 4, one pixel lower on
+;@ frame 0 than on frame 1.
+;@ test: skip draws sprites through bank 0
+DrawSwordMoblinHilt::
+;> bob = frame ^ 1
 	xor $01
 	push af
+;> p = wOAMBuffer + wOAMNextIndex
 	ld a, [wOAMNextIndex]
 	ld l, a
 	ld h, $00
-	ld de, $c030
+	ld de, wOAMBuffer + $30
 	add hl, de
 	pop de
+;> p[0] = hActiveEntityDrawY + bob + 4
 	ldh a, [hActiveEntityDrawY]
 	add d
 	add $04
 	ld [hli], a
+;> p[1] = hActiveEntityX - 2
 	ldh a, [hActiveEntityX]
 	add $fe
 	ld [hli], a
+;> p[2] = 0x86
 	ld a, $86
 	ld [hli], a
+;> p[3] = 0x10
 	ld [hl], $10
+;> ReserveOAMEntriesFar(1)
 	ld a, $01
 	call ReserveOAMEntriesFar
 	ret
 
 
+;@ path: object/chest_item
+;@ The item rising out of an opened chest, drawn by DrawEntity8x16: tile and attributes (palette 1)
+;@ of one 8x16 sprite for each chest content 0-$20 (the sprite variant; e.g. 0 = power bracelet,
+;@ 1 = shield, $0B = sword).
+ChestItemSprites::
 	db $82, $10, $86, $10, $88, $10, $8a, $10, $8c, $10, $98, $10, $90, $10, $92, $10
 	db $96, $10, $8e, $10, $80, $10, $84, $10, $94, $10, $9a, $10, $ae, $10, $9c, $10
 	db $a0, $10, $c0, $10, $c2, $10, $c4, $10, $c6, $10, $ca, $10, $c0, $10, $c2, $10
 	db $c4, $10, $c6, $10, $ca, $10, $a6, $10, $a6, $10, $a6, $10, $a6, $10, $a6, $10
-	db $9e, $10, $90, $91, $92, $93, $94, $95, $96, $97, $98, $99, $9a, $9b, $9c, $9d
-	db $9e, $9f, $a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $aa, $ac, $ab, $ad
-	db $ae, $ae, $ef, $06, $10, $10, $10, $10, $10, $10, $10, $10, $10, $01, $01, $10
-	db $10, $10, $10, $10, $01, $10, $10, $10, $10, $10, $01, $01, $01, $01, $01, $01
-	db $01, $01, $01, $01, $01, $00
+	db $9e, $10
 
-Call_07_7AE3::
+;@ path: object/chest_item
+;@ Text (dialogue number in the first table) shown for each chest content 0-$21.
+ChestItemTexts::
+	db $90, $91, $92, $93, $94, $95, $96, $97, $98, $99, $9a, $9b, $9c, $9d, $9e, $9f
+	db $a0, $a1, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $aa, $ac, $ab, $ad, $ae, $ae
+	db $ef, $06
+
+;@ path: object/chest_item
+;@ Sound for each chest content 0-$21, started 8 frames after the item appears: 1 = jingle 1 (for
+;@ the smaller finds), any other value = the music track to play (always $10 here); 0 = none.
+ChestItemMusic::
+	db $10, $10, $10, $10, $10, $10, $10, $10, $10, $01, $01, $10, $10, $10, $10, $10
+	db $01, $10, $10, $10, $10, $10, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01
+	db $01, $00
+
+;@ def ChestItemHandler(slot: c)
+;@ path: object/chest_item
+;@ Entity $07, the content of an opened chest (the sprite variant says which). Link is held
+;@ still. The item rises out of the chest for 16 frames; at frame 8 the item's sound starts
+;@ (ChestItemMusic), at frame $26 its text opens (ChestItemTexts; the second-level shield $ED,
+;@ sword $9F and power bracelet $EE have their own texts; content $21 in room $96 shows text $111
+;@ and nothing is drawn for it); at frame $28 it is gone. Content $22 is a trap: a zol ($1B)
+;@ jumps out of the chest instead (jingle $1D).
+;@ test: skip spawns entities and opens dialogue
+ChestItemHandler::
+;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
+;> wSwordAnimationState = 0
 	xor a
 	ld [wSwordAnimationState], a
+;> wSwordAnimationStatePrev = 0
 	ld [wSwordAnimationStatePrev], a
+;> if hActiveEntitySpriteVariant == 0x22:        # a zol in the chest
 	ldh a, [hActiveEntitySpriteVariant]
 	cp $22
-	jr nz, jr_007_7b2f
-
+	jr nz, .item
+;>     zol = SpawnEntity(0x1B)
 	ld a, $1b
 	call SpawnEntity
+;>     if carry: return ClearEntityStatus(slot)
 	jp c, ClearEntityStatus
-
+;>     wEntityX[zol] = hMultiPurpose0
 	ldh a, [hMultiPurpose0]
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
+;>     wEntityY[zol] = hMultiPurpose1
 	ldh a, [hMultiPurpose1]
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
+;>     wEntitySpeedZ[zol] = 0x18
 	ld hl, wEntitySpeedZ
 	add hl, de
 	ld [hl], $18
+;>     wEntityZ[zol] = 6
 	ld hl, wEntityZ
 	add hl, de
 	ld [hl], $06
+;>     wEntityTimer1[zol] = 0x50
 	ld hl, wEntityTimer1
 	add hl, de
 	ld [hl], $50
+;>     wEntitySpeedX[zol] = 8
 	ld hl, wEntitySpeedX
 	add hl, de
 	ld [hl], $08
+;>     wEntityState[zol] = 3
 	ld hl, wEntityState
 	add hl, de
 	ld [hl], $03
+;>     hJingle = 0x1D
 	ld a, $1d
 	ldh [hJingle], a
+;>     return ClearEntityStatus(slot)
 	jp ClearEntityStatus
 
-
-jr_007_7b2f:
+.item
+;> if hActiveEntitySpriteVariant != 0x21:
 	cp $21
-	jr z, jr_007_7b39
-
-	ld de, $7a5d
+	jr z, .update
+;>     DrawEntity8x16(ChestItemSprites)
+	ld de, ChestItemSprites
 	call DrawEntity8x16
-
-jr_007_7b39:
+.update
+;> if wDialogState != 0:
 	ld a, [wDialogState]
 	and a
-	jp nz, Jump_007_7bcf
-
+;>     return
+	jp nz, .done
+;> UpdateEntityPosWithSpeed(slot)                 # rises
 	call UpdateEntityPosWithSpeed
+;> n = wEntityPrivateCounter[slot] + 1
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	inc a
+;> wEntityPrivateCounter[slot] = n
 	ld [hl], a
+;> if n == 0x10:
 	cp $10
-	jr nz, jr_007_7b54
-
+	jr nz, .sound
+;>     wEntitySpeedY[slot] = 0                    # stops rising
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], $00
-
-jr_007_7b54:
+.sound
+;> if n == 8:
 	cp $08
-	jr nz, jr_007_7b71
-
+	jr nz, .text
+;>     sound = ChestItemMusic[hActiveEntitySpriteVariant]
 	ldh a, [hActiveEntitySpriteVariant]
 	ld e, a
 	ld d, b
-	ld hl, $7ac1
+	ld hl, ChestItemMusic
 	add hl, de
 	ld a, [hl]
+;>     if sound == 1:
 	and a
-	jr z, jr_007_7b71
-
+	jr z, .text
 	cp $01
-	jr nz, jr_007_7b6e
-
+	jr nz, .music
+;>         hJingle = 1
 	ld a, $01
 	ldh [hJingle], a
-	jr jr_007_7b71
-
-jr_007_7b6e:
+	jr .text
+;>     elif sound != 0:
+.music
+;>         wMusicTrackToPlay = sound
 	ld [wMusicTrackToPlay], a
-
-jr_007_7b71:
+.text
+;> if wEntityPrivateCounter[slot] == 0x26:
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	cp $26
-	jr nz, jr_007_7bc8
-
+	jr nz, .end
+;>     item = hActiveEntitySpriteVariant
 	ldh a, [hActiveEntitySpriteVariant]
 	ld e, a
 	ld d, b
+;>     if item == 0x21 and hMapRoom == 0x96:
 	cp $21
-	jr nz, jr_007_7b8f
-
+	jr nz, .levels
 	ldh a, [hMapRoom]
 	cp $96
-	jr nz, jr_007_7b8f
-
+	jr nz, .levels
+;>         OpenDialogTable1(0x11)
 	ld a, $11
 	call OpenDialogTable1
-	jr jr_007_7bc7
-
-jr_007_7b8f:
+	jr .opened
+.levels
+;>@sh     elif item == 1 and wShieldLevel == 2:
 	ld a, e
 	cp $01
-	jr nz, jr_007_7b9f
-
+	jr nz, .sword
 	ld a, [wShieldLevel]
 	cp $02
-	jr nz, jr_007_7b9f
-
+;=@sh
+	jr nz, .sword
+;>         OpenDialog(0xED)
 	ld a, $ed
-	jr jr_007_7bc4
-
-jr_007_7b9f:
+	jr .open
+.sword
+;>@sw     elif item == 0x0B and wSwordLevel == 2:
 	ld a, e
 	cp $0b
-	jr nz, jr_007_7baf
-
+	jr nz, .bracelet
 	ld a, [wSwordLevel]
 	cp $02
-	jr nz, jr_007_7baf
-
+;=@sw
+	jr nz, .bracelet
+;>         OpenDialog(0x9F)
 	ld a, $9f
-	jr jr_007_7bc4
-
-jr_007_7baf:
+	jr .open
+.bracelet
+;>@br     elif item == 0 and wPowerBraceletLevel == 2:
 	ld a, e
 	cp $00
-	jr nz, jr_007_7bbf
-
+	jr nz, .normal
 	ld a, [wPowerBraceletLevel]
 	cp $02
-	jr nz, jr_007_7bbf
-
+;=@br
+	jr nz, .normal
+;>         OpenDialog(0xEE)
 	ld a, $ee
-	jr jr_007_7bc4
-
-jr_007_7bbf:
-	ld hl, $7a9f
+	jr .open
+.normal
+;>     else:
+;>         OpenDialog(ChestItemTexts[item])
+	ld hl, ChestItemTexts
 	add hl, de
 	ld a, [hl]
-
-jr_007_7bc4:
+.open
 	call OpenDialog
-
-jr_007_7bc7:
+.opened
+;>     return                                     # (a = 0 never matches $28)
 	xor a
-
-jr_007_7bc8:
+.end
+;> if wEntityPrivateCounter[slot] == 0x28:
 	cp $28
-	jr nz, jr_007_7bcf
-
+	jr nz, .done
+;>     ClearEntityStatus(slot)
 	call ClearEntityStatus
-
-Jump_007_7bcf:
-jr_007_7bcf:
+.done
 	ret
 
 
+;@ def PushLinkOutOfEntity(slot: c) -> carry
+;@ path: entity/helpers
+;@ For solid entities: when Link touches it, he is put back where he was and his dash stops; a
+;@ hookshot chain on its way (an entity of type 3 in slot wHookshotChainSlot - 1) is reset to state
+;@ 0. Returns carry when Link was touching.
+;@ test: skip checks Link collision through bank 3
 PushLinkOutOfEntity::
+;> if not EntityTouchesLink():
 	call EntityTouchesLink
-	jr nc, jr_007_7bf4
-
+;>     return False
+	jr nc, .no
+;> RestoreLinkPosition()
 	call RestoreLinkPosition
+;> ResetPegasusBoots()
 	call ResetPegasusBoots
+;> chain = wHookshotChainSlot                     # slot + 1, 0 = none
 	ld a, [wHookshotChainSlot]
 	and a
-	jr z, jr_007_7bf2
-
+;>@ch if chain != 0 and wEntityType[chain - 1] == 3:
+	jr z, .yes
 	ld e, a
 	ld d, b
-	ld hl, $c39f
+	ld hl, wEntityType - 1
 	add hl, de
 	ld a, [hl]
+;=@ch
 	cp $03
-	jr nz, jr_007_7bf2
-
-	ld hl, $c28f
+	jr nz, .yes
+;>     wEntityState[chain - 1] = 0
+	ld hl, wEntityState - 1
 	add hl, de
 	ld [hl], $00
-
-jr_007_7bf2:
+.yes
+;> return True
 	scf
 	ret
 
-
-jr_007_7bf4:
+.no
 	and a
 	ret
 
 
+;@ path: entity/helpers
+;@ Base sprite frame for each direction (0 right, 1 left, 2 up, 3 down) used by UpdateWalkFrame:
+;@ right 6, left 4, up 2, down 0; the step (0/1) is added to it.
+WalkBaseFrames::
 	db $06, $04, $02, $00
 
+;@ def UpdateWalkFrame(slot: c)
+;@ path: entity/helpers
+;@ Advances the walk counter (wEntityPrivateCounter) and sets the sprite frame to
+;@ WalkBaseFrames[wEntityDirection] plus the step (bit 4 of the counter).
+;@ test: c = rand(0, 15); wEntityDirection[c] = rand(0, 3)
 UpdateWalkFrame::
+;>@b base = WalkBaseFrames[wEntityDirection[slot]]
 	ld hl, wEntityDirection
 	add hl, bc
 	ld e, [hl]
 	ld d, b
-	ld hl, $7bf6
+	ld hl, WalkBaseFrames
 	add hl, de
+;=@b
 	push hl
+;> wEntityPrivateCounter[slot] += 1
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	inc [hl]
+;>@s step = (wEntityPrivateCounter[slot] >> 4) & 1
 	ld a, [hl]
 	rra
 	rra
 	rra
 	rra
 	pop hl
+;=@s
 	and $01
+;> return SetEntitySpriteVariant(slot, step | base)
 	or [hl]
 	jp SetEntitySpriteVariant
 
@@ -11218,12 +13125,12 @@ ShouldLinkTalkToEntity_CheckRange:
 	ld [hl], $01
 ;> busy = wDialogState | wInventoryAppearing
 	ld a, [wDialogState]
-	ld hl, $c14f
+	ld hl, wInventoryAppearing
 	or [hl]
-;> busy |= wLinkInAir | mem[0xC134]
-	ld hl, $c146
+;> busy |= wIsLinkInTheAir | wDialogCooldown
+	ld hl, wIsLinkInTheAir
 	or [hl]
-	ld hl, $c134
+	ld hl, wDialogCooldown
 	or [hl]
 ;> if busy:
 ;>     return False
@@ -11274,16 +13181,16 @@ ReturnIfPaused::
 	cp $07
 ;>@exit     return_from_caller()   # pops the caller's return address
 	jr z, .exitCaller
-;> if wDialogState or mem[0xC1A8] or wInventoryAppearing:
+;> if wDialogState or wLinkShowItemPoseActive or wInventoryAppearing:
 	ld a, [wDialogState]
 	ld hl, wLinkShowItemPoseActive
 	or [hl]
-	ld hl, $c14f
+	ld hl, wInventoryAppearing
 	or [hl]
 ;>     return_from_caller()
 	jr nz, .exitCaller
 ;> if wRoomTransitionState:
-	ld a, [$c124]
+	ld a, [wRoomTransitionState]
 	and a
 ;>     return_from_caller()
 	jr z, .done

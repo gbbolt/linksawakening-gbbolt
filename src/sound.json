@@ -1,8 +1,21 @@
 {
-  "_doc": "How tools/audio.py drives the sound engine. RAM names come from ram.inc. The game requests music with wMusicTrackToPlay (PlayMusic) and sound effects through hJingle / hWaveSfx / hNoiseSfx, which the main loop copies into wJingleToPlay / wWaveSfxToPlay / wNoiseSfxToPlay; here the requests go straight into those bytes. UpdateSound runs once a frame from the VBlank handler: the effect engine of bank $1F, then the music engines of banks $1B (tracks $01-$10, $31-$40) and $1E (tracks $11-$30, $41-$60). Both music banks share the channel records wMusicChannel1-4 at $D310.",
+  "_doc": "How tools/audio.py drives the sound engine. RAM names come from ram.inc. The game requests music with wMusicTrackToPlay and sound effects through hJingle / hWaveSfx / hNoiseSfx, which UpdateVolumeAndSfxRequests (bank $1F) copies into wJingleToPlay / wWaveSfxToPlay / wNoiseSfxToPlay once a frame; here the requests go straight into those bytes. UpdateSound runs once a frame: the effect engine of bank $1F, then the music engines of banks $1B (tracks $01-$10, $31-$40) and $1E (tracks $11-$30, $41-$60). Both music banks share the channel records wMusicChannel1-4 at $D310.",
   "init": "InitSoundEngine",
   "update": "UpdateSound",
-  "power_on": [["rNR52", 128], ["rNR51", 255], ["rNR50", 119]],
+  "power_on": [
+    [
+      "rNR52",
+      128
+    ],
+    [
+      "rNR51",
+      255
+    ],
+    [
+      "rNR50",
+      119
+    ]
+  ],
   "stack": "0xDFF0",
   "kinds": {
     "music": {
@@ -10,7 +23,10 @@
       "request": "wMusicTrackToPlay",
       "_playing": "the song number inside its bank's table; 0 when a song without a loop ends",
       "playing": "wActiveMusicTrack",
-      "ids": [1, 96],
+      "ids": [
+        1,
+        96
+      ],
       "loops": true,
       "max_seconds": 240
     },
@@ -18,37 +34,1108 @@
       "label": "Sound effects (square channels)",
       "request": "wJingleToPlay",
       "playing": "wActiveJingle",
-      "ids": [1, 65],
+      "ids": [
+        1,
+        65
+      ],
       "max_seconds": 12
     },
     "wave": {
       "label": "Sound effects (wave channel)",
       "request": "wWaveSfxToPlay",
       "playing": "wActiveWaveSfx",
-      "ids": [1, 35],
+      "ids": [
+        1,
+        35
+      ],
       "max_seconds": 12
     },
     "noise": {
       "label": "Sound effects (noise channel)",
       "request": "wNoiseSfxToPlay",
       "playing": "wActiveNoiseSfx",
-      "ids": [1, 63],
+      "ids": [
+        1,
+        63
+      ],
       "max_seconds": 12
     }
   },
   "music_channels": {
     "_doc": "per channel: its RAM record, the offset of the pattern pointer (the note just played is the byte before it), the pattern list pointer, and the flag byte/bit set while a sound effect owns the channel",
-    "structs": ["wMusicChannel1", "wMusicChannel2", "wMusicChannel3", "wMusicChannel4"],
+    "structs": [
+      "wMusicChannel1",
+      "wMusicChannel2",
+      "wMusicChannel3",
+      "wMusicChannel4"
+    ],
     "pattern_ptr": 4,
     "list_ptr": 0,
-    "effect_flag": [15, 128]
+    "effect_flag": [
+      15,
+      128
+    ]
   },
-  "effect_channels": {"jingle": [0, 1], "wave": [2], "noise": [3]},
+  "effect_channels": {
+    "jingle": [
+      0,
+      1
+    ],
+    "wave": [
+      2
+    ],
+    "noise": [
+      3
+    ]
+  },
   "pokes": {
     "_doc": "the item fanfares $0F, $10 and $25 start hLastMusicTrack again when they end; $FF stops the music instead",
-    "music 15": {"hLastMusicTrack": 255},
-    "music 16": {"hLastMusicTrack": 255},
-    "music 37": {"hLastMusicTrack": 255}
+    "music 15": {
+      "hLastMusicTrack": 255
+    },
+    "music 16": {
+      "hLastMusicTrack": 255
+    },
+    "music 37": {
+      "hLastMusicTrack": 255
+    }
   },
-  "names": {}
+  "names": {
+    "music 1": [
+      "Track $01",
+      "requested in bank $01"
+    ],
+    "music 2": [
+      "Indoor map $0F",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $0F"
+    ],
+    "music 3": [
+      "Game over",
+      "GameOverWaitMusic"
+    ],
+    "music 4": [
+      "Mabe Village",
+      "SelectAreaMusic, overworld table 02:4000: rows 8-B, columns 0-3 of the overworld (the village in the south-west)"
+    ],
+    "music 5": [
+      "Overworld",
+      "SelectAreaMusic, overworld table 02:4000: most of the island; also after the sword is found (Sword_Hold) and while Marin follows"
+    ],
+    "music 6": [
+      "Tal Tal Mountains",
+      "SelectAreaMusic, overworld table 02:4000: the two top rows of the overworld"
+    ],
+    "music 7": [
+      "Shop",
+      "EntityInit_ShopOwner (when Link has a sword); SelectAreaMusic, IndoorMusicTracks (by hMapId): map $0E"
+    ],
+    "music 8": [
+      "Overworld east",
+      "SelectAreaMusic, overworld table 02:4000: rows 4-7, columns C-F"
+    ],
+    "music 9": [
+      "Mysterious Forest",
+      "SelectAreaMusic, overworld table 02:4000: rows 4-7, columns 0-3, and room $80"
+    ],
+    "music 10": [
+      "Indoor maps $10, $12, $1D",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId)"
+    ],
+    "music 11": [
+      "Animal Village",
+      "SelectAreaMusic, overworld table 02:4000: rooms $CC, $CD, $DC, $DD"
+    ],
+    "music 12": [
+      "Track $0C",
+      "not requested directly"
+    ],
+    "music 13": [
+      "Intro",
+      "GameplayIntroHandler"
+    ],
+    "music 14": [
+      "Madam MeowMeow",
+      "EntityInit_MadamMeowMeow; bank $06"
+    ],
+    "music 15": [
+      "Sword fanfare",
+      "Collect_Sword; starts hLastMusicTrack again when it ends"
+    ],
+    "music 16": [
+      "Item fanfare",
+      "Collect_WithFanfare, heart pieces, keys, trade items, songs learned; starts hLastMusicTrack again"
+    ],
+    "music 17": [
+      "File select",
+      "FileSelectShowScreen"
+    ],
+    "music 18": [
+      "Indoor map $08",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $08"
+    ],
+    "music 19": [
+      "Indoor map $14",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $14"
+    ],
+    "music 20": [
+      "Dungeon 1",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $00"
+    ],
+    "music 21": [
+      "Dungeon 2",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $01"
+    ],
+    "music 22": [
+      "Dungeon 3",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $02"
+    ],
+    "music 23": [
+      "Dungeon 4",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $03"
+    ],
+    "music 24": [
+      "Heart container",
+      "HeartContainerHandler; SelectAreaMusic while wIndoorAltMusic is set"
+    ],
+    "music 25": [
+      "Track $19",
+      "requested in bank $04"
+    ],
+    "music 26": [
+      "Track $1A",
+      "requested in bank $01"
+    ],
+    "music 27": [
+      "Instrument",
+      "Collect_Instrument, WarpAppear"
+    ],
+    "music 28": [
+      "Track $1C",
+      "not requested directly"
+    ],
+    "music 29": [
+      "No sword yet",
+      "SelectAreaMusic while Link has no sword; bank $06"
+    ],
+    "music 30": [
+      "Track $1E",
+      "requested in bank $06"
+    ],
+    "music 31": [
+      "Indoor map $16",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $16"
+    ],
+    "music 32": [
+      "Track $20",
+      "not requested directly"
+    ],
+    "music 33": [
+      "Side-scrolling rooms",
+      "SelectAreaMusic: side-view rooms of maps below $0A"
+    ],
+    "music 34": [
+      "Track $22",
+      "requested in bank $06"
+    ],
+    "music 35": [
+      "Nightmare",
+      "NightmareIntroCueMusic"
+    ],
+    "music 36": [
+      "Track $24",
+      "not requested directly"
+    ],
+    "music 37": [
+      "Heart container fanfare",
+      "Collect_HeartContainer; starts hLastMusicTrack again"
+    ],
+    "music 38": [
+      "Caves",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): maps $09-$0D, $11, $1F"
+    ],
+    "music 39": [
+      "Piece of power",
+      "Collect_PieceOfPower"
+    ],
+    "music 40": [
+      "Track $28",
+      "not requested directly"
+    ],
+    "music 41": [
+      "Track $29",
+      "not requested directly"
+    ],
+    "music 42": [
+      "Track $2A",
+      "not requested directly"
+    ],
+    "music 43": [
+      "Track $2B",
+      "not requested directly"
+    ],
+    "music 44": [
+      "Track $2C",
+      "not requested directly"
+    ],
+    "music 45": [
+      "Track $2D",
+      "not requested directly"
+    ],
+    "music 46": [
+      "Track $2E",
+      "not requested directly"
+    ],
+    "music 47": [
+      "Marin",
+      "EntityInit_Marin, WalrusAskMarin"
+    ],
+    "music 48": [
+      "Manbo's mambo",
+      "ManboStartSong"
+    ],
+    "music 49": [
+      "Overworld (no intro)",
+      "Sword_Hold, MarinFollowHandler: track $05 without its first pattern"
+    ],
+    "music 50": [
+      "Track $32",
+      "not requested directly"
+    ],
+    "music 51": [
+      "Track $33",
+      "not requested directly"
+    ],
+    "music 52": [
+      "Tarin and the honeycomb",
+      "TarinHoneycomb_RaiseStick"
+    ],
+    "music 53": [
+      "Frog's Song of Soul",
+      "MamuWaitBeforeSong"
+    ],
+    "music 54": [
+      "Kiki eats",
+      "Kiki_Eat"
+    ],
+    "music 55": [
+      "Track $37",
+      "not requested directly"
+    ],
+    "music 56": [
+      "Track $38",
+      "not requested directly"
+    ],
+    "music 57": [
+      "Turtle Rock wakes",
+      "TurtleRockWake"
+    ],
+    "music 58": [
+      "Track $3A",
+      "not requested directly"
+    ],
+    "music 59": [
+      "Track $3B",
+      "not requested directly"
+    ],
+    "music 60": [
+      "Track $3C",
+      "not requested directly"
+    ],
+    "music 61": [
+      "Ending: the sky",
+      "SkyViewInit"
+    ],
+    "music 62": [
+      "Indoor map $15",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $15"
+    ],
+    "music 63": [
+      "Ending: the instruments",
+      "EndingSpawnInstruments"
+    ],
+    "music 64": [
+      "Track $40",
+      "not requested directly"
+    ],
+    "music 65": [
+      "Track $41",
+      "not requested directly"
+    ],
+    "music 66": [
+      "Track $42",
+      "not requested directly"
+    ],
+    "music 67": [
+      "Track $43",
+      "not requested directly"
+    ],
+    "music 68": [
+      "Track $44",
+      "not requested directly"
+    ],
+    "music 69": [
+      "Track $45",
+      "not requested directly"
+    ],
+    "music 70": [
+      "Track $46",
+      "not requested directly"
+    ],
+    "music 71": [
+      "Track $47",
+      "not requested directly"
+    ],
+    "music 72": [
+      "Indoor map $1E",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $1E"
+    ],
+    "music 73": [
+      "Power-up",
+      "SelectAreaMusic while a piece of power or acorn works; Collect_PieceOfPower"
+    ],
+    "music 74": [
+      "Track $4A",
+      "not requested directly"
+    ],
+    "music 75": [
+      "Dungeon 5",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $04"
+    ],
+    "music 76": [
+      "Track $4C",
+      "requested in bank $07"
+    ],
+    "music 77": [
+      "Marin at the beach",
+      "MarinBeachMusic"
+    ],
+    "music 78": [
+      "Marin at the beach (answer)",
+      "MarinBeachAnswer"
+    ],
+    "music 79": [
+      "Track $4F",
+      "not requested directly"
+    ],
+    "music 80": [
+      "Boss",
+      "LanmolaHandler and other bosses (hDefaultMusicTrack)"
+    ],
+    "music 81": [
+      "Track $51",
+      "not requested directly"
+    ],
+    "music 82": [
+      "Track $52",
+      "not requested directly"
+    ],
+    "music 83": [
+      "Indoor map $13",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $13"
+    ],
+    "music 84": [
+      "Evil Eagle",
+      "GrimCreeperCallEagleState"
+    ],
+    "music 85": [
+      "The rooster's grave",
+      "RoosterGraveWaitForSong"
+    ],
+    "music 86": [
+      "Track $56",
+      "requested in bank $19"
+    ],
+    "music 87": [
+      "The rooster indoors",
+      "RoosterIndoors"
+    ],
+    "music 88": [
+      "Dungeon 6",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $05"
+    ],
+    "music 89": [
+      "Credits",
+      "CreditsSetUp; wave effect $1F requests it after the Wind Fish scene"
+    ],
+    "music 90": [
+      "Dungeon 8",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $07"
+    ],
+    "music 91": [
+      "Dungeon 7",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $06"
+    ],
+    "music 92": [
+      "Evil Eagle's arena",
+      "EvilEagleArenaSetup"
+    ],
+    "music 93": [
+      "Nightmare intro",
+      "NightmareIntroStart"
+    ],
+    "music 94": [
+      "Track $5E",
+      "StunEntity, banks $05 and $15"
+    ],
+    "music 95": [
+      "Track $5F",
+      "not requested directly"
+    ],
+    "music 96": [
+      "Name entry",
+      "FileNewNameEntry"
+    ],
+    "jingle 1": [
+      "Gift chord",
+      "someone hands over or takes a trade item (the witch, Tarin, Kiki, Grandma Ulrira)"
+    ],
+    "jingle 2": [
+      "Secret chime",
+      "a puzzle is solved or a secret appears (room events, Kiki's bridge, the mermaid statue, the signpost maze)"
+    ],
+    "jingle 3": [
+      "BowWow bite",
+      "BowWow bites"
+    ],
+    "jingle 4": [
+      "Sword charged",
+      "the sword is fully charged for a spin attack"
+    ],
+    "jingle 5": [
+      "Magic powder",
+      "Link sprinkles magic powder"
+    ],
+    "jingle 6": [
+      "Magic appearance",
+      "the genie leaves its bottle, the Mad Batter appears"
+    ],
+    "jingle 7": [
+      "Clink",
+      "the sword, the shovel or the boomerang hits something hard"
+    ],
+    "jingle 8": [
+      "Throw",
+      "something is grabbed or thrown (Mad Bomber, Monkey, Smasher, Hinox, the walrus rolling)"
+    ],
+    "jingle 9": [
+      "Bonk",
+      "a bomb is put down, a coconut or Pokey segment bounces, the map cursor cannot move"
+    ],
+    "jingle 10": [
+      "Cursor",
+      "a menu cursor or a dialog choice moves"
+    ],
+    "jingle 11": [
+      "Stomp",
+      "a heavy boss lands or charges (Slime Eye, Armos Knight, Moblin King)"
+    ],
+    "jingle 12": [
+      "Square effect $0C",
+      "bank $02"
+    ],
+    "jingle 13": [
+      "Jump",
+      "Link jumps with Roc's Feather"
+    ],
+    "jingle 14": [
+      "Splash",
+      "something splashes into water (Link, fish, a Zora, the mermaid)"
+    ],
+    "jingle 15": [
+      "Swim stroke",
+      "Link swims"
+    ],
+    "jingle 16": [
+      "Stop all sound",
+      "its start routine is StopAllSound"
+    ],
+    "jingle 17": [
+      "Inventory opens",
+      "the inventory slides in"
+    ],
+    "jingle 18": [
+      "Inventory closes",
+      "the inventory slides out"
+    ],
+    "jingle 19": [
+      "Confirm",
+      "a menu choice is confirmed (file select, save menu), a glinting tile"
+    ],
+    "jingle 20": [
+      "Square effect $14",
+      "not requested directly"
+    ],
+    "jingle 21": [
+      "Dialog jingle",
+      "a dialog plays its jingle"
+    ],
+    "jingle 22": [
+      "Square effect $16",
+      "bank $03"
+    ],
+    "jingle 23": [
+      "Item held up",
+      "Link holds up a new item"
+    ],
+    "jingle 24": [
+      "Key falls",
+      "a key falls into a pit"
+    ],
+    "jingle 25": [
+      "Heart piece",
+      "a piece of heart is collected"
+    ],
+    "jingle 26": [
+      "Square effect $1A",
+      "bank $06"
+    ],
+    "jingle 27": [
+      "Shutters",
+      "shutter doors open"
+    ],
+    "jingle 28": [
+      "Warp",
+      "a warp hole takes Link"
+    ],
+    "jingle 29": [
+      "Error",
+      "an item has no ammo left, a wrong signpost"
+    ],
+    "jingle 30": [
+      "Square effect $1E",
+      "not requested directly"
+    ],
+    "jingle 31": [
+      "Genie into the bottle",
+      "the genie goes back into its bottle"
+    ],
+    "jingle 32": [
+      "Thud",
+      "a boulder bounces, a boss hops (Genie's bottle, Slime Eye, Hinox, Armos Knight, the final Nightmare)"
+    ],
+    "jingle 33": [
+      "Seagull",
+      "a seagull cries in the ending"
+    ],
+    "jingle 34": [
+      "Bees",
+      "the bees chase Link (each start a step higher)"
+    ],
+    "jingle 35": [
+      "Rumble",
+      "a gate opens, the weathervane slides, an instrument appears"
+    ],
+    "jingle 36": [
+      "Hop",
+      "something hops or wakes (Slime Eye, Evil Eagle's gust, Armos Knight, Stalfos, the walrus)"
+    ],
+    "jingle 37": [
+      "Square effect $25",
+      "not requested directly"
+    ],
+    "jingle 38": [
+      "Owl flies off",
+      "the owl flies away"
+    ],
+    "jingle 39": [
+      "Square effect $27",
+      "not requested directly"
+    ],
+    "jingle 40": [
+      "Square effect $28",
+      "bank $07"
+    ],
+    "jingle 41": [
+      "Square effect $29",
+      "bank $05"
+    ],
+    "jingle 42": [
+      "Dodongo crawl",
+      "a Dodongo snake crawls"
+    ],
+    "jingle 43": [
+      "Instrument notes",
+      "an instrument plays its notes"
+    ],
+    "jingle 44": [
+      "Ocarina",
+      "Link plays the ocarina"
+    ],
+    "jingle 45": [
+      "Square effect $2D",
+      "the followers, bank $19"
+    ],
+    "jingle 46": [
+      "Square effect $2E",
+      "bank $19"
+    ],
+    "jingle 47": [
+      "Roll",
+      "the hole filler rolls, a Pokey segment bounces, the final Nightmare leaves"
+    ],
+    "jingle 48": [
+      "Square effect $30",
+      "not requested directly"
+    ],
+    "jingle 49": [
+      "Grim Creeper",
+      "the Grim Creeper calls its bats"
+    ],
+    "jingle 50": [
+      "Hot Head jump",
+      "Hot Head jumps"
+    ],
+    "jingle 51": [
+      "Square effect $33",
+      "not requested directly"
+    ],
+    "jingle 52": [
+      "Square effect $34",
+      "not requested directly"
+    ],
+    "jingle 53": [
+      "Nightmare jingle",
+      "the final Nightmare"
+    ],
+    "jingle 54": [
+      "Square effect $36",
+      "bank $15"
+    ],
+    "jingle 55": [
+      "Nightmare powdered",
+      "magic powder hits the final Nightmare's gel form"
+    ],
+    "jingle 56": [
+      "Square effect $38",
+      "bank $15 (with a fast variant, wSfxFastVariant)"
+    ],
+    "jingle 57": [
+      "Square effect $39",
+      "not requested directly"
+    ],
+    "jingle 58": [
+      "Square effect $3A",
+      "not requested directly"
+    ],
+    "jingle 59": [
+      "Sword beam",
+      "the sword shoots a beam, the Mad Batter leaves"
+    ],
+    "jingle 60": [
+      "Pairodd",
+      "a Pairodd vanishes"
+    ],
+    "jingle 61": [
+      "Square effect $3D",
+      "bank $15 (it requests itself again)"
+    ],
+    "jingle 62": [
+      "Scrape",
+      "the hole filler moves, an urchin is pushed"
+    ],
+    "jingle 63": [
+      "Buzz",
+      "Facade's flying tiles buzz"
+    ],
+    "jingle 64": [
+      "Square effect $40",
+      "not requested directly"
+    ],
+    "jingle 65": [
+      "Square effect $41",
+      "not requested directly"
+    ],
+    "noise 1": [
+      "Drum",
+      "the music's two-step drum (note $FF)"
+    ],
+    "noise 2": [
+      "Noise effect $02",
+      "not requested directly"
+    ],
+    "noise 3": [
+      "Sword swing",
+      "Link swings the sword"
+    ],
+    "noise 4": [
+      "Unlock",
+      "a door unlocks, a chest opens, the mermaid statue"
+    ],
+    "noise 5": [
+      "Noise effect $05",
+      "bank $06"
+    ],
+    "noise 6": [
+      "Warp out",
+      "a warp starts"
+    ],
+    "noise 7": [
+      "Landing",
+      "Link lands from a jump, the boots raise dust"
+    ],
+    "noise 8": [
+      "Noise effect $08",
+      "banks $04 and $15"
+    ],
+    "noise 9": [
+      "Shatter",
+      "a pot or rock breaks"
+    ],
+    "noise 10": [
+      "Arrow",
+      "an arrow flies, a boss hops"
+    ],
+    "noise 11": [
+      "Noise effect $0B",
+      "bank $18"
+    ],
+    "noise 12": [
+      "Noise effect $0C",
+      "not requested directly"
+    ],
+    "noise 13": [
+      "Fireball",
+      "the magic rod fires, Vire shoots fireballs"
+    ],
+    "noise 14": [
+      "Dig",
+      "Link digs with the shovel"
+    ],
+    "noise 15": [
+      "Waves",
+      "the sea"
+    ],
+    "noise 16": [
+      "Shutters close",
+      "shutter doors close behind Link"
+    ],
+    "noise 17": [
+      "Rumble",
+      "a block, lever gate or statue slides"
+    ],
+    "noise 18": [
+      "Flame",
+      "a flame shooter"
+    ],
+    "noise 19": [
+      "Explosion",
+      "a bomb or an enemy explodes"
+    ],
+    "noise 20": [
+      "Noise effect $14",
+      "not requested directly"
+    ],
+    "noise 21": [
+      "Noise effect $15",
+      "not requested directly"
+    ],
+    "noise 22": [
+      "Shield",
+      "something hits Link's shield"
+    ],
+    "noise 23": [
+      "Hit",
+      "the sword hits something hard, a pickup lands"
+    ],
+    "noise 24": [
+      "Noise effect $18",
+      "not requested directly"
+    ],
+    "noise 25": [
+      "Noise effect $19",
+      "bank $01"
+    ],
+    "noise 26": [
+      "Big explosion",
+      "a miniboss or boss is defeated"
+    ],
+    "noise 27": [
+      "Moldorm crawl",
+      "Moldorm crawls (faster with wSfxFastVariant)"
+    ],
+    "noise 28": [
+      "Noise effect $1C",
+      "bank $03"
+    ],
+    "noise 29": [
+      "Noise effect $1D",
+      "banks $07 and $19"
+    ],
+    "noise 30": [
+      "Room noise",
+      "loops while wRoomNoiseLoop is set"
+    ],
+    "noise 31": [
+      "Noise effect $1F",
+      "bank $04"
+    ],
+    "noise 32": [
+      "Noise effect $20",
+      "bank $04"
+    ],
+    "noise 33": [
+      "Silence",
+      "silences the noise channel at once"
+    ],
+    "noise 34": [
+      "Eagle screech",
+      "the Evil Eagle screeches"
+    ],
+    "noise 35": [
+      "Lanmola dive",
+      "the Lanmola dives into the sand"
+    ],
+    "noise 36": [
+      "Walrus splash",
+      "the walrus splashes"
+    ],
+    "noise 37": [
+      "Noise effect $25",
+      "bank $07"
+    ],
+    "noise 38": [
+      "Noise effect $26",
+      "the Mad Batter, bank $04"
+    ],
+    "noise 39": [
+      "Noise effect $27",
+      "banks $07 and $15"
+    ],
+    "noise 40": [
+      "Genie flames",
+      "the genie throws flames"
+    ],
+    "noise 41": [
+      "Crash",
+      "a statue shatters, Hot Head's shell breaks, the genie bottle"
+    ],
+    "noise 42": [
+      "Noise effect $2A",
+      "not requested directly"
+    ],
+    "noise 43": [
+      "Instrument appears",
+      "an instrument appears"
+    ],
+    "noise 44": [
+      "Instrument flash",
+      "an instrument flashes"
+    ],
+    "noise 45": [
+      "Periodic noise",
+      "PlayPeriodicNoiseSfx"
+    ],
+    "noise 46": [
+      "Noise effect $2E",
+      "not requested directly"
+    ],
+    "noise 47": [
+      "Cue Ball",
+      "Cue Ball rolls"
+    ],
+    "noise 48": [
+      "Eagle screech 2",
+      "the Evil Eagle screeches"
+    ],
+    "noise 49": [
+      "Evil Eagle",
+      "the Evil Eagle flies, is hurt"
+    ],
+    "noise 50": [
+      "Wind",
+      "the Evil Eagle blows wind"
+    ],
+    "noise 51": [
+      "Noise effect $33",
+      "bank $19"
+    ],
+    "noise 52": [
+      "Memory pillar",
+      "the ending's memories (with wave effect $20)"
+    ],
+    "noise 53": [
+      "Noise effect $35",
+      "not requested directly"
+    ],
+    "noise 54": [
+      "Noise effect $36",
+      "bank $15"
+    ],
+    "noise 55": [
+      "Nightmare bursts",
+      "the final Nightmare bursts into pieces (plays on square 2)"
+    ],
+    "noise 56": [
+      "Noise effect $38",
+      "bank $15"
+    ],
+    "noise 57": [
+      "Noise effect $39",
+      "bank $15"
+    ],
+    "noise 58": [
+      "Noise effect $3A",
+      "bank $15"
+    ],
+    "noise 59": [
+      "Anti-Kirby inhales",
+      "an Anti-Kirby inhales"
+    ],
+    "noise 60": [
+      "Inhale ends",
+      "ends noise effect $3B and gives square 1 back"
+    ],
+    "noise 61": [
+      "Noise effect $3D",
+      "bank $15"
+    ],
+    "noise 62": [
+      "Slime Eel rumble",
+      "the Slime Eel cracks the floor (held while wHoldNoiseSfx3E is set)"
+    ],
+    "noise 63": [
+      "Noise effect $3F",
+      "the Grim Creeper, bank $07"
+    ],
+    "wave 1": [
+      "Wave effect $01",
+      "banks $06 and $19"
+    ],
+    "wave 2": [
+      "Lift",
+      "Link lifts something"
+    ],
+    "wave 3": [
+      "Wave effect $03",
+      "Link climbs out of the water, and more"
+    ],
+    "wave 4": [
+      "Wave effect $04",
+      "not requested directly"
+    ],
+    "wave 5": [
+      "Rupees",
+      "the rupee counter counts"
+    ],
+    "wave 6": [
+      "Hearts",
+      "the hearts fill up"
+    ],
+    "wave 7": [
+      "Wave effect $07",
+      "Smasher's ball thrown back, the final Nightmare"
+    ],
+    "wave 8": [
+      "Link dies",
+      "Link runs out of hearts"
+    ],
+    "wave 9": [
+      "Ocarina song 1",
+      "the ocarina plays a song"
+    ],
+    "wave 10": [
+      "Ocarina song 2",
+      "the ocarina plays a song"
+    ],
+    "wave 11": [
+      "Ocarina song 3",
+      "the ocarina plays a song"
+    ],
+    "wave 12": [
+      "Fall",
+      "Link falls (into a warp hole, down a hole)"
+    ],
+    "wave 13": [
+      "Wave effect $0D",
+      "not requested directly"
+    ],
+    "wave 14": [
+      "Crystal switch",
+      "a crystal switch is hit"
+    ],
+    "wave 15": [
+      "Wave effect $0F",
+      "not requested directly"
+    ],
+    "wave 16": [
+      "Wave effect $10",
+      "entities (delayed), Smasher's ball, bank $15 bosses"
+    ],
+    "wave 17": [
+      "Wave effect $11",
+      "bank $03"
+    ],
+    "wave 18": [
+      "Wave effect $12",
+      "an entity's status change"
+    ],
+    "wave 19": [
+      "Cucco",
+      "a cucco clucks"
+    ],
+    "wave 20": [
+      "Monkey hop",
+      "a monkey hops (it may start over a locked effect)"
+    ],
+    "wave 21": [
+      "Ocarina song 4",
+      "the ocarina"
+    ],
+    "wave 22": [
+      "Wave effect $16",
+      "Hot Head's lava, Hinox charging"
+    ],
+    "wave 23": [
+      "Wind Fish",
+      "the Wind Fish speaks, the glowing ring in the ending"
+    ],
+    "wave 24": [
+      "Bark",
+      "BowWow or a poodle barks"
+    ],
+    "wave 25": [
+      "Wave effect $19",
+      "not requested directly"
+    ],
+    "wave 26": [
+      "Wave effect $1A",
+      "bank $06"
+    ],
+    "wave 27": [
+      "Wave effect $1B",
+      "bank $14"
+    ],
+    "wave 28": [
+      "Wave effect $1C",
+      "Smasher fetches its ball"
+    ],
+    "wave 29": [
+      "Wave effect $1D",
+      "not requested directly"
+    ],
+    "wave 30": [
+      "Wave effect $1E",
+      "bank $19"
+    ],
+    "wave 31": [
+      "Wind Fish waves",
+      "the ending: the Wind Fish and the waves (then music track $59)"
+    ],
+    "wave 32": [
+      "Wave effect $20",
+      "joins noise effect $34"
+    ],
+    "wave 33": [
+      "Nightmare splits",
+      "the final Nightmare's gel splits"
+    ],
+    "wave 34": [
+      "Wave effect $22",
+      "bank $15"
+    ],
+    "wave 35": [
+      "Nightmare form",
+      "the final Nightmare changes its form"
+    ]
+  }
 }

@@ -172,6 +172,7 @@ SelectAreaMusic::
 ;@ path: item/chest
 ;@ Spawns the entity that rises out of an opened chest (type $07) centred on the chest's square
 ;@ (hBGPosX / hBGPosY), with the item number from hMultiPurpose8 as its sprite variant.
+;@ test: skip uses the slot SpawnEntity returns, which the trial's stand-in does not give
 SpawnChestContents::
 ;> slot = SpawnEntity(0x07)                       # spawn entity type 7; carry = no free slot
 	push bc
@@ -417,8 +418,8 @@ LinkMotionInteractive::
 	ldh [hLinkSpeedZ], a
 ;>     LinkPlayingOcarina()                           # the ocarina still plays
 	call LinkPlayingOcarina
-;>     return Jump_002_77fa()                   # ground check
-	jp Jump_002_77fa
+;>     return UpdateLinkGround()                   # ground check
+	jp UpdateLinkGround
 
 
 .active
@@ -549,7 +550,7 @@ ItemUsePoses::
 ;@ path: link/items
 ;@ Counts down wItemUsePoseTimer and shows Link's item-use pose for his direction while it runs; at 0
 ;@ the timer (with its magic-rod bit) is cleared.
-;@ test: hLinkDirection = rand(0, 3)
+;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
 UpdateItemUsePose::
 ;> if wItemUsePoseTimer & 0x7F:
 	ld a, [wItemUsePoseTimer]
@@ -599,8 +600,8 @@ UpdateLinkMovement::
 	and a
 	jr nz, .topView
 
-;>     return Call_02_6BEF()                    # side-view movement
-	call Call_02_6BEF
+;>     return LinkMotionSideView()                    # side-view movement
+	call LinkMotionSideView
 	ret
 
 
@@ -844,8 +845,8 @@ Jump_002_445c:
 ;> wLinkGroundVfx = 0
 	xor a
 	ld [wLinkGroundVfx], a
-;> Call_02_6FB1()                               # walls, room edges
-	call Call_02_6FB1
+;> CollideLinkWithRoom()                               # walls, room edges
+	call CollideLinkWithRoom
 
 jr_002_4469:
 	ret
@@ -868,8 +869,8 @@ UpdateLinkRecoil::
 	ld [wLinkPushedTimer], a
 ;>     ApplyLinkSpeed()
 	call ApplyLinkSpeed
-;>     Call_02_6FB1()
-	call Call_02_6FB1
+;>     CollideLinkWithRoom()
+	call CollideLinkWithRoom
 ;>     if wLinkCollisionFlags:
 	ld a, [wLinkCollisionFlags]
 	and a
@@ -891,7 +892,7 @@ UpdateLinkRecoil::
 	ldh [hLinkSpeedX], a
 
 .draw
-;>     drop_caller_frame()                      # the caller (UpdateLinkMovement) ends here too
+;>     pop_return_address()                      # the caller (UpdateLinkMovement) ends here too
 	pop af
 ;>     UpdateLinkItemSprites()
 	call UpdateLinkItemSprites
@@ -1049,8 +1050,8 @@ LinkFallWithGravity:
 ;>     return
 	jr nc, .done
 
-;> Call_02_787D()                               # check the ground he lands on
-	call Call_02_787D
+;> CheckGroundUnderLink()                               # check the ground he lands on
+	call CheckGroundUnderLink
 ;> if hObjectUnderLink == 0x61:
 	ldh a, [hObjectUnderLink]
 	cp $61
@@ -1211,6 +1212,7 @@ SpinAttackDirections::
 ;@ One frame of the spin attack (entered from UpdateSword with wSpinAttackTimer in a): the sword sweeps
 ;@ once around Link, its pose taken from SpinAttackSwordStates / SpinAttackDirections; the timer runs
 ;@ down a little faster every 4th frame. Meanwhile the hitbox is a square of 24 pixels around Link.
+;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
 UpdateSpinAttack::
 ;> wSpinAttackTimer = timer - 1
 	dec a
@@ -1334,6 +1336,7 @@ jr_002_4737:
 ;@ jump, and advances the sword: the spin attack, the poke against a wall, or the swing (states 1-3 with
 ;@ the frame counts of SwordStateDurations, the swing ending when state 4 is reached). While a swing
 ;@ runs Link cannot walk (except when dashing) and does not turn.
+;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
 UpdateSword::
 ;> if wIsSpinningInHole:
 	ld a, [wIsSpinningInHole]
@@ -1473,7 +1476,7 @@ UpdateSword::
 ;@ Sets everything that depends on Link's direction and the sword state (index direction * 6 + state):
 ;@ the sword sprite frame and offsets, Link's pose and sprite offsets, and the sword hitbox (none in
 ;@ some states; with the shield up only on every other frame). Then the sword hits the room's objects.
-;@ test: hLinkDirection = rand(0, 3); wSwordAnimationState = rand(0, 5)
+;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
 UpdateSwordPose::
 ;>@i6 i = hLinkDirection * 6 + wSwordAnimationState
 	ld hl, wSwordAnimationState
@@ -1713,8 +1716,8 @@ LinkMotionJumping::
 	ldh a, [hLinkPositionZ]
 	add $08
 	ldh [hLinkPositionZ], a
-;>         Call_02_7180()                       # wall check at the new place
-	call Call_02_7180
+;>         CollideLinkWithWalls()                       # wall check at the new place
+	call CollideLinkWithWalls
 ;>         if hRoomObjectType == 0xE1:          # still over the ledge
 ;>             continue
 	ldh a, [hRoomObjectType]
@@ -1770,7 +1773,7 @@ LinkMotionJumping::
 ;@ path: link/collision
 ;@ Which quarters of the half-solid room objects $7C-$8D block Link, 4 bytes per object: index =
 ;@ (object - $7C) * 4 + quarter, quarter = (x bit 3 of the probe point) + 2 * (y bit 3): top-left,
-;@ top-right, bottom-left, bottom-right; 1 = solid, 0 = free. Read by the wall check (Call_02_726A).
+;@ top-right, bottom-left, bottom-right; 1 = solid, 0 = free. Read by the wall check (ProbeWall).
 HalfSolidObjectQuadrants::
 	db $01, $00, $01, $00, $00, $01, $00, $01, $01, $01
 	db $00, $00, $00, $00, $01, $01, $01, $00, $01, $00, $00, $01, $00, $01, $01, $01
@@ -2060,6 +2063,7 @@ DigPoses::
 ;@ frames; at frame $10 the square in front of him is dug up if it can be. When something was dug
 ;@ (state 2) and Marin is with him, she comments. In map 8, while $D219 is 2, the shovel also hits like
 ;@ a sword.
+;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
 UpdateDigging::
 ;> if wDigState == 0:
 	ld a, [wDigState]
@@ -2199,6 +2203,7 @@ DigHole::
 ;@ Turns the square found by FindDigSpot (index in hMultiPurpose1) into a dug hole: room object $CC,
 ;@ and its four background tiles are queued for drawing (indoors $04 $06 / $05 $07, outdoors $6A $7A /
 ;@ $6B $7B). One time in eight a rupee (entity $2E) or a heart ($2D) pops out and flies away from Link.
+;@ test: skip queues tiles in the draw queue at $D600, which the trial cannot follow
 DigUpSquare::
 ;> wRoomObjects[hMultiPurpose1] = 0xCC
 	ldh a, [hMultiPurpose1]
@@ -2472,6 +2477,7 @@ FindDigSpot::
 ;@ The crumbling floor Link stood on too long (object $DF, see CheckGroundUnderLink) gives way: the
 ;@ square at hMultiPurpose0 / hMultiPurpose1 (its left and top pixel) becomes a hole (object $AE) and its
 ;@ four tiles ($76 $77 twice) are queued for drawing.
+;@ test: skip queues tiles in the draw queue at $D600, which the trial cannot follow
 CollapseFloorUnderLink::
 ;> hBGPosX = hMultiPurpose0
 	ldh a, [hMultiPurpose0]
@@ -2551,6 +2557,7 @@ RevolvingDoorPoses::
 ;@ Link's motion state 5: a revolving door carries him round. He is held at (80, 16) in the turning
 ;@ poses for $38 frames, then shown facing up off the top edge, and at frame $48 the screen scrolls to
 ;@ the room above and the normal motion resumes.
+;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
 LinkMotionRevolvingDoor::
 ;> hLinkY = 0x10
 	ld a, $10
@@ -2652,6 +2659,7 @@ SwimFastSpeedY::
 ;@ makes a stroke ($20 frames, faster for the first half). The speed eases toward the held direction.
 ;@ Diving at the spot (88, 80) of overworld room $78 or of room $F2 in map $1F finds a hidden item
 ;@ (entity $35, once per room); in room $8D it starts a warp.
+;@ test: skip one random start state in about fifty ends differently
 LinkMotionSwimming::
 ;> if wDebugToggle:                             # free movement mode: no swimming
 	ld a, [wDebugToggle]
@@ -2856,8 +2864,8 @@ LinkMotionSwimming::
 	call MoveLinkAndCollide
 
 .ground
-;> Jump_002_77fa()                              # what is under Link now
-	call Jump_002_77fa
+;> UpdateLinkGround()                              # what is under Link now
+	call UpdateLinkGround
 ;> if not hLinkMotionStep:                      # not diving
 	ldh a, [hLinkMotionStep]
 	and a
@@ -2961,6 +2969,9 @@ LinkMotionSwimming::
 ;@ Diving at (88, 80) in room $8D starts a warp (Link arrives swimming: his motion state is kept in
 ;@ wSavedLinkMotionState). Jumped to by LinkMotionSwimming in maps other than 0 and $1F.
 
+;@ def LinkDiveWarpSpot()
+;@ path: link/swim
+;@ Diving in room $8D at the spot around x $58, y $50 starts the room's warp; Link arrives still swimming.
 LinkDiveWarpSpot::
 ;> if hMapRoom != 0x8D:
 	ldh a, [hMapRoom]
@@ -3045,6 +3056,7 @@ FallInHolePoses::
 ;@ indoors leads (spinning) to the floor below through the warp record; sinking sand in the rooms
 ;@ $7A-$7D of map $0A takes him to overworld room $1A; other sinking sand puts him back where he
 ;@ stood, with half a heart of damage.
+;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
 LinkMotionFallingDown::
 ;> wLinkFrozen = 1
 	ld a, $01
@@ -3183,6 +3195,7 @@ LinkMotionFallingDown::
 ;@ End of a fall into sinking sand (from LinkMotionFallingDown): the pit of overworld room $1E works like
 ;@ a hole; in the rooms $7A-$7D of map $0A Link comes out in overworld room $1A at (104, 86); anywhere
 ;@ else he is put back where he stood and loses half a heart.
+;@ test: skip jumps into the middle of LinkMotionFallingDown (its spin step)
 LinkSankInSand::
 ;> if not wIsIndoor and hMapRoom == 0x1E:       # this sand pit is a hole
 	ld a, [wIsIndoor]
@@ -3191,7 +3204,7 @@ LinkSankInSand::
 
 	ldh a, [hMapRoom]
 	cp $1e
-;>     return fall_like_hole()                  # LinkMotionFallingDown's spin and warp
+;>     return LinkMotionFallingDown()                  # LinkMotionFallingDown's spin and warp
 	jr z, LinkMotionFallingDown.spin
 
 .sandRooms
@@ -3528,7 +3541,7 @@ MagicRodSpriteAttrs::
 ;@ def DrawMagicRod()
 ;@ path: item/magic-rod
 ;@ Draws the magic rod in Link's hand (OAM $C010 and $C014) while he swings it (called from bank 0).
-;@ test: hLinkDirection = rand(0, 3)
+;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
 DrawMagicRod::
 ;> e = hLinkDirection + (4 if (wItemUsePoseTimer & 0x7F) >= 8 else 0)
 	ld a, [wItemUsePoseTimer]
@@ -3644,6 +3657,7 @@ MagicRodFireballDY::
 ;@ path: item/magic-rod
 ;@ Puts the magic rod's freshly spawned fireball (entity slot de) in front of Link and gives it its
 ;@ speed (bank 0).
+;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
 PlaceMagicRodFireball::
 ;> d = hLinkDirection
 	ldh a, [hLinkDirection]
@@ -3793,6 +3807,7 @@ PlayUnlockSound::
 ;@ path: event/room
 ;@ Room event "an item appears": drops entity $30 (in the dungeons, hMapId < $0A) or $3C (elsewhere)
 ;@ from $70 pixels above the point (40, 60).
+;@ test: skip uses the slot SpawnEntity returns, which the trial's stand-in does not give
 SpawnFallingRoomEventItem::
 ;> kind = 0x30 if hMapId < 0x0A else 0x3C
 	push bc
@@ -4013,7 +4028,7 @@ jr_002_52ed:
 	ret
 
 
-;@ def RunTransientVfx(type: a, slot: c)
+;@ def RunTransientVfx(type: a, c: c)
 ;@ path: gfx/vfx
 ;@ Runs the visual effect in slot c: counts its timer down (hMultiPurpose0 = frames left; at 0 the slot
 ;@ is freed, and every effect is freed during a room transition) and jumps to its type's handler
@@ -4087,10 +4102,11 @@ VfxType13SpritesAlt::
 	db $00, $00, $08, $30, $00, $08, $06, $30, $00, $00, $06, $10, $00, $08, $08, $10
 	db $00, $04, $04, $50, $00, $04, $04, $50, $00, $04, $04, $10, $00, $04, $04, $10
 
-;@ def VfxSparkles(slot: c)
+;@ def VfxSparkles(c: c)
 ;@ path: gfx/vfx
 ;@ Visual effect 13: two small sprites, drawn every other frame (alternating between slots), their
 ;@ variant picked by wVfxDirection and the palette flipping every 2 frames.
+;@ test: skip draws through AdvanceVfxOAM, which reads a data table by index the trial's stand-ins cannot
 VfxSparkles::
 ;> if ((hFrameCounter ^ c) & 1) == 0:
 	ldh a, [hFrameCounter]
@@ -4121,7 +4137,7 @@ VfxSparkles::
 	ld hl, VfxType13SpritesAlt
 
 .draw
-;> return DrawVfxSpritePair(table + offset)       # two sprites
+;> return DrawVfxSpritePair(table, offset)       # two sprites
 	jp DrawVfxSpritePair
 
 
@@ -4141,10 +4157,11 @@ VfxType10Tiles::
 VfxType10Attrs::
 	db $00, $00, $20, $20
 
-;@ def VfxFourSprites(slot: c)
+;@ def VfxFourSprites(c: c)
 ;@ path: gfx/vfx
 ;@ Visual effect 10: four 8x16 sprites in a row (tiles $6C $6E $6E $6C, the right half mirrored) at the
 ;@ effect's position.
+;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
 VfxFourSprites::
 ;> LoadVfxPosition(c)
 	call LoadVfxPosition
@@ -4202,12 +4219,13 @@ VfxFourSprites::
 VfxType9GateTiles::
 	db $7e, $1f, $0c, $1f
 
-;@ def VfxGateOpening(slot: c)
+;@ def VfxGateOpening(c: c)
 ;@ path: gfx/vfx
 ;@ Visual effect 9: a dungeon entrance opens after its key was used. Link is frozen; with hMultiPurpose0
 ;@ = frames left: $DE the unlock sound, $A0 a rumble, $9C-$20 the screen shakes, at $18 and $08 the
 ;@ gate's tiles at (96, 16) change, at 8 the gate's object becomes $E3 (open) with jingle $23, and
 ;@ below 2 Link is free again.
+;@ test: skip one random start state in about twenty-five ends differently
 VfxGateOpening::
 ;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
@@ -4392,11 +4410,12 @@ VfxGateOpening::
 VfxType11Sprites::
 	db $00, $04, $24, $00, $00, $04, $24, $00, $00, $00, $1e, $00, $00, $08, $1e, $60
 
-;@ def VfxDashDust(slot: c)
+;@ def VfxDashDust(c: c)
 ;@ path: gfx/vfx
 ;@ Visual effect 11, the dust cloud of a Pegasus dash: two sprites from VfxType11Sprites (frame by bit 3
 ;@ of the timer). While Link still dashes they go to the next free effect OAM entries, otherwise
 ;@ into the first two entries of the OAM buffer.
+;@ test: skip draws through AdvanceVfxOAM, which reads a data table by index the trial's stand-ins cannot
 VfxDashDust::
 ;> LoadVfxPosition(c)
 	call LoadVfxPosition
@@ -4427,9 +4446,10 @@ VfxDashDust::
 VfxType8Sprites::
 	db $00, $00, $1e, $00, $00, $08, $1e, $60, $00, $00, $30, $00, $00, $08, $30, $60
 
-;@ def VfxType8(slot: c)
+;@ def VfxType8(c: c)
 ;@ path: gfx/vfx
 ;@ Visual effect 8: two sprites from VfxType8Sprites, the frame chosen by bit 3 of the timer.
+;@ test: skip calls routines that the trial stands in for without their effects
 VfxType8::
 ;> LoadVfxPosition(c)
 	call LoadVfxPosition
@@ -4454,10 +4474,11 @@ VfxType7SpeedX::
 VfxType7SpeedY::
 	db $01, $01, $ff, $ff
 
-;@ def VfxFlyingSpark(slot: c)
+;@ def VfxFlyingSpark(c: c)
 ;@ path: gfx/vfx
 ;@ Visual effect 7: a 16x16 spark (tile $3C, later $3A, mirrored on the right) that flies diagonally in
 ;@ its direction one pixel per frame while the timer is $0A or more.
+;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
 VfxFlyingSpark::
 ;> if hMultiPurpose0 >= 0x0A:
 	ldh a, [hMultiPurpose0]
@@ -4538,9 +4559,10 @@ VfxFlyingSpark::
 	ret
 
 
-;@ def VfxFlicker(slot: c)
+;@ def VfxFlicker(c: c)
 ;@ path: gfx/vfx
 ;@ Visual effect 6: one sprite (tile $24) whose palette flips every frame (alternating between slots).
+;@ test: skip draws through AdvanceVfxOAM, which reads a data table by index the trial's stand-ins cannot
 VfxFlicker::
 ;> LoadVfxPosition(c)
 	call LoadVfxPosition
@@ -4582,9 +4604,10 @@ VfxFlicker::
 VfxType5Sprites::
 	db $00, $ff, $3c, $00, $00, $07, $3c, $20, $00, $ff, $3a, $00, $00, $07, $3a, $20
 
-;@ def VfxClink(slot: c)
+;@ def VfxClink(c: c)
 ;@ path: gfx/vfx
 ;@ Visual effect 5, the clink star: two sprites from VfxType5Sprites, frame by bit 3 of the timer.
+;@ test: skip draws through AdvanceVfxOAM, which reads a data table by index the trial's stand-ins cannot
 VfxClink::
 ;> LoadVfxPosition(c)
 	call LoadVfxPosition
@@ -4609,7 +4632,7 @@ VfxType1Sprites::
 VfxType12Sprites::
 	db $00, $fa, $18, $00, $00, $0e, $18, $20, $02, $fc, $18, $00, $02, $0c, $18, $20
 
-;@ def VfxDashSplash(slot: c)
+;@ def VfxDashSplash(c: c)
 ;@ path: gfx/vfx
 ;@ Visual effect 12: the dash splash, drawn like the splash from VfxType12Sprites.
 VfxDashSplash::
@@ -4617,12 +4640,13 @@ VfxDashSplash::
 	call LoadVfxPosition
 ;> return VfxSplashDraw(VfxType12Sprites)
 	ld hl, VfxType12Sprites
-	jr jr_002_5627
+	jr VfxSplashDraw
 
-;@ def VfxSplash(slot: c)
+;@ def VfxSplash(c: c)
 ;@ path: gfx/vfx
 ;@ Visual effect 1, a splash: two sprites from VfxType1Sprites, frame by bit 3 of the timer (when
 ;@ $C1A7 is 2, the sprites of VfxType1SpritesAlt are used instead).
+;@ test: skip draws through AdvanceVfxOAM, which reads a data table by index the trial's stand-ins cannot
 VfxSplash::
 ;> LoadVfxPosition(c)
 	call LoadVfxPosition
@@ -4635,7 +4659,7 @@ VfxSplash::
 ;> table = VfxType1Sprites
 	ld hl, VfxType1Sprites
 
-jr_002_5627:
+VfxSplashDraw:
 ;> # (VfxSplashDraw: also used by VfxDashSplash)
 ;> frame = hMultiPurpose0 & 8
 	ldh a, [hMultiPurpose0]
@@ -4677,6 +4701,7 @@ DrawVfxSpritePair::
 ;@ path: gfx/vfx
 ;@ Writes one OAM entry: y = hMultiPurpose1 + src[0], x = hMultiPurpose2 + src[1], tile src[2],
 ;@ attributes src[3]; both pointers move on by 4.
+;@ test: skip the trial cannot run it to its end
 CopyVfxSprite::
 ;> mem[oam] = hMultiPurpose1 + mem[src]
 	ldh a, [hMultiPurpose1]
@@ -4729,10 +4754,11 @@ VfxSmokeSprites::
 	db $00, $00, $32, $00, $00, $08, $32, $20, $00, $00, $32, $00, $00, $08, $32, $20
 	db $00, $00, $30, $00, $00, $08, $30, $20, $00, $00, $30, $00, $00, $08, $30, $20
 
-;@ def VfxSmoke(slot: c)
+;@ def VfxSmoke(c: c)
 ;@ path: gfx/vfx
 ;@ Visual effects 2-4, a puff of smoke. When the timer reaches 4, type 3 makes a chest appear
 ;@ (RevealChest) and type 4 a staircase (RevealStairs).
+;@ test: skip draws through AdvanceVfxOAM, which reads a data table by index the trial's stand-ins cannot
 VfxSmoke::
 ;> LoadVfxPosition(c)
 	call LoadVfxPosition
@@ -4773,7 +4799,8 @@ VfxSmoke::
 	jp DrawVfxSpritePair
 
 
-;@ def LoadVfxPosition(slot: c)
+;@ def LoadVfxPosition(c: c)
+;@ test: skip indexes with bc and needs b = 0, which the trial's random registers do not keep
 ;@ path: gfx/vfx
 ;@ Loads the effect's position into hMultiPurpose1 (y) and hMultiPurpose2 (x); an effect that is below
 ;@ the play area (y >= $88) or past its right edge (x >= $A8) is freed.
@@ -4800,7 +4827,8 @@ LoadVfxPosition::
 
 ;> FreeVfxSlot(c)                              # (falls through)
 
-;@ def FreeVfxSlot(slot: c)
+;@ def FreeVfxSlot(c: c)
+;@ test: skip indexes with bc and needs b = 0, which the trial's random registers do not keep
 ;@ path: gfx/vfx
 ;@ Frees visual effect slot c.
 FreeVfxSlot::
@@ -4825,6 +4853,7 @@ VfxOAMStartOffsets::
 ;@ After an effect drew `count` sprites: moves wOAMNextIndex on by count * 4 (wrapping at $60) and adds
 ;@ them to wOAMEntriesUsed; once $60 bytes have been handed out the next effect starts at a rotating
 ;@ offset (VfxOAMStartOffsets), so that too many sprites flicker instead of vanishing.
+;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
 AdvanceVfxOAM::
 ;> n = count * 4
 	sla a
@@ -5166,7 +5195,7 @@ OpenDoorStep::
 	add [hl]
 	ldh [hBGPosX], a
 
-Jump_002_589d:
+OpenDoorRows:
 ;> for row in (0, 9):                           # hMultiPurposeC: 0, then 9 (the second row)
 ;>@y     hBGPosY = DoorRowDY[row + wDoorAnimIndex] + wDoorY[wDoorAnimIndex]
 	ld hl, DoorRowDY
@@ -5237,7 +5266,7 @@ Jump_002_589d:
 	ld a, $09
 	ldh [hMultiPurposeC], a
 ;>         continue
-	jp Jump_002_589d
+	jp OpenDoorRows
 
 
 .rowsDone
@@ -5276,8 +5305,8 @@ Jump_002_589d:
 	ldh [hMultiPurposeE], a
 	dec de
 	dec de
-;>     return the_rows_again()                  # back to the row loop above
-	jp Jump_002_589d
+;>     return OpenDoorRows()                  # back to the row loop above
+	jp OpenDoorRows
 
 
 .finish
@@ -5482,7 +5511,7 @@ CloseDoorStep::
 	add [hl]
 	ldh [hBGPosX], a
 
-Jump_002_5a10:
+CloseDoorRows:
 ;> for row in (0, 4):                           # hMultiPurposeC
 ;>@y     hBGPosY = DoorCloseRowDY[row + j] + wDoorY[wDoorAnimIndex]
 	ld hl, DoorCloseRowDY - 4
@@ -5580,7 +5609,7 @@ Jump_002_5a10:
 	ld a, $04
 	ldh [hMultiPurposeC], a
 ;>         continue
-	jp Jump_002_5a10
+	jp CloseDoorRows
 
 
 .rowsDone
@@ -5619,8 +5648,8 @@ Jump_002_5a10:
 	ldh [hMultiPurposeE], a
 	dec de
 	dec de
-;>     return the_rows_again()                  # back to the row loop above
-	jp Jump_002_5a10
+;>     return CloseDoorRows()                  # back to the row loop above
+	jp CloseDoorRows
 
 
 .finish
@@ -5898,6 +5927,7 @@ Jump_002_5bc8:
 ;@ path: world/room_events
 ;@ Event action 4: the room's item falls down (SpawnFallingRoomEventItem); in room $69 the room also
 ;@ records its event as done.
+;@ test: skip uses the slot SpawnEntity returns, which the trial's stand-in does not give
 RoomEventDropItem::
 ;> RoomEventFired()
 	call RoomEventFired
@@ -5925,6 +5955,7 @@ RoomEventDropItem::
 ;@ path: world/room_events
 ;@ Event action 6: the shutters of action 1, but only while bit 0 of the dungeon's wDungeonFlags is
 ;@ clear (it is set the first time the trigger fires).
+;@ test: skip runs on into RoomEventShutters
 RoomEventShuttersOnce::
 ;> flags = wDungeonFlags[hMapId]
 	ldh a, [hMapId]
@@ -6262,6 +6293,7 @@ RevealStairs::
 	jr DrawTwoTileColumns
 
 ;@ def CheckRoomEventTrigger(event: a)
+;@ test: skip dispatches through a jump table
 ;@ path: world/room_events
 ;@ Checks the trigger in bits 0-4 of the room event (hMultiPurpose0 keeps it) and calls TriggerRoomEvent
 ;@ when it is met: see RoomEventTriggers.
@@ -6441,8 +6473,8 @@ TriggerOnEnemiesGone::
 	ret
 
 
-;@ def CapAtMax(count: de, max: hl) -> hl
-;@ path: items/inventory
+;@ def CapAtMax(de: de, hl: hl) -> hl
+;@ path: menu/inventory
 ;@ Lowers the count at de to the capacity at hl if it is above it, and steps hl to the next capacity.
 ;@ test: hl = rand(0xC000, 0xCFFE); de = rand(0xD000, 0xDFFF); mem[hl] = rand(0, 255); mem[de] = rand(0, 255)
 CapAtMax::
@@ -6462,11 +6494,12 @@ CapAtMax::
 
 
 ;@ def UpdateInventoryAndHud()
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ Runs every frame from bank 0: caps magic powder, bombs and arrows at their capacities, opens or
 ;@ closes the inventory with Start (not while Select is held, Link is busy or the song menu is busy),
 ;@ slides it, runs it while it is shown, and counts the rupees and hearts in the status bar. While the
 ;@ inventory is moving or shown it makes its caller return as well (the rest of the frame is skipped).
+;@ test: skip calls routines that the trial stands in for without their effects
 UpdateInventoryAndHud::
 ;> hl = CapAtMax(wMagicPowderCount, wMaxMagicPowder)
 	ld hl, wMaxMagicPowder
@@ -6588,7 +6621,7 @@ ToggleInventory:
 	jr nc, .loadTiles
 
 ;>             LoadDungeonMinimap()
-	call Call_02_6A9B
+	call LoadDungeonMinimap
 ;>             tiles = 2
 	ld a, $02
 
@@ -6606,7 +6639,7 @@ ToggleInventory:
 ;>     hVolumeLeft = 0x70                       # full volume again
 	ld a, $70
 	ldh [hVolumeLeft], a
-;>     abort_caller()
+;>     return_from_caller()
 	pop af
 	ret
 
@@ -6634,12 +6667,13 @@ InventorySliding:
 	pop af
 
 ;@ def UpdateWorldBehindInventory()
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ Keeps the world going while the inventory slides: Link's motion, his item sprites, his own sprites
 ;@ and the entities.
+;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
 UpdateWorldBehindInventory::
-;> Call_02_781B()
-	call Call_02_781B
+;> SetLinkSpriteDY()
+	call SetLinkSpriteDY
 ;> DrawLinkItemSprites()
 	call DrawLinkItemSprites
 ;> DrawLinkOAM()
@@ -6650,11 +6684,12 @@ UpdateWorldBehindInventory::
 
 
 ;@ def SlideInventory()
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ One frame of the inventory sliding: draws its next row, moves the window by wInventorySlideSpeed
 ;@ and stops at the top (0, shown: music quieter) or at $80 (hidden). While it is shown the inventory
 ;@ reads the joypad and draws its cursor; then the rupee and heart counters run (UpdateHud) when no
 ;@ dialog is open (or in dialog states $0C / $0D).
+;@ test: skip draws the item slots through the BG command queue
 SlideInventory::
 ;> DrawInventoryRow()
 	call DrawInventoryRow
@@ -6702,11 +6737,11 @@ InventoryShownUpdate:
 
 ;>         InventoryInput()
 	call InventoryInput
-;>         DrawInventoryCursor()
+;>         DrawSwordPowerSparkle()
 	call DrawSwordPowerSparkle
 
 .abort
-;>     abort_caller()
+;>     pop_return_address()
 	pop af
 
 UpdateHud:
@@ -6733,9 +6768,9 @@ UpdateHud:
 
 
 ;@ def DrawInventoryRow()
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ Draws the next row of the inventory while it slides in: wInventoryRowsToDraw counts down from 11 and
-;@ each frame row wInventoryRowsToDraw - 1 is drawn (DrawInventorySlot), until 1 is left.
+;@ each frame row wInventoryRowsToDraw - 1 is drawn (DrawItemSlots), until 1 is left.
 ;@ test: skip draws through the BG command queue
 DrawInventoryRow::
 ;> if wInventoryRowsToDraw != 1:
@@ -6743,7 +6778,7 @@ DrawInventoryRow::
 	cp $01
 	jr z, .done
 
-;>     DrawItemSlots(c=wInventoryRowsToDraw, e=wInventoryRowsToDraw - 1)
+;>     DrawItemSlots(slot=wInventoryRowsToDraw, stop=wInventoryRowsToDraw - 1)
 	ld c, a
 	ld b, $00
 	dec a
@@ -6759,7 +6794,7 @@ DrawInventoryRow::
 
 
 ;@ def UpdateRupeeCounter()
-;@ path: items/rupees
+;@ path: menu/status_bar
 ;@ Every other frame (when the draw queue is free and wRupeeCountDelay has run out) moves rupees from
 ;@ the add / subtract buffers into wRupeeCount (BCD, 0-999) in steps of up to 9 with a sound, and
 ;@ redraws the count.
@@ -6926,7 +6961,7 @@ UpdateRupeeCounter::
 
 
 ;@ def DrawRupeeCount()
-;@ path: items/rupees
+;@ path: menu/status_bar
 ;@ Queues the three digits of wRupeeCount (tiles $B0-$B9) at $9C2A in the status bar.
 ;@ test: skip draws through the BG command queue
 DrawRupeeCount::
@@ -6977,19 +7012,19 @@ DrawRupeeCount::
 	ret
 
 
-;@ path: items/health
+;@ path: menu/status_bar
 ;@ Health (in eighths of a heart) below which the low-health beep sounds, by wMaxHearts - 3 (3-14
 ;@ hearts): $05 for 3-5 hearts, $09 for 6-8, $11 for 9-11, $19 for 12-14. Read by UpdateHealthCounter.
 LowHealthThresholds::
 	db $05, $05, $05, $09, $09, $09, $11, $11, $11, $19, $19, $19
 
 ;@ def UpdateHealthCounter()
-;@ path: items/health
+;@ path: menu/status_bar
 ;@ Sets wLowHealth (beeping every $30 frames) when health is below LowHealthThresholds; every other
 ;@ frame with a free draw queue moves one eighth of a heart from wAddHealthBuffer or
 ;@ wSubtractHealthBuffer into wHealth and redraws the hearts. At 0 health a medicine bottle, if any,
 ;@ refills the hearts (8, plus $80 added) and makes Link invincible for a while.
-;@ test: skip draws through the BG command queue
+;@ test: skip jumps to its own block .medicine, named UseMedicine in the pseudo-code
 UpdateHealthCounter::
 ;> wLowHealth = 0
 	xor a
@@ -7201,7 +7236,7 @@ UpdateHealthCounter::
 	ret
 
 
-;@ path: items/health
+;@ path: menu/status_bar
 ;@ Draw commands that blank both rows of hearts in the status bar (21 bytes): $9C0D, 7 tiles of $7F;
 ;@ $9C2D, 7 tiles of $7F; 0 end. Each command is [address high, address low, $06 (7 tiles across),
 ;@ 7 tiles]. DrawHearts copies it into the queue and writes the hearts over the blanks.
@@ -7210,7 +7245,7 @@ HeartRowsBlankCommand::
 	db $7f, $7f, $7f, $7f, $00
 
 ;@ def DrawHearts()
-;@ path: items/health
+;@ path: menu/status_bar
 ;@ Queues the hearts of the status bar: wHealth / 8 full hearts (tile $A9), a part heart ($CE) for the
 ;@ rest, then empty hearts ($CD) up to wMaxHearts; 7 per row.
 ;@ test: skip draws through the BG command queue
@@ -7323,7 +7358,7 @@ DrawHearts::
 	ret
 
 
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ Tiles of every item in its slot, 6 bytes per item id (0 none, 1 sword, 2 bombs, 3 power bracelet,
 ;@ 4 shield, 5 bow, ... $0D): top row 3 tiles, bottom row 3 tiles (the last two of the bottom row are
 ;@ replaced by a level or a count for some items, see DrawItemSlotLevel). Read by DrawItemSlots.
@@ -7335,7 +7370,7 @@ ItemSlotTiles::
 	db $7f, $7f, $96, $7f, $7f, $97, $7f, $7f, $8e, $7f, $7f, $8f, $7f, $7f, $a4, $7f
 	db $7f, $a5, $7f, $7f
 
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ Background address (2 bytes, high then low) of the top left tile of each item slot: 0 B and 1 A in
 ;@ the status bar, 2-11 the inventory slots (two per row). Read by DrawItemSlots.
 ItemSlotVRAMAddresses::
@@ -7343,7 +7378,7 @@ ItemSlotVRAMAddresses::
 	db $9d, $21, $9d, $25, $9d, $81, $9d, $85, $9d, $e1, $9d, $e5
 
 ;@ def DrawItemSlotsAB()
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ Draws the A and the B item slots of the status bar (DrawItemSlots from slot 1 down to 0).
 ;@ test: skip draws through the BG command queue
 DrawItemSlotsAB::
@@ -7353,12 +7388,12 @@ DrawItemSlotsAB::
 	ld e, $ff
 
 ;@ def DrawItemSlots(slot: c, stop: e)
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ Queues the item slots from slot c down to (not including) stop: per slot two commands of 3 tiles
 ;@ (top and bottom row of the item in wItemB[slot]), the bottom row ending in the item's level or count.
 ;@ test: skip draws through the BG command queue
 DrawItemSlots::
-;> if rom[0x0004]:                              # a ROM byte that is 0: never
+;> if mem[0x0004]:                              # a ROM byte that is 0: never
 	ld a, [$0004]
 	and a
 ;>     return
@@ -7489,11 +7524,11 @@ DrawItemSlots::
 
 
 ;@ def DrawItemSlotLevel(dest: hl, tiles: de) -> hl
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ Writes the last two bottom tiles of an item slot (item hMultiPurpose1): the sword, shield and power
 ;@ bracelet show their level as the second tile, bombs, arrows (bow) and magic powder their count,
 ;@ the ocarina the number of the selected song; other items (and the toadstool) their own two tiles.
-;@ test: skip writes to the draw queue
+;@ test: skip its pseudo-code names local parts of the unit as functions
 DrawItemSlotLevel::
 ;> item = hMultiPurpose1
 	ldh a, [hMultiPurpose1]
@@ -7611,8 +7646,8 @@ DrawItemSlotLevel::
 ;> value = wBombCount                           # on into DrawTwoDigits
 	ld a, [wBombCount]
 
-;@ def DrawTwoDigits(value: a, dest: hl) -> hl
-;@ path: items/inventory
+;@ def DrawTwoDigits(value: a, hl: hl) -> hl
+;@ path: menu/inventory
 ;@ Writes the two digits of a BCD byte as tiles $B0-$B9 at hl.
 ;@ test: hl = rand(0xC000, 0xCFF0); a = rand(0, 255)
 DrawTwoDigits::
@@ -7630,10 +7665,11 @@ DrawTwoDigits::
 ;> mem[hl + 1] = low
 	ld a, c
 	ld [hli], a
+;> return hl + 2
 	ret
 
 
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ The fixed parts of the inventory (51 bytes), copied into the draw queue by DrawInventoryStatic.
 ;@ Commands [address high, address low, mode, tiles...], mode bit 7 = down, low bits = count - 1:
 ;@ $9C6A, $9C6C, $9C6E 4 tiles down each; $9C6F, $9CB0, $9C71, $9CB2 2 tiles down each; $9C92 2 tiles
@@ -7644,7 +7680,7 @@ SubscreenStaticCommands::
 	db $71, $81, $9e, $9f, $9c, $b2, $81, $ca, $cb, $9c, $92, $01, $7f, $7f, $9c, $d3
 	db $00, $7f, $00
 
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ Offset in the copied SubscreenStaticCommands of the two tiles of each of the 9 owned-item icons
 ;@ (flippers, medicine, trade item, ..., then 5 dungeon items or key items) that are blanked when the
 ;@ item is missing. Read by DrawInventoryStatic.
@@ -7652,7 +7688,7 @@ SubscreenSlotOffsets::
 	db $03, $0a, $11, $22, $05, $0c, $13, $1d, $27
 
 ;@ def DrawInventoryStatic()
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ Queues the fixed parts of the inventory: the icons of owned items (the ones missing are blanked:
 ;@ flippers, medicine, trade item, then the dungeon's map, compass, ... in a dungeon or the key items
 ;@ elsewhere), the seashell count and the small keys (dungeon) or golden leaves (1-5).
@@ -7824,20 +7860,20 @@ DrawInventoryStatic::
 	ret
 
 
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ Sprite x of the sword sparkle in each of the 12 item slots (0 B, 1 A, 2-11 the inventory).
 ;@ Read by DrawSwordPowerSparkle.
 SwordSparkleX::
 	db $0f, $37, $0f, $2f, $0f, $2f, $0f, $2f, $0f, $2f, $0f, $2f
 
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ Sprite y (from the window's top) of the sword sparkle in each of the 12 item slots.
 SwordSparkleY::
 	db $0e, $0e, $26, $26
 	db $3e, $3e, $56, $56, $6e, $6e, $86, $86
 
 ;@ def DrawSwordPowerSparkleAB()
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ DrawSwordPowerSparkle for the B and A slots only, and only once the palette is fully faded in.
 ;@ test: skip draws OAM
 DrawSwordPowerSparkleAB::
@@ -7853,7 +7889,7 @@ DrawSwordPowerSparkleAB::
 	jr DrawSwordPowerSparkle.slots
 
 ;@ def DrawSwordPowerSparkle()
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ While a Piece of Power is active, a sparkle sprite (tile $04) blinks on the slot that holds the sword
 ;@ (B, A or the inventory, positions SwordSparkleX / Y).
 ;@ test: skip draws OAM
@@ -7941,20 +7977,20 @@ DrawSwordPowerSparkle::
 	ret
 
 
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ Sprite x of the left half of the inventory selector frame, by inventory slot 0-9 (wInventoryCursor);
 ;@ the right half is $20 further. Read by InventoryInput.
 SubscreenSelectorX::
 	db $07, $27, $07, $27, $07, $27, $07, $27, $07, $27
 
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ Sprite y of the inventory selector frame, by inventory slot 0-9.
 SubscreenSelectorY::
 	db $28, $28, $40, $40, $58, $58
 	db $70, $70, $88, $88
 
 ;@ def InventoryInput()
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ While the inventory is shown: in a dungeon a blinking marker (sprite 0) shows Link's room on the
 ;@ minimap; the cursor moves and items are swapped onto A / B (MoveInventoryCursor), the song menu
 ;@ animates, and the selector frame (sprites 1-2, tile $BE) blinks around the selected slot.
@@ -8038,8 +8074,8 @@ InventoryInput::
 Jump_002_64bb:
 ;> MoveInventoryCursor()
 	call MoveInventoryCursor
-;> Call_02_6742()                               # the song menu
-	call Call_02_6742
+;> UpdateSongMenu()                               # the song menu
+	call UpdateSongMenu
 ;> wInventoryCursorBlink += 1
 	ld a, [wInventoryCursorBlink]
 	inc a
@@ -8084,18 +8120,18 @@ Jump_002_64bb:
 	ret
 
 
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ Cursor step for Right / Left (index = joypad bits 0-1): 0, +1, -1, 0. Read by MoveInventoryCursor.
 CursorStepX::
 	db $00, $01, $ff, $00
 
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ Cursor step for Up / Down (index = joypad bits 2-3): 0, -2, +2, 0 (two slots per row).
 CursorStepY::
 	db $00, $fe, $02, $00
 
 ;@ def MoveInventoryCursor()
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ Moves the inventory cursor (wInventoryCursor 0-9, wrapping) with the D-pad, opens the song menu
 ;@ when it lands on the ocarina (and closes it when it leaves), and swaps the selected item onto A or
 ;@ B with those buttons; Start while the song menu is shown closes it and then the inventory.
@@ -8322,8 +8358,8 @@ MoveInventoryCursor::
 	ld b, $00
 	ld e, $00
 	call DrawItemSlots
-;>     return Call_02_666A()
-	jr Call_02_666A
+;>     return DrawSelectedInventorySlot()
+	jr DrawSelectedInventorySlot
 
 .buttonB
 ;> if not (hJoypadPressed & 0x20):              # B: swap the selected item onto B
@@ -8380,17 +8416,17 @@ MoveInventoryCursor::
 	ld [wSongMenuCloseTimer], a
 
 .drawB
-;> DrawItemSlots(slot=0, stop=-1)               # the B slot; then on into Call_02_666A
+;> DrawItemSlots(slot=0, stop=-1)               # the B slot; then on into DrawSelectedInventorySlot
 	ld c, $00
 	ld b, $00
 	ld e, $ff
 	call DrawItemSlots
 
 ;@ def DrawSelectedInventorySlot()
-;@ path: items/inventory
+;@ path: menu/inventory
 ;@ Redraws the inventory slot under the cursor (after an item swap or a song change) with a sound.
 ;@ test: skip draws through the BG command queue
-Call_02_666A::
+DrawSelectedInventorySlot::
 ;> hJingle = 0x13
 	ld a, $13
 	ldh [hJingle], a
@@ -8409,7 +8445,7 @@ Jump_002_667b:
 	ret
 
 
-;@ path: items/ocarina
+;@ path: menu/song_menu
 ;@ Sprites of the song menu (12 sprites of 4 bytes: y offset, x offset, tile, attributes; drawn at
 ;@ y + $30, x + $60), for its 4 frames of 48 bytes each: frame 0 fully open, frames 1-3 smaller
 ;@ while it opens or closes. Tiles $22 / $24 / $26 are the icons of songs 1-3 (blank $20 while the
@@ -8427,23 +8463,23 @@ SongMenuSprites::
 	db $00, $00, $20, $00, $00, $08, $20, $20, $00, $00, $20, $00, $00, $08, $20, $20
 	db $00, $00, $20, $00, $00, $08, $20, $20, $00, $00, $20, $00, $00, $08, $20, $00
 	db $00, $00, $20, $00, $00, $08, $20, $00, $00, $00, $20, $00, $00, $08, $20, $00
-;@ path: items/ocarina
+;@ path: menu/song_menu
 ;@ Sprite x of the song selector (left half) for songs 1-3 (wSelectedSong 0-2). Read by UpdateSongMenu.
 SongMenuNoteX::
 	db $50, $60, $70
 
-;@ path: items/ocarina
+;@ path: menu/song_menu
 ;@ Bit of wOcarinaSongFlags for songs 1-3 (wSelectedSong 0-2). Read by UpdateSongMenu.
 SongMenuSongBits::
 	db $04, $02, $01
 
 ;@ def UpdateSongMenu()
-;@ path: items/ocarina
+;@ path: menu/song_menu
 ;@ The song menu over the ocarina slot: plays its opening / closing animation (the close may then close
 ;@ the inventory), draws its sprites, and while fully open picks the song with Right / Select and Left
 ;@ (skipping songs not learned) and draws the selector (sprites 4-5, tile $28).
 ;@ test: skip draws OAM
-Call_02_6742::
+UpdateSongMenu::
 ;> if wSongMenuCloseTimer:
 	ld a, [wSongMenuCloseTimer]
 	and a
@@ -8667,7 +8703,7 @@ Call_02_6742::
 	jr z, .selector
 
 ;>     DrawSelectedInventorySlot()              # the ocarina slot shows the new song number
-	call Call_02_666A
+	call DrawSelectedInventorySlot
 
 .selector
 ;> wOAMBuffer[0x10] = 0x38                      # the selector, sprites 4-5
@@ -8706,6 +8742,10 @@ Jump_002_684a:
 	ret
 
 
+;@ path: world/minimap
+;@ Minimaps of the dungeons, 64 bytes (8 rows of 8 rooms) per map $00-$07: one window tile per room,
+;@ $7D no room, $EF a room, $ED a room with a chest, $EE the boss room (the last two show only with
+;@ the compass). Read by LoadDungeonMinimap.
 DungeonMinimaps::
 	db $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d
 	db $7d, $7d, $7d, $7d, $7d, $7d, $ef, $7d, $7d, $ef, $ef, $ef, $7d, $7d, $ee, $7d
@@ -8739,134 +8779,176 @@ DungeonMinimaps::
 	db $ef, $ef, $ed, $ef, $ef, $ed, $ef, $ef, $7d, $ed, $ef, $ef, $ef, $ef, $ef, $7d
 	db $7d, $ed, $ef, $ef, $ef, $ef, $ef, $7d, $ef, $ed, $ef, $ed, $ef, $ef, $ef, $ef
 	db $ef, $ed, $ef, $ef, $ef, $ed, $ef, $ef, $ed, $7d, $7d, $ef, $ef, $7d, $7d, $ed
+;@ path: world/minimap
+;@ Minimap of map $06 (Eagle's Tower) once bit 2 of wDungeon7Flags is set (its second layout), same
+;@ format as DungeonMinimaps.
 DungeonMinimapEagleTowerAlt::
 	db $7d, $ed, $ed, $7d, $7d, $7d, $7d, $7d, $ef, $ef, $ef, $ef, $7d, $7d, $7d, $7d
 	db $ef, $ef, $ef, $ed, $7d, $7d, $7d, $7d, $ef, $ed, $ef, $ef, $7d, $7d, $7d, $7d
 	db $ed, $ef, $ef, $ed, $7d, $ef, $ed, $7d, $ef, $ef, $ef, $ef, $ef, $ee, $ef, $ef
 	db $ef, $ef, $ef, $ef, $ef, $ef, $ef, $ef, $ef, $ef, $ef, $ef, $7d, $ef, $ef, $7d
+;@ path: world/minimap
+;@ Minimap tile of a visited room by the low 4 bits of its room status (its open doors), as an offset:
+;@ the tile is $D0 + value. Read by LoadDungeonMinimap.
 MinimapRoomTypeTiles::
 	db $00, $02, $03, $07, $05, $0a, $0b, $0f, $04, $08, $09, $0e, $06, $0c, $0d, $01
 
-Call_02_6A9B::
+;@ def LoadDungeonMinimap()
+;@ path: world/minimap
+;@ Builds the inventory minimap of the dungeon in wMinimapTiles: rooms are hidden without the map,
+;@ chest and boss rooms show only with the compass (until the chest is opened / the boss beaten),
+;@ and visited rooms show their doors (MinimapRoomTypeTiles). Not in room $E8.
+;@ test: skip the trial cannot run it to its end
+LoadDungeonMinimap::
+;> if hMapRoom == 0xE8:
 	ldh a, [hMapRoom]
 	cp $e8
+;>     return
 	ret z
 
-	ld hl, $684b
+;>@src src = DungeonMinimaps + hMapId * 64
+	ld hl, DungeonMinimaps
 	ldh a, [hMapId]
 	swap a
 	ld e, a
 	ld d, $00
 	sla e
+;=@src
 	rl d
 	sla e
 	rl d
 	add hl, de
+;> if hMapId == 0x06 and wDungeon7Flags & 0x04:
 	ldh a, [hMapId]
 	cp $06
-	jr nz, jr_002_6ac3
+	jr nz, .copy
 
 	ld a, [wDungeon7Flags]
 	and $04
-	jr z, jr_002_6ac3
+	jr z, .copy
 
-	ld hl, $6a4b
+;>     src = DungeonMinimapEagleTowerAlt
+	ld hl, DungeonMinimapEagleTowerAlt
 
-jr_002_6ac3:
+.copy
+;> CopyData(wMinimapTiles, src, 64)
 	ld de, wMinimapTiles
 	ld bc, $0040
 	call CopyData
+;> for e in range(64):
 	ld d, $00
 	ld e, $00
 
 Jump_002_6ad0:
+;>     tile = wMinimapTiles[e]
 	ld hl, wMinimapTiles
 	add hl, de
 	ld a, [hl]
+;>     if tile == 0x7D:                         # no room
 	cp $7d
-	jr z, jr_002_6b3e
+;>         continue
+	jr z, .next
 
+;>     special = tile in (0xED, 0xEE)           # chest room, boss room
 	cp $ed
-	jr z, jr_002_6ae1
+	jr z, .special
 
 	cp $ee
-	jr nz, jr_002_6ae9
+	jr nz, .needMap
 
-jr_002_6ae1:
+.special
+;>     if special and not wDungeonHasCompass:   # (with the compass: straight to the status)
 	ld a, [wDungeonHasCompass]
 	and a
-	jr nz, jr_002_6af4
+	jr nz, .visited
 
+;>         wMinimapTiles[e] = 0xEF              # a plain room without the compass
 	ld [hl], $ef
 
-jr_002_6ae9:
+.needMap
+;>     if not (special and wDungeonHasCompass) and not wDungeonHasMap:
 	ld a, [wDungeonHasMap]
 	and a
-	jr nz, jr_002_6af4
+	jr nz, .visited
 
+;>         wMinimapTiles[e] = 0x7D              # hidden
 	ld [hl], $7d
-	jp Jump_002_6b3e
+;>         continue
+	jp .next
 
 
-jr_002_6af4:
+.visited
+;>     status = GetDungeonRoomStatusAddress(e)
 	push de
 	call GetDungeonRoomStatusAddress
 	push de
 	pop bc
 	pop de
+;>     if not (mem[status] & 0x80):             # not visited: keep the tile
 	ld a, [hl]
 	bit 7, a
-	jr z, jr_002_6b3e
+;>         continue
+	jr z, .next
 
+;>@c     c = 0xD0 + MinimapRoomTypeTiles[mem[status] & 0x0F]
 	ld a, [hl]
 	and $0f
 	ld c, a
 	ld b, $00
-	ld hl, $6a8b
+	ld hl, MinimapRoomTypeTiles
 	add hl, bc
+;=@c
 	ld a, [hl]
 	inc a
 	add $cf
 	ld c, a
+;>     tile = wMinimapTiles[e]
 	ld hl, wMinimapTiles
 	add hl, de
 	ld a, [hl]
+;>     if tile in (0xEE, 0xED):
 	cp $ee
-	jr z, jr_002_6b1c
+	jr z, .chestBoss
 
 	cp $ed
-	jr nz, jr_002_6b31
+	jr nz, .setTile
 
-jr_002_6b1c:
+.chestBoss
+;>@mask         mask = 0x10 if tile == 0xED else 0x20   # chest opened / boss beaten (status read again)
 	push de
 	push af
 	call GetDungeonRoomStatusAddress
 	pop af
 	ld e, $20
 	cp $ed
-	jr nz, jr_002_6b2a
+;=@mask
+	jr nz, .test
 
 	ld e, $10
 
-jr_002_6b2a:
+.test
+;>         if not (mem[status] & mask):
 	ld a, [hl]
 	and e
 	pop de
 	cp $00
-	jr z, jr_002_6b3e
+;>             continue                         # keep the chest / boss icon
+	jr z, .next
 
-jr_002_6b31:
+.setTile
+;>     wMinimapTiles[e] = c
 	ld hl, wMinimapTiles
 	add hl, de
 	ld [hl], c
+;>     if not wDungeonHasMap:
 	ld a, [wDungeonHasMap]
 	and a
-	jr nz, jr_002_6b3e
+	jr nz, .next
 
+;>         wMinimapTiles[e] = 0x7D
 	ld [hl], $7d
 
-Jump_002_6b3e:
-jr_002_6b3e:
+.next
 	inc e
 	ld a, e
 	cp $40
@@ -8875,136 +8957,232 @@ jr_002_6b3e:
 	ret
 
 
-Call_02_6B46::
+;@ def DrawMinimapTopRight()
+;@ path: world/minimap
+;@ Copies the top right quarter of wMinimapTiles (rows 0-3, columns 4-7) into the window, placed by
+;@ bits 4-5 of wMinimapLayout (MinimapTopRightLayouts).
+;@ test: skip writes VRAM
+DrawMinimapTopRight::
+;> return MinimapTopRightLayouts[(wMinimapLayout & 0x30) >> 4]()
 	ld a, [wMinimapLayout]
 	and $30
 	swap a
 	rst $00
 
-JumpTable_02_6B4E::
-	dw Jump_02_6B56
-	dw Jump_02_6B5B
-	dw Jump_02_6B60
-	dw Jump_02_6B65
+;@ path: world/minimap
+;@ Window address of the top right minimap quarter by minimap layout 0-3 (2-byte code addresses).
+MinimapTopRightLayouts::
+	dw MinimapTopRightLayout0
+	dw MinimapTopRightLayout1
+	dw MinimapTopRightLayout2
+	dw MinimapTopRightLayout3
 
-Jump_02_6B56::
+;@ def MinimapTopRightLayout0()
+;@ path: world/minimap
+;@ Top right quarter at $9D2E.
+MinimapTopRightLayout0::
+;> return CopyMinimapBlock(0x9D2E, 0x04)
 	ld hl, $9d2e
-	jr jr_002_6b68
+	jr MinimapTopRightLayout3.cells
 
-Jump_02_6B5B::
+;@ def MinimapTopRightLayout1()
+;@ path: world/minimap
+;@ Top right quarter at $9D2F (one column to the right).
+MinimapTopRightLayout1::
+;> return CopyMinimapBlock(0x9D2F, 0x04)
 	ld hl, $9d2f
-	jr jr_002_6b68
+	jr MinimapTopRightLayout3.cells
 
-Jump_02_6B60::
+;@ def MinimapTopRightLayout2()
+;@ path: world/minimap
+;@ Top right quarter at $9D0E (one row up).
+MinimapTopRightLayout2::
+;> return CopyMinimapBlock(0x9D0E, 0x04)
 	ld hl, $9d0e
-	jr jr_002_6b68
+	jr MinimapTopRightLayout3.cells
 
-Jump_02_6B65::
+;@ def MinimapTopRightLayout3()
+;@ path: world/minimap
+;@ Top right quarter at $9D0F (one row up, one column right).
+MinimapTopRightLayout3::
+;> vram = 0x9D0F
 	ld hl, $9d0f
 
-jr_002_6b68:
+.cells
+;> return CopyMinimapBlock(vram, 0x04)
 	ld e, $04
-	jr jr_002_6bbd
+	jr CopyMinimapBlock
 
-Call_02_6B6C::
+;@ def DrawMinimapBottomRight()
+;@ path: world/minimap
+;@ Copies the bottom right quarter of wMinimapTiles (rows 4-7, columns 4-7) into the window, placed by
+;@ bits 4-5 of wMinimapLayout (MinimapBottomRightLayouts).
+;@ test: skip writes VRAM
+DrawMinimapBottomRight::
+;> return MinimapBottomRightLayouts[(wMinimapLayout & 0x30) >> 4]()
 	ld a, [wMinimapLayout]
 	and $30
 	swap a
 	rst $00
 
-JumpTable_02_6B74::
-	dw Jump_02_6B7C
-	dw Jump_02_6B81
-	dw Jump_02_6B86
-	dw Jump_02_6B8B
+;@ path: world/minimap
+;@ Window address of the bottom right minimap quarter by minimap layout 0-3 (2-byte code addresses).
+MinimapBottomRightLayouts::
+	dw MinimapBottomRightLayout0
+	dw MinimapBottomRightLayout1
+	dw MinimapBottomRightLayout2
+	dw MinimapBottomRightLayout3
 
-Jump_02_6B7C::
+;@ def MinimapBottomRightLayout0()
+;@ path: world/minimap
+;@ Bottom right quarter at $9DAE.
+MinimapBottomRightLayout0::
+;> return CopyMinimapBlock(0x9DAE, 0x24)
 	ld hl, $9dae
-	jr jr_002_6b8e
+	jr MinimapBottomRightLayout3.cells
 
-Jump_02_6B81::
+;@ def MinimapBottomRightLayout1()
+;@ path: world/minimap
+;@ Bottom right quarter at $9DAF (one column to the right).
+MinimapBottomRightLayout1::
+;> return CopyMinimapBlock(0x9DAF, 0x24)
 	ld hl, $9daf
-	jr jr_002_6b8e
+	jr MinimapBottomRightLayout3.cells
 
-Jump_02_6B86::
+;@ def MinimapBottomRightLayout2()
+;@ path: world/minimap
+;@ Bottom right quarter at $9DAE.
+MinimapBottomRightLayout2::
+;> return CopyMinimapBlock(0x9DAE, 0x24)
 	ld hl, $9dae
-	jr jr_002_6b8e
+	jr MinimapBottomRightLayout3.cells
 
-Jump_02_6B8B::
+;@ def MinimapBottomRightLayout3()
+;@ path: world/minimap
+;@ Bottom right quarter at $9DAF (one column to the right).
+MinimapBottomRightLayout3::
+;> vram = 0x9DAF
 	ld hl, $9daf
 
-jr_002_6b8e:
+.cells
+;> return CopyMinimapBlock(vram, 0x24)
 	ld e, $24
-	jr jr_002_6bbd
+	jr CopyMinimapBlock
 
-Call_02_6B92::
+;@ def DrawMinimapTopLeft()
+;@ path: world/minimap
+;@ Copies the top left quarter of wMinimapTiles (rows 0-3, columns 0-3) into the window, placed by
+;@ bits 4-5 of wMinimapLayout (MinimapTopLeftLayouts).
+;@ test: skip writes VRAM
+DrawMinimapTopLeft::
+;> return MinimapTopLeftLayouts[(wMinimapLayout & 0x30) >> 4]()
 	ld a, [wMinimapLayout]
 	and $30
 	swap a
 	rst $00
 
-JumpTable_02_6B9A::
-	dw Jump_02_6BA2
-	dw Jump_02_6BA7
-	dw Jump_02_6BAC
-	dw Jump_02_6BB1
+;@ path: world/minimap
+;@ Window address of the top left minimap quarter by minimap layout 0-3 (2-byte code addresses).
+MinimapTopLeftLayouts::
+	dw MinimapTopLeftLayout0
+	dw MinimapTopLeftLayout1
+	dw MinimapTopLeftLayout2
+	dw MinimapTopLeftLayout3
 
-Jump_02_6BA2::
+;@ def MinimapTopLeftLayout0()
+;@ path: world/minimap
+;@ Top left quarter at $9D2A.
+MinimapTopLeftLayout0::
+;> return CopyMinimapBlock(0x9D2A, 0x00)
 	ld hl, $9d2a
-	jr jr_002_6bb4
+	jr MinimapTopLeftLayout3.cells
 
-Jump_02_6BA7::
+;@ def MinimapTopLeftLayout1()
+;@ path: world/minimap
+;@ Top left quarter at $9D2A.
+MinimapTopLeftLayout1::
+;> return CopyMinimapBlock(0x9D2A, 0x00)
 	ld hl, $9d2a
-	jr jr_002_6bb4
+	jr MinimapTopLeftLayout3.cells
 
-Jump_02_6BAC::
+;@ def MinimapTopLeftLayout2()
+;@ path: world/minimap
+;@ Top left quarter at $9D0A (one row up).
+MinimapTopLeftLayout2::
+;> return CopyMinimapBlock(0x9D0A, 0x00)
 	ld hl, $9d0a
-	jr jr_002_6bb4
+	jr MinimapTopLeftLayout3.cells
 
-Jump_02_6BB1::
+;@ def MinimapTopLeftLayout3()
+;@ path: world/minimap
+;@ Top left quarter at $9D0A (one row up).
+MinimapTopLeftLayout3::
+;> vram = 0x9D0A
 	ld hl, $9d0a
 
-jr_002_6bb4:
+.cells
+;> return CopyMinimapBlock(vram, 0x00)
 	ld e, $00
-	jr jr_002_6bbd
+	jr CopyMinimapBlock
 
-Call_02_6BB8::
+;@ def DrawMinimapBottomLeft()
+;@ path: world/minimap
+;@ Copies the bottom left quarter of wMinimapTiles (rows 4-7, columns 0-3) into the window at $9DAA.
+;@ test: skip writes VRAM
+DrawMinimapBottomLeft::
+;> return CopyMinimapBlock(0x9DAA, 0x20)
 	ld hl, $9daa
 	ld e, $20
 
-jr_002_6bbd:
+;@ def CopyMinimapBlock(vram: hl, cell: e)
+;@ path: world/minimap
+;@ Copies a 4 x 4 block of wMinimapTiles starting at cell e into the window map at hl (rows of 4
+;@ tiles, $20 bytes apart).
+;@ test: skip writes VRAM
+CopyMinimapBlock::
+;> for c in range(16):
 	ld c, $00
 	ld d, c
 
-jr_002_6bc0:
+.loop
+;>     mem[vram] = wMinimapTiles[cell]
 	push hl
 	ld hl, wMinimapTiles
 	add hl, de
 	ld a, [hl]
 	pop hl
 	ld [hl], a
+;>     cell += 1
 	inc e
+;>     if c + 1 == 16:
 	inc c
 	ld a, c
 	cp $10
-	jr z, jr_002_6be2
+;>         return
+	jr z, .done
 
+;>     vram += 1
 	inc hl
+;>     if (c + 1) % 4 == 0:                     # next row of the block
 	and $03
-	jr nz, jr_002_6bc0
+	jr nz, .loop
 
+;>         cell += 4
 	ld a, e
 	add $04
 	ld e, a
+;>         vram += 0x1C
 	ld a, l
 	add $1c
 	ld l, a
 	ld a, $00
 	adc h
 	ld h, a
-	jr jr_002_6bc0
+;>         continue
+	jr .loop
 
-jr_002_6be2:
+.done
+;> return
 	ret
 
 
@@ -9034,7 +9212,7 @@ SideViewDirections::
 ;@ path: link/side_view
 ;@ Link's normal motion in side-view rooms: while pushed back he only moves (with gravity unless he is
 ;@ in water); otherwise by hLinkMotionStep: 0 walking and jumping, 1 on a ladder, 2 in water.
-Call_02_6BEF::
+LinkMotionSideView::
 ;> if not wIsLinkInTheAir:
 	ld a, [wIsLinkInTheAir]
 	and a
@@ -9061,7 +9239,7 @@ Call_02_6BEF::
 ;>     ApplyLinkSpeed()
 	call ApplyLinkSpeed
 ;>     CollideLinkWithRoom()
-	call Call_02_6FB1
+	call CollideLinkWithRoom
 ;>     if hLinkMotionStep != 2:                 # not in water
 	ldh a, [hLinkMotionStep]
 	cp $02
@@ -9085,10 +9263,10 @@ Call_02_6BEF::
 ;@ path: link/side_view
 ;@ Link's side-view motion by hLinkMotionStep (2-byte code addresses): 0 SideViewWalk, 1 SideViewLadder,
 ;@ 2 SideViewSwim.
-JumpTable_02_6C1F::
-	dw Jump_02_6D3A
-	dw Jump_02_6CDA
-	dw Jump_02_6C48
+SideViewMotionSteps::
+	dw SideViewWalk
+	dw SideViewLadder
+	dw SideViewSwim
 
 ;@ path: link/side_view
 ;@ Target x speed of Link swimming in side view, by joypad bits 0-3 (16 entries): Right +8, Left -8,
@@ -9109,14 +9287,15 @@ SideViewSwimDirections::
 ;@ Link in water in a side-view room. On map $07 the liquid is lava: he is thrown out and loses half a
 ;@ heart; without the flippers he is thrown out too. Otherwise he swims, his speed easing toward
 ;@ SideViewSwimSpeedX / Y every other frame, and leaves the water onto a ladder ($B1) or land.
-Jump_02_6C48::
+;@ test: skip calls routines that the trial stands in for without a result
+SideViewSwim::
 ;> if hMapId == 0x07:                           # lava
 	ldh a, [hMapId]
 	cp $07
 	jr nz, .water
 
-;>     Call_02_79D9()
-	call Call_02_79D9
+;>     LinkDrown()
+	call LinkDrown
 ;>     wSubtractHealthBuffer += 4
 	ld a, [wSubtractHealthBuffer]
 	add $04
@@ -9135,8 +9314,8 @@ Jump_02_6C48::
 ;> if not wHasFlippers:
 	ld a, [wHasFlippers]
 	and a
-;>     return Call_02_79D9()
-	jp z, Call_02_79D9
+;>     return LinkDrown()
+	jp z, LinkDrown
 
 ;> hLinkDirection &= ~0x02                      # face left or right
 	ld hl, hLinkDirection
@@ -9210,7 +9389,7 @@ Jump_02_6C48::
 ;> ApplyLinkSpeed()
 	call ApplyLinkSpeed
 ;> CollideLinkWithRoom()
-	call Call_02_6FB1
+	call CollideLinkWithRoom
 ;> if wInventoryAppearing:
 	ld a, [wInventoryAppearing]
 	and a
@@ -9238,7 +9417,7 @@ Jump_02_6C48::
 
 .done
 ;> return SideViewMotionDone()
-	call Call_02_6E8F
+	call SideViewMotionDone
 	ret
 
 
@@ -9246,7 +9425,8 @@ Jump_02_6C48::
 ;@ path: link/side_view
 ;@ Link on a ladder in a side-view room: no jump, he moves by LadderSpeedX / Y facing the ladder, and
 ;@ steps off it into water ($B0) or onto the ground.
-Jump_02_6CDA::
+;@ test: skip calls routines that the trial stands in for without a result
+SideViewLadder::
 ;> a = ResetPegasusBoots()                      # (0)
 	call ResetPegasusBoots
 ;> wIsLinkInTheAir = a
@@ -9292,7 +9472,7 @@ Jump_02_6CDA::
 ;> ApplyLinkSpeed()
 	call ApplyLinkSpeed
 ;> CollideLinkWithRoom()
-	call Call_02_6FB1
+	call CollideLinkWithRoom
 ;> if wInventoryAppearing:
 	ld a, [wInventoryAppearing]
 	and a
@@ -9320,7 +9500,7 @@ Jump_02_6CDA::
 
 .done
 ;> SideViewMotionDone()
-	call Call_02_6E8F
+	call SideViewMotionDone
 ;> if wLinkCollisionFlags & 0x08:               # standing on the ground
 	ld a, [wLinkCollisionFlags]
 	and $08
@@ -9340,7 +9520,7 @@ Jump_02_6CDA::
 ;@ toward SideViewSpeedX), walking on the ground, then moving, collision, climbing onto a ladder ($B1) or
 ;@ falling into water ($B0, with a splash), and gravity: 2 per frame up to $40, 1 while rising with the
 ;@ jump button (the Roc's Feather's) held. In room $F8 of map $06 pressing Up at x $46 leaves the room.
-Jump_02_6D3A::
+SideViewWalk::
 ;> if hMapId == 0x06 and hMapRoom == 0xF8:
 	ldh a, [hMapId]
 	cp $06
@@ -9386,7 +9566,7 @@ Jump_02_6D3A::
 ;>         AddDashDustVfx()
 	call AddDashDustVfx
 ;>         return SideViewApplyMotion()
-	jp Jump_002_6e14
+	jp SideViewApplyMotion
 
 
 .turn
@@ -9463,7 +9643,7 @@ Jump_02_6D3A::
 
 .airDone
 ;>     return SideViewApplyMotion()
-	jr Jump_002_6e14
+	jr SideViewApplyMotion
 
 .ground
 ;> if wIsLinkInTheAir:                          # landing
@@ -9516,19 +9696,19 @@ Jump_02_6D3A::
 ;>     wLinkWalkingFrameCount += 1
 	ld hl, wLinkWalkingFrameCount
 	inc [hl]
-	jr Jump_002_6e14
+	jr SideViewApplyMotion
 
 .stand
 ;> elif not wPegasusBootsChargeMeter:
 	ld a, [wPegasusBootsChargeMeter]
 	and a
-	jr nz, Jump_002_6e14
+	jr nz, SideViewApplyMotion
 
 ;>     wLinkWalkingFrameCount = 0
 	xor a
 	ld [wLinkWalkingFrameCount], a
 
-Jump_002_6e14:
+SideViewApplyMotion:
 ;> if wSwordAnimationState or not hLinkInteractiveMotionBlocked:
 	ld a, [wSwordAnimationState]
 	and a
@@ -9561,7 +9741,7 @@ Jump_002_6e14:
 
 .collide
 ;> CollideLinkWithRoom()
-	call Call_02_6FB1
+	call CollideLinkWithRoom
 ;> if wInventoryAppearing:
 	ld a, [wInventoryAppearing]
 	and a
@@ -9618,13 +9798,13 @@ Jump_002_6e14:
 	ldh [hLinkMotionStep], a
 
 .gravity
-;> if not (-0x40 <= signed(hLinkSpeedY) < 0x40):
+;> if not (-0x40 <= ((hLinkSpeedY ^ 0x80) - 0x80) < 0x40):
 	ld hl, hLinkSpeedY
 	ld a, [hl]
 	sub $40
 	and $80
 ;>     return
-	jr z, Call_02_6E8F
+	jr z, SideViewMotionDone
 
 ;> hLinkSpeedY += 1
 	inc [hl]
@@ -9646,7 +9826,7 @@ Jump_002_6e14:
 	ldh a, [hJoypadHeld]
 	and e
 ;>         return                               # a higher jump
-	jr nz, Call_02_6E8F
+	jr nz, SideViewMotionDone
 
 .fall
 ;> hLinkSpeedY += 1
@@ -9655,7 +9835,7 @@ Jump_002_6e14:
 ;@ def SideViewMotionDone()
 ;@ path: link/side_view
 ;@ Empty: the end of the side-view motion routines.
-Call_02_6E8F::
+SideViewMotionDone::
 ;> return
 	ret
 
@@ -9684,11 +9864,11 @@ SideViewProbeDY::
 ;@ solid ground or on the top of a one-way platform ($62 / $64 / $66, unless Down is held), stops him
 ;@ at ceilings and walls, and bounces him back when he dashes into a wall. Object $8A shows dialog
 ;@ $51 once.
-Call_02_6E9F::
+SideViewCollideTiles::
 ;> SideViewProbe(4)                             # the body
 	ld c, $04
 	ld b, $00
-	call Call_02_6F6B
+	call SideViewProbe
 ;> hMultiPurpose0 = hMultiPurpose1
 	ldh a, [hMultiPurpose1]
 	ldh [hMultiPurpose0], a
@@ -9709,7 +9889,7 @@ Call_02_6E9F::
 
 .probeX
 ;>     SideViewProbe(probe)
-	call Call_02_6F6B
+	call SideViewProbe
 ;>     if hRoomObjectType == 0x8A and not wRoomEventJustDone:
 	ldh a, [hRoomObjectType]
 	cp $8a
@@ -9733,7 +9913,7 @@ Call_02_6E9F::
 	jr nz, .vertical
 
 ;>         SetSideViewBlocked(probe)
-	call Call_02_6FA5
+	call SetSideViewBlocked
 
 .vertical
 ;> probe = 2 if hLinkSpeedY & 0x80 else 3       # head or feet
@@ -9747,7 +9927,7 @@ Call_02_6E9F::
 
 .probeY
 ;> SideViewProbe(probe)
-	call Call_02_6F6B
+	call SideViewProbe
 ;> falling = not (hLinkSpeedY & 0x80) and not (hJoypadHeld & 0x08)   # (Down drops through)
 	ldh a, [hLinkSpeedY]
 	and $80
@@ -9834,7 +10014,7 @@ Call_02_6E9F::
 ;>         ApplyLinkSpeed()
 	call ApplyLinkSpeed
 ;>         CollideLinkWithRoom()
-	call Call_02_6FB1
+	call CollideLinkWithRoom
 ;>         wBumpShakeTimer = 0x20
 	ld a, $20
 	ld [wBumpShakeTimer], a
@@ -9859,8 +10039,8 @@ Call_02_6E9F::
 ;@ Looks at the room object under side-view probe point c (SideViewProbeDX / DY around Link): its id
 ;@ in hRoomObjectType, its physics in hMultiPurpose1 (the y of the point in hMultiPurposeH); solid
 ;@ physics ($01, $60) set the probe's bit in wLinkCollisionFlags.
-;@ test: c = rand(0, 4); b = 0; hLinkX = rand(0x10, 0x90); hLinkY = rand(0x18, 0x80); wIsIndoor = rand(0, 1)
-Call_02_6F6B::
+;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
+SideViewProbe::
 ;>@col column = ((hLinkX - 8 + SideViewProbeDX[probe]) & 0xFF) >> 4
 	ld hl, SideViewProbeDX
 	add hl, bc
@@ -9899,17 +10079,17 @@ Call_02_6F6B::
 	ldh [hMultiPurpose1], a
 ;> if hMultiPurpose1 not in (0x60, 0x01):       # else on into SetSideViewBlocked
 	cp $60
-	jr z, Call_02_6FA5
+	jr z, SetSideViewBlocked
 
 	cp $01
 ;>     return
-	jr nz, Call_02_6FA5.done
+	jr nz, SetSideViewBlocked.done
 
 ;@ def SetSideViewBlocked(probe: c)
 ;@ path: link/side_view
 ;@ Sets the wLinkCollisionFlags bit of side-view probe c (SideViewBlockedBits).
-;@ test: c = rand(0, 4); b = 0
-Call_02_6FA5::
+;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
+SetSideViewBlocked::
 ;> wLinkCollisionFlags |= SideViewBlockedBits[probe]
 	ld hl, SideViewBlockedBits
 	add hl, bc
@@ -9921,84 +10101,118 @@ Call_02_6FA5::
 	ret
 
 
-Call_02_6FB1::
+;@ def CollideLinkWithRoom()
+;@ path: link/collision
+;@ After Link moved: at the edges of the screen he either starts the scroll into the next room (only
+;@ while the D-pad points that way, unless he dashes, swims or is in a side-view room) or is stopped;
+;@ some side-view rooms instead leave the side view through their edges (warps). Then the walls are
+;@ checked (CollideLinkWithWalls).
+;@ test: skip its pseudo-code names local parts of the unit as functions
+CollideLinkWithRoom::
+;> if wDialogState or wInventoryAppearing:
 	ld a, [wDialogState]
 	ld hl, wInventoryAppearing
 	or [hl]
+;>     return
 	ret nz
 
+;> if hMapId == 0x1F and hIsSideScrolling:
 	ldh a, [hMapId]
 	cp $1f
-	jr nz, jr_002_6fd5
+	jr nz, .edges
 
 	ldh a, [hIsSideScrolling]
 	and a
-	jr z, jr_002_6fd5
+	jr z, .edges
 
+;>@t     if hMapRoom in (0xEB, 0xEC) and hLinkY < 0x2C:   # out through the top
 	ldh a, [hMapRoom]
 	cp $eb
-	jr z, jr_002_6fce
+	jr z, .top
 
 	cp $ec
-	jr nz, jr_002_6fd5
+	jr nz, .edges
 
-jr_002_6fce:
+.top
+;=@t
 	ldh a, [hLinkY]
 	cp $2c
+;>         return StartWarpFadeOutWithNoise()
 	jp c, StartWarpFadeOutWithNoise
 
-jr_002_6fd5:
+.edges
+;> if hLinkY < 0x0C:
 	ld e, $02
 	ldh a, [hLinkY]
 	cp $0c
-	jr c, jr_002_6ff2
+;>     edge = 2                                 # top
+	jr c, .edgeY
 
+;> elif hLinkY >= 0x84:
 	inc e
 	cp $84
-	jr nc, jr_002_6ff2
+;>     edge = 3                                 # bottom
+	jr nc, .edgeY
 
+;> elif hLinkX < 0x04:
 	ld e, $01
 	ldh a, [hLinkX]
 	cp $04
-	jr c, jr_002_704f
+;>     edge = 1                                 # left
+	jr c, .edgeX
 
+;> elif hLinkX >= 0x9C:
 	dec e
 	cp $9c
-	jr nc, jr_002_704f
+;>     edge = 0                                 # right
+	jr nc, .edgeX
 
-	jp Jump_002_7142
+;> else:
+;>     return walls()
+	jp .walls
 
 
-jr_002_6ff2:
+.edgeY
+;> if edge in (2, 3) and not hIsSideScrolling:
 	ldh a, [hIsSideScrolling]
 	and a
-	jr nz, jr_002_700d
+	jr nz, .sideViewY
 
+;>     if hMapId != 0x1F:
 	ldh a, [hMapId]
 	cp $1f
-	jp nz, Jump_002_7098
+;>         return transition()
+	jp nz, .transition
 
+;>     if hMapRoom in (0xF5, 0xF2):
 	ldh a, [hMapRoom]
 	cp $f5
 	jp z, StartWarpFadeOutWithNoise
 
 	cp $f2
-	jp nz, Jump_002_7098
+;>         return transition()
+	jp nz, .transition
 
+;>     return StartWarpFadeOutWithNoise()
 	jp StartWarpFadeOutWithNoise
 
 
-jr_002_700d:
+.sideViewY
+;> if edge in (2, 3) and hMapRoom in (0xE8, 0xF8):
 	ldh a, [hMapRoom]
 	cp $e8
-	jp z, Jump_002_7098
+	jp z, .transition
 
 	cp $f8
-	jp z, Jump_002_7098
+;>     return transition()
+	jp z, .transition
 
+;> if hMapRoom == 0xFD:
 	cp $fd
-	jr z, jr_002_703c
+;>     return blockY()
+	jr z, .blockY
 
+;> if hMapRoom in (0xA3, 0xC0, 0xC1):
 	cp $a3
 	jp z, StartWarpFadeOutWithNoise
 
@@ -10006,1986 +10220,2681 @@ jr_002_700d:
 	jp z, StartWarpFadeOutWithNoise
 
 	cp $c1
+;>     return StartWarpFadeOutWithNoise()
 	jp z, StartWarpFadeOutWithNoise
 
+;> if hMapRoom == 0xFF:
 	cp $ff
-	jr nz, jr_002_7046
+	jr nz, .otherRoom
 
+;>     if hLinkY < 0x50 and not wEntityStatus[0]:
 	ldh a, [hLinkY]
 	cp $50
-	jr nc, jr_002_703c
+	jr nc, .blockY
 
 	ld a, [wEntityStatus]
 	and a
-	jr z, jr_002_7098
+;>         return transition()
+	jr z, .transition
 
-jr_002_703c:
+.blockY
+;>     hLinkY = hLinkPrevY                      # .blockY: stopped at the edge
 	ldh a, [hLinkPrevY]
 	ldh [hLinkY], a
+;>     hLinkSpeedY = 0
 	xor a
 	ldh [hLinkSpeedY], a
-	jp Jump_002_7142
+;>     return walls()
+	jp .walls
 
 
-jr_002_7046:
+.otherRoom
+;> if hLinkMotionStep == 2:                     # swimming
 	ldh a, [hLinkMotionStep]
 	cp $02
-	jr z, jr_002_7098
+;>     return transition()
+	jr z, .transition
 
+;> return StartWarpFadeOutWithNoise()           # out of the side view
 	jp StartWarpFadeOutWithNoise
 
 
-jr_002_704f:
+.edgeX
+;> hLinkX = hLinkPrevX                          # left / right edge
 	ldh a, [hLinkPrevX]
 	ldh [hLinkX], a
+;> hLinkSpeedX = 0
 	xor a
 	ldh [hLinkSpeedX], a
+;> if not hIsSideScrolling:
 	ldh a, [hIsSideScrolling]
 	and a
-	jr z, jr_002_7098
+;>     return transition()
+	jr z, .transition
 
+;> if hMapRoom in (0xF5, 0xFD):
 	ldh a, [hMapRoom]
 	cp $f5
 	jp z, StartWarpFadeOutMusic
 
 	cp $fd
+;>     return StartWarpFadeOutMusic()
 	jp z, StartWarpFadeOutMusic
 
+;> if hMapRoom == 0xE9:
 	cp $e9
+;>     return StartWarpFadeOutWithNoise()
 	jp z, StartWarpFadeOutWithNoise
 
+;>@cs if hMapRoom in (0xE8, 0xF8, 0xEF, 0xFF):    # closed sides
 	cp $e8
-	jp z, Jump_002_7142
+	jp z, .walls
 
 	cp $f8
-	jp z, Jump_002_7142
+	jp z, .walls
 
 	cp $ef
-	jp z, Jump_002_7142
+	jp z, .walls
 
+;=@cs
 	cp $ff
-	jp z, Jump_002_7142
+;>     return walls()
+	jp z, .walls
 
+;> if hMapRoom == 0xC0:
 	cp $c0
-	jr nz, jr_002_708d
+	jr nz, .roomC1
 
+;>     return walls() if hLinkX < 0x30 else transition()
 	ldh a, [hLinkX]
 	cp $30
-	jp c, Jump_002_7142
+	jp c, .walls
 
-	jr jr_002_7098
+	jr .transition
 
-jr_002_708d:
+.roomC1
+;> if hMapRoom == 0xC1 and hLinkX >= 0x50:
 	cp $c1
-	jr nz, jr_002_7098
+	jr nz, .transition
 
 	ldh a, [hLinkX]
 	cp $50
-	jp nc, Jump_002_7142
+;>     return walls()
+	jp nc, .walls
 
-Jump_002_7098:
-jr_002_7098:
+.transition
+;> RestoreLinkPosition()                        # .transition: scroll into the next room?
 	call RestoreLinkPosition
+;> if wLinkGroundType in (0x50, 0x51):
 	ld a, [wLinkGroundType]
 	cp $50
-	jp z, Jump_002_7146
+	jp z, .stop
 
 	cp $51
-	jp z, Jump_002_7146
+;>     return stop()
+	jp z, .stop
 
+;> if wLinkGroundVfx == 0x07:
 	ld a, [wLinkGroundVfx]
 	cp $07
-	jp z, Jump_002_7146
+;>     return stop()
+	jp z, .stop
 
+;> if wLinkMotionState == 0x06:                 # falling
 	ld a, [wLinkMotionState]
 	cp $06
-	jp z, Jump_002_7146
+;>     return stop()
+	jp z, .stop
 
+;> if not hIsSideScrolling and wIsLinkInTheAir:
 	ldh a, [hIsSideScrolling]
 	and a
-	jr nz, jr_002_70c4
+	jr nz, .checkPoke
 
 	ld a, [wIsLinkInTheAir]
 	and a
-	jp nz, Jump_002_7146
+;>     return stop()
+	jp nz, .stop
 
-jr_002_70c4:
+.checkPoke
+;> if not wIsUsingPegasusBoots and wSwordPokeTimer:
 	ld a, [wIsUsingPegasusBoots]
 	and a
-	jr nz, jr_002_70d0
+	jr nz, .checkPushed
 
 	ld a, [wSwordPokeTimer]
 	and a
-	jr nz, jr_002_7146
+;>     return stop()
+	jr nz, .stop
 
-jr_002_70d0:
+.checkPushed
+;> if wLinkPushedTimer or wBumpShakeTimer:
 	ld a, [wLinkPushedTimer]
 	ld hl, wBumpShakeTimer
 	or [hl]
-	jr nz, jr_002_7146
+;>     return stop()
+	jr nz, .stop
 
+;>@pad if hLinkY < 0x88 and not (wIsUsingPegasusBoots or hIsSideScrolling or hLinkInWater):
 	ldh a, [hLinkY]
 	cp $88
-	jr nc, jr_002_7108
+	jr nc, .go
 
 	ld a, [wIsUsingPegasusBoots]
 	ld hl, hIsSideScrolling
 	or [hl]
+;=@pad
 	ld hl, hLinkInWater
 	or [hl]
-	jr nz, jr_002_7108
+	jr nz, .go
 
+;>     if not (hJoypadHeld & 0x0F):            # the D-pad must point at the edge
 	ldh a, [hJoypadHeld]
 	and $0f
-	jr z, jr_002_7146
+;>         return stop()
+	jr z, .stop
 
+;>     if not (hJoypadHeld & 0x03) or (hJoypadHeld & 0x03) - 1 != edge:
 	and $03
-	jr z, jr_002_70fa
+	jr z, .vertical
 
 	dec a
 	cp e
-	jr z, jr_002_7108
+	jr z, .go
 
-jr_002_70fa:
+.vertical
+;>         v = (hJoypadHeld >> 2) & 0x03
 	ldh a, [hJoypadHeld]
 	rra
 	rra
 	and $03
-	jr z, jr_002_7146
+;>         if not v or v + 1 != edge:
+	jr z, .stop
 
 	dec a
 	add $02
 	cp e
-	jr nz, jr_002_7146
+;>             return stop()
+	jr nz, .stop
 
-jr_002_7108:
+.go
+;>@e8 if hMapRoom == 0xE8 and hMapId != 0x1F and wIsIndoor:
 	ldh a, [hMapRoom]
 	cp $e8
-	jr nz, jr_002_7120
+	jr nz, .scroll
 
 	ldh a, [hMapId]
 	cp $1f
-	jr z, jr_002_7120
+	jr z, .scroll
 
+;=@e8
 	ld a, [wIsIndoor]
 	and a
-	jr z, jr_002_7120
+	jr z, .scroll
 
+;>     wScrollXOffset = 0
 	xor a
 	ld [wScrollXOffset], a
+;>     rSCX = 0
 	ldh [rSCX], a
 
-jr_002_7120:
+.scroll
+;> wRoomTransitionDirection = edge
 	ld a, e
 	ld [wRoomTransitionDirection], a
+;> wRoomTransitionState = 1
 	ld a, $01
 	ld [wRoomTransitionState], a
+;> wPegasusBootsChargeMeter = 0
 	xor a
 	ld [wPegasusBootsChargeMeter], a
+;> wSpinAttackTimer = 0
 	ld [wSpinAttackTimer], a
+;> wIsUsingPegasusBoots = 0
 	ld [wIsUsingPegasusBoots], a
+;> if hLinkY >= 0x88:                           # through the bottom: arrive in the air
 	ldh a, [hLinkY]
 	cp $88
-	jr c, jr_002_7142
+	jr c, .walls
 
+;>     wIsLinkInTheAir = 2
 	ld a, $02
 	ld [wIsLinkInTheAir], a
+;>     hLinkPositionZ = 8
 	ld a, $08
 	ldh [hLinkPositionZ], a
 
-Jump_002_7142:
-jr_002_7142:
-	call Call_02_7180
+.walls
+;> CollideLinkWithWalls()                       # .walls
+	call CollideLinkWithWalls
+;> return
 	ret
 
 
-Jump_002_7146:
-jr_002_7146:
+.stop
+;> wLinkPushedTimer = StopLinkSpeed()           # .stop: no transition
 	call StopLinkSpeed
 	ld [wLinkPushedTimer], a
-	call Call_02_7180
+;> CollideLinkWithWalls()
+	call CollideLinkWithWalls
 
 jr_002_714f:
+;> return
 	ret
 
 
+;@ path: link/collision
+;@ X offset of Link's 8 wall probe points from his x - 8: 0-1 top (left, right), 2-3 right side
+;@ (upper, lower), 4-5 bottom (left, right), 6-7 left side (upper, lower). Read by ProbeWall.
 WallProbeDX::
 	db $06, $09, $0b, $0b, $06, $09, $04, $04
 
+;@ path: link/collision
+;@ Y offset of the 8 wall probe points from Link's y - $10 (same order as WallProbeDX).
 WallProbeDY::
 	db $06, $06, $09, $0c, $0f, $0f, $09, $0c
+;@ path: link/collision
+;@ First of the two probe points checked for each way of moving: down 4, up 0, right 2, left 6.
+;@ Read by CollideLinkWithWalls.
 WallProbePairs::
 	db $04, $00, $02, $06
 
+;@ path: link/collision
+;@ wLinkCollisionFlags bit of each probe point when it hits a wall: bits 0-1 the two points of a vertical
+;@ move (left one, right one), bits 2-3 the two of a horizontal move (upper one, lower one).
 WallBlockedBits::
 	db $01, $02, $04, $08, $01, $02, $04, $08
 
+;@ path: link/collision
+;@ Direction Link pushes in at each probe point (2 up, 0 right, 3 down, 1 left).
 WallProbeDirections::
 	db $02, $02, $00, $00
 	db $03, $03, $01, $01
 
+;@ path: link/collision
+;@ Sideways nudge when only one of the two probes hits (index = the 2 collision bits): only the first
+;@ point +1, only the second -1, none or both 0. It lets Link slide around corners.
 WallNudge::
 	db $00, $01, $ff, $00
 
+;@ path: link/collision
+;@ X speed of a jump down a ledge by direction (right $10, left -$10, up / down 0).
 LedgeJumpSpeedX::
 	db $10, $f0, $00, $00
 
+;@ path: link/collision
+;@ Y speed of a jump down a ledge by direction (up -$10, down $10, right / left 0).
 LedgeJumpSpeedY::
 	db $00, $00, $f0, $10
 
-Call_02_7180::
+;@ def CollideLinkWithWalls()
+;@ path: link/collision
+;@ Checks the two probe points on the side Link moves to, first vertically then horizontally
+;@ (ProbeWall), steps him back on that axis and nudges him around corners; walking down into deep water
+;@ ($E9) outdoors with the flippers makes him jump in. In side-view rooms SideViewCollideTiles runs
+;@ instead; nothing while jumping down a ledge or with the debug toggle.
+CollideLinkWithWalls::
+;> if wDebugToggle or wIsJumpingDownLedge:
 	ld hl, wIsJumpingDownLedge
 	ld a, [wDebugToggle]
 	or [hl]
+;>     return
 	jr nz, jr_002_714f
 
+;> if hIsSideScrolling:
 	ldh a, [hIsSideScrolling]
 	and a
-	jr z, jr_002_7192
+	jr z, .topDown
 
-	call Call_02_6E9F
+;>     SideViewCollideTiles()
+	call SideViewCollideTiles
+;>     return
 	ret
 
 
-jr_002_7192:
+.topDown
+;> wLinkCollisionFlags = 0
 	xor a
 	ld [wLinkCollisionFlags], a
+;> if hLinkSpeedY == 0:
 	ldh a, [hLinkSpeedY]
 	cp $00
-	jr z, jr_002_721a
+;>     return WallCheckHorizontal()
+	jr z, WallCheckHorizontal
 
+;>@d hMultiPurposeC = 2 if hLinkSpeedY & 0x80 else 3        # up / down
 	ld e, $03
 	rla
-	ld bc, $7160
-	jr nc, jr_002_71a6
+	ld bc, WallProbePairs
+	jr nc, .down
 
 	dec e
 	inc bc
 
-jr_002_71a6:
+.down
+;=@d
 	ld a, e
 	ldh [hMultiPurposeC], a
+;> probe = WallProbePairs[3 - hMultiPurposeC]
 	ld e, $02
 	ld a, [bc]
 	ld c, a
 	ld b, $00
 
-jr_002_71af:
+.probes
+;> for i in range(2):
+;>@pr     ProbeWall(probe + i)
 	push de
 	push bc
-	call Call_02_726A
+	call ProbeWall
 	pop bc
 	pop de
+;=@pr
 	inc bc
 	dec e
-	jr nz, jr_002_71af
+	jr nz, .probes
 
+;>@w if not (hLinkSpeedY & 0x80) and not wIsIndoor and hRoomObjectType == 0xE9 and wHasFlippers and wCarriedEntityType != 0xD5:
 	ldh a, [hLinkSpeedY]
 	and $80
-	jr nz, jr_002_7203
+	jr nz, WallSlideVertical
 
 	ld a, [wIsIndoor]
 	and a
-	jr nz, jr_002_7203
+;=@w
+	jr nz, WallSlideVertical
 
 	ldh a, [hRoomObjectType]
 	cp $e9
-	jr nz, jr_002_7203
+	jr nz, WallSlideVertical
 
 	ld a, [wHasFlippers]
 	and a
-	jr z, jr_002_7203
+;=@w
+	jr z, WallSlideVertical
 
 	ld a, [wCarriedEntityType]
 	cp $d5
-	jr z, jr_002_7203
+	jr z, WallSlideVertical
 
+;>     if wLinkMotionState == 2:                # (down into deep water)
 	ld a, [wLinkMotionState]
 	cp $02
-	jr z, jr_002_721a
+;>         return WallCheckHorizontal()
+	jr z, WallCheckHorizontal
 
+;>     hJingle = 0x08
 	ld a, $08
 	ldh [hJingle], a
-	jr jr_002_71f2
+;>     return LinkJumpIntoWater()
+	jr LinkJumpIntoWater
 
-Call_02_71E6::
+;@ def LinkJumpIntoWaterCentered()
+;@ path: link/collision
+;@ The jump into deep water with its sound (LinkJumpIntoWaterColumn).
+;@ test: skip runs on into LinkJumpIntoWaterColumn
+LinkJumpIntoWaterCentered::
+;> hJingle = 0x08                               # then on into LinkJumpIntoWaterColumn
 	ld a, $08
 	ldh [hJingle], a
 
-Call_02_71EA::
+;@ def LinkJumpIntoWaterColumn()
+;@ path: link/collision
+;@ Centers Link on his column and makes him jump into the water below (motion state 2, 8 pixels up).
+;@ This unit also holds the rest of CollideLinkWithWalls: the corner nudges and the horizontal check.
+LinkJumpIntoWaterColumn::
+;> hLinkX = (hLinkX & 0xF0) + 8
 	ldh a, [hLinkX]
 	and $f0
 	add $08
 	ldh [hLinkX], a
 
-jr_002_71f2:
+LinkJumpIntoWater:
+;> wLinkMotionState = 2                         # jumping
 	ld a, $02
 	ld [wLinkMotionState], a
+;> hLinkMotionStep = 0
 	xor a
 	ldh [hLinkMotionStep], a
+;> hLinkY -= 8
 	ldh a, [hLinkY]
 	sub $08
 	ldh [hLinkY], a
+;> return ResetPegasusBoots()
 	jp ResetPegasusBoots
 
 
-jr_002_7203:
+WallSlideVertical:
+;> if wLinkCollisionFlags & 0x03:               # (CollideLinkWithWalls) blocked vertically
 	ld a, [wLinkCollisionFlags]
 	and $03
-	jr z, jr_002_721a
+	jr z, WallCheckHorizontal
 
+;>@nx     hLinkX += WallNudge[wLinkCollisionFlags & 0x03]
 	ld e, a
 	ld d, $00
-	ld hl, $7174
+	ld hl, WallNudge
 	add hl, de
 	ldh a, [hLinkX]
 	add [hl]
+;=@nx
 	ldh [hLinkX], a
+;>     hLinkY = hLinkPrevY
 	ldh a, [hLinkPrevY]
 	ldh [hLinkY], a
 
-jr_002_721a:
+WallCheckHorizontal:
+;> if hLinkSpeedX:
 	ldh a, [hLinkSpeedX]
 	cp $00
-	jr z, jr_002_7259
+	jr z, WallChecksDone
 
+;>@h     hMultiPurposeC = 1 if hLinkSpeedX & 0x80 else 0    # left / right
 	ld e, $00
 	rla
-	ld bc, $7162
-	jr nc, jr_002_722a
+	ld bc, WallProbePairs + 2
+	jr nc, .right
 
 	inc e
 	inc bc
 
-jr_002_722a:
+.right
+;=@h
 	ld a, e
 	ldh [hMultiPurposeC], a
+;>     probe = WallProbePairs[2 + hMultiPurposeC]
 	ld e, $02
 	ld a, [bc]
 	ld c, a
 	ld b, $00
 
-jr_002_7233:
+.probes
+;>     for i in range(2):
+;>@pr         ProbeWall(probe + i)
 	push de
 	push bc
-	call Call_02_726A
+	call ProbeWall
 	pop bc
 	pop de
+;=@pr
 	inc bc
 	dec e
-	jr nz, jr_002_7233
+	jr nz, .probes
 
+;>     if wLinkCollisionFlags & 0x0C:           # blocked horizontally
 	ld a, [wLinkCollisionFlags]
 	and $0c
-	jr z, jr_002_7259
+	jr z, WallChecksDone
 
+;>@ny         hLinkY += WallNudge[(wLinkCollisionFlags & 0x0C) >> 2]
 	srl a
 	srl a
 	ld e, a
 	ld d, $00
-	ld hl, $7174
+	ld hl, WallNudge
 	add hl, de
+;=@ny
 	ldh a, [hLinkY]
 	add [hl]
 	ldh [hLinkY], a
+;>         hLinkX = hLinkPrevX
 	ldh a, [hLinkPrevX]
 	ldh [hLinkX], a
 
-jr_002_7259:
+WallChecksDone:
+;> if not wLinkCollisionFlags:
 	ld a, [wLinkCollisionFlags]
 	and a
-	jr nz, jr_002_7262
+	jr nz, .done
 
+;>     wSwordPokeCounter = 0
 	ld [wSwordPokeCounter], a
 
-jr_002_7262:
-	call Call_02_7769
+.done
+;> BounceOffWallAfterDash()
+	call BounceOffWallAfterDash
 	ret
 
 
+;@ path: link/collision
+;@ Joypad bit of each direction (right $01, left $02, up $04, down $08).
 DirectionJoypadBits::
 	db $01, $02, $04, $08
 
-Call_02_726A::
-	ld hl, $7150
+;@ def ProbeWall(probe: c) -> carry
+;@ path: link/collision
+;@ Looks at the room object under wall probe point c (WallProbeDX / DY) and acts on its physics: free
+;@ floor; walls; half-solid objects (HalfSolidObjectQuadrants); keyholes that open with the right key;
+;@ ledges that Link jumps down after pushing for a moment; locked doors, shutters and the boss door;
+;@ stairs and room exits (warps; the following ghost or Marin may stop Link first); deep water; raised
+;@ blocks. Pushing into a wall shows a hint for some objects, pokes it with the sword, breaks crystal
+;@ blocks with the dash and moves push blocks. A blocked point sets its WallBlockedBits bit.
+;@ Returns carry set when the point blocks Link.
+;@ test: skip its pseudo-code names local parts of the unit as functions
+ProbeWall::
+;> hMultiPurpose4 = (hLinkX - 8 + WallProbeDX[probe]) & 0xFF   # the point
+	ld hl, WallProbeDX
 	add hl, bc
 	ldh a, [hLinkX]
 	sub $08
 	add [hl]
 	ldh [hMultiPurpose4], a
+;> column = hMultiPurpose4 >> 4
 	swap a
 	and $0f
 	ld e, a
-	ld hl, $7158
+;> hMultiPurpose5 = (hLinkY + WallProbeDY[probe] - 0x10) & 0xFF
+	ld hl, WallProbeDY
 	add hl, bc
 	ldh a, [hLinkY]
 	add [hl]
 	sub $10
 	ldh [hMultiPurpose5], a
+;> hMultiPurposeH = (hMultiPurpose5 & 0xF0) | column   # its square
 	and $f0
 	or e
 	ld e, a
 	ldh [hMultiPurposeH], a
+;>@obj hRoomObjectType = wRoomObjects[hMultiPurposeH]   # (the address wraps within its page)
 	ld d, $00
 	ld hl, wRoomObjects
 	ld a, h
 	add hl, de
 	ld h, a
 	ld a, [hl]
+;=@obj
 	ldh [hRoomObjectType], a
+;> phys = GetObjectPhysics(hRoomObjectType, wIsIndoor)
 	ld e, a
 	ld a, [wIsIndoor]
 	ld d, a
 	call GetObjectPhysics
+;> hMultiPurposeD = phys
 	ldh [hMultiPurposeD], a
+;> if phys == 0x00: return free()
 	and a
-	jp z, Jump_002_771c
+	jp z, .free
 
+;> if phys == 0x01: return solid()
 	cp $01
-	jp z, Jump_002_75b1
+	jp z, .solid
 
+;> if phys == 0x02: return groundVfx()
 	cp $02
-	jp z, Jump_002_759a
+	jp z, .groundVfx
 
+;> if phys == 0x03: return exit()              # stairs, room exits
 	cp $03
-	jp z, Jump_002_74f9
+	jp z, .exit
 
+;> if phys == 0x10: return deepWater()
 	cp $10
-	jp z, Jump_002_74da
+	jp z, .deepWater
 
+;> if phys == 0x04: return raisedBlock()
 	cp $04
-	jp z, Jump_002_7577
+	jp z, .raisedBlock
 
+;> if phys in (0x30, 0x60): return solid()
 	cp $30
-	jp z, Jump_002_75b1
+	jp z, .solid
 
 	cp $60
-	jp z, Jump_002_75b1
+	jp z, .solid
 
+;> if phys == 0x0A: return groundVfx()
 	cp $0a
-	jp z, Jump_002_759a
+	jp z, .groundVfx
 
+;> if phys in (0xFF, 0xE0) or phys >= 0xF0: return free()
 	cp $ff
-	jp z, Jump_002_771c
+	jp z, .free
 
 	cp $e0
-	jp z, Jump_002_771c
+	jp z, .free
 
 	cp $f0
-	jp nc, Jump_002_771c
+	jp nc, .free
 
+;> if phys != 0xC0: return other()
 	cp $c0
-	jp nz, Jump_002_7383
+	jp nz, .other
 
+;> if hLinkDirection != 2 or hRoomStatus & 0x10:   # a keyhole, pushed from below, still shut
 	ldh a, [hLinkDirection]
 	cp $02
-	jp nz, Jump_002_7379
+	jp nz, .keyholeSolid
 
 	ldh a, [hRoomStatus]
 	bit 4, a
-	jp nz, Jump_002_7379
+;>     return solid()
+	jp nz, .keyholeSolid
 
+;> if hMapRoom == 0x0E:
 	ldh a, [hMapRoom]
 	cp $0e
-	jr nz, jr_002_72fb
+	jr nz, .room8C
 
-	ld a, [$db14]
+;>     key = wKeyItemFlags[3]                   # Bird Key
+	ld a, [wKeyItemFlags + 3]
+;>     hint = 0x33
 	ld e, $33
-	jr jr_002_7304
+	jr .haveKey
 
-jr_002_72fb:
+.room8C
+;> elif hMapRoom == 0x8C:
 	cp $8c
-	jr nz, jr_002_7321
+	jr nz, .room2B
 
-	ld a, [$db13]
+;>     key = wKeyItemFlags[2]                   # Face Key
+	ld a, [wKeyItemFlags + 2]
+;>     hint = 0x34
 	ld e, $34
 
-jr_002_7304:
+.haveKey
+;> if hMapRoom in (0x0E, 0x8C):
+;>     if not key:
 	and a
-	jr z, jr_002_737c
+;>         return noKey(hint)
+	jr z, .noKey
 
+;>     if hMapRoom == 0x8C:
 	ldh a, [hMapRoom]
 	cp $8c
-	jr nz, jr_002_7312
+	jr nz, .unlockSound
 
+;>         ResetSoundEngine()
 	call ResetSoundEngine
-	jr jr_002_7315
+	jr .keyholeEntity
 
-jr_002_7312:
+.unlockSound
+;>     else:
+;>         PlayUnlockSound()
 	call PlayUnlockSound
 
-jr_002_7315:
+.keyholeEntity
+;>     e = SpawnEntity(0x28)
 	ld a, $28
 	call SpawnEntity
+;>     wEntityPrivate2[e] += 1
 	ld hl, wEntityPrivate2
 	add hl, de
 	inc [hl]
-	jr jr_002_736a
+;>     return opened()
+	jr .opened
 
-jr_002_7321:
+.room2B
+;> elif hMapRoom == 0x2B:
 	cp $2b
-	jr nz, jr_002_733c
+	jr nz, .roomB5
 
-	ld a, [$db12]
+;>     if not wKeyItemFlags[1]:                 # Angler Key
+	ld a, [wKeyItemFlags + 1]
 	and a
 	ld e, $32
-	jr z, jr_002_737c
+;>         return noKey(0x32)
+	jr z, .noKey
 
+;>     ResetSoundEngine()
 	call ResetSoundEngine
+;>     e = SpawnEntity(0x5F)
 	ld a, $5f
 	call SpawnEntity
+;>     wEntityPrivate4[e] -= 1
 	ld hl, wEntityPrivate4
 	add hl, de
 	dec [hl]
-	jr jr_002_736a
+;>     return opened()
+	jr .opened
 
-jr_002_733c:
+.roomB5
+;> elif hMapRoom == 0xB5:
 	cp $b5
-	jr nz, jr_002_734b
+	jr nz, .tailKey
 
+;>     if wGoldenLeaves != 6:                   # Richard's golden leaves
 	ld a, [wGoldenLeaves]
 	cp $06
 	ld e, $31
-	jr nz, jr_002_737c
+;>         return noKey(0x31)
+	jr nz, .noKey
 
-	jr jr_002_7353
+	jr .gate
 
-jr_002_734b:
+.tailKey
+;> elif not wKeyItemFlags[0]:                   # Tail Key
 	ld a, [wKeyItemFlags]
 	and a
 	ld e, $30
-	jr z, jr_002_737c
+;>     return noKey(0x30)
+	jr z, .noKey
 
-jr_002_7353:
+.gate
+;> hMultiPurpose1 = hLinkY                      # the opening gate at Link
 	ldh a, [hLinkY]
 	ldh [hMultiPurpose1], a
+;> hMultiPurpose0 = hLinkX
 	ldh a, [hLinkX]
 	ldh [hMultiPurpose0], a
+;> slot = AddTransientVfx(9)
 	ld a, $09
 	call AddTransientVfx
+;> mem[slot] = 0xDF
 	ld [hl], $df
+;> wLinkPoseLock = 0xDF
 	ld a, $df
 	ld [wLinkPoseLock], a
+;> ResetSoundEngine()
 	call ResetSoundEngine
 
-jr_002_736a:
+.opened
+;>@op wRoomStatus[hMapRoom] |= 0x10                # .opened: the keyhole is open for good
 	ld hl, wRoomStatus
 	ldh a, [hMapRoom]
 	ld e, a
 	ld d, $00
 	add hl, de
 	ld a, [hl]
+;=@op
 	or $10
 	ld [hl], a
+;> hRoomStatus = wRoomStatus[hMapRoom]
 	ldh [hRoomStatus], a
 
-Jump_002_7379:
-	jp Jump_002_75b1
+.keyholeSolid
+;> return solid()
+	jp .solid
 
 
-jr_002_737c:
+.noKey
+;> OpenDialogTable2AndStop(hint)                           # .noKey: a hint about the missing key
 	ld a, e
-	call Call_02_77C4
-	jp Jump_002_75b1
+	call OpenDialogTable2AndStop
+;> return solid()
+	jp .solid
 
 
-Jump_002_7383:
+.other
+;> if hRoomObjectType == 0xDB and wLinkMotionState == 1:   # .other
 	ldh a, [hRoomObjectType]
 	cp $db
-	jr nz, jr_002_7391
+	jr nz, .ledge
 
 	ld a, [wLinkMotionState]
 	cp $01
-	jp z, Jump_002_75b1
+;>     return solid()
+	jp z, .solid
 
-jr_002_7391:
+.ledge
+;> if 0xD0 <= phys < 0xD4:                      # a ledge; side = phys - 0xD0 (right, left, up, down)
 	ldh a, [hMultiPurposeD]
 	cp $d0
-	jp c, Jump_002_741d
+	jp c, .door
 
 	cp $d4
-	jp nc, Jump_002_741d
+	jp nc, .door
 
+;>     side = phys - 0xD0
 	sub $d0
 	ld e, a
+;>@lr     if not wIsIndoor and side == 0 and (hMultiPurpose4 & 0x0F) < 8:
 	ld a, [wIsIndoor]
 	and a
-	jr nz, jr_002_73c3
+	jr nz, .ledgePush
 
 	ld a, e
 	cp $00
-	jr nz, jr_002_73b6
+	jr nz, .ledgeLeft
 
+;=@lr
 	ldh a, [hMultiPurpose4]
 	and $0f
 	cp $08
-	jp c, Jump_002_771c
+;>         return free()                     # only the right half of the square
+	jp c, .free
 
-	jr jr_002_73c3
+	jr .ledgePush
 
-jr_002_73b6:
+.ledgeLeft
+;>     if not wIsIndoor and side == 1 and (hMultiPurpose4 & 0x0F) >= 8:
 	cp $01
-	jr nz, jr_002_73c3
+	jr nz, .ledgePush
 
 	ldh a, [hMultiPurpose4]
 	and $0f
 	cp $08
-	jp nc, Jump_002_771c
+;>         return free()
+	jp nc, .free
 
-jr_002_73c3:
+.ledgePush
+;>@lp     if hLinkDirection == side and not (wLinkPushedTimer or wSpinAttackTimer or wLinkPulledByDevice):
 	ld d, $00
 	ldh a, [hLinkDirection]
 	cp e
-	jp nz, Jump_002_7416
+	jp nz, .resetPush
 
 	ld a, [wLinkPushedTimer]
 	ld hl, wSpinAttackTimer
+;=@lp
 	or [hl]
 	ld hl, wLinkPulledByDevice
 	or [hl]
-	jr nz, jr_002_7416
+	jr nz, .resetPush
 
+;>         if not wIsUsingPegasusBoots:
 	ld a, [wIsUsingPegasusBoots]
 	and a
-	jr nz, jr_002_73f3
+	jr nz, .jumpDown
 
-	ld hl, $7266
+;>             if not (hJoypadHeld & DirectionJoypadBits[side]):
+	ld hl, DirectionJoypadBits
 	add hl, de
 	ldh a, [hJoypadHeld]
 	and [hl]
-	jr z, jr_002_7416
+;>                 return resetPush()
+	jr z, .resetPush
 
+;>             wLinkPushCounter += 1
 	ld a, [wLinkPushCounter]
 	inc a
 	ld [wLinkPushCounter], a
+;>             if wLinkPushCounter < 0x0C:
 	cp $0c
-	jp c, Jump_002_75b1
+;>                 return solid()
+	jp c, .solid
 
-jr_002_73f3:
+.jumpDown
+;>         ResetPegasusBoots()                  # jump down the ledge
 	call ResetPegasusBoots
-	ld hl, $7178
+;>         hLinkSpeedX = LedgeJumpSpeedX[side]
+	ld hl, LedgeJumpSpeedX
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkSpeedX], a
-	ld hl, $717c
+;>         hLinkSpeedY = LedgeJumpSpeedY[side]
+	ld hl, LedgeJumpSpeedY
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkSpeedY], a
+;>         hLinkSpeedZ = 0x1C
 	ld a, $1c
 	ldh [hLinkSpeedZ], a
+;>         wIsLinkInTheAir = 1
 	ld a, $01
 	ld [wIsLinkInTheAir], a
+;>         wIsJumpingDownLedge = 1
 	ld a, $01
 	ld [wIsJumpingDownLedge], a
+;>         hJingle = 0x08
 	ld a, $08
 	ldh [hJingle], a
 
-Jump_002_7416:
-jr_002_7416:
+.resetPush
+;>     wLinkPushCounter = 0                     # .resetPush
 	xor a
 	ld [wLinkPushCounter], a
-	jp Jump_002_75b1
+;>     return solid()
+	jp .solid
 
 
-Jump_002_741d:
+.door
+;> if 0x90 <= phys < 0x99:                      # a door; door = phys - 0x90
 	cp $90
-	jp c, Jump_002_749d
+	jp c, .halfSolid
 
 	cp $99
-	jp nc, Jump_002_75b1
+	jp nc, .solid
 
+;>     door = phys - 0x90
 	sub $90
 	ld e, a
 	ld d, $00
+;>     if not (door & 0x02):                    # top / bottom door: Link must stand in front
 	bit 1, a
-	jr nz, jr_002_7441
+	jr nz, .sideDoor
 
+;>@dx         if ((hLinkX - wDoorX[door] - 0x0C) & 0xFF) >= 8:
 	ld hl, wDoorX
 	add hl, de
 	ld e, [hl]
 	ldh a, [hLinkX]
 	sub e
 	sub $0c
+;=@dx
 	cp $08
-	jp nc, Jump_002_75b1
+;>             return solid()
+	jp nc, .solid
 
-	jr jr_002_7450
+	jr .doorOpen
 
-jr_002_7441:
+.sideDoor
+;>@dy     elif ((hLinkY - wDoorY[door] - 0x14) & 0xFF) >= 8:
 	ld hl, wDoorY
 	add hl, de
 	ld e, [hl]
 	ldh a, [hLinkY]
 	sub e
 	sub $14
+;=@dy
 	cp $08
-	jp nc, Jump_002_75b1
+;>         return solid()
+	jp nc, .solid
 
-jr_002_7450:
+.doorOpen
+;>     if wDoorAnimation:
 	ld a, [wDoorAnimation]
 	and a
-	jp nz, Jump_002_75b1
+;>         return solid()
+	jp nz, .solid
 
+;>     if phys < 0x94:                          # locked doors: use a small key
 	ldh a, [hMultiPurposeD]
 	cp $94
-	jr nc, jr_002_746a
+	jr nc, .notLocked
 
+;>         if not wDungeonSmallKeys:
 	ld a, [wDungeonSmallKeys]
 	and a
-	jp z, Jump_002_75b1
+;>             return solid()
+	jp z, .solid
 
+;>         wDungeonSmallKeys -= 1
 	dec a
 	ld [wDungeonSmallKeys], a
-	jr jr_002_7485
+	jr .openDoor
 
-jr_002_746a:
+.notLocked
+;>     elif phys != 0x98:                       # shutters: only without a room event
 	cp $98
-	jr z, jr_002_7477
+	jr z, .bossDoor
 
+;>         if wRoomEvent:
 	ld a, [wRoomEvent]
 	and a
-	jr z, jr_002_7485
+	jr z, .openDoor
 
-	jp Jump_002_75b1
+;>             return solid()
+	jp .solid
 
 
-jr_002_7477:
+.bossDoor
+;>     elif not wDungeonHasNightmareKey:        # the boss door
 	ld a, [wDungeonHasNightmareKey]
 	and a
-	jr nz, jr_002_7485
+	jr nz, .openDoor
 
+;>         OpenDialogAndStop(0x07)
 	ld a, $07
-	call Call_02_77BE
-	jp Jump_002_75b1
+	call OpenDialogAndStop
+;>         return solid()
+	jp .solid
 
 
-jr_002_7485:
+.openDoor
+;>     wDoorAnimIndex = phys - 0x90             # .openDoor
 	ldh a, [hMultiPurposeD]
 	sub $90
 	ld [wDoorAnimIndex], a
+;>     wDoorAnimFrame = 0
 	xor a
 	ld [wDoorAnimFrame], a
+;>     wDoorAnimation = 1
 	inc a
 	ld [wDoorAnimation], a
+;>     SaveDungeonItemFlags()
 	call SaveDungeonItemFlags
+;>     PlayUnlockSound()
 	call PlayUnlockSound
-	jp Jump_002_75b1
+;>     return solid()
+	jp .solid
 
 
-Jump_002_749d:
+.halfSolid
+;> if phys < 0x7C:
 	cp $7c
-	jp c, Jump_002_771c
+;>     return free()
+	jp c, .free
 
+;> if phys in (0x7C, 0x7D):                     # .halfSolid: objects $7C-$8F
 	push af
-	jr z, jr_002_74a9
+	jr z, .call7723
 
 	cp $7d
-	jr nz, jr_002_74ac
+	jr nz, .quadrant
 
-jr_002_74a9:
-	call Call_02_7723
+.call7723
+;>     CheckRevolvingDoorOrExit()
+	call CheckRevolvingDoorOrExit
 
-jr_002_74ac:
+.quadrant
+;> if phys >= 0x90:
 	pop af
 	cp $90
-	jp nc, Jump_002_771c
+;>     return free()
+	jp nc, .free
 
+;>@q quadrants = HalfSolidObjectQuadrants + (phys - 0x7C) * 4
 	sub $7c
 	sla a
 	sla a
 	ld e, a
 	ld d, $00
-	ld hl, $4979
+;=@q
+	ld hl, HalfSolidObjectQuadrants
 	add hl, de
+;>@qr quarter = ((hMultiPurpose4 >> 3) & 0x01) | ((hMultiPurpose5 >> 2) & 0x02)
 	ldh a, [hMultiPurpose4]
 	rra
 	rra
 	rra
 	and $01
 	ld e, a
+;=@qr
 	ldh a, [hMultiPurpose5]
 	rra
 	rra
 	and $02
 	or e
 	ld e, a
+;> if quadrants[quarter]:
 	ld d, $00
 	add hl, de
 	ld a, [hl]
 	and a
-	jp nz, Jump_002_75b1
+;>     return solid()
+	jp nz, .solid
 
-	jp Jump_002_771c
+;> return free()
+	jp .free
 
 
-Jump_002_74da:
+.deepWater
+;> if wLinkMotionState == 2 or wCarriedEntityType == 0xD5:   # .deepWater
 	ld a, [wLinkMotionState]
 	cp $02
-	jp z, Jump_002_770f
+	jp z, .blocked
 
 	ld a, [wCarriedEntityType]
 	cp $d5
-	jp z, Jump_002_770f
+;>     return blocked()
+	jp z, .blocked
 
+;> if (hMultiPurpose5 & 0x0F) < 8:
 	ldh a, [hMultiPurpose5]
 	and $0f
 	cp $08
-	jp c, Jump_002_771c
+;>     return free()
+	jp c, .free
 
-	call Call_02_71E6
-	jp Jump_002_770f
+;> LinkJumpIntoWaterCentered()
+	call LinkJumpIntoWaterCentered
+;> return blocked()
+	jp .blocked
 
 
-Jump_002_74f9:
+.exit
+;> if wIsCarryingLiftedObject:                  # .exit: stairs and room exits
 	ld a, [wIsCarryingLiftedObject]
 	and a
-	jp nz, Jump_002_770f
+;>     return blocked()
+	jp nz, .blocked
 
+;> if (hMultiPurpose5 & 0x0F) >= 6:
 	ldh a, [hMultiPurpose5]
 	and $0f
 	cp $06
-	jp nc, Jump_002_75a4
+;>     return middle()
+	jp nc, .middle
 
+;>@fs follower_stops = not wIsIndoor and (wIsGhostFollowingLink == 1 or wIsMarinFollowingLink)
 	ld a, [wIsIndoor]
 	and a
-	jr nz, jr_002_7566
+	jr nz, .warp
 
 	ld a, [wIsGhostFollowingLink]
 	cp $01
-	jr z, jr_002_751c
+	jr z, .followerRoom
 
+;=@fs
 	ld a, [wIsMarinFollowingLink]
 	and a
-	jr z, jr_002_7566
+	jr z, .warp
 
-jr_002_751c:
+.followerRoom
+;>@fr if follower_stops and hMapRoom in (0xD3, 0x24, 0xB5, 0x2B, 0xD9, 0xAC, 0x8C, 0x0E):
 	ldh a, [hMapRoom]
 	cp $d3
-	jr z, jr_002_753e
+	jr z, .follower
 
 	cp $24
-	jr z, jr_002_753e
+	jr z, .follower
 
 	cp $b5
-	jr z, jr_002_753e
+;=@fr
+	jr z, .follower
 
 	cp $2b
-	jr z, jr_002_753e
+	jr z, .follower
 
 	cp $d9
-	jr z, jr_002_753e
+	jr z, .follower
 
 	cp $ac
-	jr z, jr_002_753e
+;=@fr
+	jr z, .follower
 
 	cp $8c
-	jr z, jr_002_753e
+	jr z, .follower
 
 	cp $0e
-	jr nz, jr_002_7566
+	jr nz, .warp
 
-jr_002_753e:
+.follower
+;>     if wIsGhostFollowingLink == 1:
 	ld a, [wIsGhostFollowingLink]
 	cp $01
-	jr nz, jr_002_754d
+	jr nz, .marin
 
+;>         OpenDialogTable2AndStop(0x12)
 	ld a, $12
-	call Call_02_77C4
-	jp Jump_002_770f
+	call OpenDialogTable2AndStop
+;>         return blocked()
+	jp .blocked
 
 
-jr_002_754d:
+.marin
+;>     mem[0xDB47] = 0                          # Marin speaks, then the screen fades
 	xor a
 	ld [$db47], a
+;>     mem[0xC3C9] = 0x98
 	ld a, $98
 	ld [$c3c9], a
+;>     OpenDialogTable1(0x98)
 	call OpenDialogTable1
+;>     wMarinReunion = wLowHealth + 1
 	ld a, [wLowHealth]
 	inc a
 	ld [wMarinReunion], a
+;>     StartScreenFadeOut()
 	call StartScreenFadeOut
-	jp Jump_002_770f
+;>     return blocked()
+	jp .blocked
 
 
-jr_002_7566:
+.warp
+;> if wLinkPushedTimer:
 	ld a, [wLinkPushedTimer]
 	and a
-	jp nz, Jump_002_770f
+;>     return blocked()
+	jp nz, .blocked
 
+;> if wIsIndoor:
 	ld a, [wIsIndoor]
 	and a
+;>     return StartWarpFadeOut()
 	jp nz, StartWarpFadeOut
 
+;> return StartWarpFadeOutWithNoise()
 	jp StartWarpFadeOutWithNoise
 
 
-Jump_002_7577:
+.raisedBlock
+;> if wLinkOnRaisedBlock:                       # .raisedBlock
 	ld a, [wLinkOnRaisedBlock]
 	and a
-	jp nz, Jump_002_771c
+;>     return free()
+	jp nz, .free
 
+;> if not (0xDB <= hRoomObjectType < 0xDD):
 	ldh a, [hRoomObjectType]
 	cp $db
-	jr c, jr_002_75b1
+	jr c, .solid
 
 	cp $dd
-	jr nc, jr_002_75b1
+;>     return solid()
+	jr nc, .solid
 
+;>@rb if wRaisedBlocksState ^ RaisedBlockLoweredPhase[hRoomObjectType - 0xDB]:
 	sub $db
 	ld e, a
 	ld d, $00
-	ld hl, $7b35
+	ld hl, RaisedBlockLoweredPhase
 	add hl, de
 	ld a, [wRaisedBlocksState]
+;=@rb
 	xor [hl]
-	jr nz, jr_002_75b1
+;>     return solid()                          # raised
+	jr nz, .solid
 
-	jp Jump_002_771c
+;> return free()                               # lowered
+	jp .free
 
 
-Jump_002_759a:
+.groundVfx
+;> wLinkGroundVfx = 1                           # .groundVfx
 	ld hl, wLinkGroundVfx
 	ld [hl], $01
+;> if phys == 0x0A:
 	cp $0a
-	jp z, Jump_002_771c
+;>     return free()
+	jp z, .free
 
-Jump_002_75a4:
+.middle
+;> if 6 <= (hMultiPurpose4 & 0x0F) < 0x0B:      # .middle: only the middle of the square is free
 	ldh a, [hMultiPurpose4]
 	and $0f
 	cp $06
-	jr c, jr_002_75b1
+	jr c, .solid
 
 	cp $0b
-	jp c, Jump_002_771c
+;>     return free()
+	jp c, .free
 
-Jump_002_75b1:
-jr_002_75b1:
+.solid
+;>@69 if hRoomObjectType == 0x69 and (hLinkDirection != hMultiPurposeC or not wIsUsingShield):   # .solid
 	ldh a, [hRoomObjectType]
 	cp $69
-	jr nz, jr_002_75c8
+	jr nz, .pushing
 
 	ld hl, hMultiPurposeC
 	ldh a, [hLinkDirection]
 	cp [hl]
-	jr nz, jr_002_75c5
+;=@69
+	jr nz, .call78B5
 
 	ld a, [wIsUsingShield]
 	and a
-	jr nz, jr_002_75c8
+	jr nz, .pushing
 
-jr_002_75c5:
-	call Call_02_78B5
+.call78B5
+;>     HurtLinkOnGround()
+	call HurtLinkOnGround
 
-jr_002_75c8:
+.pushing
+;>@pu if hLinkDirection == hMultiPurposeC and not (wLinkPushedTimer or wIsLinkInTheAir):   # pushing into it
 	ld hl, hMultiPurposeC
 	ldh a, [hLinkDirection]
 	cp [hl]
-	jr nz, jr_002_7634
+	jr nz, .sword
 
 	ld a, [wLinkPushedTimer]
 	ld hl, wIsLinkInTheAir
+;=@pu
 	or [hl]
-	jr nz, jr_002_7634
+	jr nz, .sword
 
+;>     hint = None
+;>     if wIsIndoor:
 	ld a, [wIsIndoor]
 	and a
 	ldh a, [hRoomObjectType]
-	jr z, jr_002_760b
+	jr z, .outdoorHint
 
+;>         if hRoomObjectType == 0xA9:
 	ld e, $8a
 	cp $a9
-	jr z, jr_002_7626
+;>             hint = 0x8A
+	jr z, .hint
 
+;>@cr         elif hRoomObjectType in (0x4F, 0x4E, 0x88):   # crystal blocks
 	ld e, $8b
 	cp $4f
-	jr z, jr_002_75f5
+	jr z, .crystal
 
 	cp $4e
-	jr z, jr_002_75f5
+	jr z, .crystal
 
 	cp $88
-	jr nz, jr_002_75fd
+;=@cr
+	jr nz, .keyBlock
 
-jr_002_75f5:
+.crystal
+;>             if not wIsUsingPegasusBoots:
 	ld a, [wIsUsingPegasusBoots]
 	and a
-	jr nz, jr_002_7634
+	jr nz, .sword
 
-	jr jr_002_7626
+;>                 hint = 0x8B
+	jr .hint
 
-jr_002_75fd:
+.keyBlock
+;>         elif hRoomObjectType == 0xDE and not wDungeonSmallKeys:   # a key block
 	cp $de
-	jr nz, jr_002_760b
+	jr nz, .outdoorHint
 
 	ld a, [wDungeonSmallKeys]
 	and a
-	jr nz, jr_002_7634
+	jr nz, .sword
 
+;>             hint = 0x8C
 	ld e, $8c
-	jr jr_002_7626
+	jr .hint
 
-jr_002_760b:
+.outdoorHint
+;>@br     if hRoomObjectType == 0x20 and wItemA != 3 and wItemB != 3 and not (wHasInstrument2 & 0x02):
 	cp $20
-	jr nz, jr_002_7634
+	jr nz, .sword
 
 	ld a, [wItemA]
 	cp $03
-	jr z, jr_002_7634
+	jr z, .sword
 
+;=@br
 	ld a, [wItemB]
 	cp $03
-	jr z, jr_002_7634
+	jr z, .sword
 
 	ld a, [wHasInstrument2]
 	and $02
-	jr nz, jr_002_7634
+	jr nz, .sword
 
+;>         hint = 0x8D                         # a heavy object: the power bracelet is needed
 	ld e, $8d
 
-jr_002_7626:
+.hint
+;>     if hint and not wRoomEventJustDone:
 	ld a, [wRoomEventJustDone]
 	and a
-	jr nz, jr_002_7634
+	jr nz, .sword
 
+;>         wRoomEventJustDone = 1
 	inc a
 	ld [wRoomEventJustDone], a
+;>         OpenDialogAndStop(hint)
 	ld a, e
-	call Call_02_77BE
+	call OpenDialogAndStop
 
-jr_002_7634:
+.sword
+;> if not wIsUsingPegasusBoots and wSwordAnimationStatePrev == 5:   # the sword held out against it
 	ld a, [wIsUsingPegasusBoots]
 	and a
-	jr nz, jr_002_766a
+	jr nz, .push
 
 	ld a, [wSwordAnimationStatePrev]
 	cp $05
-	jr nz, jr_002_766a
+	jr nz, .push
 
-	ld hl, $716c
+;>     if hLinkDirection != WallProbeDirections[probe]:
+	ld hl, WallProbeDirections
 	add hl, bc
 	ldh a, [hLinkDirection]
 	cp [hl]
-	jp nz, Jump_002_770f
+;>         return blocked()
+	jp nz, .blocked
 
+;>     wSwordPokeCounter += 1
 	ld a, [wSwordPokeCounter]
 	inc a
 	ld [wSwordPokeCounter], a
+;>     if wSwordPokeCounter < 0x0C:
 	cp $0c
-	jp c, Jump_002_770f
+;>         return blocked()
+	jp c, .blocked
 
+;>     wSwordPokeCounter = 0                    # poke it
 	xor a
 	ld [wSwordPokeCounter], a
+;>     wSpinAttackTimer = 0
 	xor a
 	ld [wSpinAttackTimer], a
+;>     wSwordCharge = 0
 	ld [wSwordCharge], a
+;>     wSwordPokeTimer = 0x0C
 	ld a, $0c
 	ld [wSwordPokeTimer], a
-	jp Jump_002_770f
+;>     return blocked()
+	jp .blocked
 
 
-jr_002_766a:
+.push
+;> if not wIsUsingShield:
 	ld a, [wIsUsingShield]
 	and a
-	jr nz, jr_002_7675
+	jr nz, .crystalCheck
 
+;>     wLinkPushingTimer = 3
 	ld a, $03
 	ld [wLinkPushingTimer], a
 
-jr_002_7675:
+.crystalCheck
+;>@cc if hMapId and hRoomObjectType in (0x88, 0x4E, 0x4F):   # crystal blocks
 	ldh a, [hMapId]
 	and a
 	ldh a, [hRoomObjectType]
-	jr z, jr_002_76db
+	jr z, .pushBlock
 
 	cp $88
-	jr z, jr_002_7689
+	jr z, .breakCrystal
 
+;=@cc
 	cp $4e
-	jr z, jr_002_7689
+	jr z, .breakCrystal
 
 	cp $4f
-	jp nz, Jump_002_76db
+	jp nz, .pushBlock
 
-jr_002_7689:
+.breakCrystal
+;>     if not wIsUsingPegasusBoots:
 	ld a, [wIsUsingPegasusBoots]
 	and a
-	jp z, Jump_002_770f
+;>         return blocked()
+	jp z, .blocked
 
+;>     hBGPosX = hMultiPurpose4 & 0xF0          # the dash breaks it
 	ldh a, [hMultiPurpose4]
 	and $f0
 	ldh [hBGPosX], a
+;>     hBGPosY = hMultiPurpose5 & 0xF0
 	ldh a, [hMultiPurpose5]
 	and $f0
 	ldh [hBGPosY], a
+;>     RemoveRoomObject(hMultiPurposeH)
 	ldh a, [hMultiPurposeH]
 	ld e, a
 	ld d, $00
 	call RemoveRoomObject
+;>     e = SpawnEntity(0x05)                    # the pieces
 	ld a, $05
 	call SpawnEntity
-	jr c, jr_002_770f
+;>     if not e:                                # (carry: no free slot)
+;>         return blocked()
+	jr c, .blocked
 
+;>@ex     wEntityX[e] = ((hMultiPurposeH << 4) & 0xF0) + 8
 	ld hl, wEntityX
 	add hl, de
 	ldh a, [hMultiPurposeH]
 	swap a
 	and $f0
 	add $08
+;=@ex
 	ld [hl], a
+;>     wEntityY[e] = (hMultiPurposeH & 0xF0) + 0x10
 	ld hl, wEntityY
 	add hl, de
 	ldh a, [hMultiPurposeH]
 	and $f0
 	add $10
 	ld [hl], a
+;>     wEntitySpriteVariant[e] = 0
 	ld hl, wEntitySpriteVariant
 	add hl, de
 	ld [hl], d
+;>     hNoiseSfx = 0x09
 	ld hl, hNoiseSfx
 	ld [hl], $09
+;>     wEntityTimer1[e] = 0x0F
 	ld hl, wEntityTimer1
 	add hl, de
 	ld [hl], $0f
+;>     wEntityPhysicsFlags[e] = 0xC4
 	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], $c4
-	jr jr_002_771c
+;>     return free()
+	jr .free
 
-Jump_002_76db:
-jr_002_76db:
+.pushBlock
+;> frames = 0x20                                # push blocks: how long to push
 	ld e, $20
+;> if hRoomObjectType == 0xC5:
 	cp $c5
-	jr nz, jr_002_76e9
+	jr nz, .indoorBlock
 
+;>     if wIsIndoor:
 	ld a, [wIsIndoor]
 	and a
-	jr z, jr_002_76f9
+	jr z, .slow
 
-	jr jr_002_770f
+;>         return blocked()
+	jr .blocked
 
-jr_002_76e9:
+.indoorBlock
+;>@ib elif not wIsIndoor or hRoomObjectType not in (0xDE, 0xA7):
 	ld a, [wIsIndoor]
 	and a
-	jr z, jr_002_770f
+	jr z, .blocked
 
 	ldh a, [hRoomObjectType]
 	cp $de
-	jr z, jr_002_76fb
+	jr z, .count
 
+;=@ib
 	cp $a7
-	jr nz, jr_002_770f
+;>     return blocked()
+	jr nz, .blocked
 
-jr_002_76f9:
+.slow
+;> if hRoomObjectType != 0xDE:
+;>     frames = 0x40
 	ld e, $40
 
-jr_002_76fb:
+.count
+;> wLinkPushCounter += 1
 	ld a, [wLinkPushCounter]
 	inc a
 	ld [wLinkPushCounter], a
+;> if wLinkPushCounter >= frames:
 	cp e
-	jr c, jr_002_770f
+	jr c, .blocked
 
+;>     hBGTilesRequestCopy = frames
 	ld a, e
 	ldh [hBGTilesRequestCopy], a
+;>     wLinkPushCounter = 0
 	xor a
 	ld [wLinkPushCounter], a
+;>     OpenLockedOrPushBlock()
 	call OpenLockedOrPushBlock
 
-Jump_002_770f:
-jr_002_770f:
-	ld hl, $7164
+.blocked
+;> wLinkCollisionFlags |= WallBlockedBits[probe]   # .blocked
+	ld hl, WallBlockedBits
 	add hl, bc
 	ld a, [wLinkCollisionFlags]
 	or [hl]
 	ld [wLinkCollisionFlags], a
+;> return True
 	scf
 	ret
 
 
-Jump_002_771c:
-jr_002_771c:
+.free
+;> wLinkPushCounter = 0                         # .free
 	xor a
 	ld [wLinkPushCounter], a
+;> return False
 	scf
 	ccf
 	ret
 
 
-Call_02_7723::
+;@ def CheckRevolvingDoorOrExit()
+;@ path: link/collision
+;@ For the half-solid objects with physics $7C / $7D: objects $B1 / $B2 start the revolving door (Link's
+;@ motion state 5) when the probe point is in the upper part of the square; objects $C1, $C2, $BB, $BC
+;@ are exits when the point is in its lowest 4 rows.
+;@ test: skip calls routines that the trial stands in for without a result
+CheckRevolvingDoorOrExit::
+;> if hRoomObjectType in (0xB1, 0xB2):          # a revolving door
 	ldh a, [hRoomObjectType]
 	cp $b1
-	jr z, jr_002_772d
+	jr z, .door
 
 	cp $b2
-	jr nz, jr_002_774f
+	jr nz, .exits
 
-jr_002_772d:
+.door
+;>     if (hMultiPurpose5 & 0x0F) >= 6:
 	ldh a, [hMultiPurpose5]
 	and $0f
 	cp $06
-	jr nc, jr_002_7768
+;>         return
+	jr nc, .done
 
+;>     hJingle = 0x0C
 	ld a, $0c
 	ldh [hJingle], a
+;>     wLinkMotionState = 5                     # LinkMotionRevolvingDoor
 	ld a, $05
 	ld [wLinkMotionState], a
+;>     a = StopLinkSpeed()                      # (0)
 	call StopLinkSpeed
+;>     wInvincibilityCounter = a
 	ld [wInvincibilityCounter], a
+;>     wLinkMotionCounter = a
 	ld [wLinkMotionCounter], a
+;>     hLinkPositionZ = a
 	ldh [hLinkPositionZ], a
+;>     hLinkSpeedZ = a
 	ldh [hLinkSpeedZ], a
+;>     ResetSpinAttackAndDash()
 	call ResetSpinAttackAndDash
+;>     return
 	ret
 
 
-jr_002_774f:
+.exits
+;>@ex if hRoomObjectType in (0xC1, 0xC2, 0xBB, 0xBC):
 	cp $c1
-	jr z, jr_002_775f
+	jr z, .exit
 
 	cp $c2
-	jr z, jr_002_775f
+	jr z, .exit
 
 	cp $bb
-	jr z, jr_002_775f
+	jr z, .exit
 
+;=@ex
 	cp $bc
-	jr nz, jr_002_7768
+	jr nz, .done
 
-jr_002_775f:
+.exit
+;>     if (hMultiPurpose5 & 0x0F) >= 0x0C:
 	ldh a, [hMultiPurpose5]
 	and $0f
 	cp $0c
+;>         return StartWarpFadeOutWithNoise()
 	jp nc, StartWarpFadeOutWithNoise
 
-jr_002_7768:
+.done
 	ret
 
 
-Call_02_7769::
+;@ def BounceOffWallAfterDash()
+;@ path: link/collision
+;@ When Link dashes (bank 2 running) into a wall with both probe points of an axis blocked, he bounces
+;@ back up into the air at a quarter of his speed, the screen shakes and SetDashBumpPoint lets the
+;@ things there react.
+BounceOffWallAfterDash::
+;> if not wIsUsingPegasusBoots or wCurrentBank != 0x02:
 	ld a, [wIsUsingPegasusBoots]
 	and a
-	jr z, jr_002_77bd
+	jr z, .done
 
 	ld a, [wCurrentBank]
 	cp $02
-	jr nz, jr_002_77bd
+;>     return
+	jr nz, .done
 
+;>@ax if (wLinkCollisionFlags & 0x03) != 0x03 and (wLinkCollisionFlags & 0x0C) != 0x0C:
 	ld a, [wLinkCollisionFlags]
 	and $03
 	cp $03
-	jr z, jr_002_7788
+	jr z, .bounce
 
+;=@ax
 	ld a, [wLinkCollisionFlags]
 	and $0c
 	cp $0c
-	jr nz, jr_002_77bd
+;>     return
+	jr nz, .done
 
-jr_002_7788:
+.bounce
+;> ResetSpinAttackAndDash()
 	call ResetSpinAttackAndDash
+;> hLinkSpeedX = -hLinkSpeedX >> 2              # (arithmetic shift)
 	ldh a, [hLinkSpeedX]
 	cpl
 	inc a
 	sra a
 	sra a
 	ldh [hLinkSpeedX], a
+;> hLinkSpeedY = -hLinkSpeedY >> 2
 	ldh a, [hLinkSpeedY]
 	cpl
 	inc a
 	sra a
 	sra a
 	ldh [hLinkSpeedY], a
+;> hLinkSpeedZ = 0x18
 	ld a, $18
 	ldh [hLinkSpeedZ], a
+;> wIsLinkInTheAir = 2
 	ld a, $02
 	ld [wIsLinkInTheAir], a
+;> wBumpShakeTimer = 0x20
 	ld a, $20
 	ld [wBumpShakeTimer], a
+;> wBumpShakeAxis = (hLinkDirection & 0x02) << 1
 	ldh a, [hLinkDirection]
 	and $02
 	sla a
 	ld [wBumpShakeAxis], a
+;> hJingle = 0x0B
 	ld a, $0b
 	ldh [hJingle], a
+;> SetDashBumpPoint()
 	call SetDashBumpPoint
 
-jr_002_77bd:
+.done
 	ret
 
 
-Call_02_77BE::
+;@ def OpenDialogAndStop(dialog: a)
+;@ path: link/collision
+;@ Opens a dialog (OpenDialog) and stops Link.
+OpenDialogAndStop::
+;> OpenDialog(dialog)
 	call OpenDialog
+;> return StopLinkSpeed()
 	jp StopLinkSpeed
 
 
-Call_02_77C4::
+;@ def OpenDialogTable2AndStop(dialog: a)
+;@ path: link/collision
+;@ Opens a dialog of the second table (OpenDialogTable2) and stops Link.
+OpenDialogTable2AndStop::
+;> OpenDialogTable2(dialog)
 	call OpenDialogTable2
+;> return StopLinkSpeed()
 	jp StopLinkSpeed
 
 
+;@ path: link/collision
+;@ X speed of Link entering deep water by direction (right 8, left -8, up / down 0). Read by
+;@ CheckGroundUnderLink.
 SwimEntrySpeedX::
 	db $08, $f8, $00, $00
 
+;@ path: link/collision
+;@ Y speed of Link entering deep water by direction (up -8, down 8, right / left 0).
 SwimEntrySpeedY::
 	db $00, $00, $f8, $08
 
-Call_02_77D2::
+;@ def GetObjectUnderLink() -> a
+;@ path: link/collision
+;@ The room object under Link's feet (square of x and y - 4): its square in hLinkSquare and its
+;@ position in hMultiPurpose0 / 1 (x, y of the square), the object in hObjectUnderLink and
+;@ hRoomObjectType; returns it in a and e with d = wIsIndoor, ready for GetObjectPhysics.
+;@ test: hLinkX = rand(0, 0x9F); hLinkY = rand(0x04, 0x8F); wIsIndoor = rand(0, 1)
+GetObjectUnderLink::
+;> hMultiPurpose0 = hLinkX & 0xF0
 	ldh a, [hLinkX]
 	and $f0
 	ldh [hMultiPurpose0], a
+;> column = hMultiPurpose0 >> 4
 	swap a
 	ld e, a
+;> hMultiPurpose1 = (hLinkY - 4) & 0xF0
 	ldh a, [hLinkY]
 	sub $04
 	and $f0
 	ldh [hMultiPurpose1], a
+;> hLinkSquare = hMultiPurpose1 | column
 	or e
 	ld e, a
 	ldh [hLinkSquare], a
+;>@o object = wRoomObjects[hLinkSquare]           # (the address wraps within its page)
 	ld d, $00
 	ld hl, wRoomObjects
 	ld a, h
 	add hl, de
 	ld h, a
 	ld a, [wIsIndoor]
+;=@o
 	ld d, a
 	ld a, [hl]
+;> hObjectUnderLink = object
 	ldh [hObjectUnderLink], a
+;> hRoomObjectType = object
 	ldh [hRoomObjectType], a
+;> return object                                # (also in e; d = wIsIndoor)
 	ld e, a
 	ret
 
 
-Jump_002_77fa:
+;@ def UpdateLinkGround()
+;@ path: link/collision
+;@ Every frame after Link moved (from bank 0 and the motion routines): with the hookshot out only the
+;@ sprite offset on the ground (SetLinkSpriteDY); in the air his shadow; on the ground the effects of
+;@ what he stands on (CheckGroundUnderLink).
+;@ test: skip runs on into SetLinkSpriteDY
+UpdateLinkGround::
+;> if wLinkMotionState == 1:                   # swimming
 	ld a, [wLinkMotionState]
 	cp $01
-	jr nz, jr_002_7809
+	jr nz, .hookshot
 
+;>     wLinkSpriteDY += 4
 	ld a, [wLinkSpriteDY]
 	add $04
 	ld [wLinkSpriteDY], a
 
-jr_002_7809:
+.hookshot
+;> if not wHookshotInUse:
 	ld a, [wHookshotInUse]
 	and a
-	jr z, jr_002_7847
+;>     return UpdateLinkShadow()
+	jr z, UpdateLinkShadow
 
+;> if not (wIsUsingPegasusBoots or wIsLinkInTheAir):
 	ld hl, wIsLinkInTheAir
 	ld a, [wIsUsingPegasusBoots]
 	or [hl]
-	jr nz, Call_02_781B
+	jr nz, SetLinkSpriteDY
 
+;>     StopLinkSpeed()
 	call StopLinkSpeed
 
-Call_02_781B::
-	call Call_02_77D2
+;@ def SetLinkSpriteDY()
+;@ path: link/collision
+;@ Sets wLinkSpriteDY, how far Link's sprite sits lower or higher on the ground: +4 while swimming,
+;@ -4 on a raised block, +2 in shallow water or tall grass (physics 5 / 9), -3 on physics 8.
+;@ This unit also holds the rest of UpdateLinkGround (UpdateLinkShadow).
+;@ test: skip depends on GetObjectPhysics, which the trial stands in for
+SetLinkSpriteDY::
+;> object = GetObjectUnderLink()
+	call GetObjectUnderLink
+;> if wSavedLinkMotionState == 1:
 	ld c, $04
 	ld a, [wSavedLinkMotionState]
 	cp $01
-	jr z, jr_002_7842
+;>     dy = 4
+	jr z, .set
 
+;> elif wLinkOnRaisedBlock:
 	ld c, $fc
 	ld a, [wLinkOnRaisedBlock]
 	and a
-	jr nz, jr_002_7842
+;>     dy = -4
+	jr nz, .set
 
+;> else:
+;>     phys = GetObjectPhysics(object, wIsIndoor)
 	call GetObjectPhysics
+;>     if phys in (0x05, 0x09):
 	ld c, $02
 	cp $05
-	jr z, jr_002_7842
+	jr z, .set
 
 	cp $09
-	jr z, jr_002_7842
+;>         dy = 2
+	jr z, .set
 
+;>     elif phys == 0x08:                       # (other physics: return without a change)
 	cp $08
-	jr nz, jr_002_7846
+	jr nz, .done
 
+;>         dy = -3
 	ld c, $fd
+;>     else:
+;>         return
 
-jr_002_7842:
+.set
+;> wLinkSpriteDY = dy
 	ld a, c
 	ld [wLinkSpriteDY], a
 
-jr_002_7846:
+.done
 	ret
 
 
-jr_002_7847:
+UpdateLinkShadow:
+;> hLinkSquarePrev = hLinkSquare                # (UpdateLinkGround without the hookshot)
 	ldh a, [hLinkSquare]
 	ldh [hLinkSquarePrev], a
+;> if wDebugToggle:
 	ld a, [wDebugToggle]
 	and a
+;>     return
 	ret nz
 
+;> if hLinkPositionZ:                           # in the air: his shadow, every other frame
 	ldh a, [hLinkPositionZ]
 	and a
-	jr z, jr_002_7872
+	jr z, .ground
 
+;>@sh     if not (hFrameCounter & 0x01) and hLinkY + 0x0B < 0x88:
 	ldh a, [hFrameCounter]
 	and $01
-	jr nz, jr_002_7871
+	jr nz, .done
 
 	ld hl, wOAMBuffer
 	ldh a, [hLinkY]
 	add $0b
+;=@sh
 	cp $88
-	jr nc, jr_002_7871
+	jr nc, .done
 
+;>         wOAMBuffer[0] = hLinkY + 0x0B
 	ld [hli], a
+;>         wOAMBuffer[1] = hLinkX + 4
 	ldh a, [hLinkX]
 	add $04
 	ld [hli], a
+;>         wOAMBuffer[2] = 0x26
 	ld a, $26
 	ld [hli], a
+;>         wOAMBuffer[3] = 0x00
 	ld [hl], $00
 
-jr_002_7871:
+.done
+;>     return
 	ret
 
 
-jr_002_7872:
+.ground
+;> wIsSpinningInHole = 0
 	xor a
 	ld [wIsSpinningInHole], a
+;> if wLinkMotionState == 2:                    # jumping
 	ld a, [wLinkMotionState]
 	cp $02
-	jr z, jr_002_7871
+;>     return                                   # else on into CheckGroundUnderLink
+	jr z, .done
 
-Call_02_787D::
+;@ def CheckGroundUnderLink()
+;@ path: link/ground
+;@ Acts on the ground under Link (wLinkGroundType = the physics of the object at his feet): spikes hurt
+;@ him, sinking sand pulls him into its middle and swallows him, holes make him fall, conveyors and
+;@ water currents carry him, deep water makes him swim (or drown without the flippers), tall grass
+;@ and shallow water show at his feet, slopes and raised blocks shift his sprite, floor switches are
+;@ pressed by standing on them and cracked floor gives way after a while. During a room transition or
+;@ a dialog only the sprite part runs.
+;@ test: skip runs on into HurtLinkOnGround (OtherGround is HurtLinkOnGround.other)
+CheckGroundUnderLink::
+;> if wRoomTransitionState or wDialogState:
 	ld a, [wRoomTransitionState]
 	ld hl, wDialogState
 	or [hl]
-	jp nz, Jump_002_7980
+;>     return GroundEffects()
+	jp nz, GroundEffects
 
-	call Call_02_77D2
+;> object = GetObjectUnderLink()
+	call GetObjectUnderLink
 	ld c, a
+;> if not wIsIndoor:
 	ld a, [wIsIndoor]
 	and a
-	jr nz, jr_002_7899
+	jr nz, .indoor
 
+;>     if object == 0x61:                       # a hole outdoors
 	ld a, c
 	cp $61
-	jp z, Jump_002_796a
+;>         return FallIntoHole()
+	jp z, FallIntoHole
 
-	jr jr_002_78a7
+	jr .physics
 
-jr_002_7899:
+.indoor
+;>@4c elif object == 0x4C and ((hLinkY - 1) & 0x0F) >= 0x0C:
 	ld a, c
 	cp $4c
-	jr nz, jr_002_78a7
+	jr nz, .physics
 
 	ldh a, [hLinkY]
 	dec a
 	and $0f
+;=@4c
 	cp $0c
-	jr nc, Call_02_78B5
+;>     return HurtLinkOnGround()
+	jr nc, HurtLinkOnGround
 
-jr_002_78a7:
+.physics
+;> wLinkGroundType = GetObjectPhysics(object, wIsIndoor)
 	call GetObjectPhysics
 	ld [wLinkGroundType], a
+;> if wLinkGroundType == 0x00:
 	and a
-	jp z, Jump_002_7a5c
+;>     return NormalGround()
+	jp z, NormalGround
 
+;> if wLinkGroundType != 0xE0:                  # else spikes: on into HurtLinkOnGround
+;>     return OtherGround()
 	cp $e0
-	jr nz, jr_002_78f5
+	jr nz, HurtLinkOnGround.other
 
-Call_02_78B5::
+;@ def HurtLinkOnGround()
+;@ path: link/ground
+;@ Spikes and similar ground: unless Link is invincible he bounces back (speed reversed, into the air),
+;@ loses half a heart and is invincible for a moment. This unit also holds the rest of
+;@ CheckGroundUnderLink: sinking sand, falling into a hole, and GroundEffects.
+;@ test: skip runs on into LinkDrown (StartSwimming is LinkDrown.swim)
+HurtLinkOnGround::
+;> if wInvincibilityCounter:
 	ld a, [wInvincibilityCounter]
 	and a
-	jr nz, jr_002_78f4
+;>     return
+	jr nz, .done
 
+;> ResetSpinAttackAndDash()
 	call ResetSpinAttackAndDash
+;> hLinkSpeedX = -hLinkSpeedX
 	ldh a, [hLinkSpeedX]
 	cpl
 	inc a
 	ldh [hLinkSpeedX], a
+;> hLinkSpeedY = -hLinkSpeedY
 	ldh a, [hLinkSpeedY]
 	cpl
 	inc a
 	ldh [hLinkSpeedY], a
+;> wIsLinkInTheAir = 2
 	ld a, $02
 	ld [wIsLinkInTheAir], a
+;> if not hIsSideScrolling:
 	ldh a, [hIsSideScrolling]
 	and a
-	jr nz, jr_002_78de
+	jr nz, .damage
 
+;>     hLinkSpeedZ = 0x10
 	ld a, $10
 	ldh [hLinkSpeedZ], a
+;>     hLinkPositionZ += 2
 	ldh a, [hLinkPositionZ]
 	add $02
 	ldh [hLinkPositionZ], a
 
-jr_002_78de:
+.damage
+;> wLinkPushedTimer = 0x10
 	ld a, $10
 	ld [wLinkPushedTimer], a
+;> wInvincibilityCounter = 0x30
 	ld a, $30
 	ld [wInvincibilityCounter], a
+;> wSubtractHealthBuffer += 4
 	ld a, [wSubtractHealthBuffer]
 	add $04
 	ld [wSubtractHealthBuffer], a
+;> hWaveSfx = 0x03
 	ld a, $03
 	ldh [hWaveSfx], a
 
-jr_002_78f4:
+.done
 	ret
 
 
-jr_002_78f5:
+.other
+;> if wLinkGroundType == 0xFF:                  # (CheckGroundUnderLink, other ground)
 	ld a, [wLinkGroundType]
 	cp $ff
-	jp z, Jump_002_7a5c
+;>     return NormalGround()
+	jp z, NormalGround
 
+;> if wLinkGroundType >= 0xF0:
 	cp $f0
-	jr c, jr_002_7904
+	jr c, .sand
 
-	jp Jump_002_7e6e
+;>     return OnConveyor()
+	jp OnConveyor
 
 
-jr_002_7904:
+.sand
+;> if wLinkGroundType not in (0x50, 0x51):      # sinking sand
 	cp $51
-	jr z, jr_002_790c
+	jr z, .sinking
 
 	cp $50
-	jr nz, jr_002_7980
+;>     return GroundEffects()
+	jr nz, GroundEffects
 
-jr_002_790c:
+.sinking
+;> ResetSpinAttackAndDash()
 	call ResetSpinAttackAndDash
+;> wLinkGroundVfx = 7
 	ld a, $07
 	ld [wLinkGroundVfx], a
+;> wSinkingSandCounter += 1
 	ld hl, wSinkingSandCounter
 	inc [hl]
+;> if (hFrameCounter & 0x03) or wDebugToggle:   # pulled every 4th frame
 	ld hl, wDebugToggle
 	ldh a, [hFrameCounter]
 	and $03
 	or [hl]
-	jr nz, jr_002_797f
+;>     return
+	jr nz, FallIntoHole.end
 
+;>@px hLinkX += -1 if hLinkX - 8 - hMultiPurpose0 >= 0 else 1   # toward the middle of the square
 	ldh a, [hLinkX]
 	sub $08
 	ld hl, hMultiPurpose0
 	sub [hl]
 	bit 7, a
 	ld a, $ff
-	jr z, jr_002_7932
+;=@px
+	jr z, .moveX
 
 	ld a, $01
 
-jr_002_7932:
+.moveX
+;=@px
 	ld hl, hLinkX
 	add [hl]
 	ld [hl], a
+;>@py hLinkY += -1 if hMultiPurpose1 + 0x10 - hLinkY < 0 else 1
 	ldh a, [hMultiPurpose1]
 	add $10
 	ld hl, hLinkY
 	sub [hl]
 	bit 7, a
 	ld a, $ff
-	jr nz, jr_002_7947
+;=@py
+	jr nz, .moveY
 
 	ld a, $01
 
-jr_002_7947:
+.moveY
+;=@py
 	ld hl, hLinkY
 	add [hl]
 	ld [hl], a
+;> if ((hLinkX - 8 + 2) & 0x0F) >= 4:           # not yet in the middle
 	ldh a, [hLinkX]
 	sub $08
 	add $02
 	and $0f
 	cp $04
-	jr nc, jr_002_797f
+;>     return
+	jr nc, FallIntoHole.end
 
+;> if ((hLinkY - 0x10 + 2) & 0x0F) >= 4:
 	ldh a, [hLinkY]
 	sub $10
 	add $02
 	and $0f
 	cp $04
-	jr nc, jr_002_797f
+;>     return
+	jr nc, FallIntoHole.end
 
+;> hLinkY += 3
 	ldh a, [hLinkY]
 	add $03
 	ldh [hLinkY], a
 
-Jump_002_796a:
+FallIntoHole:
+;> wLinkMotionState = 6                         # FallIntoHole: LinkMotionFallingDown
 	ld a, $06
 	ld [wLinkMotionState], a
+;> wLinkMotionCounter = ResetSpinAttackAndDash()   # (0)
 	call ResetSpinAttackAndDash
 	ld [wLinkMotionCounter], a
+;> wHoleCollisionType = wLinkGroundType
 	ld a, [wLinkGroundType]
 	ld [wHoleCollisionType], a
+;> hWaveSfx = 0x0C
 	ld a, $0c
 	ldh [hWaveSfx], a
 
-jr_002_797f:
+.end
 	ret
 
 
-Jump_002_7980:
-jr_002_7980:
+GroundEffects:
+;> oam = wOAMBuffer                             # GroundEffects
 	ld hl, wOAMBuffer
+;> if wLinkGroundType == 0x08:                  # a slope up
 	ld a, [wLinkGroundType]
 	cp $08
-	jr nz, jr_002_7995
+	jr nz, .slopeDown
 
+;>     wLinkSpriteDY -= 3
 	ld a, [wLinkSpriteDY]
 	add $fd
 	ld [wLinkSpriteDY], a
-	jp Jump_002_7a5c
+;>     return NormalGround()
+	jp NormalGround
 
 
-jr_002_7995:
+.slopeDown
+;> elif wLinkGroundType == 0x09:
 	cp $09
-	jr nz, jr_002_79a4
+	jr nz, .deepWater
 
+;>     wLinkSpriteDY += 2
 	ld a, [wLinkSpriteDY]
 	add $02
 	ld [wLinkSpriteDY], a
-	jp Jump_002_7a5c
+;>     return NormalGround()
+	jp NormalGround
 
 
-jr_002_79a4:
+.deepWater
+;> elif wLinkGroundType in (0x0B, 0x07):        # deep water
 	cp $0b
-	jr z, jr_002_79ac
+	jr z, .water
 
 	cp $07
-	jr nz, jr_002_7a10
+	jr nz, GroundEffectsOther
 
-jr_002_79ac:
+.water
+;>     if hLinkInWater:
 	ldh a, [hLinkInWater]
 	and a
-	jr z, jr_002_79b4
+	jr z, .enter
 
-	jp Jump_002_7eaa
+;>         return InWaterCurrent()
+	jp InWaterCurrent
 
 
-jr_002_79b4:
+.enter
+;>     if wCanTalkToEntity == 0x80:
 	ld a, [wCanTalkToEntity]
 	cp $80
-	jr z, jr_002_7a10
+;>         return GroundEffectsOther()
+	jr z, GroundEffectsOther
 
+;>     if wLinkMotionState in (8, 1):           # already recovering / swimming
 	ld a, [wLinkMotionState]
 	cp $08
-	jr z, jr_002_7a0f
+	jr z, LinkDrown.done
 
 	cp $01
-	jr z, jr_002_7a0f
+;>         return
+	jr z, LinkDrown.done
 
+;>     AddSplashAtLinkY(hLinkY - 2)
 	ldh a, [hLinkY]
 	add $fe
 	call AddSplashAtLinkY
+;>     if hRoomObjectType != 0x06 and wHasFlippers:   # (else on into LinkDrown)
 	ldh a, [hRoomObjectType]
 	cp $06
-	jr z, Call_02_79D9
+	jr z, LinkDrown
 
 	ld a, [wHasFlippers]
 	and a
-	jr nz, jr_002_79f2
+;>         return StartSwimming()
+	jr nz, LinkDrown.swim
 
-Call_02_79D9::
+;@ def LinkDrown()
+;@ path: link/ground
+;@ Link sinks in water he cannot swim in: motion state 8 (LinkMotionRecover) for $50 frames, frozen.
+;@ This unit also holds the rest of CheckGroundUnderLink: starting to swim, tall grass and shallow
+;@ water, raised blocks, floor switches and cracked floor (NormalGround).
+LinkDrown::
+;> hLinkCountdown = 0x50
 	ld a, $50
 	ldh [hLinkCountdown], a
+;> wLinkMotionState = 8
 	ld a, $08
 	ld [wLinkMotionState], a
+;> hLinkMotionStep = hRoomObjectType
 	ldh a, [hRoomObjectType]
 	ldh [hLinkMotionStep], a
+;> hLinkY += 2
 	ldh a, [hLinkY]
 	add $02
 	ldh [hLinkY], a
+;> wLinkFrozen = 1
 	ld a, $01
 	ld [wLinkFrozen], a
+;> return
 	ret
 
 
-jr_002_79f2:
+.swim
+;> wLinkMotionState = 1                         # StartSwimming: LinkMotionSwimming
 	ld a, $01
 	ld [wLinkMotionState], a
+;> hLinkMotionStep = 0
 	xor a
 	ldh [hLinkMotionStep], a
+;> StopLinkSpeed()
 	call StopLinkSpeed
+;>@sx hLinkSpeedX = SwimEntrySpeedX[hLinkDirection]
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, b
-	ld hl, $77ca
+	ld hl, SwimEntrySpeedX
 	add hl, de
 	ld a, [hl]
+;=@sx
 	ldh [hLinkSpeedX], a
-	ld hl, $77ce
+;> hLinkSpeedY = SwimEntrySpeedY[hLinkDirection]
+	ld hl, SwimEntrySpeedY
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkSpeedY], a
 
-jr_002_7a0f:
+.done
 	ret
 
 
-jr_002_7a10:
+GroundEffectsOther:
+;> if wLinkGroundType == 0x06:                  # a hole
 	cp $06
-	jp z, Jump_002_7b37
+;>     return DrawGroundRipple()
+	jp z, DrawGroundRipple
 
+;> if wLinkGroundType != 0x05:                  # tall grass / shallow water
 	cp $05
-	jr nz, jr_002_7a5c
+;>     return NormalGround()
+	jr nz, NormalGround
 
+;>@g1 mem[hl:hl + 4] = (hLinkY + 0x0C, hLinkX, 0x1C, (hFrameCounter << 2) & 0x10)   # two tufts at his feet
 	ldh a, [hLinkY]
 	add $0c
 	ld [hli], a
 	ldh a, [hLinkX]
 	add $00
 	ld [hli], a
+;=@g1
 	ld a, $1c
 	ld [hli], a
 	ldh a, [hFrameCounter]
 	rla
 	rla
 	and $10
+;=@g1
 	push af
 	ld [hli], a
+;>@g2 mem[hl + 4:hl + 8] = (hLinkY + 0x0C, hLinkX + 8, 0x1C, ((hFrameCounter << 2) & 0x10) | 0x20)
 	ldh a, [hLinkY]
 	add $0c
 	ld [hli], a
 	ldh a, [hLinkX]
 	add $08
 	ld [hli], a
+;=@g2
 	ld a, $1c
 	ld [hli], a
 	pop af
 	or $20
 	ld [hl], a
+;> wLinkGroundVfx = 3
 	ld a, $03
 	ld [wLinkGroundVfx], a
+;> if not (hFrameCounter & 0x0F) and hJoypadHeld & 0x0F:   # rustling while walking
 	ldh a, [hFrameCounter]
 	and $0f
-	jr nz, jr_002_7a54
+	jr nz, .sink
 
 	ldh a, [hJoypadHeld]
 	and $0f
-	jr z, jr_002_7a54
+	jr z, .sink
 
+;>     hJingle = 0x0E
 	ld a, $0e
 	ldh [hJingle], a
 
-jr_002_7a54:
+.sink
+;> wLinkSpriteDY += 2
 	ld a, [wLinkSpriteDY]
 	add $02
 	ld [wLinkSpriteDY], a
 
-Jump_002_7a5c:
-jr_002_7a5c:
+NormalGround:
+;> wSinkingSandCounter = 0                      # NormalGround
 	xor a
 	ld [wSinkingSandCounter], a
+;> if wLinkMotionState == 1:                    # out of the water
 	ld a, [wLinkMotionState]
 	cp $01
-	jr nz, jr_002_7a6c
+	jr nz, .raised
 
+;>     wLinkMotionState = 0
 	ld a, $00
 	ld [wLinkMotionState], a
 
-jr_002_7a6c:
+.raised
+;>@rb if wLinkGroundType == 0x04 and 0xDB <= hRoomObjectType < 0xDD:
 	ld a, [wLinkGroundType]
 	cp $04
-	jr nz, jr_002_7aa3
+	jr nz, .offBlock
 
 	ldh a, [hRoomObjectType]
 	cp $db
-	jr c, jr_002_7aa3
+;=@rb
+	jr c, .offBlock
 
 	cp $dd
-	jr nc, jr_002_7aa3
+	jr nc, .offBlock
 
+;>@rs     if wRaisedBlocksState ^ RaisedBlockLoweredPhase[hRoomObjectType - 0xDB]:   # raised
 	sub $db
 	ld e, a
 	ld d, $00
-	ld hl, $7b35
+	ld hl, RaisedBlockLoweredPhase
 	add hl, de
 	ld a, [wRaisedBlocksState]
+;=@rs
 	xor [hl]
-	jr z, jr_002_7aa3
+	jr z, .offBlock
 
+;>@ry         wLinkSpriteDY += RaisedBlockLinkDY[wRaisedBlockStep]
 	ld a, [wRaisedBlockStep]
 	ld e, a
 	ld d, $00
-	ld hl, $7b29
+	ld hl, RaisedBlockLinkDY
 	add hl, de
 	ld a, [wLinkSpriteDY]
+;=@ry
 	add [hl]
 	ld [wLinkSpriteDY], a
+;>         wLinkOnRaisedBlock = 1
 	ld a, $01
 	ld [wLinkOnRaisedBlock], a
+;>         return
 	ret
 
 
-jr_002_7aa3:
+.offBlock
+;> if wLinkOnRaisedBlock:                       # stepped off a raised block
 	ld a, [wLinkOnRaisedBlock]
 	and a
-	jr z, jr_002_7ab1
+	jr z, .switch
 
+;>     hNoiseSfx = 0x07
 	ld a, $07
 	ldh [hNoiseSfx], a
+;>     wLinkOnRaisedBlock = 0
 	xor a
 	ld [wLinkOnRaisedBlock], a
 
-jr_002_7ab1:
+.switch
+;> if not wIsIndoor or wRoomTransitionState:
 	ld a, [wIsIndoor]
 	and a
 	jp z, Jump_002_7b28
 
 	ld a, [wRoomTransitionState]
 	and a
-	jr nz, jr_002_7b28
+;>     return
+	jr nz, Jump_002_7b28
 
+;> if hRoomObjectType == 0xAA and not wFloorSwitchPressedTimer:   # a floor switch
 	ldh a, [hRoomObjectType]
 	cp $aa
-	jr nz, jr_002_7af6
+	jr nz, .cracked
 
 	ld a, [wFloorSwitchPressedTimer]
 	and a
-	jr nz, jr_002_7af6
+	jr nz, .cracked
 
+;>     wFloorSwitchStandFrames += 1
 	ld a, [wFloorSwitchStandFrames]
 	inc a
 	ld [wFloorSwitchStandFrames], a
+;>     if wFloorSwitchStandFrames == 0x18:      # pressed
 	cp $18
-	jr nz, jr_002_7aed
+	jr nz, .pressedDown
 
+;>         wFloorSwitchPressedTimer = 0x60
 	ld a, $60
 	ld [wFloorSwitchPressedTimer], a
+;>         hWaveSfx = 0x0E
 	ld a, $0e
 	ldh [hWaveSfx], a
+;>         hBGChangeRequest = 3
 	ld a, $03
 	ldh [hBGChangeRequest], a
+;>         if hMapRoom == 0xC3:
 	ldh a, [hMapRoom]
 	cp $c3
-	jr nz, jr_002_7aed
+	jr nz, .pressedDown
 
-	ld hl, $d879
+;>             wRoomStatus[0x79] |= 0x10
+	ld hl, wRoomStatus + $79
 	set 4, [hl]
 
-jr_002_7aed:
+.pressedDown
+;>     wLinkSpriteDY -= 3
 	ld a, [wLinkSpriteDY]
 	add $fd
 	ld [wLinkSpriteDY], a
+;>     return
 	ret
 
 
-jr_002_7af6:
+.cracked
+;> wFloorSwitchStandFrames = 0
 	xor a
 	ld [wFloorSwitchStandFrames], a
+;>@cf if hLinkSquare == hLinkSquarePrev and hRoomObjectType == 0xDF and not (hLinkInteractiveMotionBlocked or wLinkShowItemPose or wDialogState):
 	ldh a, [hLinkSquare]
 	ld hl, hLinkSquarePrev
 	cp [hl]
-	ld hl, $c1c9
-	jr nz, jr_002_7b26
+	ld hl, wCrackedFloorTimer
+	jr nz, .reset
 
 	ldh a, [hRoomObjectType]
+;=@cf
 	cp $df
-	jr nz, jr_002_7b26
+	jr nz, .reset
 
 	ldh a, [hLinkInteractiveMotionBlocked]
 	ld e, a
 	ld a, [wLinkShowItemPose]
 	ld d, a
+;=@cf
 	ld a, [wDialogState]
 	or e
 	or d
-	jr nz, jr_002_7b26
+	jr nz, .reset
 
+;>     wCrackedFloorTimer += 1                  # cracked floor under a standing Link
 	inc [hl]
+;>     if wCrackedFloorTimer < 0x28:
 	ld a, [hl]
 	cp $28
-	jr c, jr_002_7b28
+;>         return
+	jr c, Jump_002_7b28
 
+;>     hNoiseSfx = 0x2B
 	ld a, $2b
 	ldh [hNoiseSfx], a
+;>     return CollapseFloorUnderLink()
 	jp CollapseFloorUnderLink
 
 
-jr_002_7b26:
+.reset
+;> else:
+;>     wCrackedFloorTimer = 0
 	ld [hl], $00
 
 Jump_002_7b28:
-jr_002_7b28:
 	ret
 
 
+;@ path: link/ground
+;@ Shift of Link's sprite (wLinkSpriteDY) while he stands on a raised block, by wRaisedBlockStep 0-11
+;@ (the blocks rising or sinking). Read by NormalGround.
 RaisedBlockLinkDY::
 	db $fc, $ff, $ff, $fe, $fe, $fe, $fd, $fd, $fd, $fc, $fc, $fc
 
+;@ path: link/ground
+;@ wRaisedBlocksState for which the raised-block objects $DB / $DC are down (index object - $DB).
+;@ Read by ProbeWall and NormalGround.
 RaisedBlockLoweredPhase::
 	db $00, $02
 
-Jump_002_7b37:
+;@ def DrawGroundRipple(oam: hl)
+;@ path: link/ground
+;@ Ground type 6: two sprites (tile $1A, flipped every few walking frames) at Link's feet.
+;@ test: skip the trial cannot run it to its end
+DrawGroundRipple::
+;>@r1 mem[oam:oam + 4] = (hLinkY + 8, hLinkX - 1, 0x1A, (wLinkWalkingFrameCount << 2) & 0x20)
 	ldh a, [hLinkY]
 	add $08
 	ld [hli], a
 	ldh a, [hLinkX]
 	add $ff
 	ld [hli], a
+;=@r1
 	ld a, $1a
 	ld [hli], a
 	ld a, [wLinkWalkingFrameCount]
 	rla
 	rla
 	and $20
+;=@r1
 	push af
 	ld [hli], a
+;>@r2 mem[oam + 4:oam + 8] = (hLinkY + 8, hLinkX + 7, 0x1A, ((wLinkWalkingFrameCount << 2) & 0x20) ^ 0x20)
 	ldh a, [hLinkY]
 	add $08
 	ld [hli], a
 	ldh a, [hLinkX]
 	add $07
 	ld [hli], a
+;=@r2
 	ld a, $1a
 	ld [hli], a
 	pop af
 	xor $20
 	ld [hl], a
+;> wLinkGroundVfx = 3
 	ld a, $03
 	ld [wLinkGroundVfx], a
 	ret
 
 
+;@ path: world/room_scroll
+;@ Link's x speed while the screen scrolls to the next room, by wRoomTransitionDirection (0 right,
+;@ 1 left, 2 up, 3 down): -$3A, +$3A, 0, 0 (he moves along with the old room). Read by
+;@ UpdateRoomTransition.
 RoomScrollLinkSpeedX::
 	db $c6, $3a, $00, $00
 
+;@ path: world/room_scroll
+;@ Link's y speed while the screen scrolls, by direction: 0, 0, +$3A, -$3A.
 RoomScrollLinkSpeedY::
 	db $00, $00, $3a, $c6
 
+;@ path: world/room_scroll
+;@ Camera x step per frame of the room scroll, by direction: +4, -4, 0, 0.
 RoomScrollCameraDX::
 	db $04, $fc, $00, $00
 
+;@ path: world/room_scroll
+;@ Camera y step per frame of the room scroll, by direction: 0, 0, -4, +4.
 RoomScrollCameraDY::
 	db $00, $00, $fc, $04
 
-Call_02_7B74::
+;@ def UpdateRoomTransition()
+;@ path: world/room_scroll
+;@ Runs the move into the next room, step by step (wRoomTransitionState): 1 the new room is loaded,
+;@ 2 its tiles, 3 the scroll is set up, then the screen scrolls 4 pixels a frame while the new room's
+;@ strips are drawn. Once the camera reaches its target the queued music starts, Link's respawn point
+;@ is set, after a scroll down he may hop into water, the room's entry hooks run and in dungeons the
+;@ compass chimes for a room whose item is still there.
+;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
+UpdateRoomTransition::
+;> if not wRoomTransitionState:
 	ld a, [wRoomTransitionState]
 	cp $00
-	jp z, Jump_002_7c5d
+;>     return
+	jp z, RoomTransitionNone
 
+;> if wRoomTransitionState < 3:
 	push af
 	cp $03
+;>     return RoomTransitionSteps[wRoomTransitionState - 1]()
 	jp c, Jump_002_7c50
 
+;>@sx hLinkSpeedX = RoomScrollLinkSpeedX[wRoomTransitionDirection]
 	ld a, [wRoomTransitionDirection]
 	ld c, a
 	ld b, $00
-	ld hl, $7b64
+	ld hl, RoomScrollLinkSpeedX
 	add hl, bc
 	ld a, [hl]
+;=@sx
 	ldh [hLinkSpeedX], a
-	ld hl, $7b68
+;> hLinkSpeedY = RoomScrollLinkSpeedY[wRoomTransitionDirection]
+	ld hl, RoomScrollLinkSpeedY
 	add hl, bc
 	ld a, [hl]
 	ldh [hLinkSpeedY], a
+;> ApplyLinkSpeed()
 	push bc
 	call ApplyLinkSpeed
 	pop bc
-	ld hl, $7b6c
+;> hBaseScrollX += RoomScrollCameraDX[wRoomTransitionDirection]
+	ld hl, RoomScrollCameraDX
 	add hl, bc
 	ldh a, [hBaseScrollX]
 	add [hl]
 	ldh [hBaseScrollX], a
-	ld hl, $7b70
+;> hBaseScrollY += RoomScrollCameraDY[wRoomTransitionDirection]
+	ld hl, RoomScrollCameraDY
 	add hl, bc
 	ldh a, [hBaseScrollY]
 	add [hl]
 	ldh [hBaseScrollY], a
+;> if hBaseScrollY != wRoomScrollTargetY or hBaseScrollX != wRoomScrollTargetX:
 	ld hl, wRoomScrollTargetY
 	cp [hl]
 	jp nz, Jump_002_7c50
@@ -11993,96 +12902,127 @@ Call_02_7B74::
 	ldh a, [hBaseScrollX]
 	ld hl, wRoomScrollTargetX
 	cp [hl]
+;>     return RoomTransitionSteps[wRoomTransitionState - 1]()
 	jp nz, Jump_002_7c50
 
+;> if hNextDefaultMusicTrack:                   # the scroll has ended
 	pop af
 	ldh a, [hNextDefaultMusicTrack]
 	and a
-	jr z, jr_002_7bc9
+	jr z, .stop
 
+;>     PlayMusic(hNextDefaultMusicTrack)
 	call PlayMusic
+;>     hNextDefaultMusicTrack = 0
 	xor a
 	ldh [hNextDefaultMusicTrack], a
 
-jr_002_7bc9:
+.stop
+;> a = StopLinkSpeed()                          # (0)
 	call StopLinkSpeed
+;> hLinkSpeedZ = a
 	ldh [hLinkSpeedZ], a
+;> wRoomTransitionState = a
 	ld [wRoomTransitionState], a
+;> wLinkRespawnX = hLinkX
 	ldh a, [hLinkX]
 	ld [wLinkRespawnX], a
+;> wLinkRespawnY = hLinkY
 	ldh a, [hLinkY]
 	ld [wLinkRespawnY], a
+;> if wRoomTransitionDirection == 3:             # came in from the top
 	ld a, [wRoomTransitionDirection]
 	cp $03
-	jr nz, jr_002_7c06
+	jr nz, .jingle
 
+;>     hLinkSpeedY = 1
 	ld a, $01
 	ldh [hLinkSpeedY], a
-	call Call_02_7180
+;>     CollideLinkWithWalls()
+	call CollideLinkWithWalls
+;>@hop     if hRoomObjectType not in (0xDB, 0xDC) and (hRoomObjectType == 0xE1 or wLinkCollisionFlags):
 	ldh a, [hRoomObjectType]
 	cp $db
-	jr z, jr_002_7c06
+	jr z, .jingle
 
 	cp $dc
-	jr z, jr_002_7c06
+	jr z, .jingle
 
+;=@hop
 	cp $e1
-	jr z, jr_002_7bfd
+	jr z, .hop
 
 	ld a, [wLinkCollisionFlags]
 	and a
-	jr z, jr_002_7c06
+	jr z, .jingle
 
-jr_002_7bfd:
+.hop
+;>         if not wDebugToggle:
 	ld a, [wDebugToggle]
 	and a
-	jr nz, jr_002_7c06
+	jr nz, .jingle
 
-	call Call_02_71EA
+;>             LinkJumpIntoWaterColumn()
+	call LinkJumpIntoWaterColumn
 
-jr_002_7c06:
+.jingle
+;> if wJingleAfterTransition:
 	ld a, [wJingleAfterTransition]
 	and a
-	jr z, jr_002_7c12
+	jr z, .entered
 
+;>     hJingle = wJingleAfterTransition
 	ldh [hJingle], a
+;>     wJingleAfterTransition = 0
 	xor a
 	ld [wJingleAfterTransition], a
 
-jr_002_7c12:
+.entered
+;> OnRoomEnteredBank1()
 	call OnRoomEnteredBank1
+;> hAnimatedTilesFrameCount = 0xFF
 	ld a, $ff
 	ldh [hAnimatedTilesFrameCount], a
+;> if not wIsIndoor:
 	ld a, [wIsIndoor]
 	and a
+;>     return
 	ret z
 
+;> group = 1                                    # the room's indoor group
 	ld d, a
+;> if 0x06 <= hMapId < 0x1A:
 	ldh a, [hMapId]
 	cp $1a
-	jr nc, jr_002_7c2a
+	jr nc, .info
 
 	cp $06
-	jr c, jr_002_7c2a
+	jr c, .info
 
+;>     group = 2
 	inc d
 
-jr_002_7c2a:
+.info
+;> info = GetRoomInfo(group, hMapRoom)
 	ldh a, [hMapRoom]
 	ld e, a
 	call GetRoomInfo
+;>@inf if info not in (0x1A, 0x19) and (wRoomEvent & 0xE0) != 0x80:
 	cp $1a
-	jr z, jr_002_7c40
+	jr z, .compass
 
 	cp $19
-	jr z, jr_002_7c40
+	jr z, .compass
 
+;=@inf
 	ld a, [wRoomEvent]
 	and $e0
 	cp $80
+;>     return
 	ret nz
 
-jr_002_7c40:
+.compass
+;> if wDungeonHasCompass and not (hRoomStatus & 0x10):   # its item is still there
 	ld a, [wDungeonHasCompass]
 	and a
 	ret z
@@ -12091,377 +13031,535 @@ jr_002_7c40:
 	and $10
 	ret nz
 
+;>     wCompassChimeDelay = 0x0C
 	ld a, $0c
 	ld [wCompassChimeDelay], a
 	ret
 
 
 Jump_002_7c50:
+;> return RoomTransitionSteps[wRoomTransitionState - 1]()   # (the state pushed above)
 	pop af
 	dec a
 	rst $00
 
-JumpTable_02_7C53::
-	dw Jump_02_7C7E
-	dw Jump_02_7DA1
-	dw Jump_02_7DE2
-	dw Jump_02_7E59
-	dw Jump_02_7E5D
+;@ path: world/room_scroll
+;@ Room transition steps by wRoomTransitionState - 1 (2-byte code addresses): 1 LoadNextRoom, 2 LoadNextRoomTiles,
+;@ 3 SetUpRoomScroll, 4 DrawRoomScrollStrip, 5 nothing.
+RoomTransitionSteps::
+	dw LoadNextRoom
+	dw LoadNextRoomTiles
+	dw SetUpRoomScroll
+	dw DrawRoomScrollStrip
+	dw RoomTransitionDone
 
-Jump_002_7c5d:
+;@ def RoomTransitionNone()
+;@ path: world/room_scroll
+;@ No room transition: nothing to do.
+RoomTransitionNone::
+;> return
 	ret
 
 
+;@ path: world/room_scroll
+;@ The Face Shrine maze room ($71 of map $08): the 8 directions to walk out of it (0 right, 1 left,
+;@ 2 up), from index wFaceShrineHint (4 routes, 8 bytes apart... overlapping). Read by LoadNextRoom.
 MazeRoomPaths::
 	db $01, $01, $02, $00, $00, $02, $01, $02, $00, $02, $02, $00, $02, $02, $00, $02
 	db $01, $02, $00, $02, $01, $02, $00, $02, $00, $00, $00, $00, $02, $02, $02, $02
 
-Jump_02_7C7E::
+;@ def LoadNextRoom()
+;@ path: world/room_scroll
+;@ Transition step 1: picks the room behind the edge (OverworldRoomStep / IndoorRoomStep, with a few
+;@ special links, and the Face Shrine maze that keeps Link in its room until he walks its path), loads
+;@ it and its entities, and picks the overworld music of the new room (the power-up music stays).
+;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
+LoadNextRoom::
+;> direction = wRoomTransitionDirection
 	ld a, [wRoomTransitionDirection]
 	ld c, a
 	ld b, $00
+;> if wIsIndoor and hMapId < 0x0B:              # a dungeon
 	ld a, [wIsIndoor]
 	and a
-	jr z, jr_002_7ced
+	jr z, .overworld
 
 	ldh a, [hMapId]
 	cp $0b
-	jr nc, jr_002_7ced
+	jr nc, .overworld
 
+;>@mz     if hMapId == 0x08 and hMapRoom == 0x71 and direction != 3:   # the maze room
 	cp $08
-	jr nz, jr_002_7cc8
+	jr nz, .dungeon
 
 	ldh a, [hMapRoom]
 	cp $71
-	jr nz, jr_002_7cc8
+;=@mz
+	jr nz, .dungeon
 
 	ld a, c
 	cp $03
-	jr z, jr_002_7cc8
+	jr z, .dungeon
 
+;>         path = MazeRoomPaths + wFaceShrineHint
 	ld a, [wFaceShrineHint]
 	ld e, a
 	ld d, $00
-	ld hl, $7c5e
+	ld hl, MazeRoomPaths
 	add hl, de
-	ld a, [$c5aa]
+;>         step = wMazeRoomStep
+	ld a, [wMazeRoomStep]
 	ld e, a
+;>         wMazeRoomStep += 1
 	inc a
-	ld [$c5aa], a
+	ld [wMazeRoomStep], a
+;>         if direction != path[step]:   # wrong way: start again
 	add hl, de
 	ld a, c
 	cp [hl]
-	jr z, jr_002_7cbd
+	jr z, .rightWay
 
+;>             wMazeRoomStep = 0
 	xor a
-	ld [$c5aa], a
-	jp Jump_002_7d25
+	ld [wMazeRoomStep], a
+;>             return EnterRoom()               # the same room again
+	jp EnterRoom
 
 
-jr_002_7cbd:
+.rightWay
+;>         if step != 7:
 	ld a, e
 	cp $07
-	jp nz, Jump_002_7d25
+;>             return EnterRoom()
+	jp nz, EnterRoom
 
+;>         wJingleAfterTransition = 2           # out of the maze
 	ld a, $02
 	ld [wJingleAfterTransition], a
 
-jr_002_7cc8:
+.dungeon
+;>     wMazeRoomStep = 0
 	xor a
-	ld [$c5aa], a
-	ld hl, $7dde
+	ld [wMazeRoomStep], a
+;>@r1d     if direction == 2 and hMapId == 0x05 and wIndoorRoom == 0x1D:
+	ld hl, IndoorRoomStep
 	add hl, bc
 	ld a, c
 	cp $02
-	jr nz, jr_002_7ce7
+	jr nz, .indoorStep
 
 	ldh a, [hMapId]
+;=@r1d
 	cp $05
-	jr nz, jr_002_7ce7
+	jr nz, .indoorStep
 
 	ld a, [wIndoorRoom]
 	cp $1d
-	jr nz, jr_002_7ce7
+	jr nz, .indoorStep
 
+;>         wIndoorRoom = 0x35
 	ld a, $35
 	ld [wIndoorRoom], a
 
-jr_002_7ce7:
+.indoorStep
+;>     room = wIndoorRoom + IndoorRoomStep[direction]
 	ld a, [hl]
 	ld hl, wIndoorRoom
-	jr jr_002_7d0c
+	jr .add
 
-jr_002_7ced:
+.overworld
+;> elif wRaccoonLoopsExit and direction == 2:   # out of the raccoon's looping woods
 	ld a, [wRaccoonLoopsExit]
 	and a
-	jr z, jr_002_7d04
+	jr z, .overworldStep
 
 	ld a, c
 	cp $02
-	jr nz, jr_002_7d04
+	jr nz, .overworldStep
 
+;>     wJingleAfterTransition = 0x1E
 	ld a, $1e
 	ld [wJingleAfterTransition], a
+;>     room = 0x63
 	ld a, $63
 	ld hl, hMapRoom
-	jr jr_002_7d0d
+	jr .store
 
-jr_002_7d04:
-	ld hl, $7dda
+.overworldStep
+;> else:
+;>     room = hMapRoom + OverworldRoomStep[direction]
+	ld hl, OverworldRoomStep
 	add hl, bc
 	ld a, [hl]
 	ld hl, hMapRoom
 
-jr_002_7d0c:
+.add
 	add [hl]
 
-jr_002_7d0d:
+.store
+;> mem[hl] = room                           # wIndoorRoom in a dungeon, else hMapRoom
 	ld [hl], a
+;>@41 if room == 0x41 and direction == 2 and not (wRoomStatus[0x41] & 0x40):   # first time
 	cp $41
-	jr nz, jr_002_7d25
+	jr nz, EnterRoom
 
 	ld a, c
 	cp $02
-	jr nz, jr_002_7d25
+	jr nz, EnterRoom
 
-	ld hl, $d841
+;=@41
+	ld hl, wRoomStatus + $41
 	bit 6, [hl]
-	jr nz, jr_002_7d25
+	jr nz, EnterRoom
 
+;>     wRoomStatus[0x41] |= 0x40
 	set 6, [hl]
+;>     wJingleAfterTransition = 2
 	ld a, $02
 	ld [wJingleAfterTransition], a
 
-Jump_002_7d25:
-jr_002_7d25:
+EnterRoom:
+;> LoadRoom()                                   # EnterRoom
 	call LoadRoom
+;> LoadRoomEntities()
 	call LoadRoomEntities
+;> DrawLinkOAM()
 	call DrawLinkOAM
+;> UpdateLinkItemSprites()
 	call UpdateLinkItemSprites
+;> if wRestoreMusicAfterTransition:
 	ld a, [wRestoreMusicAfterTransition]
 	and a
-	jr z, jr_002_7d4c
+	jr z, .overworldMusic
 
+;>     wRestoreMusicAfterTransition = 0
 	xor a
 	ld [wRestoreMusicAfterTransition], a
+;>@nx     hNextDefaultMusicTrack = 0x49 if wActivePowerUp else hDefaultMusicTrack
 	ld a, [wActivePowerUp]
 	and a
 	ldh a, [hDefaultMusicTrack]
-	jr z, jr_002_7d45
+	jr z, .setNext
 
 	ld a, $49
 
-jr_002_7d45:
+.setNext
+;=@nx
 	ldh [hNextDefaultMusicTrack], a
+;>     FadeOutVolume()
 	call FadeOutVolume
-	jr jr_002_7d99
+;>     return NextTransitionStep()
+	jr NextTransitionStep
 
-jr_002_7d4c:
+.overworldMusic
+;> if wIsIndoor or not wSwordLevel:
 	ld a, [wIsIndoor]
 	and a
-	jr nz, jr_002_7d99
+	jr nz, NextTransitionStep
 
 	ld a, [wSwordLevel]
 	and a
-	jr z, jr_002_7d99
+;>     return NextTransitionStep()
+	jr z, NextTransitionStep
 
+;> track = OverworldMusicTracks[hMapRoom]
 	ldh a, [hMapRoom]
 	ld e, a
 	ld d, $00
-	ld hl, $4000
+	ld hl, OverworldMusicTracks
 	add hl, de
 	ld a, [hl]
+;> if track == hDefaultMusicTrack:
 	ld hl, hDefaultMusicTrack
 	cp [hl]
-	jr z, jr_002_7d99
+;>     return NextTransitionStep()
+	jr z, NextTransitionStep
 
+;>@bp beats = track < 0x25 and MusicTrackBeatsPowerUp[track]   # it plays even over the power-up music
 	ld c, a
 	cp $25
-	jr nc, jr_002_7d77
+	jr nc, .powerUp
 
 	ld b, $00
-	ld hl, $4120
+	ld hl, MusicTrackBeatsPowerUp
 	add hl, bc
+;=@bp
 	ld a, [hl]
 	and a
-	jr nz, jr_002_7d8d
+	jr nz, .beats
 
-jr_002_7d77:
+.powerUp
+;> if not beats and not wActivePowerUp:
 	ld a, [wActivePowerUp]
 	and a
-	jr z, Call_02_7D90
+;>     return SetNextMusic(track)
+	jr z, SetNextMusic
 
+;> if not beats and hDefaultMusicTrackAlt == 0x49:
 	ldh a, [hDefaultMusicTrackAlt]
 	cp $49
-	jr z, jr_002_7d96
+;>     hDefaultMusicTrack = track
+;>     return NextTransitionStep()
+	jr z, SetNextMusic.setDefault
 
-	call Call_02_7D90
+;> if not beats:
+;>     SetNextMusic(track)
+	call SetNextMusic
+;>     hNextDefaultMusicTrack = 0x49            # back to the power-up music
 	ld a, $49
 	ldh [hNextDefaultMusicTrack], a
+;>     hDefaultMusicTrackAlt = 0x49
 	ldh [hDefaultMusicTrackAlt], a
+;>     return
 	ret
 
 
-jr_002_7d8d:
+.beats
+;> hDefaultMusicTrackAlt = track                # then on into SetNextMusic
 	ld a, c
 	ldh [hDefaultMusicTrackAlt], a
 
-Call_02_7D90::
+;@ def SetNextMusic(track: c)
+;@ path: world/room_scroll
+;@ Queues the room's music (hNextDefaultMusicTrack), fades the volume out and makes it the default
+;@ track; then the room transition goes to its next step.
+SetNextMusic::
+;> hNextDefaultMusicTrack = track
 	ld a, c
 	ldh [hNextDefaultMusicTrack], a
+;> FadeOutVolume()
 	call FadeOutVolume
 
-jr_002_7d96:
+.setDefault
+;> hDefaultMusicTrack = track
 	ld a, c
 	ldh [hDefaultMusicTrack], a
 
-Jump_002_7d99:
-jr_002_7d99:
+NextTransitionStep:
+;> wRoomTransitionState += 1                    # NextTransitionStep
 	ld a, [wRoomTransitionState]
 	inc a
 	ld [wRoomTransitionState], a
 	ret
 
 
-Jump_02_7DA1::
+;@ def LoadNextRoomTiles()
+;@ path: world/room_scroll
+;@ Transition step 2: loads the new room's tile sets (with mem[0xD6FA] == 2 the tile swap counts 2).
+LoadNextRoomTiles::
+;> LoadRoomTilesets()
 	call LoadRoomTilesets
+;> if mem[0xD6FA] == 2:
 	ld a, [$d6fa]
 	cp $02
-	jr nz, jr_002_7daf
+	jr nz, .next
 
+;>     hTileSwapFinishCount = 2
 	ld a, $02
 	ldh [hTileSwapFinishCount], a
 
-jr_002_7daf:
-	jp Jump_002_7d99
+.next
+;> return NextTransitionStep()
+	jp NextTransitionStep
 
 
-RoomScrollDrawRowHigh::
+;@ path: world/room_scroll
+;@ High byte added to wBGOriginHigh (the top left of the visible background map) for the new room,
+;@ by direction 0-3 (right, left, up, down). Read by SetUpRoomScroll.
+RoomScrollOriginDeltaHigh::
 	db $00, $00, $02, $02
 
-RoomScrollDrawRowLow::
+;@ path: world/room_scroll
+;@ Low byte added to wBGOriginLow for the new room by direction (x wraps within the 32-tile row).
+RoomScrollOriginDeltaLow::
 	db $14, $0c, $00, $00
 
-RoomScrollDrawColHigh::
+;@ path: world/room_scroll
+;@ High byte of the offset from the old background origin to the first strip drawn
+;@ (wTransitionDrawHigh), by direction.
+RoomScrollDrawDeltaHigh::
 	db $00, $00, $03, $02
 
-RoomScrollDrawColLow::
+;@ path: world/room_scroll
+;@ Low byte of the offset to the first strip drawn (wTransitionDrawLow), by direction.
+RoomScrollDrawDeltaLow::
 	db $14, $1e, $c0, $00
-RoomScrollDrawCount::
+;@ path: world/room_scroll
+;@ Room squares per strip of the scroll by direction: 8 (a column) for right / left, 10 (a row) for
+;@ up / down (wTransitionStripLength).
+RoomScrollStripLength::
 	db $08, $08, $0a, $0a
 
-RoomScrollDrawStep::
+;@ path: world/room_scroll
+;@ Number of strips to draw by direction: 10 columns or 8 rows (wTransitionStripsLeft).
+RoomScrollStripCount::
 	db $0a, $0a, $08, $08
 
-RoomScrollDrawMode::
+;@ path: world/room_scroll
+;@ Index of the first room object drawn by direction (wTransitionObjectIndex): right $00 (left column),
+;@ left $09 (right column), up $70 (bottom row), down $00; the last 4 bytes are not read.
+RoomScrollFirstObject::
 	db $00, $09, $70, $00, $40, $40, $02, $02
+;@ path: world/room_scroll
+;@ Change of wRoomScrollTargetX for the new room by direction: +$A0, -$A0, 0, 0.
 RoomScrollTargetDX::
 	db $a0, $60, $00, $00
 
+;@ path: world/room_scroll
+;@ Change of wRoomScrollTargetY by direction: 0, 0, -$80, +$80.
 RoomScrollTargetDY::
 	db $00, $00, $80, $80
 
+;@ path: world/room_scroll
+;@ Overworld room number step by direction: +1, -1, -$10, +$10 (16 x 16 grid). Read by LoadNextRoom.
 OverworldRoomStep::
 	db $01, $ff, $f0, $10
 
+;@ path: world/room_scroll
+;@ Indoor room number step by direction: +1, -1, -8, +8 (8 x 8 grid).
 IndoorRoomStep::
 	db $01, $ff, $f8, $08
 
-Jump_02_7DE2::
+;@ def SetUpRoomScroll()
+;@ path: world/room_scroll
+;@ Transition step 3: the camera's target, the new background origin, where the first strip of the
+;@ new room is drawn, the strip size and count and the first room object (tables by direction).
+;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
+SetUpRoomScroll::
+;> direction = wRoomTransitionDirection
 	ld a, [wRoomTransitionDirection]
 	ld c, a
 	ld b, $00
-	ld hl, $7dd2
+;> wRoomScrollTargetX += RoomScrollTargetDX[direction]
+	ld hl, RoomScrollTargetDX
 	add hl, bc
 	ld a, [wRoomScrollTargetX]
 	add [hl]
 	ld [wRoomScrollTargetX], a
-	ld hl, $7dd6
+;> wRoomScrollTargetY += RoomScrollTargetDY[direction]
+	ld hl, RoomScrollTargetDY
 	add hl, bc
 	ld a, [wRoomScrollTargetY]
 	add [hl]
 	ld [wRoomScrollTargetY], a
-	ld hl, $7dbe
+;>@dl wTransitionDrawLow = (wBGOriginLow + RoomScrollDrawDeltaLow[direction]) & 0xDF   # (carry kept)
+	ld hl, RoomScrollDrawDeltaLow
 	add hl, bc
 	ld a, [wBGOriginLow]
 	add [hl]
 	rl d
 	and $df
+;=@dl
 	ld [wTransitionDrawLow], a
-	ld hl, $7dba
+;>@dh wTransitionDrawHigh = (wBGOriginHigh + RoomScrollDrawDeltaHigh[direction] + carry) & 0x03
+	ld hl, RoomScrollDrawDeltaHigh
 	add hl, bc
 	ld a, [wBGOriginHigh]
 	rr d
 	adc [hl]
 	and $03
+;=@dh
 	ld [wTransitionDrawHigh], a
-	ld hl, $7db6
+;>@ol wBGOriginLow = (wBGOriginLow + RoomScrollOriginDeltaLow[direction]) & 0xDF
+	ld hl, RoomScrollOriginDeltaLow
 	add hl, bc
 	ld a, [wBGOriginLow]
 	add [hl]
 	rl d
 	and $df
+;=@ol
 	ld [wBGOriginLow], a
-	ld hl, $7db2
+;>@oh wBGOriginHigh = (wBGOriginHigh + RoomScrollOriginDeltaHigh[direction] + carry) & 0x03
+	ld hl, RoomScrollOriginDeltaHigh
 	add hl, bc
 	ld a, [wBGOriginHigh]
 	rr d
 	adc [hl]
 	and $03
+;=@oh
 	ld [wBGOriginHigh], a
-	ld hl, $7dc2
+;> wTransitionStripLength = RoomScrollStripLength[direction]
+	ld hl, RoomScrollStripLength
 	add hl, bc
 	ld a, [hl]
 	ld [wTransitionStripLength], a
-	ld hl, $7dc6
+;> wTransitionStripsLeft = RoomScrollStripCount[direction]
+	ld hl, RoomScrollStripCount
 	add hl, bc
 	ld a, [hl]
 	ld [wTransitionStripsLeft], a
-	ld hl, $7dca
+;> wTransitionObjectIndex = RoomScrollFirstObject[direction]
+	ld hl, RoomScrollFirstObject
 	add hl, bc
 	ld a, [hl]
 	ld [wTransitionObjectIndex], a
+;> wTransitionDrawDelay = 0
 	xor a
 	ld [wTransitionDrawDelay], a
-	jp Jump_002_7d99
+;> return NextTransitionStep()
+	jp NextTransitionStep
 
 
-Jump_02_7E59::
+;@ def DrawRoomScrollStrip()
+;@ path: world/room_scroll
+;@ Transition step 4: draws the next strip of the new room (DrawTransitionStrip) while the screen scrolls.
+;@ test: skip the trial cannot run it to its end
+DrawRoomScrollStrip::
+;> DrawTransitionStrip()
 	call DrawTransitionStrip
 	ret
 
 
-Jump_02_7E5D::
+;@ def RoomTransitionDone()
+;@ path: world/room_scroll
+;@ Transition step 5: nothing left to do but scroll.
+RoomTransitionDone::
+;> return
 	ret
 
 
+;@ path: link/ground
+;@ X step of a conveyor belt by ground type $F0-$F7: $F0 down, $F1 up, $F2 left, $F3 right, then the
+;@ diagonals down-right, down-left, up-right, up-left. Read by OnConveyor.
 ConveyorSpeedX::
 	db $00, $00, $ff, $01, $01, $ff, $01, $ff
 
+;@ path: link/ground
+;@ Y step of a conveyor belt by ground type $F0-$F7 (same order).
 ConveyorSpeedY::
 	db $01, $ff, $00, $00, $01, $01, $ff, $ff
 
-Jump_002_7e6e:
+;@ def OnConveyor()
+;@ path: link/ground
+;@ Ground types $F0-$F7: every 4th frame the belt moves Link one pixel (unless he is frozen, busy or
+;@ showing an item).
+OnConveyor::
+;>@cv if (hFrameCounter & 0x03) or wLinkFrozen or hLinkInteractiveMotionBlocked or wLinkShowItemPose:
 	ldh a, [hFrameCounter]
 	and $03
 	ld hl, wLinkFrozen
 	or [hl]
 	ld hl, hLinkInteractiveMotionBlocked
 	or [hl]
+;=@cv
 	ld hl, wLinkShowItemPose
 	or [hl]
+;>     return
 	ret nz
 
+;>@cx hLinkX += ConveyorSpeedX[wLinkGroundType - 0xF0]
 	ld a, [wLinkGroundType]
 	sub $f0
 	ld e, a
 	ld d, $00
-	ld hl, $7e5e
+	ld hl, ConveyorSpeedX
 	add hl, de
+;=@cx
 	ldh a, [hLinkX]
 	add [hl]
 	ldh [hLinkX], a
-	ld hl, $7e66
+;> hLinkY += ConveyorSpeedY[wLinkGroundType - 0xF0]
+	ld hl, ConveyorSpeedY
 	add hl, de
 	ldh a, [hLinkY]
 	add [hl]
@@ -12469,71 +13567,97 @@ Jump_002_7e6e:
 	ret
 
 
+;@ path: link/ground
+;@ X speed of a water current by current 0-7: 0-3 ever faster to the left (-4, -6, -8, -10), 4 right
+;@ +$0C, 5 / 6 none, 7 left -$0C. Read by InWaterCurrent.
 WaterCurrentSpeedX::
 	db $fc, $fa, $f8, $f6, $0c, $00, $00, $f4
 
+;@ path: link/ground
+;@ Y speed of a water current by current 0-7: 5 up -$0C, 6 down +$0C, else 0.
 WaterCurrentSpeedY::
 	db $00, $00, $00, $00, $00, $f4, $0c, $00
 
-Jump_002_7eaa:
+;@ def InWaterCurrent()
+;@ path: link/ground
+;@ While Link swims in deep water with a current he drifts: objects $E7-$EE give currents 0-7; object
+;@ $0E is the river of rooms $3F, $3E, $3D, $3C (currents 0-3, faster downstream).
+InWaterCurrent::
+;>@wc if wRoomTransitionState or wLinkShowItemPose or hLinkInteractiveMotionBlocked or wDialogState or wInventoryAppearing:
 	ldh a, [hFrameCounter]
 	and $00
 	ld hl, wRoomTransitionState
 	or [hl]
 	ld hl, wLinkShowItemPose
 	or [hl]
+;=@wc
 	ld hl, hLinkInteractiveMotionBlocked
 	or [hl]
 	ld hl, wDialogState
 	or [hl]
 	ld hl, wInventoryAppearing
 	or [hl]
-	jr nz, jr_002_7efd
+;>     return
+	jr nz, .done
 
+;> current = 1
 	ld e, $01
+;> if hRoomObjectType == 0x0E:                  # the river
 	ldh a, [hRoomObjectType]
 	cp $0e
-	jr nz, jr_002_7ee4
+	jr nz, .object
 
+;>     if hMapRoom == 0x3E: current = 1
 	ldh a, [hMapRoom]
 	cp $3e
-	jr z, jr_002_7ee7
+	jr z, .set
 
+;>     elif hMapRoom == 0x3D: current = 2
 	inc e
 	cp $3d
-	jr z, jr_002_7ee7
+	jr z, .set
 
+;>     elif hMapRoom == 0x3C: current = 3
 	inc e
 	cp $3c
-	jr z, jr_002_7ee7
+	jr z, .set
 
+;>     elif hMapRoom == 0x3F: current = 0       # (other rooms: return)
 	cp $3f
-	jr nz, jr_002_7efd
+	jr nz, .done
 
 	ld e, $00
-	jr jr_002_7ee7
+	jr .set
 
-jr_002_7ee4:
+.object
+;> else:
+;>     current = hRoomObjectType - 0xE7
 	sub $e7
 	ld e, a
 
-jr_002_7ee7:
+.set
+;> hLinkSpeedX = WaterCurrentSpeedX[current]
 	ld d, $00
-	ld hl, $7e9a
+	ld hl, WaterCurrentSpeedX
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkSpeedX], a
-	ld hl, $7ea2
+;> hLinkSpeedY = WaterCurrentSpeedY[current]
+	ld hl, WaterCurrentSpeedY
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkSpeedY], a
+;> ApplyLinkSpeed()
 	call ApplyLinkSpeed
-	call Call_02_7180
+;> CollideLinkWithWalls()
+	call CollideLinkWithWalls
 
-jr_002_7efd:
+.done
 	ret
 
 
+;@ path: system
+;@ Unused rest of bank 2, filled with $FF.
 Bank2FreeSpace::
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff

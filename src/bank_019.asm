@@ -113,8 +113,8 @@ LiftableStatueIdle::
 	add $20
 	cp $30
 	jp nc, LiftableStatueResetPulls
-;> if mem[0xC19B]: return LiftableStatueResetPulls(slot)      # Link is busy (swinging his sword, ...)
-	ld a, [$c19b]
+;> if wItemUsePoseTimer: return LiftableStatueResetPulls(slot)      # Link is busy (swinging his sword, ...)
+	ld a, [wItemUsePoseTimer]
 	and a
 	jp nz, LiftableStatueResetPulls
 ;> if wItemB == 0x03:                       # Power Bracelet on B
@@ -162,16 +162,16 @@ LiftableStatueIdle::
 	ldh a, [hJoypadHeld]
 	and [hl]
 	jr z, LiftableStatueResetPulls
-;> mem[0xC13C] = mem[0x1E6B + d]            # Link's pulling pose offsets
+;> wLinkSpriteDX = mem[0x1E6B + d]            # Link's pulling pose offsets
 	ld hl, $1e6b
 	add hl, de
 	ld a, [hl]
-	ld [$c13c], a
-;> mem[0xC13B] = mem[0x1E6F + d]
+	ld [wLinkSpriteDX], a
+;> wLinkSpriteDY = mem[0x1E6F + d]
 	ld hl, $1e6f
 	add hl, de
 	ld a, [hl]
-	ld [$c13b], a
+	ld [wLinkSpriteDY], a
 ;> hLinkAnimationState += 1                 # the pulling pose
 	ld hl, hLinkAnimationState
 	inc [hl]
@@ -201,7 +201,7 @@ LiftableStatueIdle::
 	ld hl, wEntityStatus
 	add hl, bc
 	ld [hl], $07
-;> mem[0xC490 + slot] = 0
+;> wEntityLiftStep[slot] = 0
 	ld hl, wEntityLiftStep
 	add hl, bc
 	ld [hl], b
@@ -265,7 +265,7 @@ LiftableStatueThrown::
 .shatter
 ;> ShatterLiftableStatue(slot)
 	call ShatterLiftableStatue
-;> if wRoomEvent & 0x1F != 0x0B: return
+;> if (wRoomEvent & 0x1F) != 0x0B: return
 	ld a, [wRoomEvent]
 	and $1f
 	cp $0b
@@ -501,7 +501,7 @@ WarpHandler::
 	jp ClearEntityStatus_19
 
 .indoors
-;> mem[0xC19D] = 1
+;> wNoEventJingle = 1
 	ld a, $01
 	ld [wNoEventJingle], a
 ;> flags = wDungeonFlags[hMapId]
@@ -591,7 +591,7 @@ WarpWaitForLink::
 	jr nc, Jump_019_42de
 ;> wEntityState[slot] += 1
 	call IncrementEntityState
-;> mem[0xC1C6] = 0x20
+;> wHookshotOut = 0x20
 	ld a, $20
 	ld [wHookshotOut], a
 ;> wEntityTimer[slot] = 0x50
@@ -637,7 +637,7 @@ WarpTransportLink::
 	ld [wSwordAnimationStatePrev], a
 ;> wOcarinaSongState = 0
 	ld [wOcarinaSongState], a
-;> mem[0xC1A9] = 0
+;> wLinkShowItemPose = 0
 	ld [wLinkShowItemPose], a
 ;> wLinkFrozen = 1
 	inc a
@@ -725,7 +725,7 @@ WarpTransportLink::
 	pop af
 	cp $40
 	jr nc, .palette
-;>     if t & 3 == 0 and fade != 0x0C:      # a step every 4 frames, up to step $0C
+;>     if not t & 3 and fade != 0x0C:      # a step every 4 frames, up to step $0C
 	and $03
 	jr nz, .palette
 	ld a, [hl]
@@ -965,7 +965,7 @@ BoomerangHandler::
 	call ReturnIfNonInteractive_19
 ;> PlayPeriodicNoiseSfx()                              # whirring sound
 	call PlayPeriodicNoiseSfx
-;> if hFrameCounter & 3 == 0:
+;> if not hFrameCounter & 3:
 	ldh a, [hFrameCounter]
 	and $03
 	jr nz, .hit
@@ -1039,7 +1039,7 @@ BoomerangFlyOut::
 ;@ The boomerang homes in on Link, re-aiming every 4 frames at speed $20, and disappears when it reaches him.
 ;@ test: skip calls routines in other banks
 BoomerangReturn::
-;> if hFrameCounter & 3 == 0:
+;> if not hFrameCounter & 3:
 	ldh a, [hFrameCounter]
 	and $03
 	jr nz, .catch
@@ -1300,7 +1300,7 @@ GoriyaHandler::
 	call DrawEntity16x16
 ;> SetWalkingSpriteVariant_19(slot)
 	call SetWalkingSpriteVariant_19
-;> if hFrameCounter & 0x3F == 0:
+;> if not hFrameCounter & 0x3F:
 	ldh a, [hFrameCounter]
 	and $3f
 	jr nz, .solid
@@ -1898,7 +1898,7 @@ DogHandler::
 	ld hl, wEntityDirection
 	add hl, bc
 	ld [hl], e
-;>     if hFrameCounter & 0x3F == 0:
+;>     if not hFrameCounter & 0x3F:
 	ldh a, [hFrameCounter]
 	and $3f
 	jr nz, .animate
@@ -2431,7 +2431,7 @@ EggSongInstrument::
 	rra
 	rra
 	xor [hl]
-;>         if phase & 3 == 0: return        # its turn to blink off
+;>         if not phase & 3: return        # its turn to blink off
 	and $03
 	ret z
 ;>         return DrawEntity16x16(InstrumentSprites)
@@ -2489,12 +2489,12 @@ EggSongInstrument::
 	ld [wScreenShakeX], a
 ;> wOcarinaEndEffect = 0
 	ld [wOcarinaEndEffect], a
-;> mem[0xD736] = 0xC1                       # the egg opens: two of the room's objects change
+;> wRoomObjects[0x25] = 0xC1                       # the egg opens: two of the room's objects change
 	ld a, $c1
-	ld [$d736], a
-;> mem[0xD746] = 0xCB
+	ld [wRoomObjects + $25], a
+;> wRoomObjects[0x35] = 0xCB
 	ld a, $cb
-	ld [$d746], a
+	ld [wRoomObjects + $35], a
 ;> hBGPosX = 0x50
 	ld a, $50
 	ldh [hBGPosX], a
@@ -3247,7 +3247,7 @@ RoosterGraveSpirit::
 	ld a, [hl]
 	inc a
 	ld [hl], a
-;> if wEntityPrivateCounter[slot] & 7 == 0:
+;> if not wEntityPrivateCounter[slot] & 7:
 	and $07
 	jr nz, .fly
 ;>     wEntityPrivate2[slot] += 1           # next step of the path
@@ -3385,7 +3385,7 @@ RoosterIndoors::
 	call ReturnIfNonInteractive_19
 ;> PushLinkOutOfEntity_19(slot)
 	call PushLinkOutOfEntity_19
-;> if hFrameCounter & 0x7F == 0:
+;> if not hFrameCounter & 0x7F:
 	ldh a, [hFrameCounter]
 	and $7f
 	jr nz, .animate
@@ -3409,7 +3409,7 @@ RoosterIndoors::
 	ld a, e
 	add [hl]
 	call SetEntitySpriteVariant
-;> if hFrameCounter & 0x3F == 0x0F:
+;> if (hFrameCounter & 0x3F) == 0x0F:
 	ldh a, [hFrameCounter]
 	and $3f
 	cp $0f
@@ -3577,7 +3577,7 @@ RoosterFlyingIndoors::
 	call LoadEntityPosition
 ;> ReturnIfNonInteractive_19()
 	call ReturnIfNonInteractive_19
-;> if hFrameCounter & 0x3F == 0 and GetRandomByte() & 1 == 0:   # now and then
+;> if not hFrameCounter & 0x3F and not GetRandomByte() & 1:   # now and then
 	ldh a, [hFrameCounter]
 	and $3f
 	jr nz, .move
@@ -3763,11 +3763,11 @@ WeathervaneWaitForPush::
 ;> wEntityTimer[slot] = 0x40
 	call GetEntityTimer
 	ld [hl], $40
-;> mem[0xD746] = 0x0C                       # the room objects under the weathervane
-	ld hl, $d746
+;> wRoomObjects[0x35] = 0x0C                       # the room objects under the weathervane
+	ld hl, wRoomObjects + $35
 	ld [hl], $0c
-;> mem[0xD756] = 0xC6
-	ld hl, $d756
+;> wRoomObjects[0x45] = 0xC6
+	ld hl, wRoomObjects + $45
 	ld [hl], $c6
 ;> hBGPosX = 0x50
 	ld a, $50
@@ -3870,11 +3870,11 @@ WeathervaneSlide::
 ;>@slide     return UpdateEntityYPosWithSpeed_19(slot)
 ;> wLinkFrozen = 0
 	ld [wLinkFrozen], a
-;> mem[0xD736] = 0x91                       # the uncovered stairs
-	ld hl, $d736
+;> wRoomObjects[0x25] = 0x91                       # the uncovered stairs
+	ld hl, wRoomObjects + $25
 	ld [hl], $91
-;> mem[0xD746] = 0x5E
-	ld hl, $d746
+;> wRoomObjects[0x35] = 0x5E
+	ld hl, wRoomObjects + $35
 	ld [hl], $5e
 ;> hBGPosX = 0x50
 	ld a, $50
@@ -7357,7 +7357,7 @@ FaceKeyEventStart::
 ;@ path: event/keyhole
 ;@ State 1: the screen shakes sideways (x scroll +1 / -2, switching every 4 frames). At timer $A0 noise $2E
 ;@ plays; at 0 jingle $2F and the next drawing step (state 2). Once wEntityTimer1 has run out, a dust cloud
-;@ may rise (SpawnFaceKeyDebris).
+;@ may rise (SpawnFaceKeyDust).
 ;@ test: skip calls routines in other banks
 FaceKeyEventRumble::
 ;> t = GetEntityTimer()
@@ -7389,8 +7389,8 @@ FaceKeyEventRumble::
 ;> if GetEntityTimer1(): return
 	call GetEntityTimer1
 	ret nz
-;> return SpawnFaceKeyDebris(slot)
-	jp SpawnFaceKeyDebris
+;> return SpawnFaceKeyDust(slot)
+	jp SpawnFaceKeyDust
 
 
 ;@ def FaceKeyEventDrawTop(slot: bc)
@@ -7595,15 +7595,15 @@ FaceKeyEventDrawBottom::
 ;@ path: event/keyhole
 ;@ X positions where the dust clouds of the Face Key scene rise (one picked at random): $18, $58, $28, $48, $38,
 ;@ $20, $50, $40.
-FaceKeyDebrisX::
+FaceKeyDustX::
 	db $18, $58, $28, $48, $38, $20, $50, $40
 
-;@ def SpawnFaceKeyDebris()
+;@ def SpawnFaceKeyDust()
 ;@ path: event/keyhole
 ;@ Every 4 frames: a dust cloud (entity $A7 with wEntityPrivate1 = 1, the pillar's dust puff) at a random x of
-;@ FaceKeyDebrisX and a random y $47-$4E, timer $10.
+;@ FaceKeyDustX and a random y $47-$4E, timer $10.
 ;@ test: skip uses random numbers
-SpawnFaceKeyDebris::
+SpawnFaceKeyDust::
 ;> if hFrameCounter & 3: return
 	ldh a, [hFrameCounter]
 	and $03
@@ -7618,8 +7618,8 @@ SpawnFaceKeyDebris::
 	call GetRandomByte
 	and $07
 	ld c, a
-;> wEntityX[new] = FaceKeyDebrisX[i]
-	ld hl, FaceKeyDebrisX
+;> wEntityX[new] = FaceKeyDustX[i]
+	ld hl, FaceKeyDustX
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntityX
@@ -8201,10 +8201,10 @@ JumpingCheepCheepDefeated::
 	ret
 
 
-;@ def UnusedCheepCheepBytes()
+;@ def UnusedSplashAtEntityY()
 ;@ path: unused/entity
 ;@ A second entry in front of SpawnWaterSplash that nothing calls: a splash at the entity's drawn y.
-UnusedCheepCheepBytes::
+UnusedSplashAtEntityY::
 ;> return SpawnWaterSplash(hActiveEntityDrawY)
 	ldh a, [hActiveEntityDrawY]
 
@@ -8957,53 +8957,71 @@ DrawHippo::
 	ret
 
 
+;@ path: npc/seashell_mansion
+;@ Target height of the Seashell Mansion's meter for each seashell count, indexed by wSeashells (BCD, $00-$28):
+;@ 41 bytes. Counts 0-9: $00 $06 $0C $13 $19 $20 $26 $2C $33 $39; 10-19: $40 $43 ... $58 $5C (steps of 3,
+;@ then 4); 20-28: $60. The six bytes after each decade (the non-BCD indices $x A-$x F) are 0.
 SeashellMeterHeights::
 	db $00, $06, $0c, $13, $19, $20, $26, $2c, $33, $39, $00, $00, $00, $00, $00, $00
 	db $40, $43, $46, $49, $4c, $4f, $52, $55, $58, $5c, $00, $00, $00, $00, $00, $00
 	db $60, $60, $60, $60, $60, $60, $60, $60, $60
 
+;@ def SeashellMansionHandler(slot: bc)
+;@ path: npc/seashell_mansion
+;@ Entity $CF, the Seashell Mansion. wEntityPrivate1 picks the part: 1 the sword appearing (MansionSwordHandler),
+;@ 2 a bonus seashell (MansionBonusShell), 0 the meter: Link walks behind the pillar at x $20-$37 (his sprite
+;@ halves get the behind-background bit), and with at least one seashell the meter (DrawSeashellMeter) rises to
+;@ SeashellMeterHeights[wSeashells] when Link steps in. States (SeashellMansionStates): 0 wait for Link,
+;@ 1 wait until he lands, 2 fill the meter, 3 check for a reward, 4 the sword, 5 done, 6 bonus shell, 7 done.
+;@ test: skip draws sprites and calls routines in other banks
 SeashellMansionHandler::
+;> part = wEntityPrivate1[slot]
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
+;> if part == 2: return MansionBonusShell(slot)
 	cp $02
 	jp z, MansionBonusShell
-
+;> if part: return MansionSwordHandler(slot)
 	and a
 	jp nz, MansionSwordHandler
-
+;> if 0x20 <= hLinkX < 0x38:
 	ldh a, [hLinkX]
 	cp $38
-	jr nc, jr_019_6e3d
-
+	jr nc, .meter
 	cp $20
-	jr c, jr_019_6e3d
-
+	jr c, .meter
+;>     wLinkOAMAttrRight |= 0x80            # behind the pillar
 	ld hl, wLinkOAMAttrRight
 	set 7, [hl]
+;>     if hLinkX >= 0x24: wLinkOAMAttrLeft |= 0x80
 	cp $24
-	jr c, jr_019_6e3d
-
+	jr c, .meter
 	ld hl, wLinkOAMAttrLeft
 	set 7, [hl]
-
-jr_019_6e3d:
+.meter
+;> if not wSeashells: return
 	ld a, [wSeashells]
 	and a
 	ret z
-
+;> hBGTilesRequestCopy = SeashellMeterHeights[wSeashells]   # the meter's target
 	ld e, a
 	ld d, b
-	ld hl, $6dee
+	ld hl, SeashellMeterHeights
 	add hl, de
 	ld a, [hl]
 	ldh [hBGTilesRequestCopy], a
+;> DrawSeashellMeter(slot)                  # (a = hRoomStatus & 0x10 is loaded but not used)
 	ldh a, [hRoomStatus]
 	and $10
 	call DrawSeashellMeter
+;> return SeashellMansionStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
+;@ path: npc/seashell_mansion
+;@ State routines of the Seashell Mansion's meter: 0 wait for Link, 1 wait until he lands, 2 fill the meter,
+;@ 3 check for a reward, 4 the sword, 5 done, 6 bonus shell, 7 done.
 SeashellMansionStates::
 	dw MansionWaitForLink
 	dw MansionWaitForLanding
@@ -9014,285 +9032,418 @@ SeashellMansionStates::
 	dw MansionSpawnBonusShell
 	dw MansionBonusDone
 
+;@ def MansionWaitForLink(slot: bc)
+;@ path: npc/seashell_mansion
+;@ State 0: when Link has walked in to x $3C he is stopped (speed, spin attack and dash) and the meter starts
+;@ after $58 frames (state 1).
+;@ test: skip calls routines in other banks
 MansionWaitForLink::
+;> if hLinkX < 0x3C: return
 	ldh a, [hLinkX]
 	cp $3c
-	jr c, jr_019_6e79
-
+	jr c, .done
+;> StopLinkSpeed()
 	call StopLinkSpeed
+;> ResetSpinAttackAndDash()
 	call ResetSpinAttackAndDash
+;> IncrementEntityState()
 	call IncrementEntityState
+;> wEntityTimer[slot] = 0x58
 	call GetEntityTimer
 	ld [hl], $58
-
-jr_019_6e79:
+.done
+;> return
 	ret
 
 
+;@ def MansionWaitForLanding(slot: bc)
+;@ path: npc/seashell_mansion
+;@ State 1: Link is frozen; once he is on the ground, state 2.
+;@ test: skip calls routines in other banks
 MansionWaitForLanding::
+;> wLinkFrozen = 1
 	ld a, $01
 	ld [wLinkFrozen], a
+;> if not wIsLinkInTheAir: return IncrementEntityState()
 	ld a, [wIsLinkInTheAir]
 	and a
 	jp z, IncrementEntityState
-
+;> return
 	ret
 
 
+;@ def MansionFillMeter(slot: bc)
+;@ path: npc/seashell_mansion
+;@ State 2: after the timer the meter (height in wEntityPrivateCounter) rises: on every 4th frame, with a
+;@ chance of 1 in 2, by a sixteenth of the remaining distance (at least 1), with wave sound 6. Once it is past
+;@ the target it is set to the target and state 3 follows.
+;@ test: skip uses random numbers
 MansionFillMeter::
+;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
+;> if GetEntityTimer(): return
 	call GetEntityTimer
 	ret nz
-
+;> left = hBGTilesRequestCopy - wEntityPrivateCounter[slot]
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ldh a, [hBGTilesRequestCopy]
 	sub [hl]
-	jr nc, jr_019_6e9f
-
+;> if left < 0:
+	jr nc, .rise
+;>     wEntityPrivateCounter[slot] = hBGTilesRequestCopy
 	ldh a, [hBGTilesRequestCopy]
 	ld [hl], a
+;>     IncrementEntityState()
 	call IncrementEntityState
+;>     return
 	ret
-
-
-jr_019_6e9f:
+.rise
+;> if not hFrameCounter & 3:
 	ld e, a
 	ldh a, [hFrameCounter]
 	and $03
-	jr nz, jr_019_6ebf
-
+	jr nz, .done
+;>     if not GetRandomByte() & 1:
 	call GetRandomByte
 	and $01
-	jr nz, jr_019_6ebf
-
+	jr nz, .done
+;>         step = (left >> 4) & 0x0F
 	ld a, e
 	rra
 	rra
 	rra
 	rra
 	and $0f
+;>         if not step: step = 1
 	and a
-	jr nz, jr_019_6eb9
-
+	jr nz, .add
 	ld a, $01
-
-jr_019_6eb9:
+.add
+;>         wEntityPrivateCounter[slot] += step
 	add [hl]
 	ld [hl], a
+;>         hWaveSfx = 6
 	ld a, $06
 	ldh [hWaveSfx], a
-
-jr_019_6ebf:
+.done
+;> return
 	ret
 
 
+;@ def MansionCheckReward(slot: bc)
+;@ path: npc/seashell_mansion
+;@ State 3 (Link frozen): with 20 seashells or more the sword comes ($40 frames, state 4): the hidden passage
+;@ opens (OpenMansionPassage), the meter is no longer drawn (wEntityPrivate2) and music $56 plays. With exactly
+;@ 5 or 10 shells, if that bonus (bit 5 / bit 6 of the mansion's room status, wRoomStatus + $2E9) has not been
+;@ given yet: jingle $23 and a bonus shell (state 6). Otherwise jingle $1D and state 5.
+;@ test: skip calls routines in other banks
 MansionCheckReward::
+;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
+;> wLinkFrozen = 2
 	ld [wLinkFrozen], a
+;> if wSeashells < 0x20: return MansionCheckBonus(slot, wSeashells)
 	ld a, [wSeashells]
 	cp $20
-	jr c, jr_019_6eee
-
+	jr c, MansionCheckBonus
+;> wEntityTimer[slot] = 0x40
 	call GetEntityTimer
 	ld [hl], $40
+;> IncrementEntityState()
 	call IncrementEntityState
+;> OpenMansionPassage()
 	call OpenMansionPassage
+;> wEntityPrivate2[slot] = 1                # the meter is no longer drawn
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld [hl], $01
+;> wMusicTrackToPlay = 0x56
 	ld a, $56
 	ld [wMusicTrackToPlay], a
+;> return MansionReleaseLink(slot)
 
+;@ def MansionReleaseLink(slot: bc)
+;@ path: npc/seashell_mansion
+;@ Link can move again; wEntityTimer1 = $3F (the sparkles at the top of the meter).
+;@ test: skip calls routines in other banks
 MansionReleaseLink::
+;> wLinkFrozen = 0
 	xor a
 	ld [wLinkFrozen], a
+;> wEntityTimer1[slot] = 0x3F
 	call GetEntityTimer1
 	ld [hl], $3f
+;> return
 	ret
 
 
-jr_019_6eee:
-	ld hl, $dae9
+;@ def MansionCheckBonus(slot: bc, shells: a)
+;@ path: npc/seashell_mansion
+;@ Fewer than 20 seashells: with exactly 5 or 10, if that bonus (bit 5 / bit 6 of the mansion's room status,
+;@ wRoomStatus + $2E9) has not been given yet, jingle $23 and a bonus shell (state 6). Otherwise jingle $1D,
+;@ state 5, and Link can move again.
+;@ test: skip calls routines in other banks
+MansionCheckBonus::
+;> status = wRoomStatus + 0x2E9
+	ld hl, wRoomStatus + $2E9
+;> if shells == 0x05:
 	cp $05
-	jr nz, jr_019_6f05
-
+	jr nz, .ten
+;>     if not mem[status] & 0x20:
 	bit 5, [hl]
-	jr nz, jr_019_6f19
-
+	jr nz, .nothing
+;>         wEntityState[slot] = 6
 	call IncrementEntityState
 	ld [hl], $06
+;>         hJingle = 0x23
 	ld a, $23
 	ldh [hJingle], a
+;>         return MansionReleaseLink(slot)
 	jp MansionReleaseLink
-
-
-jr_019_6f05:
+.ten
+;> elif shells == 0x10:
 	cp $10
-	jr nz, jr_019_6f19
-
+	jr nz, .nothing
+;>     if not mem[status] & 0x40:
 	bit 6, [hl]
-	jr nz, jr_019_6f19
-
+	jr nz, .nothing
+;>         wEntityState[slot] = 6
 	call IncrementEntityState
 	ld [hl], $06
+;>         hJingle = 0x23
 	ld a, $23
 	ldh [hJingle], a
+;>         return MansionReleaseLink(slot)
 	jp MansionReleaseLink
-
-
-jr_019_6f19:
+.nothing
+;> hJingle = 0x1D
 	ld a, $1d
 	ldh [hJingle], a
+;> wEntityState[slot] = 5
 	call IncrementEntityState
 	ld [hl], $05
+;> wLinkFrozen = 0
 	xor a
 	ld [wLinkFrozen], a
+;> return
 	ret
 
 
+;@ def MansionSpawnSword(slot: bc)
+;@ path: npc/seashell_mansion
+;@ State 4 (Link frozen): jingle $23 at timer $3E; at 0 the sword's entity appears (a new $CF with
+;@ wEntityPrivate1 = 1 at x $50, y $48, timer $4F) and state 5.
+;@ test: skip calls routines in other banks
 MansionSpawnSword::
+;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
+;> wLinkFrozen = 2
 	ld [wLinkFrozen], a
+;> t = GetEntityTimer()
 	call GetEntityTimer
+;> if t == 0x3E: hJingle = 0x23
 	cp $3e
-	jr nz, jr_019_6f3a
-
+	jr nz, .check
 	ld hl, hJingle
 	ld [hl], $23
-
-jr_019_6f3a:
+.check
+;> if t: return
 	and a
-	jr nz, jr_019_6f5d
-
+	jr nz, .done
+;> new, _ = SpawnEntity(0xCF)
 	ld a, $cf
 	call SpawnEntity
+;> wEntityX[new] = 0x50
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], $50
+;> wEntityY[new] = 0x48
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $48
+;> wEntityPrivate1[new] = 1                 # the sword
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $01
+;> wEntityTimer[new] = 0x4F
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $4f
+;> IncrementEntityState()
 	call IncrementEntityState
-
-jr_019_6f5d:
+.done
+;> return
 	ret
 
 
+;@ def MansionDone(slot: bc)
+;@ path: npc/seashell_mansion
+;@ State 5: nothing more to do.
 MansionDone::
+;> return
 	ret
 
 
+;@ def MansionSpawnBonusShell(slot: bc)
+;@ path: npc/seashell_mansion
+;@ State 6: when wEntityTimer1 has run out, a bonus seashell (a new $CF with wEntityPrivate1 = 2 at x $50, y $48,
+;@ timer $14) and a bomb (entity $02, timer $20) at the same place appear; state 7.
+;@ test: skip calls routines in other banks
 MansionSpawnBonusShell::
+;> if GetEntityTimer1(): return
 	call GetEntityTimer1
-	jr nz, jr_019_6f9b
-
+	jr nz, .done
+;> IncrementEntityState()
 	call IncrementEntityState
+;> new, _ = SpawnEntity(0xCF)
 	ld a, $cf
 	call SpawnEntity
+;> wEntityX[new] = 0x50
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], $50
+;> wEntityY[new] = 0x48
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $48
+;> wEntityPrivate1[new] = 2                 # the bonus seashell
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $02
+;> wEntityTimer[new] = 0x14
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $14
+;> bomb, _ = SpawnEntity(0x02)
 	ld a, $02
 	call SpawnEntity
+;> wEntityX[bomb] = 0x50
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], $50
+;> wEntityY[bomb] = 0x48
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $48
+;> wEntityTimer[bomb] = 0x20
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $20
-
-jr_019_6f9b:
+.done
+;> return
 	ret
 
 
+;@ def MansionBonusDone(slot: bc)
+;@ path: npc/seashell_mansion
+;@ State 7: nothing more to do.
 MansionBonusDone::
+;> return
 	ret
 
 
-	db $50, $00, $50, $20, $3c, $00, $3c, $20, $3a, $00, $3a, $20, $1e, $00, $1e, $60
-	db $1e, $10, $1e, $70
+;@ path: npc/seashell_mansion
+;@ One 16x16 piece of the Seashell Mansion's meter, for DrawEntity16x16: two OAM entries (tile, attributes) -
+;@ tile $50 and the same mirrored.
+MansionMeterSprite::
+	db $50, $00, $50, $20
 
+;@ path: npc/seashell_mansion
+;@ Sparkles, for DrawEntity16x16: 4 variants of two OAM entries (tile, attributes). 0 tile $3C, 1 tile $3A
+;@ (each with a mirrored right half), 2 tile $1E with the right half flipped both ways ($60), 3 the same in
+;@ palette 1 ($10 / $70).
+MansionSparkleSprites::
+	db $3c, $00, $3c, $20, $3a, $00, $3a, $20, $1e, $00, $1e, $60, $1e, $10, $1e, $70
+
+;@ def DrawSeashellMeter(slot: bc)
+;@ path: npc/seashell_mansion
+;@ Unless wEntityPrivate2 is set: draws the meter at x $88 as a column of MansionMeterSprite pieces from drawn y
+;@ $80 - height (wEntityPrivateCounter) down to $80 (plus one at $80). While wEntityTimer1 runs, sparkles
+;@ (variant (timer1 >> 3) & 3) flank its top at x $78 and $98.
+;@ test: skip draws sprites
 DrawSeashellMeter::
+;> if not wEntityPrivate2[slot]:
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr nz, jr_019_6fe2
-
+	jr nz, .sparkles
+;>     hActiveEntityX = 0x88
 	ld a, $88
 	ldh [hActiveEntityX], a
+;>     hActiveEntityDrawY = 0x80
 	ld a, $80
 	ldh [hActiveEntityDrawY], a
-	ld de, $6f9d
+;>     DrawEntity16x16(MansionMeterSprite)
+	ld de, MansionMeterSprite
 	call DrawEntity16x16
+;>     h = wEntityPrivateCounter[slot]
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	ld e, a
+;>     hActiveEntityDrawY = u8(0x80 - h)     # top of the column
 	ld a, $80
 	sub e
 	ldh [hActiveEntityDrawY], a
-
-jr_019_6fd2:
-	ld de, $6f9d
+.piece
+;>     while True:
+;>         DrawEntity16x16(MansionMeterSprite)
+	ld de, MansionMeterSprite
 	call DrawEntity16x16
+;>         hActiveEntityDrawY = u8(hActiveEntityDrawY + 0x10)
 	ldh a, [hActiveEntityDrawY]
 	add $10
 	ldh [hActiveEntityDrawY], a
+;>         if hActiveEntityDrawY >= 0x80: break
 	cp $80
-	jr c, jr_019_6fd2
-
-jr_019_6fe2:
+	jr c, .piece
+.sparkles
+;> t = GetEntityTimer1()
 	call GetEntityTimer1
-	jr z, jr_019_700d
-
+;> if t:
+	jr z, .done
+;>     hActiveEntitySpriteVariant = (t >> 3) & 3
 	rra
 	rra
 	rra
 	and $03
 	ldh [hActiveEntitySpriteVariant], a
+;>     h = wEntityPrivateCounter[slot]
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	ld e, a
+;>     hActiveEntityDrawY = u8(0x80 - h)
 	ld a, $80
 	sub e
 	ldh [hActiveEntityDrawY], a
+;>     hActiveEntityX = 0x78
 	ld a, $78
 	ldh [hActiveEntityX], a
-	ld de, $6fa1
+;>     DrawEntity16x16(MansionSparkleSprites)
+	ld de, MansionSparkleSprites
 	call DrawEntity16x16
+;>     hActiveEntityX = 0x98
 	ld a, $98
 	ldh [hActiveEntityX], a
-	ld de, $6fa1
+;>     DrawEntity16x16(MansionSparkleSprites)
+	ld de, MansionSparkleSprites
 	call DrawEntity16x16
-
-jr_019_700d:
+.done
+;> return
 	ret
 
 
+;@ path: npc/seashell_mansion
+;@ Light around the sword while it appears, for DrawEntitySprites: 4 frames of 12 OAM entries (y offset, x
+;@ offset, tile, attributes), 48 bytes each; every entry is tile $7C, flipped in different ways (attributes $00,
+;@ $20, $40, $60), spread over 80 pixels in height.
+SwordGlowSprites::
 	db $d8, $e8, $7c, $40, $d8, $f0, $7c, $20, $e8, $e8, $7c, $00, $e8, $f0, $7c, $60
 	db $f8, $f8, $7c, $00, $f8, $00, $7c, $60, $08, $08, $7c, $00, $08, $10, $7c, $60
 	db $18, $18, $7c, $00, $18, $20, $7c, $60, $28, $18, $7c, $40, $28, $20, $7c, $20
@@ -9306,10 +9457,22 @@ jr_019_700d:
 	db $f8, $08, $7c, $40, $f8, $10, $7c, $20, $08, $f8, $7c, $40, $08, $00, $7c, $20
 	db $18, $e8, $7c, $40, $18, $f0, $7c, $20, $28, $e8, $7c, $00, $28, $f0, $7c, $60
 
+;@ def MansionSwordHandler(slot: bc)
+;@ path: npc/seashell_mansion
+;@ The Seashell Mansion's reward (entity $CF with wEntityPrivate1 = 1): sparkles, a flashing light with the
+;@ screen flickering, an emblem that shrinks into the sword, the sword falls and bounces, and when Link
+;@ touches it he holds it up - sword level 2, full health, the seashells are used up. States
+;@ (MansionSwordStates): 0 sparkle, 1 start the light, 2 light, 3 shrink, 4 fall, 5 wait for Link, 6 Link
+;@ gets it, 7 wait for the dialog.
+;@ test: skip draws sprites and calls routines in other banks
 MansionSwordHandler::
+;> return MansionSwordStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
+;@ path: npc/seashell_mansion
+;@ State routines of the Seashell Mansion's sword: 0 sparkle, 1 start the light, 2 light, 3 shrink, 4 fall,
+;@ 5 wait for Link, 6 Link gets it, 7 wait for the dialog.
 MansionSwordStates::
 	dw MansionSwordSparkle
 	dw MansionSwordGlowStart
@@ -9320,126 +9483,183 @@ MansionSwordStates::
 	dw MansionSwordGet
 	dw MansionSwordShowOff
 
+;@ def MansionSwordSparkle(slot: bc)
+;@ path: npc/seashell_mansion
+;@ Sword state 0 (Link frozen): from timer $4F down to $30 a sparkle (MansionSparkleSprites, frame by the
+;@ timer); after a pause the light starts ($A0 frames, state 1).
+;@ test: skip draws sprites
 MansionSwordSparkle::
+;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
+;> wLinkFrozen = 2
 	ld [wLinkFrozen], a
+;> t = GetEntityTimer()
 	call GetEntityTimer
-	jr z, jr_019_7100
-
+;> if t:
+	jr z, .start
+;>     if t < 0x30: return
 	cp $30
 	ret c
-
+;>     hActiveEntitySpriteVariant = ((t - 0x30) >> 3) & 3
 	sub $30
 	rra
 	rra
 	rra
 	and $03
 	ldh [hActiveEntitySpriteVariant], a
-	ld de, $6fa1
+;>     DrawEntity16x16(MansionSparkleSprites)
+	ld de, MansionSparkleSprites
 	call DrawEntity16x16
+;>     return
 	ret
-
-
-jr_019_7100:
+.start
+;> wEntityTimer[slot] = 0xA0
 	call GetEntityTimer
 	ld [hl], $a0
+;> return IncrementEntityState()
 	jp IncrementEntityState
 
 
+;@ def MansionSwordGlowStart(slot: bc)
+;@ path: npc/seashell_mansion
+;@ Sword state 1 (Link frozen): the light; when the timer runs out, wave sound $1E and state 2 for $FF frames.
+;@ test: skip draws sprites
 MansionSwordGlowStart::
+;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
+;> wLinkFrozen = 2
 	ld [wLinkFrozen], a
+;> if GetEntityTimer(): return DrawSwordGlow(slot)
 	call GetEntityTimer
 	jr nz, DrawSwordGlow
-
+;> wEntityTimer[slot] = 0xFF
 	ld [hl], $ff
+;> hWaveSfx = 0x1E
 	ld a, $1e
 	ldh [hWaveSfx], a
+;> IncrementEntityState()
 	call IncrementEntityState
+;> return DrawSwordGlow(slot)
 
+;@ def DrawSwordGlow(slot: bc)
+;@ path: npc/seashell_mansion
+;@ The light: the background palette flickers between $E4 and $84 (every 4 frames of the timer); every 8 frames
+;@ noise $33 and a random frame 0-3; the entity flashes (wEntityFlashTimer = hFrameCounter); draws the 12
+;@ entries of SwordGlowSprites.
+;@ test: skip draws sprites
 DrawSwordGlow::
+;> p = 0x84 if GetEntityTimer() & 4 else 0xE4
 	call GetEntityTimer
 	and $04
 	ld e, $e4
-	jr z, jr_019_7128
-
+	jr z, .palette
 	ld e, $84
-
-jr_019_7128:
+.palette
+;> wBGPalette = p
 	ld a, e
 	ld [wBGPalette], a
+;> if not hFrameCounter & 7:
 	ldh a, [hFrameCounter]
 	and $07
-	jr nz, jr_019_713e
-
+	jr nz, .flash
+;>     hNoiseSfx = 0x33
 	ld a, $33
 	ldh [hNoiseSfx], a
+;>     SetEntitySpriteVariant(GetRandomByte() & 3)
 	call GetRandomByte
 	and $03
 	call SetEntitySpriteVariant
-
-jr_019_713e:
+.flash
+;> wEntityFlashTimer[slot] = hFrameCounter
 	ldh a, [hFrameCounter]
 	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld [hl], a
+;> v16 = (hActiveEntitySpriteVariant << 4) & 0xF0
 	ldh a, [hActiveEntitySpriteVariant]
 	rla
 	rla
 	rla
 	rla
 	and $f0
+;> offset = v16 + ((v16 << 1) & 0xE0)        # frame * 48
 	ld e, a
 	rla
 	and $e0
 	add e
 	ld e, a
 	ld d, b
-	ld hl, $700e
+;> DrawEntitySprites(SwordGlowSprites + offset, 12)
+	ld hl, SwordGlowSprites
 	add hl, de
 	ld c, $0c
 	call DrawEntitySprites
+;> ReserveOAMEntriesFar(10)
 	ld a, $0a
 	call ReserveOAMEntriesFar
+;> return
 	ret
 
 
+;@ path: npc/seashell_mansion
+;@ A glint where the sword will be, for DrawEntity16x16: two OAM entries (tile, attributes) - tile $7A and the
+;@ same mirrored.
+SwordAppearSprite::
 	db $7a, $00, $7a, $20
 
+;@ def MansionSwordGlow(slot: bc)
+;@ path: npc/seashell_mansion
+;@ Sword state 2 (Link frozen): the light goes on; until timer $50 a glint (SwordAppearSprite), then the large
+;@ emblem (frame 4 of SwordEmblemSprites). At 0 the emblem starts to shrink ($28 frames on the drop timer,
+;@ state 3).
+;@ test: skip draws sprites
 MansionSwordGlow::
+;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
+;> wLinkFrozen = 2
 	ld [wLinkFrozen], a
+;> DrawSwordGlow(slot)
 	call DrawSwordGlow
+;> t = GetEntityTimer()
 	call GetEntityTimer
-	jr nz, jr_019_717e
-
+;> if t == 0:
+	jr nz, .running
+;>     wEntityDropTimer[slot] = 0x28
 	call GetEntityDropTimer
 	ld [hl], $28
+;>     return IncrementEntityState()
 	jp IncrementEntityState
-
-
-jr_019_717e:
+.running
+;> if t < 0x50:
 	cp $50
-	jr nc, jr_019_718f
-
-	ld hl, $7219
+	jr nc, .glint
+;>     DrawEntitySprites(SwordEmblemSprites + 4 * 0x20, 8)
+	ld hl, SwordEmblemSprites + 4 * $20
 	ld c, $08
 	call DrawEntitySprites
+;>     return ReserveOAMEntriesFar(6)
 	ld a, $06
 	jp ReserveOAMEntriesFar
-
-
-jr_019_718f:
+.glint
+;> hActiveEntitySpriteVariant = 0
 	xor a
 	ldh [hActiveEntitySpriteVariant], a
-	ld de, $7163
+;> DrawEntity16x16(SwordAppearSprite)
+	ld de, SwordAppearSprite
 	call DrawEntity16x16
+;> return
 	ret
 
 
+;@ path: npc/seashell_mansion
+;@ The emblem the sword forms from, for DrawEntitySprites: 5 frames of 8 OAM entries (y offset, x offset, tile,
+;@ attributes), 32 bytes each, from small to large. 0: tile $6E over $70 (16 wide, each entry twice); 1: $68
+;@ $6A over $6C; 2: $62 $64 over $66; 3: $5A $5C over $5E $60; 4: $56 $58 over the same flipped vertically.
+;@ Right halves are mirrored ($20).
+SwordEmblemSprites::
 	db $f8, $00, $6e, $00, $f8, $08, $6e, $20, $f8, $00, $6e, $00, $f8, $08, $6e, $20
 	db $08, $00, $70, $00, $08, $08, $70, $20, $08, $00, $70, $00, $08, $08, $70, $20
 	db $f8, $f8, $68, $00, $f8, $00, $6a, $00, $f8, $08, $6a, $20, $f8, $10, $68, $20
@@ -9451,672 +9671,952 @@ jr_019_718f:
 	db $f8, $f8, $56, $00, $f8, $00, $58, $00, $f8, $08, $58, $20, $f8, $10, $56, $20
 	db $08, $f8, $56, $40, $08, $00, $58, $40, $08, $08, $58, $60, $08, $10, $56, $60
 
+;@ def MansionSwordShrink(slot: bc)
+;@ path: npc/seashell_mansion
+;@ Sword state 3 (Link frozen, the entity flashing): the emblem shrinks with the drop timer (frame
+;@ min((timer >> 2) & 15, 4)); at 0, state 4.
+;@ test: skip draws sprites
 MansionSwordShrink::
+;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
+;> wLinkFrozen = 2
 	ld [wLinkFrozen], a
+;> wEntityFlashTimer[slot] = (hFrameCounter & 0x0F) | 0x20
 	ldh a, [hFrameCounter]
 	and $0f
 	or $20
 	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld [hl], a
+;> d = GetEntityDropTimer()
 	call GetEntityDropTimer
-	jr nz, jr_019_7253
-
+;> if not d: return IncrementEntityState()
+	jr nz, .shrink
 	jp IncrementEntityState
-
-
-jr_019_7253:
+.shrink
+;> frame = min((d >> 2) & 0x0F, 4)
 	rra
 	rra
 	and $0f
 	cp $04
-	jr c, jr_019_725d
-
+	jr c, .frame
 	ld a, $04
-
-jr_019_725d:
+.frame
+;> offset = (frame << 5) & 0xE0
 	rla
 	rla
 	rla
 	rla
 	rla
 	and $e0
+;> DrawEntitySprites(SwordEmblemSprites + offset, 8)
 	ld e, a
 	ld d, b
-	ld hl, $7199
+	ld hl, SwordEmblemSprites
 	add hl, de
 	ld c, $08
 	call DrawEntitySprites
+;> ReserveOAMEntriesFar(6)
 	ld a, $06
 	call ReserveOAMEntriesFar
+;> return
 	ret
 
 
+;@ def MansionSwordDrop(slot: bc)
+;@ path: npc/seashell_mansion
+;@ Sword state 4 (Link frozen): the sword falls (gravity 1) to y $70 and bounces (noise $17, speed halved and
+;@ reversed) until it lands slower than 4 - then state 5.
+;@ test: skip draws sprites
 MansionSwordDrop::
+;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
+;> wLinkFrozen = 2
 	ld [wLinkFrozen], a
+;> DrawSword(slot)
 	call DrawSword
+;> UpdateEntityYPosWithSpeed_19(slot)
 	call UpdateEntityYPosWithSpeed_19
+;> wEntitySpeedY[slot] += 1
 	ld hl, wEntitySpeedY
 	add hl, bc
 	inc [hl]
+;> if not wEntitySpeedY[slot] & 0x80:       # falling
 	ld a, [hl]
 	and $80
-	jr nz, jr_019_72aa
-
+	jr nz, .done
+;>     if wEntityY[slot] >= 0x70:
 	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	cp $70
-	jr c, jr_019_72aa
-
+	jr c, .done
+;>         wEntityY[slot] = 0x70
 	ld [hl], $70
+;>         hNoiseSfx = 0x17
 	ld a, $17
 	ldh [hNoiseSfx], a
+;>         v = wEntitySpeedY[slot]
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
+;>         if v < 4: return IncrementEntityState()
 	cp $04
 	jp c, IncrementEntityState
-
+;>         wEntitySpeedY[slot] = u8(-v >> 1)  # bounce
 	cpl
 	inc a
 	sra a
 	ld [hl], a
-
-jr_019_72aa:
+.done
+;> return
 	ret
 
 
+;@ def MansionSwordWaitForLink(slot: bc)
+;@ path: npc/seashell_mansion
+;@ Sword state 5: Link can move; when he touches the sword, music $0F plays and state 6 runs for $FF frames.
+;@ test: skip draws sprites
 MansionSwordWaitForLink::
+;> wLinkFrozen = 0
 	xor a
 	ld [wLinkFrozen], a
+;> DrawSword(slot)
 	call DrawSword
+;> if EntityTouchesLink():
 	call EntityTouchesLink
-	jr nc, jr_019_72c4
-
+	jr nc, .done
+;>     IncrementEntityState()
 	call IncrementEntityState
+;>     wMusicTrackToPlay = 0x0F
 	ld a, $0f
 	ld [wMusicTrackToPlay], a
+;>     wEntityTimer[slot] = 0xFF
 	call GetEntityTimer
 	ld [hl], $ff
-
-jr_019_72c4:
+.done
+;> return
 	ret
 
 
+;@ def MansionSwordGet(slot: bc)
+;@ path: npc/seashell_mansion
+;@ Sword state 6: Link holds the sword up (pose $6B, facing down, sword above his head with its rays) while the
+;@ palette flickers every 8 frames. At the end: music $10, dialog $9F, the mansion's room status (wRoomStatus +
+;@ $2E9 and hRoomStatus) gets bit 4, wSwordLevel 2, health refilled ($FF into wAddHealthBuffer), wSeashells
+;@ 0, Link can move, state 7.
+;@ test: skip draws sprites and calls routines in other banks
 MansionSwordGet::
+;> p = 0x84 if GetEntityTimer() & 8 else 0xE4
 	call GetEntityTimer
 	and $08
 	ld e, $e4
-	jr z, jr_019_72d0
-
+	jr z, .palette
 	ld e, $84
-
-jr_019_72d0:
+.palette
+;> wBGPalette = p
 	ld a, e
 	ld [wBGPalette], a
+;> if not GetEntityTimer():
 	call GetEntityTimer
-	jr nz, jr_019_7303
-
+	jr nz, .hold
+;>     wEntityTimer[slot] = 0x20
 	ld [hl], $20
+;>     wMusicTrackToPlay = 0x10
 	ld a, $10
 	ld [wMusicTrackToPlay], a
+;>     OpenDialog(0x9F)
 	ld a, $9f
 	call OpenDialog
-	ld a, [$dae9]
+;>     status = wRoomStatus[0x2E9] | 0x10
+	ld a, [wRoomStatus + $2E9]
 	or $10
-	ld [$dae9], a
+;>     wRoomStatus[0x2E9] = status
+	ld [wRoomStatus + $2E9], a
+;>     hRoomStatus = status
 	ldh [hRoomStatus], a
+;>     wSwordLevel = 2
 	ld a, $02
 	ld [wSwordLevel], a
+;>     wAddHealthBuffer = 0xFF
 	ld a, $ff
 	ld [wAddHealthBuffer], a
+;>     wSeashells = 0
 	xor a
 	ld [wSeashells], a
+;>     wLinkFrozen = 0
 	ld [wLinkFrozen], a
+;>     IncrementEntityState()
 	call IncrementEntityState
-
-jr_019_7303:
+.hold
+;> wEntityX[slot] = u8(hLinkX - 4)
 	ldh a, [hLinkX]
 	ld hl, wEntityX
 	add hl, bc
 	sub $04
 	ld [hl], a
+;> wEntityY[slot] = u8(hLinkY - 0x13)
 	ldh a, [hLinkY]
 	ld hl, wEntityY
 	add hl, bc
 	sub $13
 	ld [hl], a
+;> LoadEntityPosition()
 	call LoadEntityPosition
+;> wEntityZ[slot] = hLinkPositionZ
 	ldh a, [hLinkPositionZ]
 	ld hl, wEntityZ
 	add hl, bc
 	ld [hl], a
+;> hLinkAnimationState = 0x6B               # holding something up
 	ld a, $6b
 	ldh [hLinkAnimationState], a
+;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
+;> hLinkDirection = 3
 	ld a, $03
 	ldh [hLinkDirection], a
+;> wSwordAnimationState = 0
 	xor a
 	ld [wSwordAnimationState], a
+;> wSwordAnimationStatePrev = 0
 	ld [wSwordAnimationStatePrev], a
+;> wSwordCharge = 0
 	ld [wSwordCharge], a
+;> wSpinAttackTimer = 0
 	ld [wSpinAttackTimer], a
+;> DrawSwordRays()
 	call DrawSwordRays
+;> DrawSwordHeld()
 	call DrawSwordHeld
+;> return
 	ret
 
 
+;@ def MansionSwordShowOff(slot: bc)
+;@ path: npc/seashell_mansion
+;@ Sword state 7: the sword stays above Link until the dialog is closed, then it is removed.
+;@ test: skip draws sprites
 MansionSwordShowOff::
+;> DrawSwordHeld()
 	call DrawSwordHeld
+;> if not wDialogState: ClearEntityStatus_19(slot)
 	ld a, [wDialogState]
 	and a
-	jr nz, jr_019_734b
-
+	jr nz, .done
 	call ClearEntityStatus_19
-
-jr_019_734b:
+.done
+;> return
 	ret
 
 
+;@ path: npc/seashell_mansion
+;@ Rays around the raised sword, frame 0, for DrawEntitySprites: 12 OAM entries (y offset, x offset, tile,
+;@ attributes) of tiles $72-$78.
+SwordRays0::
 	db $00, $04, $72, $00, $e0, $04, $72, $00, $00, $f0, $78, $20, $00, $f8, $78, $40
 	db $00, $10, $78, $60, $00, $18, $78, $00, $f0, $e8, $76, $20, $f0, $f0, $76, $40
 	db $f0, $18, $76, $60, $f0, $20, $76, $00, $e8, $f4, $74, $20, $e8, $14, $74, $00
+;@ path: npc/seashell_mansion
+;@ Rays, frame 1: 14 entries (same format), further out.
+SwordRays1::
 	db $f8, $04, $72, $00, $d8, $04, $72, $00, $fc, $e8, $78, $20, $fc, $f0, $78, $40
 	db $fc, $18, $78, $60, $fc, $20, $78, $00, $e8, $e0, $76, $20, $e8, $e8, $76, $40
 	db $e8, $20, $76, $60, $e8, $28, $76, $00, $e0, $f0, $74, $20, $e0, $18, $74, $00
-	db $00, $00, $74, $20, $00, $08, $74, $00, $f0, $04, $72, $00, $d0, $04, $72, $00
-	db $f8, $e0, $78, $20, $f8, $e8, $78, $40, $f8, $20, $78, $60, $f8, $28, $78, $00
-	db $e0, $d8, $76, $20, $e0, $e0, $76, $40, $e0, $28, $76, $60, $e0, $30, $76, $00
-	db $d8, $ec, $74, $20, $d8, $1c, $74, $00, $f8, $fc, $74, $20, $f8, $0c, $74, $00
-	db $00, $f8, $76, $20, $00, $00, $76, $40, $00, $08, $76, $60, $00, $10, $76, $00
+	db $00, $00, $74, $20, $00, $08, $74, $00
+
+;@ path: npc/seashell_mansion
+;@ Rays, frame 2: 18 entries (same format), furthest out.
+SwordRays2::
+	db $f0, $04, $72, $00, $d0, $04, $72, $00, $f8, $e0, $78, $20, $f8, $e8, $78, $40
+	db $f8, $20, $78, $60, $f8, $28, $78, $00, $e0, $d8, $76, $20, $e0, $e0, $76, $40
+	db $e0, $28, $76, $60, $e0, $30, $76, $00, $d8, $ec, $74, $20, $d8, $1c, $74, $00
+	db $f8, $fc, $74, $20, $f8, $0c, $74, $00, $00, $f8, $76, $20, $00, $00, $76, $40
+	db $00, $08, $76, $60, $00, $10, $76, $00
+;@ path: npc/seashell_mansion
+;@ Rays, frame 3: 17 entries (same format).
+SwordRays3::
 	db $e4, $04, $72, $00, $00, $f8, $78, $20, $00, $00, $78, $40, $00, $08, $78, $60
 	db $00, $10, $78, $00, $f4, $f0, $76, $20, $f4, $f8, $76, $40, $f4, $10, $76, $60
 	db $f4, $18, $76, $00, $ec, $f8, $74, $20, $ec, $10, $74, $00, $f0, $d8, $78, $20
 	db $f0, $e0, $78, $40, $f0, $28, $78, $60, $f0, $30, $78, $00, $cc, $e8, $74, $20
-	db $cc, $20, $74, $00, $4c, $73, $7c, $73, $b4, $73, $fc, $73, $0c, $0e, $12, $11
+	db $cc, $20, $74, $00
 
+;@ path: npc/seashell_mansion
+;@ The four ray frames, indexed by (hFrameCounter >> 2) & 3.
+SwordRaySets::
+	dw SwordRays0
+	dw SwordRays1
+	dw SwordRays2
+	dw SwordRays3
+
+;@ path: npc/seashell_mansion
+;@ Number of OAM entries in each ray frame: 12, 14, 18, 17.
+SwordRayCounts::
+	db $0c, $0e, $12, $11
+
+;@ def DrawSwordRays()
+;@ path: npc/seashell_mansion
+;@ Draws ray frame (hFrameCounter >> 2) & 3 around the raised sword.
+;@ test: skip draws sprites
 DrawSwordRays::
+;> hActiveEntityDrawY = u8(hActiveEntityDrawY - 0)
 	ldh a, [hActiveEntityDrawY]
 	sub $00
 	ldh [hActiveEntityDrawY], a
+;> t = hFrameCounter >> 2
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	nop
 	push af
+;> n = SwordRayCounts[t & 3]
 	and $03
 	ld e, a
 	ld d, b
-	ld hl, $7448
+	ld hl, SwordRayCounts
 	add hl, de
 	ld c, [hl]
+;> p = SwordRaySets + (t & 3) * 2
 	pop af
 	rla
 	and $06
 	ld e, a
 	ld d, b
-	ld hl, $7440
+	ld hl, SwordRaySets
+;> sprites = mem[p] | (mem[p + 1] << 8)
 	add hl, de
 	ld a, [hli]
 	ld h, [hl]
 	ld l, a
+;> DrawEntitySprites(sprites, n)
 	call DrawEntitySprites
+;> ReserveOAMEntriesFar(0x10)
 	ld a, $10
 	call ReserveOAMEntriesFar
+;> return
 	ret
 
 
+;@ path: npc/seashell_mansion
+;@ The bonus seashell, for DrawEntity16x16: two OAM entries (tile, attributes) - tile $7E and the same mirrored.
+MansionSeashellSprite::
 	db $7e, $00, $7e, $20
 
+;@ def MansionBonusShell(slot: bc)
+;@ path: npc/seashell_mansion
+;@ A bonus seashell (entity $CF with wEntityPrivate1 = 2): after its timer it drops (gravity 1) to y $70 and
+;@ stays there. When Link touches it: wave sound 1, it is gone, the mansion's room status gets bit 5 (at 5
+;@ shells) or bit 6 (otherwise), wSeashells goes up by one (BCD) and dialog $EF opens.
+;@ test: skip draws sprites
 MansionBonusShell::
+;> if GetEntityTimer(): return
 	call GetEntityTimer
 	ret nz
-
-	ld de, $7477
+;> DrawEntity16x16(MansionSeashellSprite)
+	ld de, MansionSeashellSprite
 	call DrawEntity16x16
+;> UpdateEntityYPosWithSpeed_19(slot)
 	call UpdateEntityYPosWithSpeed_19
+;> wEntitySpeedY[slot] += 1
 	ld hl, wEntitySpeedY
 	add hl, bc
 	inc [hl]
+;> if not wEntitySpeedY[slot] & 0x80:
 	ld a, [hl]
 	and $80
-	jr nz, jr_019_74c9
-
+	jr nz, .done
+;>     if wEntityY[slot] >= 0x70:
 	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	cp $70
-	jr c, jr_019_74c9
-
+	jr c, .done
+;>         wEntityY[slot] = 0x70
 	ld [hl], $70
+;>         wEntitySpeedY[slot] = 0
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], b
+;>         if EntityTouchesLink():
 	call EntityTouchesLink
-	jr nc, jr_019_74c9
-
+	jr nc, .done
+;>             hWaveSfx = 1
 	ld a, $01
 	ldh [hWaveSfx], a
+;>             ClearEntityStatus_19(slot)
 	call ClearEntityStatus_19
-	ld hl, $dae9
+;>             status = wRoomStatus + 0x2E9
+	ld hl, wRoomStatus + $2E9
+;>             if wSeashells == 5: mem[status] |= 0x20
 	ld a, [wSeashells]
 	cp $05
-	jr nz, jr_019_74bc
-
+	jr nz, .ten
 	set 5, [hl]
-	jr jr_019_74be
-
-jr_019_74bc:
+	jr .count
+.ten
+;>             else: mem[status] |= 0x40
 	set 6, [hl]
-
-jr_019_74be:
+.count
+;>             wSeashells = bcd_add(wSeashells, 1)
 	add $01
 	daa
 	ld [wSeashells], a
+;>             OpenDialog(0xEF)
 	ld a, $ef
 	call OpenDialog
-
-jr_019_74c9:
+.done
+;> return
 	ret
 
 
+;@ path: npc/seashell_mansion
+;@ The falling sword, for DrawEntitySprites: 4 OAM entries (y offset, x offset, tile, attributes) - tile $52
+;@ over $54, right halves mirrored.
+SwordSprites::
 	db $f8, $00, $52, $00, $f8, $08, $52, $20, $08, $00, $54, $00, $08, $08, $54, $20
+;@ path: npc/seashell_mansion
+;@ The sword held up by Link: the same picture flipped vertically ($54 over $52, attributes $40 / $60).
+SwordHeldSprites::
 	db $f8, $00, $54, $40, $f8, $08, $54, $60, $08, $00, $52, $40, $08, $08, $52, $60
 
+;@ def DrawSwordHeld()
+;@ path: npc/seashell_mansion
+;@ Draws SwordHeldSprites.
+;@ test: skip draws sprites
 DrawSwordHeld::
-	ld hl, $74da
+;> return DrawMansionSwordSprites(SwordHeldSprites)
+	ld hl, SwordHeldSprites
 	jr DrawMansionSwordSprites
 
+;@ def DrawSword()
+;@ path: npc/seashell_mansion
+;@ Draws SwordSprites.
+;@ test: skip draws sprites
 DrawSword::
-	ld hl, $74ca
+;> return DrawMansionSwordSprites(SwordSprites)
+	ld hl, SwordSprites
 
+;@ def DrawMansionSwordSprites(sprites: hl)
+;@ path: npc/seashell_mansion
+;@ Draws 4 OAM entries from sprites and reserves 2 entries.
+;@ test: skip draws sprites
 DrawMansionSwordSprites::
+;> DrawEntitySprites(sprites, 4)
 	ld c, $04
 	call DrawEntitySprites
+;> ReserveOAMEntriesFar(2)
 	ld a, $02
 	call ReserveOAMEntriesFar
+;> return
 	ret
 
 
+;@ path: npc/seashell_mansion
+;@ Tiles of the passage that opens in the mansion: background draw commands (BG address high, low, mode $8D =
+;@ vertical 14 tiles, tiles). Column 16 from row 2: $6C $6E repeated; column 17: $6D $6F repeated; then the end
+;@ byte 0. 35 bytes.
+MansionPassageTiles::
 	db $98, $50, $8d, $6c, $6e, $6c, $6e, $6c, $6e, $6c, $6e, $6c, $6e, $6c, $6e, $6c
 	db $6e, $98, $51, $8d, $6d, $6f, $6d, $6f, $6d, $6f, $6d, $6f, $6d, $6f, $6d, $6f
 	db $6d, $6f, $00
 
+;@ def OpenMansionPassage()
+;@ path: npc/seashell_mansion
+;@ Queues MansionPassageTiles and makes room objects of column 8, rows 1-7, $89.
+;@ test: skip writes the background draw queue
 OpenMansionPassage::
+;> wDrawCommandsSize = 0x22
 	push bc
 	ld c, $23
 	ld a, $22
 	ld [wDrawCommandsSize], a
+;> dst = wDrawCommand
 	ld hl, wDrawCommand
-	ld de, $74fd
-
-jr_019_752e:
+;> src = MansionPassageTiles
+	ld de, MansionPassageTiles
+;> for _ in range(0x23):
+.copy
+;>     mem[dst] = mem[src]
 	ld a, [de]
 	inc de
 	ld [hli], a
+;>     src += 1; dst += 1
 	dec c
-	jr nz, jr_019_752e
-
+	jr nz, .copy
+;> wRoomObjects[0x18] = 0x89
 	pop bc
 	ld a, $89
-	ld [$d729], a
-	ld [$d739], a
-	ld [$d749], a
-	ld [$d759], a
-	ld [$d769], a
-	ld [$d779], a
-	ld [$d789], a
+	ld [wRoomObjects + $18], a
+;> wRoomObjects[0x28] = 0x89
+	ld [wRoomObjects + $28], a
+;> wRoomObjects[0x38] = 0x89
+	ld [wRoomObjects + $38], a
+;> wRoomObjects[0x48] = 0x89
+	ld [wRoomObjects + $48], a
+;> wRoomObjects[0x58] = 0x89
+	ld [wRoomObjects + $58], a
+;> wRoomObjects[0x68] = 0x89
+	ld [wRoomObjects + $68], a
+;> wRoomObjects[0x78] = 0x89
+	ld [wRoomObjects + $78], a
+;> return
 	ret
 
 
-	db $fc, $04, $00, $00, $ff, $00, $00, $00, $00, $00, $04, $fc, $00, $00, $00, $ff
+;@ path: entity/engine
+;@ X shift per frame of a room scroll, indexed by wRoomTransitionDirection (0 right, 1 left, 2 up, 3 down):
+;@ -4, +4, 0, 0 (everything on the old screen slides the other way).
+EntityScrollShiftX::
+	db $fc, $04, $00, $00
+
+;@ path: entity/engine
+;@ High byte of the x shift (the sign extension): $FF, 0, 0, 0.
+EntityScrollShiftXHigh::
+	db $ff, $00, $00, $00
+
+;@ path: entity/engine
+;@ Y shift per frame of a room scroll by direction: 0, 0, +4, -4.
+EntityScrollShiftY::
+	db $00, $00, $04, $fc
+
+;@ path: entity/engine
+;@ High byte of the y shift: 0, 0, 0, $FF.
+EntityScrollShiftYHigh::
+	db $00, $00, $00, $ff
+;@ path: entity/engine
+;@ How far back in the Lanmola's position history (wEntityWorkRAM / wEntityWorkRAM2, indexed from its
+;@ wEntityPrivateCounter) its 6 body segments are: $0C, $18, $24, $30, $3C, $48.
+LanmolaTrailOffsets::
 	db $0c, $18, $24, $30, $3c, $48
 
+;@ def MoveEntityWithRoomScroll(slot: bc)
+;@ path: entity/engine
+;@ During a room scroll (wRoomTransitionState 3 or more) moves the entity by the scroll's shift (16-bit, with
+;@ wEntityPosXHigh / wEntityPosYHigh), together with what some entities remember of their positions: Turtle
+;@ Rock's head ($7F, wEntityPrivate4 / wEntityPrivate3), the Lanmola's ($87) position history unless
+;@ wEntityPrivate3 is 2, the trail Marin ($C1) walks along while she follows Link, Bow-Wow's ($6D) chain links
+;@ (not on every 8th frame while he follows Link) and, for $6D, the lever ($69) and the pincer ($B0), the
+;@ position in wEntityPrivate1 / wEntityPrivate2. Ends in RemoveEntityLeftBehind.
+;@ test: skip runs during a room scroll
 MoveEntityWithRoomScroll::
+;> if wRoomTransitionState < 3: return
 	ld a, [wRoomTransitionState]
 	cp $03
-	jr nc, jr_019_756b
-
+	jr nc, .scrolling
 	ret
-
-
-jr_019_756b:
+.scrolling
+;> d = wRoomTransitionDirection
 	ld a, [wRoomTransitionDirection]
 	ld e, a
 	ld d, $00
-	ld hl, $754d
+;> hMultiPurpose0 = EntityScrollShiftX[d]
+	ld hl, EntityScrollShiftX
 	add hl, de
 	ld a, [hl]
 	ldh [hMultiPurpose0], a
-	ld hl, $7551
+;> hMultiPurpose1 = EntityScrollShiftXHigh[d]
+	ld hl, EntityScrollShiftXHigh
 	add hl, de
 	ld a, [hl]
 	ldh [hMultiPurpose1], a
-	ld hl, $7555
+;> hMultiPurpose2 = EntityScrollShiftY[d]
+	ld hl, EntityScrollShiftY
 	add hl, de
 	ld a, [hl]
 	ldh [hMultiPurpose2], a
-	ld hl, $7559
+;> hMultiPurpose3 = EntityScrollShiftYHigh[d]
+	ld hl, EntityScrollShiftYHigh
 	add hl, de
 	ld a, [hl]
 	ldh [hMultiPurpose3], a
+;> s = wEntityX[slot] + hMultiPurpose0
 	ld hl, wEntityX
 	add hl, bc
 	ldh a, [hMultiPurpose0]
 	add [hl]
 	rl d
+;> wEntityX[slot] = u8(s)
 	ld [hl], a
+;> wEntityPosXHigh[slot] = u8(wEntityPosXHigh[slot] + hMultiPurpose1 + (s >> 8))
 	ld hl, wEntityPosXHigh
 	add hl, bc
 	ldh a, [hMultiPurpose1]
 	rr d
 	adc [hl]
 	ld [hl], a
+;> s = wEntityY[slot] + hMultiPurpose2
 	ld hl, wEntityY
 	add hl, bc
 	ldh a, [hMultiPurpose2]
 	add [hl]
 	rl d
+;> wEntityY[slot] = u8(s)
 	ld [hl], a
+;> wEntityPosYHigh[slot] = u8(wEntityPosYHigh[slot] + hMultiPurpose3 + (s >> 8))
 	ld hl, wEntityPosYHigh
 	add hl, bc
 	ldh a, [hMultiPurpose3]
 	rr d
 	adc [hl]
 	ld [hl], a
+;> t = hActiveEntityType
 	ldh a, [hActiveEntityType]
+;> if t == 0x7F:                            # Turtle Rock's head
 	cp $7f
-	jr nz, jr_019_75ce
-
+	jr nz, .lanmola
+;>     wEntityPrivate4[slot] = u8(wEntityPrivate4[slot] + hMultiPurpose0)
 	ld hl, wEntityPrivate4
 	add hl, bc
 	ldh a, [hMultiPurpose0]
 	add [hl]
 	ld [hl], a
+;>     wEntityPrivate3[slot] = u8(wEntityPrivate3[slot] + hMultiPurpose2)
 	ld hl, wEntityPrivate3
 	add hl, bc
 	ldh a, [hMultiPurpose2]
 	add [hl]
 	ld [hl], a
+;>     return RemoveEntityLeftBehind(slot)
 	jp RemoveEntityLeftBehind
-
-
-jr_019_75ce:
+.lanmola
+;> if t == 0x87:                            # Lanmola
 	cp $87
-	jr nz, jr_019_760e
-
+	jr nz, .marin
+;>     if wEntityPrivate3[slot] == 2: return RemoveEntityLeftBehind(slot)
 	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	cp $02
 	jp z, RemoveEntityLeftBehind
-
+;>     hMultiPurposeF = wEntityPrivateCounter[slot]
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurposeF], a
+;>     for i in range(6, 0, -1):
 	ld a, $06
-
-jr_019_75e5:
+.trail
+;>         hBGTilesRequestCopy = i
 	ldh [hBGTilesRequestCopy], a
+;>         offset = LanmolaTrailOffsets[i - 1]
 	ld e, a
 	ld d, b
-	ld hl, $755c
+	ld hl, LanmolaTrailOffsets - 1
 	add hl, de
 	push hl
+;>         j = u8(hMultiPurposeF - offset)
 	ldh a, [hMultiPurposeF]
 	sub [hl]
 	ld e, a
 	ld d, b
+;>         wEntityWorkRAM[j] = u8(wEntityWorkRAM[j] + hMultiPurpose0)
 	ld hl, wEntityWorkRAM
 	add hl, de
 	ldh a, [hMultiPurpose0]
 	add [hl]
 	ld [hl], a
+;>         j = u8(hMultiPurposeF - offset)
 	ldh a, [hMultiPurposeF]
 	pop hl
 	sub [hl]
 	ld e, a
 	ld d, b
+;>         wEntityWorkRAM2[j] = u8(wEntityWorkRAM2[j] + hMultiPurpose2)
 	ld hl, wEntityWorkRAM2
 	add hl, de
 	ldh a, [hMultiPurpose2]
 	add [hl]
 	ld [hl], a
+;>         pass                             # next i
 	ldh a, [hBGTilesRequestCopy]
 	dec a
-	jr nz, jr_019_75e5
-
-jr_019_760e:
+	jr nz, .trail
+;>     t = 0                                # the loop leaves 0, so no case below matches
+.marin
+;> if t == 0xC1:                            # Marin
 	cp $c1
-	jr nz, jr_019_7632
-
+	jr nz, .others
+;>     if not wIsMarinFollowingLink: return RemoveEntityLeftBehind(slot)
 	ld a, [wIsMarinFollowingLink]
 	and a
-	jr z, jr_019_7673
-
+	jr z, RemoveEntityLeftBehind
+;>     for k in range(16):
 	ld e, $10
 	ld hl, wFollowerTrailX
-
-jr_019_761d:
+.trailX
+;>         wFollowerTrailX[k] = u8(wFollowerTrailX[k] + hMultiPurpose0)
 	ldh a, [hMultiPurpose0]
 	add [hl]
 	ld [hli], a
 	dec e
-	jr nz, jr_019_761d
-
+	jr nz, .trailX
+;>     for k in range(16):
 	ld e, $10
 	ld hl, wFollowerTrailY
-
-jr_019_7629:
+.trailY
+;>         wFollowerTrailY[k] = u8(wFollowerTrailY[k] + hMultiPurpose2)
 	ldh a, [hMultiPurpose2]
 	add [hl]
 	ld [hli], a
 	dec e
-	jr nz, jr_019_7629
-
-	jr jr_019_7673
-
-jr_019_7632:
+	jr nz, .trailY
+;>     return RemoveEntityLeftBehind(slot)
+	jr RemoveEntityLeftBehind
+.others
+;> if t != 0x69 and t != 0xB0:              # not the lever or the pincer
 	cp $69
-	jr z, jr_019_7663
-
+	jr z, .home
 	cp $b0
-	jr z, jr_019_7663
-
+	jr z, .home
+;>     if t != 0x6D: return RemoveEntityLeftBehind(slot)   # $6D is Bow-Wow
 	cp $6d
-	jr nz, jr_019_7673
-
+	jr nz, RemoveEntityLeftBehind
+;>     if wIsBowWowFollowingLink == 1 and not hFrameCounter & 7: return RemoveEntityLeftBehind(slot)
 	ld a, [wIsBowWowFollowingLink]
 	cp $01
-	jr nz, jr_019_764b
-
+	jr nz, .chain
 	ldh a, [hFrameCounter]
 	and $07
-	jr z, jr_019_7673
-
-jr_019_764b:
+	jr z, RemoveEntityLeftBehind
+.chain
+;>     for k in range(6):
 	ld e, $06
 	ld hl, wEntityWorkRAM2
-
-jr_019_7650:
+.chainX
+;>         wEntityWorkRAM2[k] = u8(wEntityWorkRAM2[k] + hMultiPurpose0)   # chain link x
 	ldh a, [hMultiPurpose0]
 	add [hl]
 	ld [hli], a
 	dec e
-	jr nz, jr_019_7650
-
+	jr nz, .chainX
+;>     for k in range(6):
 	ld e, $06
 	ld hl, wSegmentY
-
-jr_019_765c:
+.chainY
+;>         wSegmentY[k] = u8(wSegmentY[k] + hMultiPurpose2)               # chain link y
 	ldh a, [hMultiPurpose2]
 	add [hl]
 	ld [hli], a
 	dec e
-	jr nz, jr_019_765c
-
-jr_019_7663:
+	jr nz, .chainY
+.home
+;> wEntityPrivate1[slot] = u8(wEntityPrivate1[slot] + hMultiPurpose0)
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ldh a, [hMultiPurpose0]
 	add [hl]
 	ld [hl], a
+;> wEntityPrivate2[slot] = u8(wEntityPrivate2[slot] + hMultiPurpose2)
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ldh a, [hMultiPurpose2]
 	add [hl]
 	ld [hl], a
+;> return RemoveEntityLeftBehind(slot)
 
+;@ def RemoveEntityLeftBehind(slot: bc)
+;@ path: entity/engine
+;@ An entity that belongs to another room (wEntityRoom is not hMapRoom) and is off the screen (x $A0 or more,
+;@ or y outside $10-$87) is removed - except entity $A7.
+;@ test: skip runs during a room scroll
 RemoveEntityLeftBehind::
-jr_019_7673:
+;> if hMapRoom != wEntityRoom[slot]:
 	ldh a, [hMapRoom]
 	ld hl, wEntityRoom
 	add hl, bc
 	cp [hl]
-	jr z, jr_019_769a
-
+	jr z, .done
+;>     off = wEntityX[slot] >= 0xA0
 	ld hl, wEntityX
 	add hl, bc
 	ld a, [hl]
 	cp $a0
-	jr nc, jr_019_7690
-
+	jr nc, .off
+;>     if not off: off = u8(wEntityY[slot] - 0x10) >= 0x78
 	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	sub $10
 	cp $78
-	jr c, jr_019_769a
-
-jr_019_7690:
+	jr c, .done
+.off
+;>     if off and hActiveEntityType != 0xA7:
 	ldh a, [hActiveEntityType]
 	cp $a7
 	ret z
-
+;>         wEntityStatus[slot] = 0
 	ld hl, wEntityStatus
 	add hl, bc
 	ld [hl], b
-
-jr_019_769a:
+.done
+;> return
 	ret
 
 
+;@ def AnimateScrollingFloorTiles()
+;@ path: gfx/animation
+;@ Runs before the entities each frame. While the room has scrolling-floor objects (wScrollingFloorCount) and
+;@ no dialog is open, one of the four floor tiles in the RAM buffer at $DCC0 moves by one pixel, a different
+;@ one each frame (hFrameCounter & 3): down, up, left, right.
+;@ test: skip changes tile data in RAM
 AnimateScrollingFloorTiles::
+;> if not wScrollingFloorCount: return
 	ld a, [wScrollingFloorCount]
 	and a
-	jr z, jr_019_76d0
-
+	jr z, ScrollFloorTileDown.done
+;> if wDialogState: return
 	ld a, [wDialogState]
 	and a
-	jr nz, jr_019_76d0
-
+	jr nz, ScrollFloorTileDown.done
+;> return ScrollingFloorTileSteps[hFrameCounter & 3]()
 	ldh a, [hFrameCounter]
 	and $03
 	rst $00
 
+;@ path: gfx/animation
+;@ The four scrolling-floor steps, by hFrameCounter & 3: tile 0 down, tile 1 up, tile 2 left, tile 3 right.
 ScrollingFloorTileSteps::
 	dw ScrollFloorTileDown
 	dw ScrollFloorTileUp
 	dw ScrollFloorTileLeft
 	dw ScrollFloorTileRight
 
+;@ def ScrollFloorTileDown()
+;@ path: gfx/animation
+;@ Tile 0 ($DCC0-$DCCF, 8 rows of 2 bytes) moves down one pixel row; the bottom row wraps to the top.
+;@ test: skip changes tile data in RAM
 ScrollFloorTileDown::
+;> src = 0xDCCF
 	ld hl, $dccf
+;> dst = 0xDCCF
 	ld de, $dccf
+;> hi = mem[src]; src -= 1
 	ld a, [hld]
 	push af
+;> lo = mem[src]; src -= 1
 	ld a, [hld]
 	push af
+;> for _ in range(7):
 	ld c, $07
-
-jr_019_76c0:
+.row
+;>     mem[dst] = mem[src]; src -= 1; dst -= 1
 	ld a, [hld]
 	ld [de], a
 	dec de
+;>     mem[dst] = mem[src]; src -= 1; dst -= 1
 	ld a, [hld]
 	ld [de], a
 	dec de
 	dec c
-	jr nz, jr_019_76c0
-
+	jr nz, .row
+;> mem[0xDCC1] = hi
 	pop hl
 	pop bc
 	ld a, b
 	ld [de], a
 	dec de
+;> mem[0xDCC0] = lo
 	ld a, h
 	ld [de], a
-
-jr_019_76d0:
+.done
+;> return
 	ret
 
 
+;@ def ScrollFloorTileUp()
+;@ path: gfx/animation
+;@ Tile 1 ($DCD0-$DCDF) moves up one pixel row; the top row wraps to the bottom.
+;@ test: skip changes tile data in RAM
 ScrollFloorTileUp::
+;> src = 0xDCD0
 	ld hl, $dcd0
+;> dst = 0xDCD0
 	ld de, $dcd0
+;> lo = mem[src]; src += 1
 	ld a, [hli]
 	push af
+;> hi = mem[src]; src += 1
 	ld a, [hli]
 	push af
+;> for _ in range(7):
 	ld c, $07
-
-jr_019_76dd:
+.row
+;>     mem[dst] = mem[src]; src += 1; dst += 1
 	ld a, [hli]
 	ld [de], a
 	inc de
+;>     mem[dst] = mem[src]; src += 1; dst += 1
 	ld a, [hli]
 	ld [de], a
 	inc de
 	dec c
-	jr nz, jr_019_76dd
-
+	jr nz, .row
+;> mem[0xDCDE] = lo
 	pop hl
 	pop bc
 	ld a, b
 	ld [de], a
 	inc de
+;> mem[0xDCDF] = hi
 	ld a, h
 	ld [de], a
+;> return
 	ret
 
 
+;@ def ScrollFloorTileLeft()
+;@ path: gfx/animation
+;@ Tile 2 ($DCE0-$DCEF): every byte rotated left, so the picture moves one pixel left and wraps.
+;@ test: skip changes tile data in RAM
 ScrollFloorTileLeft::
+;> for p in range(0xDCE0, 0xDCF0):
 	ld hl, $dce0
 	ld e, $10
-
-jr_019_76f3:
+.byte
+;>     mem[p] = u8(mem[p] << 1 | mem[p] >> 7)
 	rlc [hl]
 	inc hl
 	dec e
-	jr nz, jr_019_76f3
-
+	jr nz, .byte
+;> return
 	ret
 
 
+;@ def ScrollFloorTileRight()
+;@ path: gfx/animation
+;@ Tile 3 ($DCF0-$DCFF): every byte rotated right, so the picture moves one pixel right and wraps.
+;@ test: skip changes tile data in RAM
 ScrollFloorTileRight::
+;> for p in range(0xDCF0, 0xDD00):
 	ld hl, $dcf0
 	ld e, $10
-
-jr_019_76ff:
+.byte
+;>     mem[p] = u8(mem[p] >> 1 | (mem[p] & 1) << 7)
 	rrc [hl]
 	inc hl
 	dec e
-	jr nz, jr_019_76ff
-
+	jr nz, .byte
+;> return
 	ret
 
 
+;@ path: object/liftable
+;@ Pieces of a thrown object that breaks (DrawShatterPieces, variants other than $FF and 1), for
+;@ DrawEntitySprites: 4 frames of 4 OAM entries (y offset, x offset, tile, attributes), 16 bytes each; all
+;@ tile $16, moving apart from frame to frame.
+ShatterPiecesTile16::
 	db $fd, $fc, $16, $00, $fc, $0c, $16, $00, $0e, $fb, $16, $00, $0c, $0d, $16, $00
 	db $fb, $fd, $16, $00, $fa, $0b, $16, $00, $0b, $fc, $16, $00, $09, $0c, $16, $00
 	db $fd, $fe, $16, $00, $fc, $0a, $16, $00, $0b, $fd, $16, $00, $08, $0a, $16, $00
 	db $ff, $00, $16, $00, $00, $08, $16, $00, $0a, $ff, $16, $00, $08, $09, $16, $00
+;@ path: object/liftable
+;@ Pieces for sprite variants $FF and 1: 8 frames of 4 OAM entries (same format), all tile $28 with various
+;@ flips. DrawShatterPieces reads them in reverse order of its step.
+ShatterPiecesTile28::
 	db $02, $fc, $28, $00, $fb, $04, $28, $60, $05, $06, $28, $00, $01, $0a, $28, $20
 	db $01, $ff, $28, $00, $f9, $04, $28, $60, $08, $06, $28, $00, $02, $07, $28, $20
 	db $00, $00, $28, $20, $f8, $02, $28, $60, $04, $04, $28, $20, $0a, $07, $28, $20
@@ -10126,49 +10626,59 @@ jr_019_76ff:
 	db $fb, $fe, $28, $00, $03, $f9, $28, $40, $08, $0c, $28, $00, $11, $0b, $28, $00
 	db $fa, $fd, $28, $00, $01, $f7, $28, $40, $09, $0d, $28, $00, $0f, $0c, $28, $00
 
+;@ def DrawShatterPieces(slot: bc, step: hMultiPurpose0)
+;@ path: object/liftable
+;@ Draws the pieces of a broken thrown object (called from bank 0's ShatterThrownObject). Sprite variants other
+;@ than $FF and 1: frame (step & $0C) / 4 of ShatterPiecesTile16. Variant $FF is set to 0 and then drawn only on
+;@ every second frame (by slot); variants $FF and 1 use frame 7 - (step & $1C) / 4 of ShatterPiecesTile28.
+;@ test: skip draws sprites
 DrawShatterPieces::
+;> v = hActiveEntitySpriteVariant
 	ldh a, [hActiveEntitySpriteVariant]
+;> if v != 0xFF and v != 1:
 	cp $ff
-	jr z, jr_019_77e4
-
+	jr z, .large
 	cp $01
-	jr z, jr_019_77e4
-
+	jr z, .large
+;>     offset = (hMultiPurpose0 & 0x0C) * 4
 	ldh a, [hMultiPurpose0]
 	and $0c
 	sla a
 	sla a
 	ld e, a
+;>     return DrawEntitySprites(ShatterPiecesTile16 + offset, 4)
 	ld d, b
-	ld hl, $7706
+	ld hl, ShatterPiecesTile16
 	add hl, de
 	ld c, $04
 	call DrawEntitySprites
 	ret
-
-
-jr_019_77e4:
+.large
+;> if v == 0xFF:
 	inc a
-	jr nz, jr_019_77ee
-
+	jr nz, .draw
+;>     hActiveEntitySpriteVariant = 0
 	ldh [hActiveEntitySpriteVariant], a
+;>     if (hFrameCounter ^ slot) & 1: return
 	ldh a, [hFrameCounter]
 	xor c
 	rra
 	ret c
-
-jr_019_77ee:
+.draw
+;> offset = ((hMultiPurpose0 & 0x1C) ^ 0x1C) * 4
 	ldh a, [hMultiPurpose0]
 	and $1c
 	xor $1c
 	sla a
 	sla a
 	ld e, a
+;> DrawEntitySprites(ShatterPiecesTile28 + offset, 4)
 	ld d, b
-	ld hl, $7746
+	ld hl, ShatterPiecesTile28
 	add hl, de
 	ld c, $04
 	call DrawEntitySprites
+;> return
 	ret
 
 
@@ -10355,7 +10865,7 @@ ReturnIfNonInteractive_19::
 	ld a, [wGameplayType]
 	cp $07
 	jr z, .skip
-;> if wDialogState or mem[0xC1A8] or wInventoryAppearing: return_from_caller()
+;> if wDialogState or wLinkShowItemPoseActive or wInventoryAppearing: return_from_caller()
 	ld hl, wLinkShowItemPoseActive
 	ld a, [wDialogState]
 	or [hl]
@@ -10448,6 +10958,7 @@ ApplyRecoilIfNeeded_19::
 ;@ def UpdateEntityPosWithSpeed_19(slot: bc)
 ;@ path: entity/helpers
 ;@ Moves the entity by its x and y speeds (in 1/16 pixels per frame).
+;@ test: skip needs a real entity slot (0-15); random slots run into unmapped memory
 UpdateEntityPosWithSpeed_19::
 ;> AddEntitySpeedToPos_19(slot)             # x
 	call AddEntitySpeedToPos_19
@@ -10457,6 +10968,7 @@ UpdateEntityPosWithSpeed_19::
 ;@ path: entity/helpers
 ;@ Moves the entity by its y speed: the y arrays lie 16 bytes after the x arrays, so the x routine runs on
 ;@ slot + 16.
+;@ test: skip needs a real entity slot (0-15); random slots run into unmapped memory
 UpdateEntityYPosWithSpeed_19::
 ;> AddEntitySpeedToPos_19(slot + 16)
 	push bc
@@ -10474,6 +10986,7 @@ UpdateEntityYPosWithSpeed_19::
 ;@ Adds the entity's x speed to its x position. The speed is signed 4.4 fixed point: the high nibble is whole
 ;@ pixels, the low nibble sixteenths, which collect in wEntitySpeedXAcc and carry over into the position.
 ;@ Called with slot + 16 it does the same for y.
+;@ test: skip needs a real entity slot (0-15); random slots run into unmapped memory
 AddEntitySpeedToPos_19::
 ;> speed = wEntitySpeedX[slot]
 	ld hl, wEntitySpeedX
@@ -10520,6 +11033,7 @@ AddEntitySpeedToPos_19::
 ;@ path: entity/helpers
 ;@ Adds the entity's height speed to its height (wEntityZ), the same way AddEntitySpeedToPos_19 does for x
 ;@ (it ends in that routine's code).
+;@ test: skip needs a real entity slot (0-15); random slots run into unmapped memory
 AddEntityZSpeedToPos_19::
 ;> speed = wEntitySpeedZ[slot]
 	ld hl, wEntitySpeedZ
@@ -10646,6 +11160,7 @@ GetEntityDirectionToLink_19::
 ;@ def ClearEntityStatus_19(slot: bc)
 ;@ path: entity/helpers
 ;@ Removes the entity: its slot becomes free.
+;@ test: skip needs a real entity slot (0-15); random slots run into unmapped memory
 ClearEntityStatus_19::
 ;> wEntityStatus[slot] = 0
 	ld hl, wEntityStatus
@@ -10673,6 +11188,7 @@ UnusedBossDeathSequence_19::
 ;@ path: unused/entity
 ;@ Death step 0: the boss flashes for $A0 frames. (Its last three instructions, at +$0B, are also called as
 ;@ "next step".)
+;@ test: skip needs a real entity slot (0-15); random slots run into unmapped memory
 UnusedBossDeathStart_19::
 ;> wEntityTimer[slot] = 0xA0
 	call GetEntityTimer
@@ -10844,12 +11360,13 @@ MarkRoomEventDone_19::
 	jr c, .add
 	inc d
 .add
-;> wRoomStatus[group * 256 + hMapRoom] |= 0x20
+;> p = wRoomStatus + group * 256 + hMapRoom
 	add hl, de
+;> mem[p] |= 0x20
 	ld a, [hl]
 	or $20
 	ld [hl], a
-;> hRoomStatus = wRoomStatus[group * 256 + hMapRoom]
+;> hRoomStatus = mem[p]
 	ldh [hRoomStatus], a
 	ret
 

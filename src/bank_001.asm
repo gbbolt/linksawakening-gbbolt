@@ -43,10 +43,10 @@ SaveMenuInit::
 	cp $04
 ;>     return
 	jr nz, .done
-;> hWindowYUnused = 3
+;> hVolumeRight = 3
 	ld a, $03
 	ldh [$ffa9], a
-;> hWindowXUnused = 0x30
+;> hVolumeLeft = 0x30
 	ld a, $30
 	ldh [$ffaa], a
 ;> IncrementGameplaySubtype()                    # next step
@@ -153,7 +153,7 @@ SaveMenuInput::
 	jr z, .done
 ;>     mem[0xC50A] = 0
 	xor a
-	ld [$c50a], a
+	ld [wItemButtonsDisabled], a
 ;>     mem[0xC116] = 0
 	ld [wRoomEntitySetupDone], a
 .done
@@ -219,10 +219,10 @@ SaveMenuQuitToTitle::
 	ld [wWindowY], a
 ;> rWY = 0x80
 	ldh [rWY], a
-;> hWindowYUnused = 7
+;> hVolumeRight = 7
 	ld a, $07
 	ldh [$ffa9], a
-;> hWindowXUnused = 0x70
+;> hVolumeLeft = 0x70
 	ld a, $70
 	ldh [$ffaa], a
 .done
@@ -252,7 +252,7 @@ UpdateSaveMenuCursor::
 	and $01
 	ld [hl], a
 .draw
-;>@y wOAMBuffer[24] = SaveMenuCursorY[wMenuCursor]     # OAM entry 6: y
+;>@y wOAMBuffer[24] = mem[SaveMenuCursorY + wMenuCursor]     # OAM entry 6: y
 	ld e, [hl]
 	ld d, $00
 	ld hl, SaveMenuCursorY
@@ -389,8 +389,8 @@ GameOverSpin::
 	ldh a, [hLinkCountdown]
 	and a
 	jr nz, .spin
-;>@f     hLinkAnimationState = GameOverSpinLinkFrames[hLinkCountdown >> 3]
-;>@v     mem[0xC3CD] = GameOverSpinValues[hLinkCountdown >> 3]
+;>@f     hLinkAnimationState = mem[GameOverSpinLinkFrames + (hLinkCountdown >> 3)]
+;>@v     mem[0xC3CD] = mem[GameOverSpinValues + (hLinkCountdown >> 3)]
 ;>@c     mem[0xC3CB] = 1
 ;>@o0     wOBJ0Palette = 0x1C            # darker sprites
 ;>@o1     wOBJ1Palette = wBGPalette
@@ -436,8 +436,8 @@ GameOverSpin::
 ;> mem[0xD47A] = 0
 	ld [wPowerUpHits], a
 ;> fill(0xC3CB, 0, 3)
-	ld [$c3cb], a
-	ld [$c3cc], a
+	ld [wRoomHasTorches], a
+	ld [wRoomDarknessShown], a
 	ld [wRoomDarkness], a
 ;> return
 	ret
@@ -469,7 +469,7 @@ GameOverSpin::
 	ld [wRoomDarkness], a
 ;=@c
 	ld a, $01
-	ld [$c3cb], a
+	ld [wRoomHasTorches], a
 ;=@o0
 	ld a, $1c
 	ld [wOBJ0Palette], a
@@ -631,6 +631,7 @@ GameOverCursorY::
 ;@ path: menu/gameover
 ;@ Down or Select moves the game over menu cursor down, Up moves it up (both wrap around, with the
 ;@ cursor sound); then puts the arrow sprite (tile $BE at x $24) at the chosen line in OAM entry 6.
+;@ test: wMenuCursor = rand(0, 2)
 UpdateGameOverCursor::
 ;> PlayCursorSoundOnMove()
 	ld hl, wMenuCursor
@@ -661,7 +662,7 @@ UpdateGameOverCursor::
 .storeUp
 	ld [hl], a
 .draw
-;>@y wOAMBuffer[24] = GameOverCursorY[wMenuCursor]
+;>@y wOAMBuffer[24] = mem[GameOverCursorY + wMenuCursor]
 	ld e, [hl]
 	ld d, $00
 	ld hl, GameOverCursorY
@@ -765,7 +766,7 @@ WorldLoadPickLayout::
 	inc de
 	dec c
 	jr nz, .copy
-;>@lay wMinimapLayout = MapMinimapLayouts[hMapId]
+;>@lay wMinimapLayout = mem[MapMinimapLayouts + hMapId]
 	ldh a, [hMapId]
 	ld e, a
 	ld d, $00
@@ -990,11 +991,11 @@ WorldLoadDrawRoom::
 
 ;@ def WorldLoadDrawRoom2()
 ;@ path: world/load
-;@ Step 5: second part of drawing the room (DrawAButtonItemFar).
+;@ Step 5: second part of drawing the room (DrawItemSlotsABFar).
 ;@ test: skip draws the room through bank 0
 WorldLoadDrawRoom2::
-;> DrawAButtonItemFar()
-	call DrawAButtonItemFar
+;> DrawItemSlotsABFar()
+	call DrawItemSlotsABFar
 ;> IncrementGameplaySubtype()
 	call IncrementGameplaySubtype
 	ret
@@ -1029,11 +1030,11 @@ WorldLoadStartFadeIn::
 ;> wTransitionFrameCounter = 0
 	ld [wTransitionFrameCounter], a
 ;> if mem[0xC3CB]:
-	ld a, [$c3cb]
+	ld a, [wRoomHasTorches]
 	and a
 	jr z, .done
 ;>     wBGPalette = mem[0xC5AD]
-	ld a, [$c5ad]
+	ld a, [wRoomDarkPalette]
 	ld [wBGPalette], a
 ;>     wOBJ0Palette = 0x1C
 	ld a, $1c
@@ -1229,7 +1230,7 @@ InitSaveFiles::
 	ld d, $00
 	ld bc, $a405
 .copy
-;>     mem[0xA405 + i] = DebugSaveData[i]     # over $DB00-$DB42
+;>     mem[0xA405 + i] = mem[DebugSaveData + i]     # over $DB00-$DB42
 	ld hl, DebugSaveData
 	add hl, de
 	ld a, [hli]
@@ -1430,7 +1431,7 @@ FileSelectInit::
 ;> wTileMapToLoad = 4
 	ld a, $04
 	ld [wTileMapToLoad], a
-;> wEntityWorkRAM = 0                   # bottom-row choice
+;> wEntityWorkRAM[0] = 0                   # bottom-row choice
 	xor a
 	ld [wEntityWorkRAM], a
 ;> IncrementGameplaySubtype()
@@ -1724,7 +1725,7 @@ FileSelectMenu::
 	jr z, .blink
 ;>         PlayCursorSound()
 	call PlayCursorSound
-;>         wEntityWorkRAM ^= 1
+;>         wEntityWorkRAM[0] ^= 1
 	ld a, [wEntityWorkRAM]
 	xor $01
 	ld [wEntityWorkRAM], a
@@ -1733,7 +1734,7 @@ FileSelectMenu::
 	ldh a, [hFrameCounter]
 	and $10
 	jr nz, DrawFileSelectCursor
-;>         x = 0x64 if wEntityWorkRAM else 0x2C
+;>         x = 0x64 if wEntityWorkRAM[0] else 0x2C
 	ld a, [wEntityWorkRAM]
 	and a
 	ld a, $2c
@@ -1757,7 +1758,7 @@ FileSelectMenu::
 ;@ Puts the fairy cursor (two sprites, tiles 0 and 2, at x $18 and $20) on the row of wSaveSlot in OAM
 ;@ entries 0-1; every 8 frames it is drawn mirrored, which makes its wings flap.
 DrawFileSelectCursor::
-;>@y y = FileSelectCursorY[wSaveSlot]
+;>@y y = mem[FileSelectCursorY + wSaveSlot]
 	ld a, [wSaveSlot]
 	ld e, a
 	ld d, $00
@@ -1895,7 +1896,7 @@ FileSelectChooseBottomRow::
 ;> wGameplaySubtype = 0
 	xor a
 	ld [wGameplaySubtype], a
-;>@t wGameplayType = 5 if wEntityWorkRAM else 4
+;>@t wGameplayType = 5 if wEntityWorkRAM[0] else 4
 	ld a, [wEntityWorkRAM]
 	and a
 	ld a, $04
@@ -2011,7 +2012,7 @@ FileSlotNameOffsets::
 ;@ comes back. A file named ZELDA starts a special tune (track $60).
 ;@ test: skip writes battery RAM
 FileNewNameEntry::
-;>@nm name = wSaveSlotNames + FileSlotNameOffsets[wSaveSlot]
+;>@nm name = wSaveSlotNames + mem[FileSlotNameOffsets + wSaveSlot]
 	ld a, [wSaveSlot]
 	ld e, a
 	ld d, $00
@@ -2035,7 +2036,7 @@ FileNewNameEntry::
 ;>@t3     return
 ;> PlayConfirmSound()
 	call PlayConfirmSound
-;>@st state = SaveSlotStateAddresses[wSaveSlot]   # the slot's copy of $DB00
+;>@st state = mem16[SaveSlotStateAddresses + 2 * wSaveSlot]   # the slot's copy of $DB00
 	ld a, [wSaveSlot]
 	sla a
 	ld e, a
@@ -2258,14 +2259,14 @@ NameEntryMoveCursor::
 ;=@ud3
 	jr .draw
 .draw
-;>@x x = NameEntryCursorX[wNameEntryCursor]
+;>@x x = mem[NameEntryCursorX + wNameEntryCursor]
 	ld a, [wNameEntryCursor]
 	ld hl, NameEntryCursorX
 	ld c, a
 	ld b, $00
 	add hl, bc
 	ld e, [hl]
-;>@y y = NameEntryCursorY[wNameEntryCursor]
+;>@y y = mem[NameEntryCursorY + wNameEntryCursor]
 	ld a, [wNameEntryCursor]
 	ld hl, NameEntryCursorY
 	ld c, a
@@ -2292,6 +2293,7 @@ NameEntryMoveCursor::
 ;@ path: menu/nameentry
 ;@ A types the letter under the cursor at the current name position and moves on (up to position 4);
 ;@ B moves back (down to 0). The marker under the name (tile $E0, OAM entry 1) blinks at the position.
+;@ test: wSaveSlot = rand(0, 2); wNameEntryPosition = rand(0, 4)
 NameEntryInput::
 ;> if hJoypadPressed & 0x30:             # A, B
 	ldh a, [hJoypadPressed]
@@ -2326,7 +2328,7 @@ NameEntryInput::
 ;=@b
 	ld [wNameEntryPosition], a
 .marker
-;>@x x = NameEntryNameCursorX[wNameEntryPosition]
+;>@x x = mem[NameEntryNameCursorX + wNameEntryPosition]
 	ld a, [wNameEntryPosition]
 	ld hl, NameEntryNameCursorX
 	ld c, a
@@ -2358,8 +2360,9 @@ NameEntryInput::
 ;@ path: menu/nameentry
 ;@ Writes the character of the grid place under the cursor (NameEntryCharacters) into the new file's
 ;@ name at wNameEntryPosition.
+;@ test: wSaveSlot = rand(0, 2); wNameEntryPosition = rand(0, 4)
 NameEntryWriteLetter::
-;>@c char = NameEntryCharacters[wNameEntryCursor]
+;>@c char = mem[NameEntryCharacters + wNameEntryCursor]
 	ld a, [wNameEntryCursor]
 	ld c, a
 	ld b, $00
@@ -2420,7 +2423,7 @@ FileDeleteInit::
 ;> wSaveSlot = 0
 	xor a
 	ld [wSaveSlot], a
-;> wEntityWorkRAM = 0                    # 0 QUIT, 1 OK
+;> wEntityWorkRAM[0] = 0                    # 0 QUIT, 1 OK
 	ld [wEntityWorkRAM], a
 ;> IncrementGameplaySubtype()
 	jp IncrementGameplaySubtype
@@ -2699,14 +2702,14 @@ FileDeleteConfirm::
 	and $90
 ;>     return FileDeleteBlinkName()
 	jr z, FileDeleteBlinkName
-;> if wEntityWorkRAM == 0:               # QUIT
+;> if wEntityWorkRAM[0] == 0:               # QUIT
 	ld a, [wEntityWorkRAM]
 	and a
 ;>     return ReturnToFileSelect()
 	jp z, ReturnToFileSelect
 ;> PlayConfirmSound()
 	call PlayConfirmSound
-;>@d data = SaveSlotDataAddresses[wSaveSlot]
+;>@d data = mem16[SaveSlotDataAddresses + 2 * wSaveSlot]
 	ld a, [wSaveSlot]
 	sla a
 	ld e, a
@@ -2812,6 +2815,7 @@ DrawFileNameTable::
 ;@ path: menu/fileselect
 ;@ Puts the blanking commands of the file wSaveSlot points at (FileNameBlanks, 8 bytes) at the start
 ;@ of the draw command queue.
+;@ test: wSaveSlot = rand(0, 2)
 HideSelectedFileName::
 ;>@s src = FileNameBlanks + wSaveSlot * 8
 	ld a, [wSaveSlot]
@@ -2851,7 +2855,7 @@ UpdateYesNoCursor::
 	jr z, .draw
 ;>     PlayCursorSound()
 	call PlayCursorSound
-;>     wEntityWorkRAM ^= 1
+;>     wEntityWorkRAM[0] ^= 1
 	ld a, [wEntityWorkRAM]
 	xor $01
 	ld [wEntityWorkRAM], a
@@ -2860,7 +2864,7 @@ UpdateYesNoCursor::
 	ldh a, [hFrameCounter]
 	and $10
 	jr nz, .done
-;>@x     x = 0x6C if wEntityWorkRAM == 1 else 0x28
+;>@x     x = 0x6C if wEntityWorkRAM[0] == 1 else 0x28
 	ld a, [wEntityWorkRAM]
 	ld e, a
 	ld a, $28
@@ -2910,7 +2914,7 @@ DrawDeathCount::
 	ld [hli], a
 	ld a, $02
 	ld [hli], a
-;>@h mem[cmd + 3] = DigitTiles[lo(count) & 0x0F]   # hundreds
+;>@h mem[cmd + 3] = mem[DigitTiles + (lo(count) & 0x0F)]   # hundreds
 	pop bc
 	push hl
 	ld a, c
@@ -2923,7 +2927,7 @@ DrawDeathCount::
 	ld a, [hl]
 	pop hl
 	ld [hli], a
-;>@t mem[cmd + 4] = DigitTiles[hi(count) >> 4]     # tens
+;>@t mem[cmd + 4] = mem[DigitTiles + (hi(count) >> 4)]     # tens
 	push hl
 	ld a, b
 	and $f0
@@ -2936,7 +2940,7 @@ DrawDeathCount::
 	ld a, [hl]
 	pop hl
 	ld [hli], a
-;>@o mem[cmd + 5] = DigitTiles[hi(count) & 0x0F]   # ones
+;>@o mem[cmd + 5] = mem[DigitTiles + (hi(count) & 0x0F)]   # ones
 	push hl
 	ld a, b
 	and $0f
@@ -2986,7 +2990,7 @@ FileCopyInit::
 ;> wSaveSlot = 0
 	xor a
 	ld [wSaveSlot], a
-;> wEntityWorkRAM = 0                    # QUIT / OK
+;> wEntityWorkRAM[0] = 0                    # QUIT / OK
 	ld [wEntityWorkRAM], a
 ;> wSceneVar1 = 0                        # source file
 	ld [wSceneVar1], a
@@ -3092,7 +3096,7 @@ FileCopySelectSource::
 ;>     PlayConfirmSound()
 	call PlayConfirmSound
 .draw
-;>@d return DrawFileCursorPair(FileSelectCursorY[wSceneVar1], wOAMBuffer)    # mirrored when hFrameCounter & 8 == 0
+;>@d return DrawFileCursorPair(mem[FileSelectCursorY + wSceneVar1], wOAMBuffer, hFrameCounter & 8 == 0)
 	ld a, [wSceneVar1]
 	ld e, a
 	ld d, $00
@@ -3104,11 +3108,11 @@ FileCopySelectSource::
 	ld a, [hl]
 	ld hl, wOAMBuffer
 
-;@ def DrawFileCursorPair(y: a, oam: hl)
+;@ def DrawFileCursorPair(y: a, oam: hl, mirrored: zero)
 ;@ path: menu/copy
 ;@ Draws the fairy cursor (two sprites at x $10 and $18) at height `y` into two OAM entries at `oam`;
 ;@ the caller's zero flag (hFrameCounter & 8 == 0) selects the mirrored picture.
-;@ test: skip depends on the caller's flags
+;@ test: oam = rand(0xC000, 0xDFF0)
 DrawFileCursorPair::
 ;> if not mirrored:
 	jr z, .mirrored
@@ -3161,7 +3165,7 @@ DrawFileCursorPair::
 ;@ path: menu/copy
 ;@ Marks the chosen source file with an arrow (tile $BE at x $14) in OAM entry 0.
 DrawCopySourceArrow::
-;>@y y = FileSelectCursorY[wSceneVar1]
+;>@y y = mem[FileSelectCursorY + wSceneVar1]
 	ld a, [wSceneVar1]
 	ld e, a
 	ld d, $00
@@ -3266,6 +3270,7 @@ FileCopySelectDest::
 ;@ path: menu/copy
 ;@ Every 16 frames alternately shows (DrawCopySourceName) and blanks (FileCopySourceBlanks, at the
 ;@ start of the draw queue) the source file's name.
+;@ test: wSceneVar1 = rand(0, 2); hFrameCounter = rand(0, 255) | 0x10
 BlinkCopySourceName::
 ;> if not hFrameCounter & 0x10:
 	ldh a, [hFrameCounter]
@@ -3333,7 +3338,7 @@ DrawCopySourceName::
 ;@ file at x $58 and $60, in OAM entries 2-3; mirrored every 8 frames.
 ;@ test: skip draws sprites
 DrawCopyDestCursor::
-;>@y y = FileSelectCursorY[wSceneVar2]
+;>@y y = mem[FileSelectCursorY + wSceneVar2]
 	ld a, [wSceneVar2]
 	ld e, a
 	ld d, $00
@@ -3342,7 +3347,7 @@ DrawCopyDestCursor::
 ;> if wSceneVar2 == 3:
 	ld a, [wSceneVar2]
 	cp $03
-;>@r     return DrawFileCursorPair(y, wOAMBuffer + 8)
+;>@r     return DrawFileCursorPair(y, wOAMBuffer + 8, hFrameCounter & 8 == 0)
 	jp z, .bottomRow
 ;> if hFrameCounter & 0x08:
 	ldh a, [hFrameCounter]
@@ -3407,7 +3412,7 @@ DrawCopyDestCursor::
 ;@ path: menu/copy
 ;@ Marks the chosen destination file with an arrow (tile $BE at x $5C) in OAM entry 2.
 DrawCopyDestArrow::
-;>@y y = FileSelectCursorY[wSceneVar2]
+;>@y y = mem[FileSelectCursorY + wSceneVar2]
 	ld a, [wSceneVar2]
 	ld e, a
 	ld d, $00
@@ -3444,14 +3449,14 @@ FileCopyConfirm::
 	ldh a, [hJoypadPressed]
 	and $90
 	jr z, .notA
-;>     if wEntityWorkRAM == 0:           # QUIT
+;>     if wEntityWorkRAM[0] == 0:           # QUIT
 	ld a, [wEntityWorkRAM]
 	and a
 ;>         return ReturnToFileSelect()
 	jp z, ReturnToFileSelect
 ;>     PlayConfirmSound()
 	call PlayConfirmSound
-;>@s     src = SaveSlotAddresses[wSceneVar1]
+;>@s     src = mem16[SaveSlotAddresses + 2 * wSceneVar1]
 	ld a, [wSceneVar1]
 	sla a
 	ld e, a
@@ -3462,7 +3467,7 @@ FileCopyConfirm::
 	ld c, [hl]
 	inc hl
 	ld b, [hl]
-;>@d     dest = SaveSlotAddresses[wSceneVar2]
+;>@d     dest = mem16[SaveSlotAddresses + 2 * wSceneVar2]
 	ld a, [wSceneVar2]
 	sla a
 	ld e, a
@@ -3497,7 +3502,7 @@ FileCopyConfirm::
 ;>     wGameplaySubtype -= 1
 	ld hl, wGameplaySubtype
 	dec [hl]
-;>     wEntityWorkRAM = 0
+;>     wEntityWorkRAM[0] = 0
 	xor a
 	ld [wEntityWorkRAM], a
 ;>     DrawReturnToMenuText()
@@ -3590,7 +3595,7 @@ StartGameplay::
 	ld a, [wHealth]
 	and a
 	jr nz, .load
-;>@h     wHealth = DefaultHealthByMaxHearts[wMaxHearts]
+;>@h     wHealth = mem[DefaultHealthByMaxHearts + wMaxHearts]
 	ld a, [wMaxHearts]
 	ld e, a
 	ld d, $00
@@ -3608,7 +3613,7 @@ StartGameplay::
 ;> if not keep:
 	and a
 	jr nz, .play
-;>@s     src = SaveSlotDataAddresses[wSaveSlot]
+;>@s     src = mem16[SaveSlotDataAddresses + 2 * wSaveSlot]
 	ld a, [wSaveSlot]
 	sla a
 	ld e, a
@@ -3864,7 +3869,7 @@ DrawMinimapFrame::
 	jr nz, .copy
 ;> out = 0xD679                          # over the end byte
 	push de
-;>@z fill(hMultiPurpose0, 0, 4)         # hMultiPurpose0-3
+;>@z fill(addr(hMultiPurpose0), 0, 4)         # hMultiPurpose0-3
 	xor a
 	ldh [hMultiPurpose0], a
 	ldh [hMultiPurpose1], a
@@ -3898,22 +3903,22 @@ DrawMinimapFrame::
 .frameLoop
 ;>@f while True:
 	push hl
-;>@g     hMultiPurpose0 = MinimapFrameHigh[i]
+;>@g     hMultiPurpose0 = mem[MinimapFrameHigh + i]
 	ld hl, MinimapFrameHigh
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose0], a
-;>     hMultiPurpose1 = MinimapFrameLow[i]
+;>     hMultiPurpose1 = mem[MinimapFrameLow + i]
 	ld hl, MinimapFrameLow
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose1], a
-;>     hMultiPurpose2 = MinimapFrameMode[i]
+;>     hMultiPurpose2 = mem[MinimapFrameMode + i]
 	ld hl, MinimapFrameMode
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose2], a
-;>     hMultiPurpose3 = MinimapFrameTile[i]
+;>     hMultiPurpose3 = mem[MinimapFrameTile + i]
 	ld hl, MinimapFrameTile
 	add hl, bc
 	ld a, [hl]
@@ -3930,7 +3935,7 @@ DrawMinimapFrame::
 	ld a, [hl]
 	pop hl
 	inc hl
-;>     if MinimapFrameHigh[i] == 0xFF:
+;>     if mem[MinimapFrameHigh + i] == 0xFF:
 	cp $ff
 ;=@f
 	jr nz, .frameLoop
@@ -3938,7 +3943,7 @@ DrawMinimapFrame::
 ;> mem[out] = 0
 	xor a
 	ld [hl], a
-;>@z2 fill(hMultiPurpose0, 0, 4)
+;>@z2 fill(addr(hMultiPurpose0), 0, 4)
 	xor a
 	ldh [hMultiPurpose0], a
 	ldh [hMultiPurpose1], a
@@ -4002,12 +4007,12 @@ DrawMinimapFrame::
 .pieces
 ;>@p     while True:
 	push hl
-;>         hMultiPurpose0 = MinimapFloorHigh[i]
+;>         hMultiPurpose0 = mem[MinimapFloorHigh + i]
 	ld hl, MinimapFloorHigh
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose0], a
-;>         hMultiPurpose1 = MinimapFloorLow[i]
+;>         hMultiPurpose1 = mem[MinimapFloorLow + i]
 	ld hl, MinimapFloorLow
 	add hl, bc
 	ld a, [hl]
@@ -4015,7 +4020,7 @@ DrawMinimapFrame::
 ;>         hMultiPurpose2 = 0             # one tile
 	xor a
 	ldh [hMultiPurpose2], a
-;>         hMultiPurpose3 = MinimapFloorTile[i]
+;>         hMultiPurpose3 = mem[MinimapFloorTile + i]
 	ld hl, MinimapFloorTile
 	add hl, bc
 	ld a, [hl]
@@ -4032,7 +4037,7 @@ DrawMinimapFrame::
 	ld a, [hl]
 	pop hl
 	inc hl
-;>         if MinimapFloorHigh[i] == 0xFF:
+;>         if mem[MinimapFloorHigh + i] == 0xFF:
 	cp $ff
 ;=@p
 	jr nz, .pieces
@@ -4048,13 +4053,13 @@ DrawMinimapFrame::
 ;=@jj
 	inc bc
 .number
-;>@lv hMultiPurpose0 = MinimapLevelHigh[j]
+;>@lv hMultiPurpose0 = mem[MinimapLevelHigh + j]
 	push hl
 	ld hl, MinimapLevelHigh
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose0], a
-;> hMultiPurpose1 = MinimapLevelLow[j]
+;> hMultiPurpose1 = mem[MinimapLevelLow + j]
 	ld hl, MinimapLevelLow
 	add hl, bc
 	ld a, [hl]
@@ -4085,6 +4090,7 @@ DrawMinimapFrame::
 ;@ path: world/minimap
 ;@ Stores hMultiPurpose0-3 (a 4-byte draw command: VRAM high, low, mode, tile) at `out`; returns
 ;@ the address of its last byte.
+;@ test: out = rand(0xC000, 0xDFF0)
 StoreDrawCommand4::
 ;> mem[out] = hMultiPurpose0
 	ldh a, [hMultiPurpose0]
@@ -4172,7 +4178,7 @@ WorldMapInit::
 ;> wWorldMapCursor = wOverworldRoom
 	ld a, [wOverworldRoom]
 	ld [wWorldMapCursor], a
-;>@p place = WorldMapRoomPlaces[wOverworldRoom]
+;>@p place = mem[WorldMapRoomPlaces + wOverworldRoom]
 	ld e, a
 	ld d, $00
 	ld hl, WorldMapRoomPlaces
@@ -4283,7 +4289,7 @@ WorldMapInput::
 	ldh a, [hJoypadPressed]
 	and $10
 	jr z, .notA
-;>@p     place = WorldMapRoomPlaces[wWorldMapCursor]
+;>@p     place = mem[WorldMapRoomPlaces + wWorldMapCursor]
 	ld a, [wWorldMapCursor]
 	ld e, a
 	ld d, $00
@@ -4311,7 +4317,7 @@ WorldMapInput::
 	and $20
 	jr z, .region
 .named
-;>@n         text = WorldMapPlaceTexts[place]
+;>@n         text = mem[WorldMapPlaceTexts + place]
 	ld d, $00
 	ld hl, WorldMapPlaceTexts
 	add hl, de
@@ -4330,7 +4336,7 @@ WorldMapInput::
 	jr .show
 ;>     else:
 .area
-;>@a         text = WorldMapRegionTexts[(wWorldMapCursor >> 5) * 8 + ((wWorldMapCursor & 0x0F) >> 1)]
+;>@a         text = mem[WorldMapRegionTexts + ((wWorldMapCursor >> 5) * 8 + ((wWorldMapCursor & 0x0F) >> 1))]
 	rra
 	and $07
 	ld e, a
@@ -4441,12 +4447,12 @@ WorldMapDraw::
 
 ;@ def SceneReturnToWorld()
 ;@ path: event/scene
-;@ Shared last step of the beach and picture scenes: keeps their sprites drawn (the routine at $6750)
+;@ Shared last step of the beach and picture scenes: draws the tower sprites once more (DrawTowerSprites)
 ;@ and falls into ReturnToWorld.
 ;@ test: skip calls scene code
 SceneReturnToWorld::
-;> Call_6750()                           # (the scene sprites)
-	call $6750
+;> DrawTowerSprites()                    # the tower sprites once more
+	call DrawTowerSprites
 ;> ReturnToWorld()                       # falls through into it
 
 ;@ def ReturnToWorld()
@@ -4465,7 +4471,7 @@ ReturnToWorld::
 	jr nz, ResetWindow.done
 ;> mem[0xC50A] = 0
 	xor a
-	ld [$c50a], a
+	ld [wItemButtonsDisabled], a
 ;> wRoomEntitySetupDone = 0
 	ld [wRoomEntitySetupDone], a
 ;> hBaseScrollX = 0
@@ -4504,7 +4510,7 @@ ReturnToWorld::
 ;@ Clears the 12 bytes of room transition state from wRoomTransitionState on, then resets the window
 ;@ (falls into ResetWindow).
 ClearRoomTransitionState::
-;>@f fill(wRoomTransitionState, 0, 12)
+;>@f fill(addr(wRoomTransitionState), 0, 12)
 	ld hl, wRoomTransitionState
 	ld e, $00
 .clear
@@ -4617,7 +4623,7 @@ WorldMapRoomPlaces::
 ;@ Opens the dialogue naming the place of the current room (WorldMapRoomPlaces / WorldMapPlaceTexts).
 ;@ test: skip opens a dialogue
 ShowCurrentPlaceName::
-;>@p return OpenDialog(WorldMapPlaceTexts[WorldMapRoomPlaces[hMapRoom]])
+;>@p return OpenDialog(mem[WorldMapPlaceTexts + mem[WorldMapRoomPlaces + hMapRoom]])
 	ldh a, [hMapRoom]
 	ld e, a
 	ld d, $00
@@ -4691,7 +4697,7 @@ WorldMapMoveCursor::
 	ldh a, [hJoypadPressed]
 	ld c, a
 .move
-;>@x     wWorldMapCursor = wWorldMapCursor & 0xF0 | (wWorldMapCursor + WorldMapCursorDX[keys & 3]) & 0x0F
+;>@x     wWorldMapCursor = wWorldMapCursor & 0xF0 | (wWorldMapCursor + mem[WorldMapCursorDX + (keys & 3)]) & 0x0F
 	ld a, c
 	and $03
 	ld e, a
@@ -4709,7 +4715,7 @@ WorldMapMoveCursor::
 	and $0f
 	or e
 	ld [wWorldMapCursor], a
-;>@y     wWorldMapCursor = u8(wWorldMapCursor + WorldMapCursorDY[(keys >> 2) & 3])
+;>@y     wWorldMapCursor = u8(wWorldMapCursor + mem[WorldMapCursorDY + ((keys >> 2) & 3)])
 	ld a, c
 	rra
 	rra
@@ -4753,7 +4759,7 @@ WorldMapMoveCursor::
 .visited
 ;>             PlayCursorSound()
 	call PlayCursorSound
-;>@p             place = WorldMapRoomPlaces[wWorldMapCursor]
+;>@p             place = mem[WorldMapRoomPlaces + wWorldMapCursor]
 	ld hl, WorldMapRoomPlaces
 	add hl, de
 	ld a, [hl]
@@ -4900,7 +4906,6 @@ WorldMapMoveCursor::
 ;@ full size) of 8 sprites, 32 bytes per frame; each sprite 4 bytes: y offset, x offset (signed, from
 ;@ the popup's corner), tile ($F2 corner / $F4 edge), attributes (flips $20 / $40 / $60). Drawn by
 ;@ DrawWorldMapPlaceMarkerSprites.
-;@ asset: sprites frames=4 count=8
 WorldMapMarkerFrames::
 	db $f8, $f8, $f2, $00, $f8, $00, $f4, $00, $f8, $08, $f4, $20, $f8, $10, $f2, $20
 	db $08, $f8, $f2, $40, $08, $00, $f4, $40, $08, $08, $f4, $60, $08, $10, $f2, $60
@@ -5015,13 +5020,13 @@ DrawWorldMapPlaceMarkerSprites::
 	jr nc, .right
 	inc e
 .right
-;> hActiveEntityX = WorldMapPopupX[quarter]
+;> hActiveEntityX = mem[WorldMapPopupX + quarter]
 	ld d, $00
 	ld hl, WorldMapPopupX
 	add hl, de
 	ld a, [hl]
 	ldh [hActiveEntityX], a
-;> hActiveEntityDrawY = WorldMapPopupY[quarter]
+;> hActiveEntityDrawY = mem[WorldMapPopupY + quarter]
 	ld hl, WorldMapPopupY
 	add hl, de
 	ld a, [hl]
@@ -5059,7 +5064,7 @@ DrawWorldMapPlaceMarkerSprites::
 	jr nc, .done
 ;> hActiveEntitySpriteVariant = wWorldMapMarkerType - 1
 	ldh [hActiveEntitySpriteVariant], a
-;>@i1 wOAMBuffer[48:52] = [hActiveEntityDrawY, hActiveEntityX] + WorldMapMarkerIcons[4 * hActiveEntitySpriteVariant:][:2]
+;>@i1 wOAMBuffer[48:52] = [hActiveEntityDrawY, hActiveEntityX] + [mem[WorldMapMarkerIcons + 4 * hActiveEntitySpriteVariant], mem[WorldMapMarkerIcons + 4 * hActiveEntitySpriteVariant + 1]]
 	ld de, wOAMBuffer + 48
 	ldh a, [hActiveEntityDrawY]
 	ld [de], a
@@ -5085,7 +5090,7 @@ DrawWorldMapPlaceMarkerSprites::
 	ld a, [hli]
 	ld [de], a
 	inc de
-;>@i2 wOAMBuffer[52:56] = [hActiveEntityDrawY, hActiveEntityX + 8] + WorldMapMarkerIcons[4 * hActiveEntitySpriteVariant + 2:][:2]
+;>@i2 wOAMBuffer[52:56] = [hActiveEntityDrawY, hActiveEntityX + 8] + [mem[WorldMapMarkerIcons + 4 * hActiveEntitySpriteVariant + 2], mem[WorldMapMarkerIcons + 4 * hActiveEntitySpriteVariant + 3]]
 	ldh a, [hActiveEntityDrawY]
 	ld [de], a
 	inc de
@@ -5268,7 +5273,7 @@ SaveGame::
 	ld a, [wHealth]
 	and a
 	jr nz, .store
-;>@h     wHealth = DefaultHealthByMaxHearts[wMaxHearts]
+;>@h     wHealth = mem[DefaultHealthByMaxHearts + wMaxHearts]
 	ld a, [wMaxHearts]
 	ld e, a
 	ld d, $00
@@ -5280,7 +5285,7 @@ SaveGame::
 .store
 ;> SaveDungeonItemFlags()                           # StoreDungeonItemFlags in this bank
 	call SaveDungeonItemFlags
-;>@d dest = SaveSlotDataAddresses[wSaveSlot]
+;>@d dest = mem16[SaveSlotDataAddresses + 2 * wSaveSlot]
 	ld a, [wSaveSlot]
 	sla a
 	ld e, a
@@ -5322,7 +5327,7 @@ StoreDungeonItemFlags::
 	cp $0a
 ;=@i
 	jr nc, .done
-;>@d     copy(wDungeonItemFlags + hMapId * 5, wDungeonHasMap, 5)
+;>@d     copy(wDungeonItemFlags + hMapId * 5, addr(wDungeonHasMap), 5)
 	ld e, a
 	sla a
 	sla a
@@ -5389,22 +5394,22 @@ PlaceEntityForRoomScroll::
 	ld a, [wRoomTransitionDirection]
 	ld c, a
 	ld b, $00
-;> hMultiPurpose0 = ScrollShiftXLow[dir]
+;> hMultiPurpose0 = mem[ScrollShiftXLow + dir]
 	ld hl, ScrollShiftXLow
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose0], a
-;> hMultiPurpose1 = ScrollShiftXHigh[dir]
+;> hMultiPurpose1 = mem[ScrollShiftXHigh + dir]
 	ld hl, ScrollShiftXHigh
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose1], a
-;> hMultiPurpose2 = ScrollShiftYLow[dir]
+;> hMultiPurpose2 = mem[ScrollShiftYLow + dir]
 	ld hl, ScrollShiftYLow
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose2], a
-;> hMultiPurpose3 = ScrollShiftYHigh[dir]
+;> hMultiPurpose3 = mem[ScrollShiftYHigh + dir]
 	ld hl, ScrollShiftYHigh
 	add hl, bc
 	ld a, [hl]
@@ -5447,6 +5452,7 @@ PlaceEntityForRoomScroll::
 ;@ Keeps the list of the last six rooms entered. When the current room is not in it, it replaces the
 ;@ oldest entry, and the room that drops out forgets which of its enemies were defeated (they come
 ;@ back the next time).
+;@ test: wRecentRoomsIndex = rand(0, 5)
 RememberRecentRoom::
 ;>@s if hMapRoom in wRecentRooms:
 	ld c, $06
@@ -5539,7 +5545,7 @@ HideSpritesUnderWindow::
 	ld d, a
 	ld e, $28
 .below
-;>         if wOAMBuffer[4 * i] >= wWindowY + 8:
+;>         if wOAMBuffer[4 * i] >= u8(wWindowY + 8):
 	ld a, [hl]
 	cp d
 	jr c, .keep
@@ -5902,7 +5908,7 @@ SpawnMarinFollower::
 ;@ def FillFollowerTrail_01(table: hl, value: a)
 ;@ path: npc/followers
 ;@ Writes `value` into the 16 bytes at `table` (one of the follower trail arrays).
-;@ test: hl = 0xD155; a = rand(0, 255)
+;@ test: table = rand(0xC000, 0xDFF0); value = rand(0, 255)
 FillFollowerTrail_01::
 ;> fill(table, value, 16)
 	ld c, $10
@@ -6027,7 +6033,7 @@ HexDigitTileAddresses::
 ;@ putting those tiles at $9909-$990A.
 ;@ test: skip copies from another bank into VRAM
 DrawDebugDialogIndex::
-;>@l copy_from_bank(0x0F, 0x96D0, HexDigitTileAddresses[wDebugDialogIndex & 0x0F], 0x10)   # low digit
+;>@l CopyDataFromBank(0x0F, mem16[HexDigitTileAddresses + 2 * (wDebugDialogIndex & 0x0F)], 0x96D0, 0x10)   # low digit
 	ld a, [wDebugDialogIndex]
 	and $0f
 	sla a
@@ -6044,7 +6050,7 @@ DrawDebugDialogIndex::
 ;=@l
 	ld a, $0f
 	call CopyDataFromBank
-;>@h copy_from_bank(0x0F, 0x96C0, HexDigitTileAddresses[wDebugDialogIndex >> 4], 0x10)     # high digit
+;>@h CopyDataFromBank(0x0F, mem16[HexDigitTileAddresses + 2 * (wDebugDialogIndex >> 4)], 0x96C0, 0x10)     # high digit
 	ld a, [wDebugDialogIndex]
 	swap a
 	and $0f
@@ -6072,7 +6078,7 @@ DrawDebugDialogIndex::
 
 
 ;@ def ShowDungeonNameText()
-;@ path: world/dungeon
+;@ path: world/dungeons
 ;@ Called by the main loop when the countdown at $FFB4 runs out: shows the name of the current dungeon
 ;@ (dialogue $56 + hMapId), unless Link is in a special motion state or the debug toggle is on.
 ;@ test: skip opens a dialogue
@@ -6093,7 +6099,7 @@ ShowDungeonNameText::
 
 
 ;@ def GameplayMarinBeachHandler()
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Game mode 9: Link and Marin sit on the beach and look at the sea, seagulls fly past and Marin talks to
 ;@ Link. Counts the scene's two timers down (wMarinBeachTimer only while no dialogue is open), then runs the
 ;@ current step of MarinBeachSteps.
@@ -6122,7 +6128,7 @@ GameplayMarinBeachHandler::
 	ld a, [wGameplaySubtype]
 	rst $00
 
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ The 14 steps of the beach scene (dw code addresses, indexed by wGameplaySubtype): fade out, load the
 ;@ tiles, set up the screen, fade in, scroll down to the beach, four rounds of Marin's talk (dialogues
 ;@ $1D8-$1DC; a "no" to her question goes back to step 5), the end, and the return to the world.
@@ -6143,7 +6149,7 @@ MarinBeachSteps::
 	dw ReturnToWorld           ; 13
 
 ;@ def MarinBeachFadeOut()
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Step 0: freezes Link and fades the room out to white; when the fade is done, clears the room
 ;@ transition and the scene sprites and asks for tile set $0F.
 ;@ test: skip calls the fade
@@ -6173,7 +6179,7 @@ MarinBeachFadeOut::
 	ret
 
 ;@ def MarinBeachLoadTiles()
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Step 1: asks for the beach tile set ($13).
 MarinBeachLoadTiles::
 ;> wTileMapToLoad = 0x13
@@ -6186,12 +6192,11 @@ MarinBeachLoadTiles::
 	jp IncrementGameplaySubtype
 
 ;@ def MarinBeachInit()
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Step 2: asks for the beach screen ($13), hides the window, starts the view scrolled up by $70 lines
 ;@ (hBaseScrollY $90), sets the sound timers and places the scene's sprites in the effect slots: two
 ;@ seagulls (type 1) that fly across - slot 0 from the top left, slot 1 from the right after $40 frames -
 ;@ and five birds (type 2) hovering in a row above the sea (slots 2-6).
-;@ test: skip
 MarinBeachInit::
 ;> wBGMapToLoad = 0x13
 	ld a, $13
@@ -6215,141 +6220,169 @@ MarinBeachInit::
 ;> wSeagullCryTimer = 0xA0
 	ld a, $a0
 	ld [wSeagullCryTimer], a
-;>@o0 place_object(0, y=0xE0, x=0x00, type=1, speed_y=0x0C, speed_x=0x08, timer=0x00, frame=0x00)
+;> wVfxY[0] = 0xE0
 	ld a, $e0
 	ld [wVfxY], a
+;> wVfxX[0] = 0x00
 	ld a, $00
 	ld [wVfxX], a
+;> wVfxType[0] = 0x01
 	ld a, $01
 	ld [wVfxType], a
-;=@o0
+;> wVfxSpeedY[0] = 0x0C
 	ld a, $0c
 	ld [wVfxSpeedY], a
+;> wVfxSpeedX[0] = 0x08
 	ld a, $08
 	ld [wVfxSpeedX], a
+;> wVfxTimer[0] = 0x00
 	ld a, $00
 	ld [wVfxTimer], a
-;=@o0
+;> wEntityWorkRAM3[0] = 0x00
 	ld [wEntityWorkRAM3], a
-;>@o1 place_object(1, y=0x20, x=0xA0, type=1, speed_y=0x08, speed_x=0xF8, timer=0x40, frame=0x24)
+;> wVfxY[1] = 0x20
 	ld a, $20
 	ld [wVfxY + 1], a
+;> wVfxX[1] = 0xA0
 	ld a, $a0
 	ld [wVfxX + 1], a
+;> wVfxType[1] = 0x01
 	ld a, $01
 	ld [wVfxType + 1], a
-;=@o1
+;> wVfxSpeedY[1] = 0x08
 	ld a, $08
 	ld [wVfxSpeedY + 1], a
+;> wVfxSpeedX[1] = 0xF8
 	ld a, $f8
 	ld [wVfxSpeedX + 1], a
+;> wVfxTimer[1] = 0x40
 	ld a, $40
 	ld [wVfxTimer + 1], a
-;=@o1
+;> wEntityWorkRAM3[1] = 0x24
 	ld a, $24
 	ld [wEntityWorkRAM3 + 1], a
-;>@o2 place_object(2, y=0x48, x=0x30, type=2, speed_y=0, speed_x=0, timer=0, frame=2)
+;> wVfxY[2] = 0x48
 	ld a, $48
 	ld [wVfxY + 2], a
+;> wVfxX[2] = 0x30
 	ld a, $30
 	ld [wVfxX + 2], a
+;> wVfxType[2] = 0x02
 	ld a, $02
 	ld [wVfxType + 2], a
-;=@o2
+;> wVfxSpeedY[2] = 0x00
 	ld a, $00
 	ld [wVfxSpeedY + 2], a
+;> wVfxSpeedX[2] = 0x00
 	ld a, $00
 	ld [wVfxSpeedX + 2], a
+;> wVfxTimer[2] = 0x00
 	ld a, $00
 	ld [wVfxTimer + 2], a
-;=@o2
+;> wEntityWorkRAM3[2] = 0x02
 	ld a, $02
 	ld [wEntityWorkRAM3 + 2], a
-;>@o3 place_object(3, y=0x3C, x=0x40, type=2, speed_y=0, speed_x=0, timer=0, frame=0)
+;> wVfxY[3] = 0x3C
 	ld a, $3c
 	ld [wVfxY + 3], a
+;> wVfxX[3] = 0x40
 	ld a, $40
 	ld [wVfxX + 3], a
+;> wVfxType[3] = 0x02
 	ld a, $02
 	ld [wVfxType + 3], a
-;=@o3
+;> wVfxSpeedY[3] = 0x00
 	ld a, $00
 	ld [wVfxSpeedY + 3], a
+;> wVfxSpeedX[3] = 0x00
 	ld a, $00
 	ld [wVfxSpeedX + 3], a
+;> wVfxTimer[3] = 0x00
 	ld a, $00
 	ld [wVfxTimer + 3], a
-;=@o3
+;> wEntityWorkRAM3[3] = 0x00
 	ld a, $00
 	ld [wEntityWorkRAM3 + 3], a
-;>@o4 place_object(4, y=0x40, x=0x50, type=2, speed_y=0, speed_x=0, timer=0, frame=0)
+;> wVfxY[4] = 0x40
 	ld a, $40
 	ld [wVfxY + 4], a
+;> wVfxX[4] = 0x50
 	ld a, $50
 	ld [wVfxX + 4], a
+;> wVfxType[4] = 0x02
 	ld a, $02
 	ld [wVfxType + 4], a
-;=@o4
+;> wVfxSpeedY[4] = 0x00
 	ld a, $00
 	ld [wVfxSpeedY + 4], a
+;> wVfxSpeedX[4] = 0x00
 	ld a, $00
 	ld [wVfxSpeedX + 4], a
+;> wVfxTimer[4] = 0x00
 	ld a, $00
 	ld [wVfxTimer + 4], a
-;=@o4
+;> wEntityWorkRAM3[4] = 0x00
 	ld a, $00
 	ld [wEntityWorkRAM3 + 4], a
-;>@o5 place_object(5, y=0x3C, x=0x60, type=2, speed_y=0, speed_x=0, timer=0, frame=0)
+;> wVfxY[5] = 0x3C
 	ld a, $3c
 	ld [wVfxY + 5], a
+;> wVfxX[5] = 0x60
 	ld a, $60
 	ld [wVfxX + 5], a
+;> wVfxType[5] = 0x02
 	ld a, $02
 	ld [wVfxType + 5], a
-;=@o5
+;> wVfxSpeedY[5] = 0x00
 	ld a, $00
 	ld [wVfxSpeedY + 5], a
+;> wVfxSpeedX[5] = 0x00
 	ld a, $00
 	ld [wVfxSpeedX + 5], a
+;> wVfxTimer[5] = 0x00
 	ld a, $00
 	ld [wVfxTimer + 5], a
-;=@o5
+;> wEntityWorkRAM3[5] = 0x00
 	ld a, $00
 	ld [wEntityWorkRAM3 + 5], a
-;>@o6 place_object(6, y=0x44, x=0x68, type=2, speed_y=0, speed_x=0, timer=0, frame=0)
+;> wVfxY[6] = 0x44
 	ld a, $44
 	ld [wVfxY + 6], a
+;> wVfxX[6] = 0x68
 	ld a, $68
 	ld [wVfxX + 6], a
+;> wVfxType[6] = 0x02
 	ld a, $02
 	ld [wVfxType + 6], a
-;=@o6
+;> wVfxSpeedY[6] = 0x00
 	ld a, $00
 	ld [wVfxSpeedY + 6], a
+;> wVfxSpeedX[6] = 0x00
 	ld a, $00
 	ld [wVfxSpeedX + 6], a
+;> wVfxTimer[6] = 0x00
 	ld a, $00
 	ld [wVfxTimer + 6], a
-;=@o6
+;> wEntityWorkRAM3[6] = 0x00
 	ld a, $00
 	ld [wEntityWorkRAM3 + 6], a
 ;> return IncrementGameplaySubtype()
 	jp IncrementGameplaySubtype
 
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Fade-in palettes for the background and OBJ1 (16 bytes). MarinBeachFadeIn reads entry
 ;@ wMarinBeachFadeStep + (hFrameCounter & 3); each value is there four times, so the fade blends between
 ;@ neighbouring palettes from frame to frame.
 MarinBeachBGPalettes::
 	db $00, $00, $00, $00, $40, $40, $40, $40, $94, $94, $94, $94, $e4, $e4, $e4, $e4
 
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ The same fade for OBJ0 (16 bytes, read with the same index as MarinBeachBGPalettes).
 MarinBeachOBJ0Palettes::
 	db $00, $00, $00, $00, $04, $04, $04, $04, $18, $18, $18, $18, $1c, $1c, $1c, $1c
 
 ;@ def MarinBeachFadeIn()
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Step 3: fades the beach in (one fade step every 8 frames, 12 steps), then goes on with the scroll of
 ;@ step 4 in the same frame.
 ;@ test: skip falls through into another unit
@@ -6375,15 +6408,15 @@ MarinBeachFadeIn::
 	ld a, [wMarinBeachFadeStep]
 	add e
 	ld e, a
-;> wBGPalette = MarinBeachBGPalettes[i]
+;> wBGPalette = mem[MarinBeachBGPalettes + i]
 	ld d, $00
 	ld hl, MarinBeachBGPalettes
 	add hl, de
 	ld a, [hl]
 	ld [wBGPalette], a
-;> wOBJ1Palette = MarinBeachBGPalettes[i]
+;> wOBJ1Palette = mem[MarinBeachBGPalettes + i]
 	ld [wOBJ1Palette], a
-;> wOBJ0Palette = MarinBeachOBJ0Palettes[i]
+;> wOBJ0Palette = mem[MarinBeachOBJ0Palettes + i]
 	ld hl, MarinBeachOBJ0Palettes
 	add hl, de
 	ld a, [hl]
@@ -6391,7 +6424,7 @@ MarinBeachFadeIn::
 ;> return MarinBeachScrollDown()   # runs on into the next step's code
 
 ;@ def MarinBeachScrollDown()
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Step 4 (and the end of every step 3 frame): scrolls the view down one line every 4 frames until
 ;@ hBaseScrollY wraps to 0, which shows the beach; then waits $80 frames (wMarinBeachTimer) before Marin
 ;@ speaks. Updates the scene each frame.
@@ -6419,7 +6452,7 @@ MarinBeachScrollDown::
 	ret
 
 ;@ def MarinBeachTalk1()
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Step 5: when wMarinBeachTimer has run out, Marin starts to talk (dialogue $1D8). While a dialogue is open,
 ;@ Marin keeps facing Link (wSceneCounter = 2).
 ;@ test: skip opens a dialogue
@@ -6449,7 +6482,7 @@ MarinBeachTalk1::
 	ret
 
 ;@ def MarinBeachPause1()
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Step 6: once the dialogue is closed, waits $C0 frames before the next one; Marin looks at the sea for
 ;@ the first $20 frames, then turns to Link (wSceneCounter = $80).
 ;@ test: skip calls the scene update
@@ -6472,7 +6505,7 @@ MarinBeachPause1::
 	ret
 
 ;@ def MarinBeachTalk2()
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Step 7: when wMarinBeachTimer has run out, opens dialogue $1D9.
 ;@ test: skip opens a dialogue
 MarinBeachTalk2::
@@ -6491,7 +6524,7 @@ MarinBeachTalk2::
 	ret
 
 ;@ def MarinBeachPause2()
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Step 8: the same pause as MarinBeachPause1.
 ;@ test: skip calls the scene update
 MarinBeachPause2::
@@ -6513,7 +6546,7 @@ MarinBeachPause2::
 	ret
 
 ;@ def MarinBeachTalk3()
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Step 9: when wMarinBeachTimer has run out, opens dialogue $1DA, which ends with a question.
 ;@ test: skip opens a dialogue
 MarinBeachTalk3::
@@ -6532,7 +6565,7 @@ MarinBeachTalk3::
 	ret
 
 ;@ def MarinBeachCheckAnswer()
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Step 10: once the question is answered: the first answer goes on with dialogue $1DB; the other one
 ;@ opens dialogue $1DE and goes back to step 5, which asks again after 5 frames.
 ;@ test: skip opens a dialogue
@@ -6573,7 +6606,7 @@ MarinBeachCheckAnswer::
 	ret
 
 ;@ def MarinBeachTalk4()
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Step 11: once dialogue $1DB is closed, opens dialogue $1DC and waits $30 frames.
 ;@ test: skip opens a dialogue
 MarinBeachTalk4::
@@ -6595,7 +6628,7 @@ MarinBeachTalk4::
 	ret
 
 ;@ def MarinBeachEnd()
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Step 12: Marin keeps facing Link; when the last wait is over, stops the music, moves on to the return
 ;@ to the world (step 13), makes Marin follow Link from now on and removes the scene sprites.
 ;@ test: skip calls the sound engine
@@ -6620,7 +6653,7 @@ MarinBeachEnd::
 ;> return ClearSceneObjects()   # runs on into it
 
 ;@ def ClearSceneObjects()
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Frees all 16 effect slots (wVfxType = 0), which removes the scene's sprites.
 ClearSceneObjects::
 ;>@l for i in range(16):
@@ -6635,7 +6668,7 @@ ClearSceneObjects::
 	jr nz, .loop
 	ret
 
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Three frames of the two people on the sand, each two sprites side by side: 4 bytes = left tile, left
 ;@ attributes, right tile, right attributes (the right sprite 8 pixels further right). Marin looking at
 ;@ the sea (the right half is the left one mirrored), Marin turned to Link, and Link.
@@ -6645,7 +6678,7 @@ MarinBeachSprites::
 	db $42, $00, $44, $00   ; Link
 
 ;@ def UpdateMarinBeach()
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Runs in every frame of the scene from the scroll on: moves and draws the birds (UpdateSceneObjects),
 ;@ plays the sound of the waves every $A0 frames and a seagull cry at random intervals ($60-$DF frames),
 ;@ and, once the view has scrolled far enough, draws Marin (x $58) and Link (x $48) on the sand at y $7C
@@ -6720,10 +6753,11 @@ UpdateMarinBeach::
 	ret
 
 ;@ def DrawSceneSpritePair(oam: hl, frame: de)
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Writes two OAM entries at `oam`: y = hActiveEntityDrawY - hBaseScrollY (also kept in
 ;@ hBGTilesRequestCopy for the caller), x = hActiveEntityX and hActiveEntityX + 8, tiles and attributes
 ;@ from the 4-byte record at `frame` (the format of MarinBeachSprites).
+;@ test: oam = rand(0xC000, 0xDFF0); frame = rand(0xC000, 0xDFF0)
 DrawSceneSpritePair::
 ;> y = (hActiveEntityDrawY - hBaseScrollY) & 0xFF
 	push bc
@@ -6765,7 +6799,7 @@ DrawSceneSpritePair::
 	ret
 
 ;@ def UpdateSceneObjects()
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Moves and draws the scene's sprites in effect slots 8 down to 0: for each used slot, puts its position
 ;@ into hActiveEntityX / hActiveEntityDrawY, counts its timer down and runs its handler
 ;@ (UpdateSceneObject).
@@ -6812,7 +6846,7 @@ UpdateSceneObjects::
 	jr nz, .loop
 	ret
 ;@ def UpdateSceneObject(type: a, slot: c)
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Runs the handler of a scene sprite of effect type `type` (1 or 2) from SceneObjectHandlers.
 ;@ test: skip jump table
 UpdateSceneObject::
@@ -6820,20 +6854,20 @@ UpdateSceneObject::
 	dec a
 	rst $00
 
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Handlers of the beach scene's sprites by effect type - 1 (dw code addresses): 1 a seagull flying past,
 ;@ 2 a bird hovering above the sea.
 SceneObjectHandlers::
 	dw UpdateSeagull
 	dw UpdateSeaBird
 
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Addresses of the six seagull frames in BeachSeagullFrames (dw, by frame number 0-5).
 BeachSeagullFramePointers::
 	dw BeachSeagullFrames, BeachSeagullFrames + 4, BeachSeagullFrames + 8
 	dw BeachSeagullFrames + 12, BeachSeagullFrames + 16, BeachSeagullFrames + 20
 
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Six seagull frames of two sprites each (4 bytes: left tile, left attributes, right tile, right
 ;@ attributes; the right half is the left one mirrored): the wing beat, frame 3 with the wings held still.
 BeachSeagullFrames::
@@ -6844,7 +6878,7 @@ BeachSeagullFrames::
 	db $58, $00, $58, $20   ; 4
 	db $5a, $00, $5a, $20   ; 5
 
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ The seagulls' flight, 108 frame numbers (0-5), one entry per 6 frames: glides (frame 3) alternate with
 ;@ series of wing beats. A seagull starts at the entry in its wEntityWorkRAM3 byte (slot 0 at 0, slot 1
 ;@ at $24).
@@ -6858,7 +6892,7 @@ BeachSeagullFrameSequence::
 	db $00, $01, $02, $03, $04, $05, $00, $01, $02, $03, $04, $05
 
 ;@ def UpdateSeagull(slot: c)
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Effect type 1, a seagull flying past: waits while its timer runs; then goes on to the next entry of
 ;@ BeachSeagullFrameSequence every 6 frames (wEntityWorkRAM3[slot] is the entry, wEntityWorkRAM3[$10 +
 ;@ slot] counts the frames), draws its two sprites at OAM entry 16 + 2 * slot and moves. Every 8 frames
@@ -6889,7 +6923,7 @@ UpdateSeagull::
 	add hl, bc
 	inc [hl]
 .draw
-;>@f frame = BeachSeagullFrameSequence[wEntityWorkRAM3[slot]]
+;>@f frame = mem[BeachSeagullFrameSequence + wEntityWorkRAM3[slot]]
 	ld hl, wEntityWorkRAM3
 	add hl, bc
 	ld e, [hl]
@@ -6898,7 +6932,7 @@ UpdateSeagull::
 	add hl, de
 ;=@f
 	ld e, [hl]
-;>@s sprites = BeachSeagullFramePointers[frame]
+;>@s sprites = mem16[BeachSeagullFramePointers + 2 * frame]
 	sla e
 	ld d, b
 	ld hl, BeachSeagullFramePointers
@@ -6953,12 +6987,12 @@ UpdateSeagull::
 .done
 	ret
 
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Addresses of the four hovering-bird frames in SeaBirdFrames (dw, by frame number 0-3).
 SeaBirdFramePointers::
 	dw SeaBirdFrames, SeaBirdFrames + 4, SeaBirdFrames + 8, SeaBirdFrames + 12
 
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Four frames of the hovering birds, two sprites each (4 bytes: left tile, left attributes, right tile,
 ;@ right attributes; the right half is the left one mirrored). Frames 0-3 are the wing beat, frame 3 is
 ;@ also shown while a bird sinks.
@@ -6968,19 +7002,19 @@ SeaBirdFrames::
 	db $5c, $00, $5c, $20   ; 2
 	db $5e, $00, $5e, $20   ; 3
 
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Speeds a hovering bird picks at random for x and for y (8 signed bytes in 4.4 fixed point: +1/16,
 ;@ -1/16 or +-2/16 pixel per frame).
 SeaBirdRandomSpeeds::
 	db $01, $ff, $01, $ff, $fe, $02, $01, $ff
 
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Home x position of the hovering birds in slots 2-6 (5 bytes; the code reads it as SeaBirdHomeX - 2
 ;@ indexed by slot). Their home y is $48.
 SeaBirdHomeX::
 	db $4c, $52, $58, $5c, $60
 ;@ def UpdateSeaBird(slot: c)
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Effect type 2, a bird hovering above the sea: beats its wings (frames 0-3, one step every 8 frames)
 ;@ while rising and holds them still (frame 3) while sinking; draws its two sprites at OAM entry
 ;@ 16 + 2 * slot and moves. Every 64 frames (offset by 16 frames per slot) it picks new random x and y
@@ -7011,7 +7045,7 @@ UpdateSeaBird::
 ;>     frame = wEntityWorkRAM3[slot]
 	ld e, [hl]
 .draw
-;>@d DrawSceneSpritePair(wOAMBuffer + 0x40 + 8 * slot, SeaBirdFramePointers[frame])
+;>@d DrawSceneSpritePair(wOAMBuffer + 0x40 + 8 * slot, mem16[SeaBirdFramePointers + 2 * frame])
 	sla e
 	ld d, b
 	ld hl, SeaBirdFramePointers
@@ -7051,7 +7085,7 @@ UpdateSeaBird::
 ;> if t & 0x3F == 0:
 	and $3f
 	jr nz, .speedY
-;>@rx     wVfxSpeedX[slot] = SeaBirdRandomSpeeds[GetRandomByte() & 7]
+;>@rx     wVfxSpeedX[slot] = mem[SeaBirdRandomSpeeds + (GetRandomByte() & 7)]
 	call GetRandomByte
 	and $07
 	ld e, a
@@ -7069,7 +7103,7 @@ UpdateSeaBird::
 	add $40
 	and $3f
 	jr nz, .home
-;>@ry     wVfxSpeedY[slot] = SeaBirdRandomSpeeds[GetRandomByte() & 7]
+;>@ry     wVfxSpeedY[slot] = mem[SeaBirdRandomSpeeds + (GetRandomByte() & 7)]
 	call GetRandomByte
 	and $07
 	ld e, a
@@ -7093,7 +7127,7 @@ UpdateSeaBird::
 	jr c, .done
 ;>     wVfxDirection[slot] = 0
 	ld [hl], b
-;>@hx     wVfxX[slot] = (wVfxX[slot] + (1 if (wVfxX[slot] - SeaBirdHomeX[slot - 2]) & 0x80 else -1)) & 0xFF
+;>@hx     wVfxX[slot] = (wVfxX[slot] + (1 if (wVfxX[slot] - mem[SeaBirdHomeX + (slot - 2)]) & 0x80 else -1)) & 0xFF
 	ld hl, SeaBirdHomeX - 2
 	add hl, bc
 	ld d, [hl]
@@ -7129,7 +7163,7 @@ UpdateSeaBird::
 	ret
 
 ;@ def MoveSceneObject(slot: c)
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Moves a scene sprite by its x and y speeds (MoveSceneObjectAxis; the y arrays lie $10 bytes after the
 ;@ x arrays).
 ;@ test: skip calls a helper twice
@@ -7146,11 +7180,12 @@ MoveSceneObject::
 	pop bc
 	ret
 
-;@ def MoveSceneObjectAxis(slot: c)
-;@ path: scenes/marin_beach
+;@ def MoveSceneObjectAxis(slot: bc)
+;@ path: event/marin_beach
 ;@ Adds the signed speed wVfxSpeedX[slot] (4.4 fixed point: the high nibble pixels, the low nibble
 ;@ sixteenths) to the position wVfxX[slot] with its fraction in wVfxSubX[slot]. With slot + $10 the same
 ;@ code moves along y (wVfxSpeedY, wVfxY, wVfxSubY).
+;@ test: slot = rand(0, 0x1F)
 MoveSceneObjectAxis::
 ;> speed = wVfxSpeedX[slot]
 	ld hl, wVfxSpeedX
@@ -7186,7 +7221,7 @@ MoveSceneObjectAxis::
 	ret
 
 ;@ def OpenBeachDialog(index: a)
-;@ path: scenes/marin_beach
+;@ path: event/marin_beach
 ;@ Opens dialogue $100 + `index` (OpenDialogTable1) with Link's y position set to $60 for the call, since
 ;@ the dialogue box is placed by Link's position.
 ;@ test: skip opens a dialogue
@@ -7207,7 +7242,7 @@ OpenBeachDialog::
 	ret
 
 ;@ def GameplayPictureHandler()
-;@ path: scenes/picture
+;@ path: event/picture
 ;@ Game mode 8: a picture shown full screen until a button is pressed - the picture in room $DD, another
 ;@ one elsewhere, and in Eagle's Tower (hMapId 6) the scene of the tower sinking into the ground, which
 ;@ ends by itself. The state of the tower scene is kept in wEntityWorkRAM3[$10-$15]: $10 a timer, $11 how
@@ -7219,7 +7254,7 @@ GameplayPictureHandler::
 	ld a, [wGameplaySubtype]
 	rst $00
 
-;@ path: scenes/picture
+;@ path: event/picture
 ;@ The 10 steps of the picture mode (dw code addresses, indexed by wGameplaySubtype): fade out, load the
 ;@ tiles, show the screen, fade in, wait for a button (or start the tower scene), return to the world;
 ;@ for the tower: shake, sink in four drops, settle, return to the world.
@@ -7236,7 +7271,7 @@ PictureSteps::
 	dw SceneReturnToWorld      ; 9
 
 ;@ def PictureFadeOut()
-;@ path: scenes/picture
+;@ path: event/picture
 ;@ Step 0: freezes Link and fades the room out to white; when the fade is done, clears the room
 ;@ transition, turns the music down (except in Eagle's Tower) and asks for tile set $0F.
 ;@ test: skip calls the fade
@@ -7275,7 +7310,7 @@ PictureFadeOut::
 	ret
 
 ;@ def PictureLoadTiles()
-;@ path: scenes/picture
+;@ path: event/picture
 ;@ Step 1: asks for the picture's tile set: $21 for Eagle's Tower, $20 in room $DD, else $12.
 PictureLoadTiles::
 ;> tiles = 0x21
@@ -7301,7 +7336,7 @@ PictureLoadTiles::
 	jp IncrementGameplaySubtype
 
 ;@ def PictureInit()
-;@ path: scenes/picture
+;@ path: event/picture
 ;@ Step 2: asks for the picture's screen ($24 for Eagle's Tower, $23 in room $DD, else $12), hides the
 ;@ window, resets the scroll and the transition counters and clears the tower scene's state.
 PictureInit::
@@ -7346,7 +7381,7 @@ PictureInit::
 	jp IncrementGameplaySubtype
 
 ;@ def PictureFadeIn()
-;@ path: scenes/picture
+;@ path: event/picture
 ;@ Step 3: fades the picture in; when done, sets the tower scene's timer to $80 frames.
 ;@ test: skip calls the fade
 PictureFadeIn::
@@ -7367,7 +7402,7 @@ PictureFadeIn::
 	ret
 
 ;@ def PictureWaitButton()
-;@ path: scenes/picture
+;@ path: event/picture
 ;@ Step 4: in Eagle's Tower goes on to the tower scene (step 6) at once; otherwise waits for A, B or Start,
 ;@ plays the sound $13 and goes on to the return to the world. AdvanceSceneStep, also used by the beach
 ;@ and mural scenes, moves to the next step and resets the transition counters.
@@ -7405,7 +7440,7 @@ AdvanceSceneStep:
 	ret
 
 ;@ def TowerShake()
-;@ path: scenes/picture
+;@ path: event/picture
 ;@ Step 6: the tower picture shakes (wScreenShakeY 0 / -2, switching every 4 frames) for $80 frames, then
 ;@ waits $20 frames before the first drop.
 ;@ test: skip calls the tower drawing
@@ -7438,7 +7473,7 @@ TowerShake::
 	ret
 
 ;@ def TowerSink()
-;@ path: scenes/picture
+;@ path: event/picture
 ;@ Step 7: every $30 frames the tower drops 8 pixels with a crash, dust at its foot ($30 frames) and a short
 ;@ shake ($18 frames); after the fourth drop the scene waits $80 frames.
 ;@ test: skip calls the tower drawing
@@ -7483,7 +7518,7 @@ TowerSink::
 .done
 	ret
 ;@ def TowerSettle()
-;@ path: scenes/picture
+;@ path: event/picture
 ;@ Step 8: waits the last $80 frames, then goes on to the return to the world.
 ;@ test: skip calls the tower drawing
 TowerSettle::
@@ -7507,7 +7542,7 @@ TowerSettle::
 	ret
 
 ;@ def UpdateTowerShake()
-;@ path: scenes/picture
+;@ path: event/picture
 ;@ While the shake timer wEntityWorkRAM3[$15] runs, shakes the picture (wScreenShakeY -2 / 0, switching
 ;@ every 4 frames); otherwise keeps it still.
 UpdateTowerShake::
@@ -7533,13 +7568,13 @@ UpdateTowerShake::
 ;> return
 	ret
 
-;@ path: scenes/picture
+;@ path: event/picture
 ;@ Number of tower sprites drawn after 0-5 drops (6 bytes): the lowest rows disappear into the ground as
 ;@ the tower sinks.
 TowerSpriteCounts::
 	db $14, $14, $10, $10, $0c, $0c
 
-;@ path: scenes/picture
+;@ path: event/picture
 ;@ The top of Eagle's Tower, 20 sprites in five rows of four (4 bytes each: y offset, x offset, tile,
 ;@ attributes; attributes $10 = palette OBP1, $30 = OBP1 mirrored), drawn with DrawEntitySprites.
 TowerSprites::
@@ -7549,7 +7584,7 @@ TowerSprites::
 	db $30, $00, $de, $10,  $30, $08, $e0, $10,  $30, $10, $e0, $30,  $30, $18, $de, $30
 	db $40, $00, $de, $10,  $40, $08, $e0, $10,  $40, $10, $e0, $30,  $40, $18, $de, $30
 
-;@ path: scenes/picture
+;@ path: event/picture
 ;@ Three frames of the dust cloud at the foot of the tower, 6 sprites each in one row (4 bytes each: y
 ;@ offset, x offset, tile, attributes; the right half is the left one mirrored).
 TowerDustSprites::
@@ -7560,13 +7595,13 @@ TowerDustSprites::
 	db $48, $08, $fc, $00,  $48, $10, $fe, $00,  $48, $18, $ee, $00
 	db $48, $20, $ee, $20,  $48, $28, $fe, $20,  $48, $30, $fc, $20
 
-;@ path: scenes/picture
+;@ path: event/picture
 ;@ Addresses of the three dust frames in TowerDustSprites (dw).
 TowerDustFrames::
 	dw TowerDustSprites, TowerDustSprites + 24, TowerDustSprites + 48
 
 ;@ def DrawTowerSprites()
-;@ path: scenes/picture
+;@ path: event/picture
 ;@ In Eagle's Tower only (hMapId 6): draws the dust cloud (x $38, 6 sprites, frame changing every 8
 ;@ frames) while the dust timer wEntityWorkRAM3[$14] runs, and the sinking top of the tower (x $48,
 ;@ y $20 + how far it has sunk), both moved by the screen shake. The dust frame index takes d from b,
@@ -7613,7 +7648,7 @@ DrawTowerSprites::
 	xor a
 .store
 	ld [wEntityWorkRAM3 + $12], a
-;>@dd     DrawEntitySpritesAtOAMStart(TowerDustFrames[wEntityWorkRAM3[0x12]], 6)
+;>@dd     DrawEntitySpritesAtOAMStart(mem16[TowerDustFrames + 2 * wEntityWorkRAM3[0x12]], 6)
 	rla
 	and $06
 	ld e, a
@@ -7637,7 +7672,7 @@ DrawTowerSprites::
 	add $20
 	sub e
 	ldh [hActiveEntityDrawY], a
-;> count = TowerSpriteCounts[wEntityWorkRAM3[0x13]]
+;> count = mem[TowerSpriteCounts + wEntityWorkRAM3[0x13]]
 	ld a, [wEntityWorkRAM3 + $13]
 	ld e, a
 	ld d, $00
@@ -7653,7 +7688,7 @@ DrawTowerSprites::
 	ret
 
 ;@ def GameplayMuralHandler()
-;@ path: scenes/mural
+;@ path: event/mural
 ;@ Game mode $0A: the mural of the Face Shrine shown full screen with its text. Runs the current step of
 ;@ MuralSteps.
 ;@ test: skip jump table
@@ -7662,7 +7697,7 @@ GameplayMuralHandler::
 	ld a, [wGameplaySubtype]
 	rst $00
 
-;@ path: scenes/mural
+;@ path: event/mural
 ;@ The 6 steps of the mural mode (dw code addresses, indexed by wGameplaySubtype): fade out, load the
 ;@ screen, fade in, show the text, wait for a button, return to the world.
 MuralSteps::
@@ -7674,7 +7709,7 @@ MuralSteps::
 	dw ReturnToWorld           ; 5
 
 ;@ def MuralFadeOut()
-;@ path: scenes/mural
+;@ path: event/mural
 ;@ Step 0: freezes Link and fades the room out to white; when the fade is done, clears the room
 ;@ transition, turns the music down and asks for tile set $14.
 ;@ test: skip calls the fade
@@ -7708,7 +7743,7 @@ MuralFadeOut::
 	ret
 
 ;@ def MuralLoadScreen()
-;@ path: scenes/mural
+;@ path: event/mural
 ;@ Step 1: asks for the mural screen ($15), hides the window and resets the scroll and the transition
 ;@ counters.
 MuralLoadScreen::
@@ -7730,7 +7765,7 @@ MuralLoadScreen::
 ;> return IncrementGameplaySubtype()
 	jp IncrementGameplaySubtype
 ;@ def MuralFadeIn()
-;@ path: scenes/mural
+;@ path: event/mural
 ;@ Step 2: fades the mural in; when done, starts the frame count of the next step.
 ;@ test: skip calls the fade
 MuralFadeIn::
@@ -7749,7 +7784,7 @@ MuralFadeIn::
 	ret
 
 ;@ def MuralShowText()
-;@ path: scenes/mural
+;@ path: event/mural
 ;@ Step 3: counts the frames in which no dialogue is open: at $80 opens the mural's text (dialogue $0E7),
 ;@ at 256 goes on to wait for a button.
 ;@ test: skip opens a dialogue
@@ -7776,7 +7811,7 @@ MuralShowText::
 	ret
 
 ;@ def MuralWaitButton()
-;@ path: scenes/mural
+;@ path: event/mural
 ;@ Step 4: on A, B or Start plays the sound $13 and goes on to the return to the world.
 ;@ test: skip calls AdvanceSceneStep
 MuralWaitButton::
@@ -7792,7 +7827,7 @@ MuralWaitButton::
 .done
 	ret
 
-;@ path: intro/title
+;@ path: title/screen
 ;@ The ripple of the title logo: 21 tables of 64 signed line offsets (one byte per screen line from line
 ;@ $10), added to the y scroll by IntroRasterEffect. Table 0 is flat; the others are waves of falling
 ;@ strength. IntroWavePointers picks one per wave step; tables 4, 6, 9 and 13 are not used.
@@ -7903,7 +7938,7 @@ IntroWaveTables::
 	db $00, $00, $00, $00, $00, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01, $02
 	db $02, $02, $02, $02, $02, $02, $02, $02, $02, $03, $03, $03, $03, $03, $03, $03
 
-;@ path: intro/title
+;@ path: title/screen
 ;@ The wave table for each wave step 0-$10 (17 dw addresses into IntroWaveTables); step $10 is the flat
 ;@ table, the logo at rest.
 IntroWavePointers::
@@ -7913,14 +7948,14 @@ IntroWavePointers::
 	dw IntroWaveTables + $40 * 17, IntroWaveTables + $40 * 18, IntroWaveTables + $40 * 19, IntroWaveTables + $40 * 20
 	dw IntroWaveTables
 
-;@ path: intro/title
+;@ path: title/screen
 ;@ For each wave step 0-$10 (17 bytes): the number of lines (counted from screen line $10) that show the
 ;@ logo; the lines below it are hidden with the palette $55. The logo grows from $28 to $3A lines.
 IntroWaveLimits::
 	db $28, $2a, $2c, $2c, $2e, $2e, $30, $30, $31, $33, $33, $34, $35, $36, $38, $3a, $3a
 
 ;@ def IntroRasterEffect()
-;@ path: intro/title
+;@ path: title/screen
 ;@ Called by the VBlank handler from intro subtype 8 on: lets the title logo ripple into place. Every
 ;@ second frame the wave step wRasterDelay grows by one, up to $10. The step picks a table of line
 ;@ offsets (IntroWavePointers) and how many lines to show (IntroWaveLimits). From screen line $10 on,
@@ -7948,14 +7983,14 @@ IntroRasterEffect::
 .store
 	ld [wRasterDelay], a
 .tables
-;> hMultiPurpose0 = IntroWaveLimits[wRasterDelay]
+;> hMultiPurpose0 = mem[IntroWaveLimits + wRasterDelay]
 	ld a, [wRasterDelay]
 	ld e, a
 	ld hl, IntroWaveLimits
 	add hl, de
 	ld a, [hl]
 	ldh [hMultiPurpose0], a
-;> offsets = IntroWavePointers[wRasterDelay]
+;> offsets = mem16[IntroWavePointers + 2 * wRasterDelay]
 	sla e
 	ld hl, IntroWavePointers
 	add hl, de
@@ -7973,19 +8008,19 @@ IntroRasterEffect::
 	ldh a, [rSTAT]
 	and $03
 	jr nz, .hblank
-;>     delay()
+;>     mem[addr(wRasterLine) + 1] = u8((mem[addr(wRasterLine) + 1] | 1) + 1)   # a short delay
 .delay
 	ld a, [wRasterLine + 1]
 	inc a
 	ld [wRasterLine + 1], a
 	and $01
 	jr nz, .delay
-;>     line = wRasterLine
+;>     line = lo(wRasterLine)
 	ldh a, [hMultiPurpose0]
 	ld l, a
 	ld a, [wRasterLine]
 	ld e, a
-;>     wRasterLine = line + 1
+;>     mem[addr(wRasterLine)] = line + 1
 	inc a
 	ld [wRasterLine], a
 ;>     if line + 1 == 0x3A:
@@ -8024,7 +8059,7 @@ IntroRasterEffect::
 
 
 ;@ def PlayCursorSoundOnMove()
-;@ path: system/menus
+;@ path: menu/cursor
 ;@ Plays the cursor sound (PlayCursorSound) when up, down or Select was just pressed.
 ;@ test: skip runs on into another unit
 PlayCursorSoundOnMove::
@@ -8036,7 +8071,7 @@ PlayCursorSoundOnMove::
 ;> return PlayCursorSound()   # runs on into it
 
 ;@ def PlayCursorSound()
-;@ path: system/menus
+;@ path: menu/cursor
 ;@ Plays the menu cursor sound (jingle $0A); a and the flags are kept.
 PlayCursorSound::
 ;> hJingle = 0x0A
@@ -8048,14 +8083,14 @@ PlayCursorSound::
 	ret
 
 
-;@ path: intro
+;@ path: title/intro
 ;@ Background palettes of a lightning flash (4 bytes), indexed by (flash timer >> 1) & 3: the timer
 ;@ wEntityWorkRAM counts down from $1C, so the screen flickers between bright and normal.
 IntroBGPalettes::
 	db $c6, $c2, $c0, $c2
 
 ;@ def GameplayIntroHandler()
-;@ path: intro
+;@ path: title/intro
 ;@ Game mode 0, the intro: Link's boat in the storm, Marin finding him on the beach, and the title
 ;@ screen. Start skips to the title screen (subtype $0D; then $28 frames pass before Start counts again)
 ;@ and on the title screen (subtype $0B) opens the file select. In the storm (subtypes 0-4) the flash
@@ -8148,15 +8183,15 @@ GameplayIntroHandler::
 	ld a, [wGameplaySubtype]
 	cp $05
 	jr nc, .dispatch
-;>     if wEntityWorkRAM:
+;>     if wEntityWorkRAM[0]:
 	ld a, [wEntityWorkRAM]
 	and a
 	jr z, .palette
-;>         wEntityWorkRAM -= 1
+;>         wEntityWorkRAM[0] -= 1
 	dec a
 	ld [wEntityWorkRAM], a
 .palette
-;>@p     wBGPalette = IntroBGPalettes[(wEntityWorkRAM >> 1) & 3]
+;>@p     wBGPalette = mem[IntroBGPalettes + ((wEntityWorkRAM[0] >> 1) & 3)]
 	rra
 	nop
 	and $03
@@ -8172,7 +8207,7 @@ GameplayIntroHandler::
 	ld a, [wGameplaySubtype]
 	rst $00
 
-;@ path: intro
+;@ path: title/intro
 ;@ The 14 steps of the intro (dw code addresses, indexed by wGameplaySubtype).
 IntroSteps::
 	dw IntroInit               ; 0
@@ -8191,7 +8226,7 @@ IntroSteps::
 	dw IntroSkipToTitle        ; 13 (Start pressed)
 
 ;@ def IntroInit()
-;@ path: intro
+;@ path: title/intro
 ;@ Subtype 0: clears the work RAM at $C000-$D5FF (ClearWRAM1600), starts the intro music ($1A), asks
 ;@ for tile set 2, resets the frame counter, seeds the random numbers ($A2) and switches the window off.
 ;@ test: skip clears RAM
@@ -8223,7 +8258,7 @@ IntroInit::
 
 
 ;@ def IntroLoadTiles()
-;@ path: intro
+;@ path: title/intro
 ;@ Subtype 1: asks for the storm tile set ($10).
 IntroLoadTiles::
 ;> wTileMapToLoad = 0x10
@@ -8234,7 +8269,7 @@ IntroLoadTiles::
 
 
 ;@ def IntroStormInit()
-;@ path: intro/storm
+;@ path: title/storm
 ;@ Subtype 2: asks for the storm screen ($0E), sets the palettes, turns on the LCD interrupt for the
 ;@ parallax bands of the sea (rIE 3, rLYC 0), clears the scene variables wEntityWorkRAM[0-$10] and
 ;@ puts Link's boat (entity 2, status 5) at x $C0, y $4E.
@@ -8304,19 +8339,19 @@ IntroStormInit::
 	jp IncrementGameplaySubtype
 
 
-;@ path: intro/storm
+;@ path: title/storm
 ;@ Background palettes of the fade to black after the lightning has struck the boat (9 bytes, one per
 ;@ 8 frames; the last one ends the storm).
 IntroFlashBGPalettes::
 	db $81, $40, $00, $00, $00, $00, $00, $00, $00
 
-;@ path: intro/storm
+;@ path: title/storm
 ;@ The same fade for OBJ0 (9 bytes).
 IntroFlashOBJ0Palettes::
 	db $08, $08, $08, $04, $00, $00, $00, $00, $00
 
 ;@ def IntroStorm()
-;@ path: intro/storm
+;@ path: title/storm
 ;@ Subtype 3, the storm: draws the rain and the entities. Once the lightning has struck the boat
 ;@ (wSceneVar2 counting up from 1), waits until $18, fades the screen to black (IntroFlashBGPalettes /
 ;@ IntroFlashOBJ0Palettes, one entry per 8 frames) and then moves on to the beach (subtype 5: tile set
@@ -8348,13 +8383,13 @@ IntroStorm::
 	rra
 	and $0f
 	ld e, a
-;>     wBGPalette = IntroFlashBGPalettes[i]
+;>     wBGPalette = mem[IntroFlashBGPalettes + i]
 	ld d, $00
 	ld hl, IntroFlashBGPalettes
 	add hl, de
 	ld a, [hl]
 	ld [wBGPalette], a
-;>     wOBJ0Palette = IntroFlashOBJ0Palettes[i]
+;>     wOBJ0Palette = mem[IntroFlashOBJ0Palettes + i]
 	ld hl, IntroFlashOBJ0Palettes
 	add hl, de
 	ld a, [hl]
@@ -8485,23 +8520,23 @@ IntroStorm::
 	ret
 
 
-;@ path: intro/storm
+;@ path: title/storm
 ;@ X positions of the six lightning bolts of the storm (6 bytes), by the scroll position that starts them.
 IntroLightningX::
 	db $28, $78, $60, $38, $68, $58
 
-;@ path: intro/storm
+;@ path: title/storm
 ;@ Entity status (= bolt shape 1-4, see IntroLightningSprites) of the six lightning bolts (6 bytes).
 IntroLightningKinds::
 	db $04, $02, $01, $04, $03, $01
 
 ;@ def IntroSpawnLightning(slot: de, kind: c)
-;@ path: intro/storm
+;@ path: title/storm
 ;@ Puts lightning bolt `kind` (0-5) into entity slot `slot`: its shape as the status, its x position,
 ;@ y $30, shown for $20 frames; then starts the flash (IntroLightningFlash).
 ;@ test: skip runs on into another unit
 IntroSpawnLightning::
-;>@s wEntityStatus[slot] = IntroLightningKinds[kind]
+;>@s wEntityStatus[slot] = mem[IntroLightningKinds + kind]
 	ld b, $00
 	ld hl, IntroLightningKinds
 	add hl, bc
@@ -8510,7 +8545,7 @@ IntroSpawnLightning::
 	add hl, de
 ;=@s
 	ld [hl], a
-;>@x wEntityX[slot] = IntroLightningX[kind]
+;>@x wEntityX[slot] = mem[IntroLightningX + kind]
 	ld hl, IntroLightningX
 	add hl, bc
 	ld a, [hl]
@@ -8528,12 +8563,12 @@ IntroSpawnLightning::
 ;> return IntroLightningFlash()   # runs on into it
 
 ;@ def IntroLightningFlash()
-;@ path: intro/storm
+;@ path: title/storm
 ;@ Starts a lightning flash: the flash timer wEntityWorkRAM = $1C (GameplayIntroHandler takes the
 ;@ palettes from it) and the thunder (PlayClinkNoise).
 ;@ test: skip plays a sound
 IntroLightningFlash::
-;> wEntityWorkRAM = 0x1C
+;> wEntityWorkRAM[0] = 0x1C
 	ld a, $1c
 	ld [wEntityWorkRAM], a
 ;> PlayClinkNoise()
@@ -8543,7 +8578,7 @@ IntroLightningFlash::
 
 
 ;@ def IntroStormView2()
-;@ path: intro/storm
+;@ path: title/storm
 ;@ Subtype 4, the second storm screen (screen $0F) for $A0 frames (wSceneVar1 counts): at $80 changes a
 ;@ block of 2x4 tiles (DrawStormView2Tiles), at $90 and every 128 frames a lightning flash; at $A0 back
 ;@ to the storm screen (subtype 3, screen $0E) with the lightning striking the boat (wSceneVar2 = 1).
@@ -8606,7 +8641,7 @@ IntroStormView2::
 
 
 ;@ def IntroLoadBeach()
-;@ path: intro/beach
+;@ path: title/beach
 ;@ Subtype 5: asks for the beach screen ($10).
 IntroLoadBeach::
 ;> wBGMapToLoad = 0x10
@@ -8617,22 +8652,22 @@ IntroLoadBeach::
 	ret
 
 
-;@ path: intro/beach
+;@ path: title/beach
 ;@ Fade-in palettes of the beach for the background (16 bytes), read at entry fade step + (hFrameCounter
 ;@ & 3): each value is there about four times, so the fade blends from frame to frame.
 IntroBeachBGPalettes::
 	db $00, $00, $00, $00, $40, $40, $40, $80, $85, $85, $85, $c5, $c9, $c9, $c9, $c9
-;@ path: intro/beach
+;@ path: title/beach
 ;@ The same fade for OBJ0 (16 bytes).
 IntroBeachOBJ0Palettes::
 	db $00, $00, $00, $00, $04, $04, $04, $04, $18, $18, $18, $18, $1c, $1c, $1c, $1c
-;@ path: intro/beach
+;@ path: title/beach
 ;@ The same fade for OBJ1 (16 bytes).
 IntroBeachOBJ1Palettes::
 	db $00, $00, $00, $00, $40, $40, $40, $40, $90, $90, $90, $90, $e0, $e0, $e0, $e0
 
 ;@ def IntroBeachFadeIn()
-;@ path: intro/beach
+;@ path: title/beach
 ;@ Subtype 6: wSceneVar1 counts down from $FF. At $A0 the LCD interrupt line moves to 2; from $33 on
 ;@ the beach fades in (the fade step, kept in wCreditsRole, goes up every 4 frames to $0C). At 0 Marin
 ;@ (entity 0, status 6) appears at the right edge (x $B0, y $68) and the beach scene begins (subtype 7).
@@ -8695,18 +8730,18 @@ IntroBeachFadeIn::
 	ld a, [wCreditsRole]
 	add e
 	ld e, a
-;> wBGPalette = IntroBeachBGPalettes[i]
+;> wBGPalette = mem[IntroBeachBGPalettes + i]
 	ld d, $00
 	ld hl, IntroBeachBGPalettes
 	add hl, de
 	ld a, [hl]
 	ld [wBGPalette], a
-;> wOBJ0Palette = IntroBeachOBJ0Palettes[i]
+;> wOBJ0Palette = mem[IntroBeachOBJ0Palettes + i]
 	ld hl, IntroBeachOBJ0Palettes
 	add hl, de
 	ld a, [hl]
 	ld [wOBJ0Palette], a
-;> wOBJ1Palette = IntroBeachOBJ1Palettes[i]
+;> wOBJ1Palette = mem[IntroBeachOBJ1Palettes + i]
 	ld hl, IntroBeachOBJ1Palettes
 	add hl, de
 	ld a, [hl]
@@ -8716,7 +8751,7 @@ IntroBeachFadeIn::
 
 
 ;@ def IntroBeach()
-;@ path: intro/beach
+;@ path: title/beach
 ;@ Subtype 7: runs the entities - Marin walks along the beach and finds Link, then the view rises to the
 ;@ sky (IntroMarin, IntroLink).
 ;@ test: skip calls the entities
@@ -8727,7 +8762,7 @@ IntroBeach::
 
 
 ;@ def PlayIntroWaveSound()
-;@ path: intro/beach
+;@ path: title/beach
 ;@ Plays the sound of the waves (noise $0F) every $A0 frames, until Link's entity (slot 1) has reached
 ;@ its state 2.
 PlayIntroWaveSound::
@@ -8753,7 +8788,7 @@ PlayIntroWaveSound::
 	ret
 
 
-;@ path: intro/title
+;@ path: title/screen
 ;@ The title logo, 7 draw commands of one BG row each (19 bytes: VRAM address high, low, $0F = 16 tiles
 ;@ in a row, then the tiles): rows $9A16-$9AD6, tiles $80-$EF.
 IntroLogoRows::
@@ -8772,7 +8807,7 @@ IntroLogoRows::
 	; row 6
 	db $9a, $d6, $0f, $e0, $e1, $e2, $e3, $e4, $e5, $e6, $e7, $e8, $e9, $ea, $eb, $ec, $ed, $ee, $ef
 
-;@ path: intro/title
+;@ path: title/screen
 ;@ The order in which IntroDrawLogo draws the logo rows (7 dw addresses into IntroLogoRows): from the
 ;@ middle row outwards.
 IntroLogoRowOrder::
@@ -8780,11 +8815,12 @@ IntroLogoRowOrder::
 	dw IntroLogoRows + 19 * 5, IntroLogoRows, IntroLogoRows + 19 * 6
 
 ;@ def IntroDrawLogo()
-;@ path: intro/title
+;@ path: title/screen
 ;@ Subtype 8: draws one row of the title logo per frame (IntroLogoRowOrder, counted in wSceneVar2); after
 ;@ the 7th goes on.
+;@ test: wSceneVar2 = rand(0, 6)
 IntroDrawLogo::
-;>@s src = IntroLogoRowOrder[wSceneVar2]
+;>@s src = mem16[IntroLogoRowOrder + 2 * wSceneVar2]
 	ld a, [wSceneVar2]
 	sla a
 	ld e, a
@@ -8821,7 +8857,7 @@ IntroDrawLogo::
 
 
 ;@ def IntroWaitLogoWave()
-;@ path: intro/title
+;@ path: title/screen
 ;@ Subtype 9: waits until the logo's ripple has settled (wave step wRasterDelay $10, see
 ;@ IntroRasterEffect), then plays the sound $19 and goes on.
 IntroWaitLogoWave::
@@ -8838,14 +8874,14 @@ IntroWaitLogoWave::
 	ret
 
 
-;@ path: intro/title
+;@ path: title/screen
 ;@ Draw command for the line under the logo (14 bytes: VRAM $9BB9, $09 = 10 tiles in a row, tiles
 ;@ $65-$6E, then the end mark 0).
 IntroCopyrightCommand::
 	db $9b, $b9, $09, $65, $66, $67, $68, $69, $6a, $6b, $6c, $6d, $6e, $00
 
 ;@ def IntroDrawCopyright()
-;@ path: intro/title
+;@ path: title/screen
 ;@ Subtype 10: draws the line under the logo, goes on to the title screen and sets its timers
 ;@ (InitTitleTimers).
 ;@ test: skip runs on into another unit
@@ -8866,7 +8902,7 @@ IntroDrawCopyright::
 ;> return InitTitleTimers()   # runs on into it
 
 ;@ def InitTitleTimers()
-;@ path: intro/title
+;@ path: title/screen
 ;@ Sets the title screen's counters: wSceneVar1 = $A0 (times 16 frames until the intro starts over),
 ;@ wSceneVar2 = 0 (the frame count), wSceneVar3 = $FF (the last sparkle position).
 InitTitleTimers::
@@ -8882,18 +8918,18 @@ InitTitleTimers::
 	ret
 
 
-;@ path: intro/title
+;@ path: title/screen
 ;@ X positions of the eight places where a sparkle appears on the title screen (8 bytes, in turn).
 IntroSparkleX::
 	db $18, $18, $38, $40, $58, $60, $80, $88
 
-;@ path: intro/title
+;@ path: title/screen
 ;@ Y positions of the same eight places (8 bytes).
 IntroSparkleY::
 	db $20, $48, $44, $28, $44, $28, $28, $40
 
 ;@ def IntroTitle()
-;@ path: intro/title
+;@ path: title/screen
 ;@ Subtype 11, the title screen: every 64 frames a sparkle (status 8, $3F frames) appears at the next of
 ;@ the eight places in a free entity slot (1 or 0). After $A0 x 16 frames the music fades out and the
 ;@ intro goes on to start over.
@@ -8937,14 +8973,14 @@ IntroTitle::
 	and $07
 	ld c, a
 	ld b, $00
-;>             wEntityX[slot] = IntroSparkleX[i]
+;>             wEntityX[slot] = mem[IntroSparkleX + i]
 	ld hl, IntroSparkleX
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-;>             wEntityY[slot] = IntroSparkleY[i]
+;>             wEntityY[slot] = mem[IntroSparkleY + i]
 	ld hl, IntroSparkleY
 	add hl, bc
 	ld a, [hl]
@@ -8980,7 +9016,7 @@ IntroTitle::
 
 
 ;@ def IntroTitleFadeOut()
-;@ path: intro/title
+;@ path: title/screen
 ;@ Subtype 12: fades to white, then starts the intro over (StartIntroMode).
 ;@ test: skip calls the fade
 IntroTitleFadeOut::
@@ -8997,7 +9033,7 @@ IntroTitleFadeOut::
 
 
 ;@ def IntroSkipToTitle()
-;@ path: intro/title
+;@ path: title/screen
 ;@ Subtype 13, after Start was pressed during the intro: asks for the title tile set ($11; the screen $11
 ;@ was asked for by GameplayIntroHandler), goes to the title screen (subtype 11) and sets its palettes and
 ;@ scroll.
@@ -9023,7 +9059,7 @@ IntroSkipToTitle::
 
 
 ;@ def DrawIntroRain()
-;@ path: intro/storm
+;@ path: title/storm
 ;@ Draws the rain into OAM from entry 19 on: 16 drops (21 on the second storm screen) on a slanted grid
 ;@ that starts at a random place each frame - x steps of $1C, wrapping at $A0 to the next row ($98
 ;@ back, $25 down); each drop is tile $28 or one of $70-$76 at random.
@@ -9090,7 +9126,7 @@ DrawIntroRain::
 	ret
 
 
-;@ path: intro/storm
+;@ path: title/storm
 ;@ Draw command used on the second storm screen (15 bytes): two columns of 4 tiles ($83 = 4 tiles going
 ;@ down) at VRAM $992B (tiles $1E-$24) and $992C (tiles $1F-$25), then the end mark 0.
 StormView2Command::
@@ -9099,7 +9135,7 @@ StormView2Command::
 	db $00
 
 ;@ def DrawStormView2Tiles()
-;@ path: intro/storm
+;@ path: title/storm
 ;@ Copies StormView2Command into the draw command buffer (drawn at the next VBlank).
 DrawStormView2Tiles::
 ;>@c copy(wDrawCommand, StormView2Command, 0x0F)
@@ -9117,7 +9153,7 @@ DrawStormView2Tiles::
 
 
 ;@ def UpdateIntroEntities()
-;@ path: intro/entities
+;@ path: title/entities
 ;@ Runs the intro's entities in slots 2, 1 and 0: for each used slot copies its x, y, sprite variant and
 ;@ state into the hActiveEntity variables and runs UpdateIntroEntity. Starts the OAM list from 0.
 ;@ test: skip calls the handlers
@@ -9170,7 +9206,7 @@ UpdateIntroEntities::
 
 
 ;@ def UpdateIntroEntity(slot: c)
-;@ path: intro/entities
+;@ path: title/entities
 ;@ Runs one intro entity by its status: 5 Link's boat (IntroBoat), 6 Marin (IntroMarin), 7 Link on the
 ;@ beach (IntroLink), 8 a sparkle on the title screen (IntroSparkle); 1-4 a lightning bolt of that shape
 ;@ (DrawIntroLightning), shown until its timer runs out.
@@ -9213,26 +9249,26 @@ UpdateIntroEntity::
 	ret
 
 
-;@ path: intro/storm
+;@ path: title/storm
 ;@ Link's boat, 6 sprites (4 bytes each: y offset, x offset, tile, attributes), written straight into OAM
 ;@ entries 0-5 by IntroBoat.
 IntroBoatSprites::
 	db $00, $00, $1c, $00,  $00, $08, $1e, $00
 	db $10, $f8, $20, $00,  $10, $00, $22, $00,  $10, $08, $24, $00,  $10, $10, $26, $00
 
-;@ path: intro/storm
+;@ path: title/storm
 ;@ The lightning bolt striking the boat, 4 sprites of tile $32 one above the other (same format as
 ;@ IntroBoatSprites), OAM entries 6-9.
 IntroBoatBoltSprites::
 	db $f8, $04, $32, $00,  $e8, $04, $32, $00,  $d8, $04, $32, $00,  $c8, $04, $32, $00
 
-;@ path: intro/storm
+;@ path: title/storm
 ;@ How far the boat sinks into the waves (8 bytes, pixels down), one entry per 16 frames.
 IntroBoatBob::
 	db $02, $01, $00, $00, $00, $01, $02, $02
 
 ;@ def IntroBoat(slot: c)
-;@ path: intro/storm
+;@ path: title/storm
 ;@ Status 5, Link's boat: bobs on the waves (IntroBoatBob by the frame counter; still once the lightning
 ;@ has struck) and writes its six sprites straight into OAM entries 0-5; from $10 frames after the strike
 ;@ also the bolt hitting it (entries 6-9).
@@ -9252,7 +9288,7 @@ IntroBoat::
 	rra
 	and $07
 .bob
-;>@y hActiveEntityDrawY = (hActiveEntityDrawY + IntroBoatBob[bob]) & 0xFF
+;>@y hActiveEntityDrawY = (hActiveEntityDrawY + mem[IntroBoatBob + bob]) & 0xFF
 	ld e, a
 	ld d, $00
 	ld hl, IntroBoatBob
@@ -9268,23 +9304,23 @@ IntroBoat::
 	push bc
 	ld c, $06
 .boat
-;>     wOAMBuffer[4 * i] = (hActiveEntityDrawY + IntroBoatSprites[4 * i]) & 0xFF
+;>     wOAMBuffer[4 * i] = (hActiveEntityDrawY + mem[IntroBoatSprites + (4 * i)]) & 0xFF
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	inc hl
 	ld [de], a
 	inc de
-;>     wOAMBuffer[4 * i + 1] = (hActiveEntityX + IntroBoatSprites[4 * i + 1]) & 0xFF
+;>     wOAMBuffer[4 * i + 1] = (hActiveEntityX + mem[IntroBoatSprites + (4 * i + 1)]) & 0xFF
 	ldh a, [hActiveEntityX]
 	add [hl]
 	inc hl
 	ld [de], a
 	inc de
-;>     wOAMBuffer[4 * i + 2] = IntroBoatSprites[4 * i + 2]
+;>     wOAMBuffer[4 * i + 2] = mem[IntroBoatSprites + (4 * i + 2)]
 	ld a, [hli]
 	ld [de], a
 	inc de
-;>     wOAMBuffer[4 * i + 3] = IntroBoatSprites[4 * i + 3]
+;>     wOAMBuffer[4 * i + 3] = mem[IntroBoatSprites + (4 * i + 3)]
 	ld a, [hli]
 	ld [de], a
 	inc de
@@ -9300,23 +9336,23 @@ IntroBoat::
 	ld de, wOAMBuffer + $18
 	ld c, $04
 .bolt
-;>         wOAMBuffer[0x18 + 4 * i] = (hActiveEntityDrawY + IntroBoatBoltSprites[4 * i]) & 0xFF
+;>         wOAMBuffer[0x18 + 4 * i] = (hActiveEntityDrawY + mem[IntroBoatBoltSprites + (4 * i)]) & 0xFF
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	inc hl
 	ld [de], a
 	inc de
-;>         wOAMBuffer[0x18 + 4 * i + 1] = (hActiveEntityX + IntroBoatBoltSprites[4 * i + 1]) & 0xFF
+;>         wOAMBuffer[0x18 + 4 * i + 1] = (hActiveEntityX + mem[IntroBoatBoltSprites + (4 * i + 1)]) & 0xFF
 	ldh a, [hActiveEntityX]
 	add [hl]
 	inc hl
 	ld [de], a
 	inc de
-;>         wOAMBuffer[0x18 + 4 * i + 2] = IntroBoatBoltSprites[4 * i + 2]
+;>         wOAMBuffer[0x18 + 4 * i + 2] = mem[IntroBoatBoltSprites + (4 * i + 2)]
 	ld a, [hli]
 	ld [de], a
 	inc de
-;>         wOAMBuffer[0x18 + 4 * i + 3] = IntroBoatBoltSprites[4 * i + 3]
+;>         wOAMBuffer[0x18 + 4 * i + 3] = mem[IntroBoatBoltSprites + (4 * i + 3)]
 	ld a, [hli]
 	ld [de], a
 	inc de
@@ -9329,7 +9365,7 @@ IntroBoat::
 	ret
 
 
-;@ path: intro/storm
+;@ path: title/storm
 ;@ The four lightning bolt shapes (entity status 1-4), 6 sprites each (4 bytes: y offset, x offset, tile,
 ;@ attributes), drawn with DrawEntitySprites.
 IntroLightningSprites::
@@ -9351,7 +9387,7 @@ IntroLightningSprites::
 	db $28, $f8, $2e, $00, $28, $f8, $2e, $00
 
 ;@ def DrawIntroLightning(slot: c)
-;@ path: intro/storm
+;@ path: title/storm
 ;@ Draws a lightning bolt of the shape given by its status (1-4): the 6 sprites at IntroLightningSprites
 ;@ + 24 * (status - 1) at the entity's position; then moves wOAMNextIndex on by 24 bytes.
 ;@ test: skip draws sprites
@@ -9383,7 +9419,7 @@ DrawIntroLightning::
 	ret
 
 
-;@ path: intro/beach
+;@ path: title/beach
 ;@ Marin's frames on the beach for DrawEntity16x16 (4 frames of 4 bytes: left tile, attributes, right
 ;@ tile, attributes): two walking frames, then two bent over Link.
 IntroMarinFrames::
@@ -9393,7 +9429,7 @@ IntroMarinFrames::
 	db $0c, $00, $0e, $00
 
 ;@ def IntroMarin(slot: c)
-;@ path: intro/beach
+;@ path: title/beach
 ;@ Status 6, Marin: keeps the waves sounding, draws her (DrawEntity16x16, IntroMarinFrames) and runs her
 ;@ state from IntroMarinStates.
 ;@ test: skip jump table
@@ -9414,7 +9450,7 @@ IntroMarin::
 	ldh a, [hActiveEntityState]
 	rst $00
 
-;@ path: intro/beach
+;@ path: title/beach
 ;@ Marin's states (5 dw code addresses, indexed by her entity state).
 IntroMarinStates::
 	dw IntroMarinWalk          ; 0
@@ -9424,7 +9460,7 @@ IntroMarinStates::
 	dw IntroMarinKneel         ; 4
 
 ;@ def IntroMarinWalk(slot: c)
-;@ path: intro/beach
+;@ path: title/beach
 ;@ State 0: Marin walks left along the beach, one pixel every 4 frames (wEntityPrivateCounter counts),
 ;@ changing her walking frame every 8 frames, while the bands of the view scroll (ScrollIntroBeachFast).
 ;@ Left of x $48 she stops for $40 frames.
@@ -9466,7 +9502,7 @@ IntroMarinWalk::
 
 
 ;@ def IntroMarinStop(slot: c)
-;@ path: intro/beach
+;@ path: title/beach
 ;@ State 1: Marin stands still for $40 frames; then Link appears lying on the sand to the right, outside
 ;@ the view (entity 1, status 7, x $FE, y $6E), and the frame counter starts from 0.
 ;@ test: skip
@@ -9506,7 +9542,7 @@ IntroMarinStop::
 
 
 ;@ def IntroMarinPan(slot: c)
-;@ path: intro/beach
+;@ path: title/beach
 ;@ State 2: Marin walks on (frame every 4 frames) and the view pans right towards Link: one pixel every
 ;@ second frame, while Link's entity moves left by one pixel a frame. At scroll $20 and $22 the left
 ;@ columns of the background are redrawn (DrawBeachColumn1 / 2); at $30 the pan pauses for $40 frames.
@@ -9559,7 +9595,7 @@ IntroMarinPan::
 
 
 ;@ def IntroMarinPanSlow(slot: c)
-;@ path: intro/beach
+;@ path: title/beach
 ;@ State 3: after the pause, the pan goes on more slowly (one pixel every 4 frames, Link's entity one
 ;@ pixel every 2 frames, ScrollIntroBeachSlow), with pauses of $30 frames at scroll $3A and $50 frames at
 ;@ $40. At $56 the scroll jumps to $A0, the band interrupt is switched off (rIE 1) and Marin goes on to
@@ -9659,7 +9695,7 @@ IntroMarinPanSlow::
 
 
 ;@ def IntroMarinKneel(slot: c)
-;@ path: intro/beach
+;@ path: title/beach
 ;@ State 4: Marin kneels by Link (frame 2). Every second frame her timer counts down; while it is in
 ;@ $90-$9F, $4A-$4F or $36-$3B she shows frame 3 and Link's entity frame 1.
 ;@ test: skip
@@ -9709,7 +9745,7 @@ IntroMarinKneel::
 	ret
 
 
-;@ path: intro/title
+;@ path: title/screen
 ;@ The 8 frames of a title screen sparkle for DrawEntity16x16 (4 bytes each: left tile, attributes, right
 ;@ tile, attributes; attributes $20 = mirrored): it grows from tile $38 to $3C/$3E and shrinks again.
 IntroSparkleFrames::
@@ -9717,7 +9753,7 @@ IntroSparkleFrames::
 	db $3c, $00, $3e, $00,  $3a, $00, $3a, $20,  $3a, $00, $3a, $20,  $38, $00, $38, $20
 
 ;@ def IntroSparkle(slot: c)
-;@ path: intro/title
+;@ path: title/screen
 ;@ Status 8, a sparkle on the title screen: counts its timer down, then frees its slot; draws frame
 ;@ (timer >> 3) & 7 of IntroSparkleFrames.
 ;@ test: skip draws sprites
@@ -9754,7 +9790,7 @@ IntroSparkle::
 	ret
 
 
-;@ path: intro/beach
+;@ path: title/beach
 ;@ Draw command used during the pan (17 bytes): rows 0-3 of BG columns 0-3 become tile $7D ($43 = one
 ;@ tile 4 times in a row), at VRAM $9800, $9820, $9840 and $9860; then the end mark 0.
 BeachColumn1Command::
@@ -9764,7 +9800,7 @@ BeachColumn1Command::
 	db $98, $60, $43, $7d
 	db $00
 
-;@ path: intro/beach
+;@ path: title/beach
 ;@ Draw command used during the pan (20 bytes): BG columns 4-7, row 0 the tiles $7D $7D $4C $4D, rows 1-3
 ;@ tile $7D; then the end mark 0.
 BeachColumn2Command::
@@ -9775,7 +9811,7 @@ BeachColumn2Command::
 	db $00
 
 ;@ def DrawBeachColumn2()
-;@ path: intro/beach
+;@ path: title/beach
 ;@ Copies BeachColumn2Command into the draw command buffer (the copy of DrawBeachColumn1).
 ;@ test: skip jumps into another unit
 DrawBeachColumn2::
@@ -9784,7 +9820,7 @@ DrawBeachColumn2::
 	jr DrawBeachColumn1.copy
 
 ;@ def DrawBeachColumn1()
-;@ path: intro/beach
+;@ path: title/beach
 ;@ Copies BeachColumn1Command into the draw command buffer: always $18 bytes, which is more than the
 ;@ command needs (the end mark stops it).
 DrawBeachColumn1::
@@ -9807,7 +9843,7 @@ DrawBeachColumn1::
 	ret
 
 
-;@ path: intro/beach
+;@ path: title/beach
 ;@ Link lying on the sand, 2 frames for DrawEntity16x16 (4 bytes: left tile, attributes, right tile,
 ;@ attributes): eyes closed, and the frame shown while Marin looks at him.
 IntroLinkFrames::
@@ -9815,7 +9851,7 @@ IntroLinkFrames::
 	db $14, $00, $16, $00
 
 ;@ def IntroLink(slot: c)
-;@ path: intro/beach
+;@ path: title/beach
 ;@ Status 7, Link lying on the beach: drawn (DrawEntity16x16, IntroLinkFrames) while on screen
 ;@ (x < $F0); runs his state from IntroLinkStates.
 ;@ test: skip jump table
@@ -9839,7 +9875,7 @@ IntroLink::
 	ldh a, [hActiveEntityState]
 	rst $00
 
-;@ path: intro/beach
+;@ path: title/beach
 ;@ The states of Link's beach entity (4 dw code addresses): wait, wait, the view rises to the sky, wait.
 IntroLinkStates::
 	dw IntroLinkWait           ; 0
@@ -9848,7 +9884,7 @@ IntroLinkStates::
 	dw IntroSkyWait            ; 3
 
 ;@ def IntroLinkWait(slot: c)
-;@ path: intro/beach
+;@ path: title/beach
 ;@ State 0: counts the timer down (from 0, so 256 frames), then sets it to $90 for the next state.
 ;@ test: skip
 IntroLinkWait::
@@ -9866,7 +9902,7 @@ IntroLinkWait::
 
 
 ;@ def IntroLinkWait2(slot: c)
-;@ path: intro/beach
+;@ path: title/beach
 ;@ State 1: counts the timer down once every 4 frames, then goes on.
 ;@ test: skip
 IntroLinkWait2::
@@ -9889,7 +9925,7 @@ IntroLinkWait2::
 
 
 ;@ def IntroScrollToSky(slot: c)
-;@ path: intro/beach
+;@ path: title/beach
 ;@ State 2: the view rises from the beach to the sky. Every 4 frames (wSceneStep counts) Marin and Link
 ;@ move down one pixel (to y $A0 at most) and the view scrolls up one line; every 8 lines the next row of
 ;@ the sky is drawn above it (DrawIntroSkyRow, rows counted in wSceneFadeStep). At row $0B the title music
@@ -9970,7 +10006,7 @@ IntroScrollToSky::
 
 
 ;@ def IntroSkyWait(slot: c)
-;@ path: intro/beach
+;@ path: title/beach
 ;@ State 3: counts the timer down once every 4 frames; then the intro goes on to the title logo (next
 ;@ subtype) and the scene variables and entities 0 and 1 are cleared.
 ;@ test: skip
@@ -10001,437 +10037,615 @@ IntroSkyWait::
 	ret
 
 
+;@ path: title/beach
+;@ The sky above the beach, 32 rows of 20 BG tiles (640 bytes), drawn row by row by DrawIntroSkyRow
+;@ while the view rises; only rows 0-$12 are used (the rest is the plain tile $7C).
 IntroSkyTilemap::
-	db $7c, $7c, $44, $45, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d
-	db $4c, $4d, $7c, $7c, $7c, $7c, $7c, $7c, $44, $45, $7d, $7d, $7d, $7d, $7d, $7d
-	db $7d, $7d, $4c, $4d, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $70, $71, $72
-	db $73, $74, $75, $76, $77, $78, $79, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $46, $7d, $7d, $7d, $7d, $4b, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $5c, $5d, $5e, $5f, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $58, $59, $5a, $5b
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $54, $55, $56, $57, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $50, $51, $52, $53, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $2b, $2c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
-	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 0
+	db $7c, $7c, $44, $45, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $4c, $4d, $7c, $7c
+	; row 1
+	db $7c, $7c, $7c, $7c, $44, $45, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $7d, $4c, $4d, $7c, $7c, $7c, $7c
+	; row 2
+	db $7c, $7c, $7c, $7c, $7c, $70, $71, $72, $73, $74, $75, $76, $77, $78, $79, $7c, $7c, $7c, $7c, $7c
+	; row 3
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $46, $7d, $7d, $7d, $7d, $4b, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 4
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $5c, $5d, $5e, $5f, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 5
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $58, $59, $5a, $5b, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 6
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $54, $55, $56, $57, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 7
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $50, $51, $52, $53, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 8
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $2b, $2c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 9
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 10
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 11
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 12
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 13
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 14
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 15
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 16
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 17
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 18
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 19
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 20
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 21
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 22
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 23
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 24
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 25
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 26
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 27
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 28
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 29
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 30
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
+	; row 31
+	db $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c, $7c
 
+;@ def DrawIntroSkyRow()
+;@ path: title/beach
+;@ Draws the next row of the sky as the view rises: row wSceneFadeStep of IntroSkyTilemap (20 tiles),
+;@ as a draw command to the BG address in wSceneVarC:wSceneVarB - $9BF4 for row 0, then one BG row ($20)
+;@ higher each time; then counts the row.
+;@ test: wSceneFadeStep = rand(0, 31)
 DrawIntroSkyRow::
+;> if wSceneFadeStep == 0:
 	ld a, [wSceneFadeStep]
 	and a
-	jr nz, jr_001_7a51
-
+	jr nz, .draw
+;>     wSceneVarB = 0xF4
 	ld a, $f4
 	ld [wSceneVarB], a
+;>     wSceneVarC = 0x9B
 	ld a, $9b
 	ld [wSceneVarC], a
-
-jr_001_7a51:
+.draw
+;>@o offset = wSceneFadeStep * 20
 	ld a, [wSceneFadeStep]
 	ld e, a
 	ld d, $00
 	sla e
 	rl d
 	sla e
+;=@o
 	rl d
 	ld a, e
 	sla e
 	rl d
 	sla e
 	rl d
+;=@o
 	add e
 	ld e, a
 	ld a, d
 	adc $00
 	ld d, a
+;> wDrawCommand[0] = wSceneVarC
 	ld c, $00
 	ld hl, wDrawCommand
 	ld a, [wSceneVarC]
 	ld [hli], a
+;> wDrawCommand[1] = wSceneVarB
 	ld a, [wSceneVarB]
 	ld [hli], a
+;> wDrawCommand[2] = 0x13
 	ld a, $13
 	ld [hli], a
-
-jr_001_7a7e:
+;>@l for i in range(20):
+;>     wDrawCommand[3 + i] = mem[IntroSkyTilemap + offset + i]
+.loop
 	push hl
-	ld hl, $77c1
+	ld hl, IntroSkyTilemap
 	add hl, de
 	ld a, [hl]
 	pop hl
 	ld [hli], a
+;=@l
 	inc de
 	inc c
 	ld a, c
 	cp $14
-	jr nz, jr_001_7a7e
-
+	jr nz, .loop
+;> wDrawCommand[23] = 0
 	ld [hl], $00
+;> wSceneFadeStep += 1
 	ld hl, wSceneFadeStep
 	inc [hl]
+;> borrow = wSceneVarB < 0x20
+;> wSceneVarB = (wSceneVarB - 0x20) & 0xFF
 	ld a, [wSceneVarB]
 	sub $20
 	ld [wSceneVarB], a
+;> wSceneVarC = (wSceneVarC - borrow) & 0xFF
 	ld a, [wSceneVarC]
 	sbc $00
 	ld [wSceneVarC], a
 	ret
 
 
+;@ path: title/storm
+;@ Sources (in bank $10) of the four frames of the storm sea's 8 animated tiles (4 dw, $80 bytes each).
 IntroSeaTilesA::
-	db $00, $50, $80, $50, $00, $51, $80, $51
+	dw $5000, $5080, $5100, $5180
 
+;@ path: title/beach
+;@ Sources (in bank $10) of the four frames of the beach sea's 8 animated tiles (4 dw).
 IntroSeaTilesB::
-	db $00, $52, $80, $52, $00, $53, $80, $53
+	dw $5200, $5280, $5300, $5380
+;@ path: title/intro
+;@ The sea animation's frame (as a byte offset into IntroSeaTilesA / B: 0, 2, 4, 6) for each step of 16
+;@ frames (8 bytes): forth and back.
 IntroSeaTileOffsets::
 	db $00, $02, $04, $06, $06, $04, $02, $00
 
+;@ path: title/storm
+;@ Up-and-down movement of the lowest band of the storm sea (8 bytes, pixels; used negated as the band's y
+;@ scroll), one entry per 16 frames.
 IntroSeaBob::
 	db $03, $02, $01, $00, $00, $01, $02, $03
 
+;@ def UpdateIntroStormScroll()
+;@ path: title/storm
+;@ Moves the storm's parallax bands (wIntroBandScrollX): band 0 one pixel every 8 frames, band 1 every
+;@ 16, band 2 every 32, band 3 every 16, band 4 by $28/256 pixel a frame (fraction in wSceneVar4); lets
+;@ the lowest band bob up and down (wIntroBandScrollY = -IntroSeaBob[...]) and animates the sea tiles.
+;@ test: skip runs on into another unit
 UpdateIntroStormScroll::
+;> if hFrameCounter & 7 == 0:
 	ld hl, wIntroBandScrollX
 	ldh a, [hFrameCounter]
 	and $07
-	jr nz, jr_001_7ace
-
+	jr nz, .band1
+;>     wIntroBandScrollX[0] += 1
 	inc [hl]
-
-jr_001_7ace:
+.band1
+;> if hFrameCounter & 0x0F == 0:
 	inc hl
 	ldh a, [hFrameCounter]
 	and $0f
-	jr nz, jr_001_7ad6
-
+	jr nz, .band2
+;>     wIntroBandScrollX[1] += 1
 	inc [hl]
-
-jr_001_7ad6:
+.band2
+;> if hFrameCounter & 0x1F == 0:
 	inc hl
 	ldh a, [hFrameCounter]
 	and $1f
-	jr nz, jr_001_7ade
-
+	jr nz, .band3
+;>     wIntroBandScrollX[2] += 1
 	inc [hl]
-
-jr_001_7ade:
+.band3
+;> if hFrameCounter & 0x0F == 0:
 	inc hl
 	ldh a, [hFrameCounter]
 	and $0f
-	jr nz, jr_001_7ae6
-
+	jr nz, .band4
+;>     wIntroBandScrollX[3] += 1
 	inc [hl]
-
-jr_001_7ae6:
+.band4
+;> wSceneVar4 += 0x28
 	inc hl
 	ld a, [wSceneVar4]
 	add $28
 	ld [wSceneVar4], a
-	jr nc, jr_001_7af2
-
+;> if wSceneVar4 < 0x28:   # the addition carried
+	jr nc, .bob
+;>     wIntroBandScrollX[4] += 1
 	inc [hl]
-
-jr_001_7af2:
+.bob
+;>@b wIntroBandScrollY = -mem[IntroSeaBob + ((((hFrameCounter + 0xFC) & 0xFF) >> 4) & 7)] & 0xFF
 	ldh a, [hFrameCounter]
 	add $fc
 	rra
 	rra
 	rra
 	rra
+;=@b
 	and $07
 	ld e, a
 	ld d, $00
-	ld hl, $7abc
+	ld hl, IntroSeaBob
 	add hl, de
 	ld a, $00
+;=@b
 	sub [hl]
 	ld [wIntroBandScrollY], a
+;> return AnimateIntroSeaTiles()   # runs on into it
 
+;@ def AnimateIntroSeaTiles()
+;@ path: title/intro
+;@ In frames 4-15 of every 16, asks the VBlank handler to copy the next quarter of the sea's animated
+;@ tiles (QueueIntroSeaTiles).
+;@ test: skip runs on into another unit
 AnimateIntroSeaTiles::
+;> if hFrameCounter & 0x0F < 4:
 	ldh a, [hFrameCounter]
 	and $0f
 	cp $04
-	jr c, jr_001_7b5e
+;>     return
+	jr c, QueueIntroSeaTiles.done
+;> return QueueIntroSeaTiles()   # runs on into it
 
+;@ def QueueIntroSeaTiles()
+;@ path: title/intro
+;@ Asks the VBlank handler to copy 32 bytes (two tiles) of the sea animation from bank $10: the frame
+;@ from IntroSeaTileOffsets by (hFrameCounter >> 4) & 7, out of IntroSeaTilesA (storm, to $8900) or, when
+;@ wSceneVarF is set, IntroSeaTilesB (beach and title, to $9300); the quarter by hFrameCounter & 3. The
+;@ request is the source address in wSceneTimer / wSceneTimer2 and the target in wSceneTimer3 /
+;@ wSceneSlowTimer (the VBlank handler reads them as two words).
 QueueIntroSeaTiles::
+;>@fr frame = mem[IntroSeaTileOffsets + ((hFrameCounter >> 4) & 7)]
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	rra
 	and $07
+;=@fr
 	ld e, a
 	ld d, $00
-	ld hl, $7ab4
+	ld hl, IntroSeaTileOffsets
 	add hl, de
 	ld e, [hl]
-	ld hl, $7aa4
+;> table = IntroSeaTilesB if wSceneVarF else IntroSeaTilesA
+	ld hl, IntroSeaTilesA
 	ld a, [wSceneVarF]
 	and a
-	jr z, jr_001_7b2d
-
-	ld hl, $7aac
-
-jr_001_7b2d:
+	jr z, .table
+	ld hl, IntroSeaTilesB
+.table
+;> src = mem16[table + frame]
 	add hl, de
 	ld a, [hli]
 	ld h, [hl]
 	ld l, a
+;> dst_high = 0x93 if wSceneVarF else 0x89
 	ld de, $8900
 	ld a, [wSceneVarF]
 	and a
-	jr z, jr_001_7b3d
-
+	jr z, .target
 	ld de, $9300
-
-jr_001_7b3d:
+.target
+;>@q quarter = (hFrameCounter & 3) << 5
 	ldh a, [hFrameCounter]
 	and $03
 	sla a
 	sla a
 	sla a
 	sla a
+;=@q
 	sla a
 	ld e, a
+;> src += quarter
 	add l
 	ld l, a
+;> wSceneTimer = src & 0xFF
 	ld a, l
 	ld [wSceneTimer], a
+;> wSceneTimer2 = src >> 8
 	ld a, h
 	ld [wSceneTimer2], a
+;> wSceneTimer3 = quarter
 	ld a, e
 	ld [wSceneTimer3], a
+;> wSceneSlowTimer = dst_high
 	ld a, d
 	ld [wSceneSlowTimer], a
-
-jr_001_7b5e:
+.done
 	ret
 
 
+;@ def ScrollIntroBeachFast()
+;@ path: title/beach
+;@ Moves the beach's parallax bands while Marin walks: band 0 one pixel every 8 frames, bands 1-3 by
+;@ $50, $58 and $B0 / 256 pixel a frame (fractions in wSceneVar4, wSceneVar5, wSceneVarD); then
+;@ animates the sea tiles.
+;@ test: skip jumps into another unit
 ScrollIntroBeachFast::
+;> if hFrameCounter & 7 == 0:
 	ld hl, wIntroBandScrollX
 	ldh a, [hFrameCounter]
 	and $07
-	jr nz, jr_001_7b69
-
+	jr nz, .band1
+;>     wIntroBandScrollX[0] += 1
 	inc [hl]
-
-jr_001_7b69:
-	ld hl, $c101
+.band1
+;> wSceneVar4 += 0x50
+	ld hl, wIntroBandScrollX + 1
 	ld a, [wSceneVar4]
 	add $50
 	ld [wSceneVar4], a
-	jr nc, jr_001_7b77
-
+;> if wSceneVar4 < 0x50:   # the addition carried
+	jr nc, .band2
+;>     wIntroBandScrollX[1] += 1
 	inc [hl]
-
-jr_001_7b77:
+.band2
+;> wSceneVar5 += 0x58
 	inc hl
 	ld a, [wSceneVar5]
 	add $58
 	ld [wSceneVar5], a
-	jr nc, jr_001_7b83
-
+;> if wSceneVar5 < 0x58:   # the addition carried
+	jr nc, .band3
+;>     wIntroBandScrollX[2] += 1
 	inc [hl]
-
-jr_001_7b83:
+.band3
+;> wSceneVarD += 0xB0
 	inc hl
 	ld a, [wSceneVarD]
 	add $b0
 	ld [wSceneVarD], a
-	jr nc, jr_001_7b8f
-
+;> if wSceneVarD < 0xB0:   # the addition carried
+	jr nc, .sea
+;>     wIntroBandScrollX[3] += 1
 	inc [hl]
-
-jr_001_7b8f:
+.sea
+;> return AnimateIntroSeaTiles()
 	jp AnimateIntroSeaTiles
 
 
+;@ def ScrollIntroBeachSlow()
+;@ path: title/beach
+;@ The slower version of ScrollIntroBeachFast for the second part of the pan: band 0 every 16 frames,
+;@ bands 1-3 by $28, $2C and $58 / 256 pixel a frame; then animates the sea tiles.
+;@ test: skip jumps into another unit
 ScrollIntroBeachSlow::
+;> if hFrameCounter & 0x0F == 0:
 	ld hl, wIntroBandScrollX
 	ldh a, [hFrameCounter]
 	and $0f
-	jr nz, jr_001_7b9c
-
+	jr nz, .band1
+;>     wIntroBandScrollX[0] += 1
 	inc [hl]
-
-jr_001_7b9c:
-	ld hl, $c101
+.band1
+;> wSceneVar4 += 0x28
+	ld hl, wIntroBandScrollX + 1
 	ld a, [wSceneVar4]
 	add $28
 	ld [wSceneVar4], a
-	jr nc, jr_001_7baa
-
+;> if wSceneVar4 < 0x28:   # the addition carried
+	jr nc, .band2
+;>     wIntroBandScrollX[1] += 1
 	inc [hl]
-
-jr_001_7baa:
+.band2
+;> wSceneVar5 += 0x2C
 	inc hl
 	ld a, [wSceneVar5]
 	add $2c
 	ld [wSceneVar5], a
-	jr nc, jr_001_7bb6
-
+;> if wSceneVar5 < 0x2C:   # the addition carried
+	jr nc, .band3
+;>     wIntroBandScrollX[2] += 1
 	inc [hl]
-
-jr_001_7bb6:
+.band3
+;> wSceneVarD += 0x58
 	inc hl
 	ld a, [wSceneVarD]
 	add $58
 	ld [wSceneVarD], a
-	jr nc, jr_001_7bc2
-
+;> if wSceneVarD < 0x58:   # the addition carried
+	jr nc, .sea
+;>     wIntroBandScrollX[3] += 1
 	inc [hl]
-
-jr_001_7bc2:
+.sea
+;> return AnimateIntroSeaTiles()
 	jp AnimateIntroSeaTiles
 
 
-Call_01_7BC5::
+;@ def TileJobInstruments()
+;@ path: menu/inventory
+;@ Background tile job 7 (hNeedsUpdatingBGTiles), run by the VBlank handler one stage per frame
+;@ (hBGTilesLoadingStage): stages 0-7 copy the instrument tiles, 64 bytes each, from bank $0C $4D00 to
+;@ $8D00 (CopyInstrumentTilesStage); stage 8 draws the slots of instruments 1-4 into BG map 1, stage 9
+;@ those of 5-8 and ends the job.
+;@ test: skip runs in VBlank
+TileJobInstruments::
+;> if hBGTilesLoadingStage < 8:
 	ldh a, [hBGTilesLoadingStage]
 	cp $08
-	jp c, Jump_001_7c87
-
-	jr nz, jr_001_7bd6
-
-	call Call_01_7C00
+;>     return CopyInstrumentTilesStage(hBGTilesLoadingStage)
+	jp c, CopyInstrumentTilesStage
+;> if hBGTilesLoadingStage == 8:
+	jr nz, .last
+;>     DrawInstruments1To4()
+	call DrawInstruments1To4
+;>     hBGTilesLoadingStage += 1
 	ld hl, hBGTilesLoadingStage
 	inc [hl]
+;>     return
 	ret
-
-
-jr_001_7bd6:
-	call Call_01_7BFA
+.last
+;> DrawInstruments5To8()
+	call DrawInstruments5To8
+;> hNeedsUpdatingBGTiles = 0
 	xor a
 	ldh [hNeedsUpdatingBGTiles], a
+;> hBGTilesLoadingStage = 0
 	ldh [hBGTilesLoadingStage], a
 	ret
 
 
-	db $0f, $51, $b1, $ef, $ec, $aa, $4a, $0c, $b1, $b2, $b3, $b4, $b5, $b6, $b7, $b8
-	db $d0, $d2, $d4, $d6, $d8, $da, $dc, $de, $01, $1f, $01
+;@ path: menu/inventory
+;@ Low bytes of the BG map 1 addresses ($9Dxx) of the eight instrument slots (8 bytes, the top left tile
+;@ of each 2x2 slot).
+InstrumentSlotAddresses::
+	db $0f, $51, $b1, $ef, $ec, $aa, $4a, $0c
 
-Call_01_7BFA::
+;@ path: menu/inventory
+;@ Tile in the bottom right corner of an empty instrument slot (8 bytes): the numbers 1-8 ($B1-$B8).
+InstrumentNumberTiles::
+	db $b1, $b2, $b3, $b4, $b5, $b6, $b7, $b8
+;@ path: menu/inventory
+;@ Top left tile of each instrument's 2x2 picture (8 bytes); the others are +1, +$10 and +$11.
+InstrumentTiles::
+	db $d0, $d2, $d4, $d6, $d8, $da, $dc, $de
+
+;@ path: menu/inventory
+;@ Steps between the four tiles of a slot in BG map 1 (3 bytes): +1 to the right, +$1F to the next
+;@ row's left tile, +1 to the right.
+InstrumentTileOffsets::
+	db $01, $1f, $01
+
+;@ def DrawInstruments5To8()
+;@ path: menu/inventory
+;@ Draws the slots of instruments 5-8 (the second half of DrawInstruments1To4).
+;@ test: skip jumps into another unit
+DrawInstruments5To8::
+;> end = 8
 	ld c, $08
+;> first = 4
 	ld e, $04
-	jr jr_001_7c04
+;> return DrawInstruments1To4.start(first, end)
+	jr DrawInstruments1To4.start
 
-Call_01_7C00::
+;@ def DrawInstruments1To4()
+;@ path: menu/inventory
+;@ Draws the 2x2 tile slots of instruments 1-4 into BG map 1 ($9Dxx; DrawInstruments5To8 does 5-8): an
+;@ obtained instrument (wDungeonFlags bit 1) shows its picture, a missing one three blank tiles ($7C) and
+;@ its number in the bottom right corner.
+;@ test: skip
+DrawInstruments1To4::
+;> end = 4
 	ld c, $04
+;> first = 0
 	ld e, $00
-
-jr_001_7c04:
+.start
+;> hMultiPurpose9 = end
 	ld a, c
 	ldh [hMultiPurpose9], a
 	ld d, $00
-
-Jump_001_7c09:
+;>@l for i in range(first, end):
+.loop
+;>     hMultiPurpose0 = 0
 	xor a
 	ldh [hMultiPurpose0], a
+;>     hMultiPurpose1 = 0
 	ldh [hMultiPurpose1], a
+;>     hMultiPurpose2 = 0
 	ldh [hMultiPurpose2], a
+;>     hMultiPurpose3 = 0
 	ldh [hMultiPurpose3], a
+;>     if wDungeonFlags[i] & 2 == 0:
 	ld hl, wDungeonFlags
 	add hl, de
 	ld a, [hl]
 	bit 1, a
-	jp nz, Jump_001_7c3a
-
+	jp nz, .owned
+;>@v         vram = 0x9D00 | mem[InstrumentSlotAddresses + i]
 	ld c, $00
 	ld b, c
-	ld hl, $7bdf
+	ld hl, InstrumentSlotAddresses
 	add hl, de
 	ld a, [hl]
 	ld l, a
+;=@v
 	ld h, $9d
 	push hl
+;>         hMultiPurpose0 = 0x7C
 	ld a, $7c
 	ldh [hMultiPurpose0], a
+;>         hMultiPurpose1 = 0x7C
 	ldh [hMultiPurpose1], a
+;>         hMultiPurpose2 = 0x7C
 	ldh [hMultiPurpose2], a
-	ld hl, $7be7
+;>         hMultiPurpose3 = mem[InstrumentNumberTiles + i]
+	ld hl, InstrumentNumberTiles
 	add hl, de
 	ld a, [hl]
 	ldh [hMultiPurpose3], a
 	pop hl
-	jr jr_001_7c58
-
-Jump_001_7c3a:
+	jr .draw
+;>     else:
+.owned
+;>@w         vram = 0x9D00 | mem[InstrumentSlotAddresses + i]
 	ld c, $00
 	ld b, c
-	ld hl, $7bdf
+	ld hl, InstrumentSlotAddresses
 	add hl, de
 	ld a, [hl]
 	ld l, a
+;=@w
 	ld h, $9d
 	push hl
-	ld hl, $7bef
+;>         hMultiPurpose0 = mem[InstrumentTiles + i]
+	ld hl, InstrumentTiles
 	add hl, de
 	ld a, [hl]
 	ldh [hMultiPurpose0], a
+;>         hMultiPurpose1 = mem[InstrumentTiles + i] + 1
 	inc a
 	ldh [hMultiPurpose1], a
+;>         hMultiPurpose2 = mem[InstrumentTiles + i] + 0x10
 	add $0f
 	ldh [hMultiPurpose2], a
+;>         hMultiPurpose3 = mem[InstrumentTiles + i] + 0x11
 	inc a
 	ldh [hMultiPurpose3], a
 	pop hl
-
-jr_001_7c58:
+.draw
+;>     mem[vram] = hMultiPurpose0
 	ldh a, [hMultiPurpose0]
 	ld [hl], a
-	call Call_01_7C79
+;>     mem[vram + 1] = hMultiPurpose1
+	call NextInstrumentTile
 	ldh a, [hMultiPurpose1]
 	ld [hl], a
+;>     mem[vram + 0x20] = hMultiPurpose2
 	inc c
-	call Call_01_7C79
+	call NextInstrumentTile
 	ldh a, [hMultiPurpose2]
 	ld [hl], a
+;>     mem[vram + 0x21] = hMultiPurpose3
 	inc c
-	call Call_01_7C79
+	call NextInstrumentTile
 	ldh a, [hMultiPurpose3]
 	ld [hl], a
+;=@l
 	inc e
 	ld a, e
 	ld hl, hMultiPurpose9
 	cp [hl]
-	jp nz, Jump_001_7c09
-
+	jp nz, .loop
 	ret
 
 
-Call_01_7C79::
+;@ def NextInstrumentTile(vram: hl, step: bc) -> hl
+;@ path: menu/inventory
+;@ Moves `vram` to the next tile of an instrument slot: + InstrumentTileOffsets[step].
+;@ test: step = rand(0, 2)
+NextInstrumentTile::
+;>@r return (vram + mem[InstrumentTileOffsets + step]) & 0xFFFF
 	push hl
-	ld hl, $7bf7
+	ld hl, InstrumentTileOffsets
 	add hl, bc
 	ld a, [hl]
 	pop hl
 	add l
+;=@r
 	ld l, a
 	ld a, h
 	adc $00
@@ -10439,162 +10653,219 @@ Call_01_7C79::
 	ret
 
 
-Jump_001_7c87:
+;@ def CopyInstrumentTilesStage(stage: a)
+;@ path: menu/inventory
+;@ Stage 0-7 of the instrument tile job: copies 64 bytes (4 tiles) from bank $0C $4D00 + 64 * stage to
+;@ $8D00 + 64 * stage, then counts the stage.
+;@ test: skip switches ROM banks
+CopyInstrumentTilesStage::
+;>@o offset = stage * 64
 	ld c, a
 	ld b, $00
 	sla c
 	rl b
 	sla c
 	rl b
+;=@o
 	sla c
 	rl b
 	sla c
 	rl b
 	sla c
 	rl b
+;=@o
 	sla c
 	rl b
+;>@c CopyTilesFromBank0C(0x4D00 + offset, 0x8D00 + offset)
 	ld hl, $8d00
 	add hl, bc
 	push hl
 	pop de
 	ld hl, $4d00
 	add hl, bc
+;=@c
 	call CopyTilesFromBank0C
+;> hBGTilesLoadingStage += 1
 	ldh a, [hBGTilesLoadingStage]
 	inc a
 	ldh [hBGTilesLoadingStage], a
 	ret
 
 
+;@ path: world/rooms
+;@ The border of the room object area (41 bytes: 40 indexes into wRoomObjectsArea, $FF ends): row 0
+;@ columns 0-$0B, columns 0 and $0B of rows 1-8, and row 9 columns 0-$0B.
+RoomBorderObjects::
 	db $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $0a, $0b, $10, $1b, $20, $2b
 	db $30, $3b, $40, $4b, $50, $5b, $60, $6b, $70, $7b, $80, $8b, $90, $91, $92, $93
 	db $94, $95, $96, $97, $98, $99, $9a, $9b, $ff
 
-Call_01_7CDE::
-	ld bc, $7cb5
-
-jr_001_7ce1:
+;@ def FillRoomObjectsBorder()
+;@ path: world/rooms
+;@ Sets the border around the room's objects in wRoomObjectsArea to $FF (RoomBorderObjects), the end of
+;@ tile set request 1 (drawing a room).
+;@ test: skip walks a list
+FillRoomObjectsBorder::
+;>@l for index in RoomBorderObjects:  # up to the 0xFF
+	ld bc, RoomBorderObjects
+.loop
 	ld a, [bc]
 	cp $ff
-	jr z, jr_001_7cf2
-
+	jr z, .done
+;>     wRoomObjectsArea[index] = 0xFF
 	ld e, a
 	ld d, $00
 	ld hl, wRoomObjectsArea
 	add hl, de
 	ld [hl], $ff
+;=@l
 	inc bc
-	jr jr_001_7ce1
-
-jr_001_7cf2:
+	jr .loop
+.done
 	ret
 
 
-Call_01_7CF3::
+;@ def FillBGCheckerboard()
+;@ path: gfx/bg
+;@ Fills the first 20 columns of BG map 0 ($9800-$9BFF) with a checkerboard of the tiles $AE and $AF;
+;@ the columns 20-31 are left alone.
+;@ test: skip writes VRAM
+FillBGCheckerboard::
+;>@l for vram in range(0x9800, 0x9C00):
 	ld bc, $0400
 	ld hl, $9800
-
-jr_001_7cf9:
+.loop
+;>@t     tile = 0xAE + ((vram & 1) ^ ((vram >> 5) & 1))
 	ld e, $00
 	ld a, l
 	and $20
-	jr z, jr_001_7d01
-
+	jr z, .even
 	inc e
-
-jr_001_7d01:
+.even
 	ld d, $ae
+;=@t
 	ld a, l
 	and $01
 	xor e
-	jr z, jr_001_7d0a
-
+	jr z, .write
 	inc d
-
-jr_001_7d0a:
+.write
+;>     if vram & 0x1F < 0x14:
 	ld a, l
 	and $1f
 	cp $14
-	jr nc, jr_001_7d12
-
+	jr nc, .next
+;>         mem[vram] = tile
 	ld [hl], d
-
-jr_001_7d12:
+.next
+;=@l
 	inc hl
 	dec bc
 	ld a, b
 	or c
-	jr nz, jr_001_7cf9
-
+	jr nz, .loop
 	ret
 
 
+;@ def CopyDMARoutine()
+;@ path: system/oam
+;@ Copies the OAM DMA routine (DMARoutine, 10 bytes) to HRAM at $FFC0, from where the VBlank handler runs
+;@ it (during an OAM DMA the CPU can only run code in HRAM).
+;@ test: skip writes HRAM code
 CopyDMARoutine::
+;>@l for i in range(10):
 	ld c, $c0
 	ld b, $0a
-	ld hl, $7d27
-
-jr_001_7d20:
+	ld hl, DMARoutine
+.loop
+;>     mem[0xFFC0 + i] = mem[DMARoutine + i]
 	ld a, [hli]
 	ldh [c], a
 	inc c
+;=@l
 	dec b
-	jr nz, jr_001_7d20
-
+	jr nz, .loop
 	ret
 
 
+;@ def DMARoutine()
+;@ path: system/oam
+;@ The OAM DMA routine, run from its copy at $FFC0 (CopyDMARoutine): starts the copy of the OAM buffer
+;@ ($C000) to OAM and waits until it is done ($28 loops = 160 cycles). Never run from here.
+;@ test: skip runs from HRAM
 DMARoutine::
-	db $3e, $c0, $e0, $46, $3e, $28, $3d, $20, $fd, $c9
+;> rDMA = 0xC0
+	ld a, $c0
+	ldh [rDMA], a
+;> for i in range(0x28): pass   # wait for the DMA
+	ld a, $28
+.wait
+	dec a
+	jr nz, .wait
+	ret
 
-UnusedDiagonalTiles::
-	db $80, $80, $40, $40, $20, $20
-	db $10, $10, $08, $08, $04, $04, $02, $02, $01, $01, $00, $00, $00, $00, $00, $00
-	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $80, $80, $40, $40, $20, $20
-	db $10, $10, $08, $08, $04, $04, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $80, $80, $40, $40, $20, $20
-	db $10, $10, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $80, $80, $40, $40, $20, $20
-	db $10, $10, $08, $08, $04, $04, $02, $02, $01, $01, $00, $00, $00, $00, $00, $00
-	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+;@ path: title/storm
+;@ The 8 sprite tiles of the rain in the storm (2bpp, 128 bytes): thin diagonal streaks of different
+;@ lengths. Tile set request $10 copies them to $8700 (tiles $70-$77, see DrawIntroRain).
+IntroRainTiles::
+	db $80, $80, $40, $40, $20, $20, $10, $10, $08, $08, $04, $04, $02, $02, $01, $01
+	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+	db $80, $80, $40, $40, $20, $20, $10, $10, $08, $08, $04, $04, $00, $00, $00, $00
+	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+	db $80, $80, $40, $40, $20, $20, $10, $10, $00, $00, $00, $00, $00, $00, $00, $00
+	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+	db $80, $80, $40, $40, $20, $20, $10, $10, $08, $08, $04, $04, $02, $02, $01, $01
+	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
+;@ path: menu/worldmap
+;@ For each dungeon (indoor maps 0-7): an address in BG map 1 (8 dw), used by DisabledDungeonMarker.
 DungeonMarkerAddresses::
-	db $2d, $9e, $2c, $9e, $2b, $9e
-	db $2d, $9e, $31, $9e, $2d, $9e, $2b, $9e, $2d, $9e
+	dw $9e2d, $9e2c, $9e2b, $9e2d, $9e31, $9e2d, $9e2b, $9e2d
 
-UnusedMarkDungeonOnMap::
+;@ def DisabledDungeonMarker()
+;@ path: menu/worldmap
+;@ Runs at the end of tile set request 1 (drawing a room), but is switched off: it returns at once
+;@ because the ROM byte at $0004 is not 0. Otherwise, inside a dungeon (indoor maps 0-7), it would put
+;@ tile $A3 ($7F in a side-scrolling room) at that dungeon's DungeonMarkerAddresses entry in BG map 1.
+;@ test: skip reads the ROM
+DisabledDungeonMarker::
+;> if mem[0x0004]:
 	ld a, [$0004]
 	and a
+;>     return
 	ret nz
-
+;> if wIsIndoor and hMapId < 8:
 	ld a, [wIsIndoor]
 	and a
-	jr z, jr_001_7de7
-
+	jr z, .done
 	ldh a, [hMapId]
 	cp $08
-	jr nc, jr_001_7de7
-
+	jr nc, .done
+;>@a     vram = mem16[DungeonMarkerAddresses + 2 * hMapId]
 	sla a
 	ld e, a
 	ld d, $00
-	ld hl, $7db1
+	ld hl, DungeonMarkerAddresses
 	add hl, de
 	ld a, [hli]
+;=@a
 	ld h, [hl]
 	ld l, a
+;>     mem[vram] = 0xA3
 	ld [hl], $a3
+;>     if hIsSideScrolling:
 	ldh a, [hIsSideScrolling]
 	and a
-	jr z, jr_001_7de7
-
+	jr z, .done
+;>         mem[vram] = 0x7F
 	ld [hl], $7f
-
-jr_001_7de7:
+.done
 	ret
 
 
+;@ path: menu/worldmap
+;@ The world map screen: one BG tile per overworld room, 16 rows of 16 (256 bytes, by room number). Rooms
+;@ not visited yet show tile $2C instead (DrawWorldMapRooms).
 WorldMapTilemap::
 	db $27, $6a, $6c, $21, $22, $23, $24, $25, $26, $6a, $ff, $6c, $6a, $6c, $6a, $6c
 	db $65, $65, $66, $31, $32, $33, $34, $35, $36, $67, $68, $64, $67, $69, $65, $66
@@ -10613,67 +10884,93 @@ WorldMapTilemap::
 	db $fd, $fd, $fd, $ff, $fd, $fd, $fb, $fb, $48, $fe, $4a, $fa, $56, $57, $54, $54
 	db $03, $12, $13, $12, $13, $02, $ff, $fb, $5c, $2b, $fa, $fa, $fa, $fa, $54, $54
 
-Call_01_7EE8::
+;@ def DrawWorldMapRooms()
+;@ path: menu/worldmap
+;@ Tile set request $0E: writes the 256 rooms of the world map screen into BG map 0 from $9822, 16 tiles
+;@ per row: a room's tile from WorldMapTilemap once it has been visited (wRoomStatus bit 7) - or always
+;@ when a library book opened the map or in the ending (wGameplayType 1) - and tile $2C otherwise.
+;@ test: skip writes VRAM
+DrawWorldMapRooms::
+;> vram = 0x9822
 	ld de, $9822
 	ld bc, $0000
-
-jr_001_7eee:
+;>@l for room in range(256):
+.loop
+;>@s     tile = mem[WorldMapTilemap + room] if wMapScreenFromBook or wGameplayType == 1 or wRoomStatus[room] & 0x80 else 0x2C
 	ld a, [wMapScreenFromBook]
 	and a
-	jr nz, jr_001_7f06
-
+	jr nz, .shown
 	ld a, [wGameplayType]
 	cp $01
-	jr z, jr_001_7f06
-
+	jr z, .shown
+;=@s
 	ld hl, wRoomStatus
 	add hl, bc
 	ld a, [hl]
 	and $80
 	ld a, $2c
-	jr z, jr_001_7f0b
-
-jr_001_7f06:
-	ld hl, $7de8
+	jr z, .store
+.shown
+;=@s
+	ld hl, WorldMapTilemap
 	add hl, bc
 	ld a, [hl]
-
-jr_001_7f0b:
+.store
+;>     mem[vram] = tile
 	ld [de], a
+;>     if room == 255:
 	inc c
-	jr z, jr_001_7f23
-
+	jr z, .done
+;>         break
+;>@v     vram = vram + 1 if (vram + 1) & 0x1F != 0x12 else ((vram + 1) & 0xFFE0) + 0x22
 	inc e
 	ld a, e
 	and $1f
 	cp $12
-	jr nz, jr_001_7f21
-
+	jr nz, .next
 	ld a, e
+;=@v
 	and $e0
 	add $22
 	ld e, a
 	ld a, d
 	adc $00
 	ld d, a
-
-jr_001_7f21:
-	jr jr_001_7eee
-
-jr_001_7f23:
+.next
+;=@l
+	jr .loop
+.done
 	ret
 
 
+;@ path: unused
+;@ Four tiles (2bpp, 64 bytes) that nothing reads.
+UnusedTiles7F24::
 	db $0f, $00, $1f, $00, $3f, $00, $3f, $11, $3f, $1f, $3f, $1f, $3f, $19, $3f, $11
 	db $3f, $03, $ff, $1f, $ff, $40, $ff, $4a, $ff, $51, $ff, $5f, $fe, $5f, $7e, $1f
 	db $3e, $1f, $3c, $1f, $3f, $1f, $3f, $1f, $3f, $1f, $3f, $1f, $3a, $1d, $39, $17
 	db $33, $1f, $3b, $16, $39, $1f, $1c, $0b, $0f, $05, $07, $03, $03, $00, $00, $00
+;@ path: gfx/tilesets
+;@ Indoor tile pages, one byte per indoor map ($00-$1F, 32 bytes): the high byte of the $100-byte page in
+;@ bank $0D that LoadTileset06 copies to $9100 (0 for maps that have none).
+IndoorTilePages9100::
 	db $4c, $62, $63, $66, $6b, $63, $65, $64, $60, $4c, $4d, $4c, $4c, $4c, $4e, $4e
 	db $4e, $4d, $4d, $4f, $61, $63, $63, $00, $00, $00, $00, $00, $00, $4e, $4e, $4d
+;@ path: gfx/tilesets
+;@ Indoor tile pages, one byte per indoor map (32 bytes): the high byte of the $200-byte block in bank
+;@ $0D that LoadTileset06 copies to $9200.
+IndoorTilePages9200::
 	db $40, $40, $6c, $40, $40, $6c, $40, $6e, $4a, $40, $46, $40, $40, $40, $48, $48
 	db $48, $46, $48, $4a, $40, $46, $6c, $00, $00, $00, $00, $00, $00, $48, $48, $46
+;@ path: gfx/tilesets
+;@ Indoor tile pages, one byte per indoor map (32 bytes): the high byte of the $100-byte page in bank
+;@ $12 that LoadTileset06 copies to $8F00.
+IndoorTilePages8F00::
 	db $79, $79, $77, $79, $79, $77, $78, $79, $79, $63, $7a, $00, $00, $00, $7b, $7b
 	db $7b, $7a, $7b, $79, $7c, $7a, $77, $00, $00, $00, $00, $00, $00, $7c, $7b, $7a
+;@ path: unused
+;@ Free space at the end of bank 1 (60 bytes of $FF).
+Bank01FreeSpace::
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff

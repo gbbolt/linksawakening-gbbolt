@@ -1326,7 +1326,7 @@ jr_005_4508:
 jr_005_4511:
 	ld e, $00
 
-;@ def SetTwoFrameSpriteVariant_05(base: e)
+;@ def SetTwoFrameSpriteVariant_05(slot: bc, base: e)
 ;@ path: entity/sprite
 ;@ Sets the entity's sprite variant to base or base + 1, switching every 8 frames (a two-frame
 ;@ walking animation).
@@ -4348,7 +4348,7 @@ jr_005_51ee:
 	add hl, de
 	ld a, [hl]
 
-;@ def DrawLinkInBed(variant: a)
+;@ def DrawLinkInBed(slot: bc, variant: a)
 ;@ path: npc/marin
 ;@ Draws Link lying in the bed at (x $38, y $34) with the given LinkInBedSprites variant; Link is held
 ;@ there and his own sprite is hidden.
@@ -4878,7 +4878,7 @@ RaftRideState::
 jr_005_5407:
 	jr jr_005_53c9
 
-;@ def MakeEntitySolid_05()
+;@ def MakeEntitySolid_05(slot: bc)
 ;@ path: entity/collision
 ;@ Makes the active entity a solid obstacle: if Link touches it he is put back where he was this
 ;@ frame (and a Pegasus Boots dash ends), and a hookshot chain that reached it goes back to its
@@ -4954,7 +4954,7 @@ AnimateNpcFacing_05::
 	jp SetEntitySpriteVariant
 
 
-;@ def ShouldLinkTalkToEntity_05() -> carry
+;@ def ShouldLinkTalkToEntity_05(slot: bc) -> carry
 ;@ path: npc/talk
 ;@ Whether Link talks to the active character now: he must stand within 20 pixels above / below and
 ;@ 16 pixels beside it and face it (any facing for BowWow, type $6D); then wCanTalkToEntity is set
@@ -5135,7 +5135,7 @@ AnglerFishDeathExplode::
 	cp $80
 	jr nc, jr_005_54f1
 
-;>     BossExplosionPuffs_05()                    # explosions
+;>     BossExplosionPuffs_05(t)                   # explosions
 	call BossExplosionPuffs_05
 
 jr_005_54f1:
@@ -5858,14 +5858,14 @@ jr_005_5918:
 
 
 ;@ path: gfx/tiles
-;@ Two background tiles (2 bits per pixel) for a background change: the routine at LoadBGChangeTilesA
+;@ Two background tiles (2 bits per pixel) for a background change: the routine at Jump_000_3fbd
 ;@ copies the first to $8460 and the second to $8480 (BGChangeTilesB is the other form).
 ;@ asset: tiles bpp=2 length=$20
 BGChangeTilesA::
 	db $07, $00, $0f, $07, $1e, $0f, $3f, $18, $3f, $10, $3f, $14, $3f, $10, $27, $1b
 	db $e0, $00, $f0, $e0, $18, $f0, $8c, $78, $8c, $70, $3f, $c0, $ff, $3e, $ef, $f1
 ;@ path: gfx/tiles
-;@ The other form of the two tiles at $8460 / $8480, copied by LoadBGChangeTilesB.
+;@ The other form of the two tiles at $8460 / $8480, copied by Jump_000_3fd3.
 ;@ asset: tiles bpp=2 length=$20
 BGChangeTilesB::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $03, $00, $07, $03
@@ -6196,7 +6196,7 @@ GrimCreeperGoneState::
 GrimCreeperSprites::
 	db $7e, $00, $7e, $20,  $7e, $40, $7e, $60
 
-;@ def DrawGrimCreeper()
+;@ def DrawGrimCreeper(slot: bc)
 ;@ path: boss/evil_eagle
 ;@ Draws the Grim Creeper (GrimCreeperSprites).
 DrawGrimCreeper::
@@ -6386,7 +6386,7 @@ EvilEagleTurnState::
 	ld [hl], $80
 ;> EvilEagleScreech()                     # runs on into it
 
-;@ def EvilEagleScreech()
+;@ def EvilEagleScreech(slot: bc)
 ;@ path: boss/evil_eagle
 ;@ The Evil Eagle's screech (noise effect $22).
 EvilEagleScreech::
@@ -7660,12 +7660,12 @@ GrimCreeperBatStates::
 ;@ path: boss/evil_eagle
 ;@ State 0: the bat hovers in place, jittering a pixel on y and on x (BatJitter, y with a phase of 7).
 BatHoverState::
-;> BatJitter(wEntityY + slot, 7)
+;> BatJitter(wEntityY + slot, 7, slot)
 	ld hl, wEntityY
 	add hl, bc
 	ld e, $07
 	call BatJitter
-;> BatJitter(wEntityX + slot, 0)          # runs on into it
+;> BatJitter(wEntityX + slot, 0, slot)        # runs on into it
 	ld hl, wEntityX
 	add hl, bc
 	ld e, $00
@@ -10828,7 +10828,7 @@ jr_005_70ba:
 ;> DrawSlimeEelSegment(0, table, i)      # runs on into it
 	ld a, $00
 
-;@ def DrawSlimeEelSegment(frame: a, table: hl, i: de)
+;@ def DrawSlimeEelSegment(slot: bc, frame: a, table: hl, i: de)
 ;@ path: boss/slime_eel
 ;@ Draws a tail segment (SlimeEelSegmentSprites frame) at angle i of the circle table around the
 ;@ middle ($50, $48). Link touching it (within 8 pixels, while walking normally) is bounced back,
@@ -10836,12 +10836,12 @@ jr_005_70ba:
 DrawSlimeEelSegment::
 ;> hActiveEntitySpriteVariant = frame
 	ldh [hActiveEntitySpriteVariant], a
-;> hActiveEntityDrawY = (0x48 + table[i]) & 0xFF
+;> hActiveEntityDrawY = (0x48 + mem[table + i]) & 0xFF
 	add hl, de
 	ld a, $48
 	add [hl]
 	ldh [hActiveEntityDrawY], a
-;>@x hActiveEntityX = (0x50 + table[i + 8]) & 0xFF
+;>@x hActiveEntityX = (0x50 + mem[table + i + 8]) & 0xFF
 	ld a, l
 	add $08
 	ld l, a
@@ -10910,7 +10910,7 @@ SlimeEelSegmentSprites::
 	db $70, $00, $70, $20, $72, $00, $72, $20, $74, $00, $74, $20, $7c, $00, $7c, $20
 	db $7e, $00, $7e, $20
 
-;@ def DrawSlimeEelSegmentSprite()
+;@ def DrawSlimeEelSegmentSprite(slot: bc)
 ;@ path: boss/slime_eel
 ;@ Draws a SlimeEelSegmentSprites frame at the active position.
 DrawSlimeEelSegmentSprite::
@@ -12324,7 +12324,7 @@ UpdateEntityPosWithSpeed_05::
 ;@ Moves the entity by its y speed: the y arrays lie $10 bytes after the x arrays, so this runs
 ;@ AddEntitySpeedToPosX_05 with slot + $10.
 AddEntitySpeedToPosY_05::
-;> AddEntitySpeedToPosX_05(slot, slot + 0x10)
+;> AddEntitySpeedToPosX_05(slot + 0x10)
 	push bc
 	ld a, c
 	add $10
@@ -12542,7 +12542,7 @@ GohmaDashSpeedX::
 	db $18, $e8
 
 ;@ path: boss/gohma
-;@ Gohma, 48x16: 6 Call_3D26 lists of 6 sprites (dy, dx, tile, attr; dx -$10 to +$18): a claw on
+;@ Gohma, 48x16: 6 DrawEntitySprites lists of 6 sprites (dy, dx, tile, attr; dx -$10 to +$18): a claw on
 ;@ each side and the eye in the middle. Frames 0-2 walk with the eye shut (tile $60), 3-5 the same
 ;@ claw poses with the eye open ($62). Claws: frame 0/3 $64, $66 (right claw $6A, $68 mirrored),
 ;@ 1/4 $6C, $6E (mirrored), 2/5 $68, $6A (right $66, $64 mirrored).
@@ -12918,7 +12918,7 @@ GohmaShowStep:
 	add hl, bc
 	ld a, [hl]
 
-;@ def GohmaShowFrame(f: a)
+;@ def GohmaShowFrame(slot: bc, f: a)
 ;@ path: boss/gohma
 ;@ Sets Gohma's frame.
 GohmaShowFrame::

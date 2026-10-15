@@ -3262,7 +3262,7 @@ MadBatterCurse::
 ;>     return
 	ret nz
 
-;> ClearEntitySpeed()                    # speeds to 0
+;> ClearEntitySpeed(slot)                    # speeds to 0
 	call ClearEntitySpeed
 ;> MadBatterOpenDialog(0xE5)
 	ld a, $e5
@@ -5846,7 +5846,7 @@ MarinFollowUpdate::
 .normal
 ;> if wIsMarinInAnimalVillage or mem[0xC1BC]:
 	ld a, [wIsMarinInAnimalVillage]
-	ld hl, $c1bc
+	ld hl, wScriptedWarpTimer
 	or [hl]
 ;>     return
 	ret nz
@@ -8066,7 +8066,7 @@ ZombieSink::
 ;@ the y high nibble, column from the x high nibble). Leaves x - 1 / y - 7 in hMultiPurpose4/5,
 ;@ the square's pixel position in hBGPosX/hBGPosY, the object in hRoomObjectType and its physics
 ;@ type (GetObjectPhysics) in hMultiPurpose3 and a.
-;@ test: slot = rand(0, 15)
+;@ test: skip GetObjectPhysics reads its table from another bank
 GetObjectUnderEntity_18::
 ;> x = (wEntityX[slot] - 1) & 0xFF
 	push bc
@@ -8225,7 +8225,7 @@ BlainoEntityHandler::
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], b
-;>     ClearEntitySpeed()                # x and y speed to 0
+;>     ClearEntitySpeed(slot)                # x and y speed to 0
 	call ClearEntitySpeed
 
 .attack
@@ -9156,7 +9156,7 @@ VireInit::
 	ld hl, wEntityDropTimer
 	add hl, bc
 	ld [hl], $80
-;> ClearEntitySpeed()                    # x and y speed to 0
+;> ClearEntitySpeed(slot)                    # x and y speed to 0
 	call ClearEntitySpeed
 ;> wEntitySpeedX[slot] = 8
 	ld hl, wEntitySpeedX
@@ -9651,7 +9651,7 @@ VireTouchLink::
 	and a
 	jr z, .dodge
 
-;>     ClearEntitySpeed()                # x and y speed to 0
+;>     ClearEntitySpeed(slot)                # x and y speed to 0
 	call ClearEntitySpeed
 ;>     wEntityPrivate2[slot] = 0xFF
 	ld hl, wEntityPrivate2
@@ -9672,7 +9672,7 @@ VireTouchLink::
 ;@ Vire stops: x, y and Z speed 0.
 ;@ test: slot = rand(0, 15)
 VireStop::
-;> ClearEntitySpeed()                    # x and y speed to 0
+;> ClearEntitySpeed(slot)                    # x and y speed to 0
 	call ClearEntitySpeed
 ;> wEntitySpeedZ[slot] = 0
 	ld hl, wEntitySpeedZ
@@ -10361,7 +10361,7 @@ VireBatWait::
 
 ;>     wEntityTimer[slot] = 0x20
 	ld [hl], $20
-;>     ClearEntitySpeed()                # x and y speed to 0
+;>     ClearEntitySpeed(slot)                # x and y speed to 0
 	call ClearEntitySpeed
 ;>     IncrementEntityState(slot)
 	call IncrementEntityState
@@ -12483,7 +12483,7 @@ BomberFly::
 ;>     wEntityState[slot] = 0
 	call IncrementEntityState
 	ld [hl], b
-;>     ClearEntitySpeed()                # x and y speed to 0
+;>     ClearEntitySpeed(slot)                # x and y speed to 0
 	call ClearEntitySpeed
 
 .act
@@ -13321,7 +13321,7 @@ DirectionSpriteVariants_18::
 ;@ path: entity/helpers
 ;@ Walking animation of a character: the sprite variant is the first frame of its facing direction
 ;@ (DirectionSpriteVariants_18) plus 0 or 1, switching every 16 frames of its own counter.
-;@ test: slot = rand(0, 15); wEntityDirection[slot] = rand(0, 3)
+;@ test: skip reads a ROM table
 AnimateEntityByDirection_18::
 ;> dir = wEntityDirection[slot]
 	ld hl, wEntityDirection

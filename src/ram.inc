@@ -637,3 +637,30 @@ DEF wKillsWithoutHit EQU $D471 ;@ u8 Enemies defeated since Link was last hurt; 
 DEF wPowerUpHits EQU $D47A ;@ u8 Hits Link took while a power-up is active; the third one ends it
 DEF wScrollingFloorCount EQU $C1A5 ;@ u8 Number of scrolling-floor objects ($CF-$D2) in the room, counted while it loads; while nonzero the four floor tiles in the RAM buffer at $DCC0 scroll (AnimateScrollingFloorTiles)
 DEF hSwordClashCooldown EQU $FFB6 ;@ u8 Frames until the sword can clash with an entity's weapon again ($0C after a clash)
+DEF wRoomHasTorches EQU $C3CB ;@ u8 Set (to the torch object $AB) in a room with unlit torches: the room is drawn as dark as wRoomDarkness says
+DEF wRoomDarknessShown EQU $C3CC ;@ u8 Darkness a torch room is drawn with now: moves one step every 2 frames towards wRoomDarkness and picks the palette
+DEF wRoomDarkPalette EQU $C5AD ;@ u8 Background palette of the torch room this frame (set again after a room transition)
+DEF wEntityWallObjectX EQU $C503 ;@ u8 Room object that stopped the current entity's x move this frame (0 = none)
+DEF wEntityWallObjectY EQU $C50D ;@ u8 Room object that stopped the current entity's y move this frame (0 = none)
+DEF wEntityLedgeCredit EQU $C4F0 ;@ u8[16] Nonzero while the entity may cross ledges (physics $D0-$D3); Link's projectiles start with 1, it counts while crossing
+DEF wEntityLedgeDirection EQU $C5D0 ;@ u8[16] Ledge kind (0-3) the entity may cross while in the air ($FF = none)
+DEF wItemButtonsDisabled EQU $C50A ;@ u8 Nonzero in the shop and at the Trendy Game: Link cannot use his items (the shop owner sets 1 and draws the shelf prices while it is 0; cleared when a room loads and after the thief's punishment)
+DEF wShopShelfItems EQU $C505 ;@ u8[4] Shop item on each of the four shelf places (1 shovel, 2 three hearts, 3 shield, 4 ten bombs, 5 bow, 6 ten arrows; 0 = empty)
+DEF wShopCarriedShelf EQU $C50B ;@ u8 Shelf place (0-3) of the shop item Link carries
+DEF wShopPunishThief EQU $DB46 ;@ u8 Nonzero after Link stole from the shop: on his next visit the shop owner strikes him down (cleared when he has died)
+DEF wScriptedWarpTimer EQU $C1BC ;@ u8 Frames until a scripted warp starts (counts down while no dialogue is open; Link cannot move meanwhile)
+DEF wEntityScratch3 EQU $D203 ;@ u8 Shared entity variable at $D203 (the Trendy Game: palette of the crane's second button, $10 = lit)
+DEF wEntityScratch6 EQU $D206 ;@ u8 Shared entity variable at $D206 (the Trendy Game: how far the crane's cable is let down)
+DEF wMasterStalfosSwordFrame EQU $D207 ;@ u8 Master Stalfos: frame of his sword sprite (0-3; $FF = not drawn, during the stroke)
+DEF wMasterStalfosTorsoFrame EQU $D208 ;@ u8 Master Stalfos: frame of his torso (0 or 1 = mirrored)
+DEF wMasterStalfosLegsFrame EQU $D209 ;@ u8 Master Stalfos: frame of his legs (0 or 1, the walking step)
+DEF wMasterStalfosShieldX EQU $D20A ;@ u8 Master Stalfos: x offset of his shield (signed)
+DEF wMasterStalfosShieldY EQU $D20B ;@ u8 Master Stalfos: y offset of his shield (signed)
+DEF wMasterStalfosSwordX EQU $D20C ;@ u8 Master Stalfos: x offset of his sword (signed)
+DEF wMasterStalfosSwordY EQU $D20D ;@ u8 Master Stalfos: y offset of his sword (signed)
+DEF wMasterStalfosTorsoY EQU $D20E ;@ u8 Master Stalfos: y offset of his torso above the legs (signed; $F0 standing, 0 = collapsed, legs hidden)
+DEF wMasterStalfosLegsY EQU $D20F ;@ u8 Master Stalfos: y offset of his legs (never set, 0)
+DEF wCrackedFloorTimer EQU $C1C9 ;@ u8 Frames Link has stood still on a cracked floor square (it gives way at $28)
+DEF wMazeRoomStep EQU $C5AA ;@ u8 Steps of the Face Shrine maze path walked so far (0-7; reset on a wrong step)
+DEF wElectricShockTimer EQU $D464 ;@ u8 Frames of an electric shock (a Buzz Blob hit with the sword, $40): the screen flashes and shakes and Link is held
+DEF wOwlSlot EQU $C501 ;@ u8 Entity slot of the owl in the current room (set by its handler); opening a chest with content $11 sets its wEntityTimer1 to $38, so the owl waits until the item pose is over

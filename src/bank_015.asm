@@ -5,14 +5,14 @@
 
 SECTION "ROM Bank $015", ROMX[$4000], BANK[$15]
 
-;@ def ResetEntityVariables(slot: c)
+;@ def ResetEntityVariables(slot: bc)
 ;@ path: entity/engine
 ;@ Clears every per-entity variable of `slot` (speeds and their fractions, state, private
 ;@ variables, timers, height, direction, sprite variant, health, flags) so a freshly spawned entity
 ;@ starts clean; $C5D0 gets $FF. Called through bank 0 when an entity is created.
 ;@ test: slot = rand(0, 15)
 ResetEntityVariables::
-;> ClearEntitySpeed()                                # x and y speed = 0
+;> ClearEntitySpeed(slot)                              # x and y speed = 0
 	call ClearEntitySpeed
 ;> for array in (wEntitySpeedZAcc, wEntitySpeedXAcc, wEntitySpeedYAcc, wEntitySpeedZ, wEntityState,
 ;>               wEntityCollisions, wEntityPrivate1, wEntityPrivate2, wEntityPrivate3, wEntityPrivate4,
@@ -81,7 +81,7 @@ ResetEntityVariables::
 	ld hl, wEntityDirection
 	add hl, bc
 	ld [hl], b
-;> SetEntitySpriteVariant(0)                               # sprite variant 0
+;> SetEntitySpriteVariant(slot, 0)                         # sprite variant 0
 	xor a
 	call SetEntitySpriteVariant
 ;> for array in (wEntityPrivateCounter, wEntityHealth, wEntityIgnoreHitsTimer, wEntityPosXHigh,
@@ -118,7 +118,7 @@ ResetEntityVariables::
 	ld hl, wEntityDyingTimer
 	add hl, bc
 	ld [hl], b
-;> mem[0xC490 + slot] = 0
+;> wEntityLiftStep[slot] = 0
 	ld hl, $c490
 	add hl, bc
 	ld [hl], b
@@ -130,12 +130,12 @@ ResetEntityVariables::
 	ld hl, wEntityDropType
 	add hl, bc
 	ld [hl], b
-;> mem[0xC4F0 + slot] = 0
-	ld hl, $c4f0
+;> wEntityLedgeCredit[slot] = 0
+	ld hl, wEntityLedgeCredit
 	add hl, bc
 	ld [hl], b
-;> mem[0xC5D0 + slot] = 0xFF
-	ld hl, $c5d0
+;> wEntityLedgeDirection[slot] = 0xFF
+	ld hl, wEntityLedgeDirection
 	add hl, bc
 	ld [hl], $ff
 	ret
@@ -1156,7 +1156,7 @@ TalkingBonesHandler::
 	jr z, .talk
 ;>         text = 0x92
 ;>     else:
-;>         if mem[0xDB79]: return
+;>         if wIsGhostFollowingLink: return
 	ld a, [wIsGhostFollowingLink]
 	and a
 	ret nz
@@ -1806,7 +1806,7 @@ MoblinKingInit::
 	call IncrementEntityState
 ;> MoblinKingFaceLink(slot)                   # falls through
 
-;@ def MoblinKingFaceLink(slot: c)
+;@ def MoblinKingFaceLink(slot: bc)
 ;@ path: boss/moblin_king
 ;@ Turns the Moblin King towards Link (wMoblinKingFacing and his direction: 0 right, 1 left).
 ;@ test: slot = rand(0, 15)
@@ -3617,7 +3617,7 @@ FinalNightmareFormTilesets::
 ;@ path: boss/final_nightmare
 ;@ Requests the entity tiles of the final boss's current form (FinalNightmareFormTilesets) for
 ;@ entity tile slots 2 and 3; the VBlank handler copies them over the next frames.
-;@ test: wFinalNightmareForm = rand(0, 5)
+;@ test: skip relies on b = 0 left by its caller (the entity slot in bc)
 LoadFinalNightmareFormTiles::
 ;>@st sets = FinalNightmareFormTilesets + wFinalNightmareForm * 2
 	ld a, [wFinalNightmareForm]
@@ -3644,9 +3644,10 @@ LoadFinalNightmareFormTiles::
 
 ;@ def FinalNightmareHandler(slot: c)
 ;@ path: boss/final_nightmare
-;@ Handler of entity $E6, the final boss: a shadow that takes six forms one after the other
+;@ Handler of entity $E6, the final boss: a shadow that takes its forms one after the other
 ;@ (wFinalNightmareForm: 0 it rises out of Link's shadow, 1 a giant gel, 2 Agahnim's shadow,
-;@ 3 a Moldorm, 4 Ganon's shadow, 5 Lanmola / the last form). On the room's first frame it
+;@ 3 a Moldorm, 4 Ganon's shadow, which after its defeat becomes the Lanmola shadow, 5 DethI,
+;@ the last form). On the room's first frame it
 ;@ requests the tiles of the current form. Entities of the same type with wEntityPrivate5 = 1
 ;@ are pieces of the burst gel, with 2 the light that ends the fight.
 ;@ test: skip jumps through a table
@@ -3687,7 +3688,7 @@ FinalNightmareForms::
 	dw NightmareAgahnim
 	dw NightmareMoldorm
 	dw NightmareGanon
-	dw Jump_15_6E4A
+	dw NightmareDethI
 
 ;@ def NightmareIntro(slot: c)
 ;@ path: boss/final_nightmare
@@ -5202,13 +5203,13 @@ NightmareAgahnimFaceLink::
 	ld [hl], a
 ;> NightmareAgahnimSetFrame(slot)             # falls through
 
-;@ def NightmareAgahnimSetFrame(slot: c)
+;@ def NightmareAgahnimSetFrame(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ Sets the frame of Agahnim's shadow: the first frame of its direction (wEntityDirection) plus
 ;@ the step in wEntityPrivate1.
-;@ test: wEntityDirection[c] = rand(0, 15); wEntityPrivate1[c] = rand(0, 4)
+;@ test: slot = rand(0, 15)
 NightmareAgahnimSetFrame::
-;>@g4 SetEntitySpriteVariant(wEntityDirection[slot] + wEntityPrivate1[slot])
+;>@g4 SetEntitySpriteVariant(slot, wEntityDirection[slot] + wEntityPrivate1[slot])
 	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
@@ -7133,18 +7134,19 @@ NightmareMoldormMove::
 ;@ path: boss/final_nightmare/ganon
 ;@ Form 4 of the final boss: Ganon's shadow. It raises its trident, sends out six fire bats,
 ;@ throws the spinning trident at Link and glides to another spot while the trident flies back
-;@ to it. Every weapon hit hurts it; after 24 points of damage it bursts, turns into a dark blob
-;@ that chases Link, and once that is hit it moves on to the next form. Entities of the same
-;@ kind with wEntityPrivate1 = 1 are its trident, 2 its fire bats, 3 the blob's trail.
+;@ to it. Every weapon hit hurts it; after 24 points of damage it bursts and becomes the Lanmola
+;@ shadow, a flying head with a trail of segments that chases Link; once that is hit it moves
+;@ on to the next form. Entities of the same kind with wEntityPrivate1 = 1 are its trident,
+;@ 2 its fire bats, 3 the Lanmola's trail segments.
 ;@ test: skip jumps through a table
 NightmareGanon::
 ;> kind = wEntityPrivate1[slot]
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
-;> if kind == 3: return GanonBlobTrail(slot)
+;> if kind == 3: return NightmareLanmolaTrail(slot)
 	cp $03
-	jp z, GanonBlobTrail
+	jp z, NightmareLanmolaTrail
 ;> if kind == 2: return GanonBat(slot)
 	cp $02
 	jp z, GanonBat
@@ -7155,7 +7157,7 @@ NightmareGanon::
 	ldh a, [hActiveEntityState]
 	cp $02
 	jr c, .states
-;>     if hActiveEntityState in (11, 12):     # the blob
+;>     if hActiveEntityState in (11, 12):     # the Lanmola's head
 	cp $0b
 	jr z, .blob
 	cp $0c
@@ -7217,7 +7219,7 @@ NightmareGanon::
 ;@ States of Ganon's shadow (rst $00 table indexed by wEntityState): 0 glide to the top of the
 ;@ room, 1 take shape, 2 wait, 3 raise the trident, 4 send out fire bats, 5 twirl and throw the
 ;@ trident, 6 pause, 7 glide to a new spot, 8 wait for the trident to come back (it sets state
-;@ 3 again), 9 beaten, 10 turn into a blob, 11 the blob chases Link, 12 glide to the top,
+;@ 3 again), 9 beaten, 10 turn into the Lanmola, 11 the Lanmola chases Link, 12 glide to the top,
 ;@ 13 shrink and turn into the next form.
 NightmareGanonStates::
 	dw NightmareGanonCenter
@@ -7230,8 +7232,8 @@ NightmareGanonStates::
 	dw NightmareGanonGlide
 	dw NightmareGanonWaitTrident
 	dw NightmareGanonDefeated
-	dw NightmareGanonBecomeBlob
-	dw NightmareGanonBlob
+	dw NightmareLanmolaAppear
+	dw NightmareLanmola
 	dw NightmareGanonLeave
 	dw NightmareGanonShrink
 
@@ -7395,7 +7397,7 @@ NightmareGanonWait::
 	jp IncrementEntityState
 
 
-;@ def NightmareGanonFaceLink(slot: c)
+;@ def NightmareGanonFaceLink(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ Turns Ganon's shadow towards Link's side: wNightmareFacing = 0 when he is to the right,
 ;@ 1 when he is to the left.
@@ -7920,7 +7922,7 @@ NightmareGanonWaitTrident::
 ;@ def NightmareGanonDefeated(slot: c)
 ;@ path: boss/final_nightmare/ganon
 ;@ State 9 (after 24 points of damage, timer $80, flashing): when the timer runs out it bursts
-;@ into pieces, drops the trident and turns into a blob (state 10, timer $40).
+;@ into pieces, drops the trident and turns into the Lanmola shadow (state 10, timer $40).
 ;@ test: skip calls routines in other banks
 NightmareGanonDefeated::
 ;> if wEntityTimer[slot]: return
@@ -7943,12 +7945,12 @@ NightmareGanonDefeated::
 	ret
 
 
-;@ def NightmareGanonBecomeBlob(slot: c)
-;@ path: boss/final_nightmare/ganon
-;@ State 10: shows the blob (gel frame 6) until the timer runs out, then clears physics flag
-;@ bit 6, stops and starts chasing Link (state 11).
+;@ def NightmareLanmolaAppear(slot: c)
+;@ path: boss/final_nightmare/lanmola
+;@ State 10 of Ganon's shadow: shows the Lanmola's head (gel frame 6 in this form's tiles) until
+;@ the timer runs out, then clears physics flag bit 6, stops and starts chasing Link (state 11).
 ;@ test: skip calls routines in other banks
-NightmareGanonBecomeBlob::
+NightmareLanmolaAppear::
 ;> hActiveEntitySpriteVariant = 6
 	ld a, $06
 	ldh [hActiveEntitySpriteVariant], a
@@ -7970,14 +7972,14 @@ NightmareGanonBecomeBlob::
 	ret
 
 
-;@ def NightmareGanonBlob(slot: c)
-;@ path: boss/final_nightmare/ganon
-;@ State 11: the blob chases Link, steering its speed by 1 every other frame towards a speed of
-;@ $18 aimed at him, and leaves a trail (entity $E6 with wEntityPrivate1 = 3) every 8 frames.
-;@ Once a weapon hits it (it flashes) it splits into gel pieces, the music stops (wave sound
-;@ $10), and it glides away (state 12, timer $80).
+;@ def NightmareLanmola(slot: c)
+;@ path: boss/final_nightmare/lanmola
+;@ State 11: the Lanmola shadow chases Link, steering its speed by 1 every other frame towards a
+;@ speed of $18 aimed at him, and leaves a trail segment (entity $E6 with wEntityPrivate1 = 3)
+;@ every 8 frames. Once a weapon hits it (it flashes) it splits into gel pieces, the music
+;@ stops (wave sound $10), and it glides away (state 12, timer $80).
 ;@ test: skip calls routines in other banks
-NightmareGanonBlob::
+NightmareLanmola::
 ;> EntityCheckHits(slot)
 	call EntityCheckHits
 ;> UpdateEntityPosWithSpeed_15(slot)
@@ -8087,9 +8089,9 @@ NightmareGanonBlob::
 
 
 ;@ def NightmareGanonLeave(slot: c)
-;@ path: boss/final_nightmare/ganon
-;@ State 12: after the timer (the boss jingle plays at its end) the blob glides at speed $0C to
-;@ the top of the room (X $50, Y $30); there it shrinks (state 13, timer $5F).
+;@ path: boss/final_nightmare/lanmola
+;@ State 12: after the timer (the boss jingle plays at its end) the beaten Lanmola shadow glides
+;@ at speed $0C to the top of the room (X $50, Y $30); there it shrinks (state 13, timer $5F).
 ;@ test: skip calls routines in other banks
 NightmareGanonLeave::
 ;> t = wEntityTimer[slot]
@@ -8160,8 +8162,8 @@ GanonShrinkFrames::
 	db $00, $00, $00, $01, $01, $01, $02, $02
 
 ;@ def NightmareGanonShrink(slot: c)
-;@ path: boss/final_nightmare/ganon
-;@ State 13: the blob shrinks (GanonShrinkFrames); when the timer runs out the last form begins:
+;@ path: boss/final_nightmare/lanmola
+;@ State 13: the shadow shrinks (GanonShrinkFrames); when the timer runs out DethI begins:
 ;@ it stops, gets full health $FF, physics flags 0, options $C0, drop timer $90 and timer2 $3F,
 ;@ and $D223 is cleared.
 ;@ test: skip calls routines in other banks
@@ -8448,903 +8450,1251 @@ DrawGanonTrident::
 	ret
 
 
+;@ path: boss/final_nightmare/ganon
+;@ wNightmareTridentFrame - 1 of the thrown trident by its own counter / 8, thrown to the
+;@ right: 3, 2, 1, 0 (it spins).
 GanonTridentSpinRight::
 	db $03, $02, $01, $00
 
+;@ path: boss/final_nightmare/ganon
+;@ The same thrown to the left: 0, 1, 2, 3.
 GanonTridentSpinLeft::
 	db $00, $01, $02, $03
 
+;@ def GanonTrident(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ The thrown trident (entity $E6 with wEntityPrivate1 = 1): spins with a whirring noise every
+;@ 16 frames and hurts Link on contact. It flies straight for its $30-frame timer, then homes
+;@ back to 12 pixels above Ganon's shadow (slot in wSmasherBallSlot), steering its speed by 1
+;@ per frame towards $10. Within 3 pixels of that spot, if the shadow is waiting (state 8), the
+;@ shadow catches it and raises it again (state 3, timer $4C). It vanishes once the shadow is
+;@ beaten.
+;@ test: skip calls routines in other banks
 GanonTrident::
+;> boss = wSmasherBallSlot
 	ld a, [wSmasherBallSlot]
 	ld e, a
 	ld d, b
+;> if wEntityState[boss] >= 9: return ClearEntityStatus_15(slot)   # Ganon is beaten
 	ld hl, wEntityState
 	add hl, de
 	ld a, [hl]
 	cp $09
 	jp nc, ClearEntityStatus_15
-
+;>@st step = (wEntityPrivateCounter[slot] >> 3) & 3
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	rra
 	rra
 	rra
+;=@st
 	and $03
 	ld e, a
 	ld d, b
+;> thrown_left = wEntityDirection[slot]
 	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
+;> spin = GanonTridentSpinLeft if thrown_left else GanonTridentSpinRight
 	and a
-	ld hl, $6c76
-	jr z, jr_015_6ca7
+	ld hl, GanonTridentSpinRight
+	jr z, .frame
+	ld hl, GanonTridentSpinLeft
 
-	ld hl, $6c7a
-
-jr_015_6ca7:
+.frame
+;> wNightmareTridentFrame = mem[spin + step] + 1
 	add hl, de
 	ld a, [hl]
 	inc a
 	ld [wNightmareTridentFrame], a
+;> wNightmareTridentX = 0
 	xor a
 	ld [wNightmareTridentX], a
+;> wNightmareTridentY = 0
 	ld [wNightmareTridentY], a
+;> DrawGanonTrident(slot)
 	call DrawGanonTrident
+;> wNightmareTridentFrame = 0
 	xor a
 	ld [wNightmareTridentFrame], a
+;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
+;> if hFrameCounter & 0x0F == 0: hNoiseSfx = 0x3A
 	ldh a, [hFrameCounter]
 	and $0f
-	jr nz, jr_015_6cc8
-
+	jr nz, .move
 	ld a, $3a
 	ldh [hNoiseSfx], a
 
-jr_015_6cc8:
+.move
+;> wEntityPrivateCounter[slot] += 1
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	inc [hl]
+;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
+;> EntityCheckContactDamage(slot)
 	call EntityCheckContactDamage
+;> if GetEntityTimer(slot): return            # still flying out
 	call GetEntityTimer
-	jr z, jr_015_6cd9
-
+	jr z, .home
 	ret
 
-
-jr_015_6cd9:
+.home
+;> link_x = hLinkX
 	ldh a, [hLinkX]
 	push af
+;> link_y = hLinkY
 	ldh a, [hLinkY]
 	push af
+;> boss = wSmasherBallSlot
 	ld a, [wSmasherBallSlot]
 	ld e, a
 	ld d, b
+;> hLinkX = wEntityX[boss]                    # aim at Ganon instead of Link
 	ld hl, wEntityX
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkX], a
+;> hLinkY = u8(wEntityY[boss] - 12)
 	ld hl, wEntityY
 	add hl, de
 	ld a, [hl]
 	sub $0c
 	ldh [hLinkY], a
+;> GetVectorTowardsLink(0x10)                 # into hMultiPurpose0 (y), hMultiPurpose1 (x)
 	ld a, $10
 	call GetVectorTowardsLink
+;>@sy wEntitySpeedY[slot] += -1 if (hMultiPurpose0 - wEntitySpeedY[slot]) & 0x80 else 1
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ldh a, [hMultiPurpose0]
 	sub [hl]
 	and $80
-	jr nz, jr_015_6d06
-
+	jr nz, .decY
+;=@sy
 	inc [hl]
 	inc [hl]
 
-jr_015_6d06:
+.decY
+;=@sy
 	dec [hl]
+;>@sx wEntitySpeedX[slot] += -1 if (hMultiPurpose1 - wEntitySpeedX[slot]) & 0x80 else 1
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ldh a, [hMultiPurpose1]
 	sub [hl]
 	and $80
-	jr nz, jr_015_6d14
-
+	jr nz, .decX
+;=@sx
 	inc [hl]
 	inc [hl]
 
-jr_015_6d14:
+.decX
+;=@sx
 	dec [hl]
+;>@ar if abs(hActiveEntityDrawY - hLinkY) <= 2 and abs(hActiveEntityX - hLinkX) <= 2:
 	ld hl, hLinkY
 	ldh a, [hActiveEntityDrawY]
 	sub [hl]
 	add $03
 	cp $06
-	jr nc, jr_015_6d46
-
+	jr nc, .restore
+;=@ar
 	ld hl, hLinkX
 	ldh a, [hActiveEntityX]
 	sub [hl]
 	add $03
 	cp $06
-	jr nc, jr_015_6d46
-
+	jr nc, .restore
+;>@ca     if wEntityState[boss] == 8:            # Ganon is waiting for it
 	ld a, [wSmasherBallSlot]
 	ld e, a
 	ld d, b
 	ld hl, wEntityState
 	add hl, de
 	ld a, [hl]
+;=@ca
 	cp $08
-	jr nz, jr_015_6d46
-
+	jr nz, .restore
+;>         wEntityState[boss] = 3             # caught: raise it again
 	ld [hl], $03
+;>         wEntityTimer[boss] = 0x4C
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $4c
+;>         ClearEntityStatus_15(slot)
 	call ClearEntityStatus_15
 
-jr_015_6d46:
+.restore
+;> hLinkY = link_y
 	pop af
 	ldh [hLinkY], a
+;> hLinkX = link_x
 	pop af
 	ldh [hLinkX], a
 	ret
 
 
-GanonTrailSprites::
+;@ path: boss/final_nightmare/lanmola
+;@ The Lanmola shadow's trail segments for RenderActiveEntitySpritesPair: 3 variants of 4 bytes
+;@ (tile, attributes per 8x16 half): $4A, $4C, $4E, each with its mirror image.
+NightmareLanmolaTrailSprites::
 	db $4a, $00, $4a, $20, $4c, $00, $4c, $20, $4e, $00, $4e, $20
 
-GanonTrailFrames::
+;@ path: boss/final_nightmare/lanmola
+;@ Frame of a trail segment by timer / 8 (the timer counts down from $1F, so read backwards):
+;@ 1, 1, 0, 0 - it shrinks.
+NightmareLanmolaTrailFrames::
 	db $00, $00, $01, $01
 
-GanonBlobTrail::
-	ld de, $6d4d
+;@ def NightmareLanmolaTrail(slot: c)
+;@ path: boss/final_nightmare/lanmola
+;@ A segment of the trail the Lanmola shadow leaves (entity $E6 with wEntityPrivate1 = 3):
+;@ shrinks (NightmareLanmolaTrailFrames) and vanishes when its timer runs out.
+;@ test: skip calls routines in other banks
+NightmareLanmolaTrail::
+;> DrawEntity16x16(NightmareLanmolaTrailSprites)
+	ld de, NightmareLanmolaTrailSprites
 	call DrawEntity16x16
+;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
+;> if t == 0: return ClearEntityStatus_15(slot)
 	jp z, ClearEntityStatus_15
-
+;>@fr SetEntitySpriteVariant(mem[NightmareLanmolaTrailFrames + ((t >> 3) & 3)])
 	rra
 	rra
 	rra
 	and $03
 	ld e, a
 	ld d, b
-	ld hl, $6d59
+;=@fr
+	ld hl, NightmareLanmolaTrailFrames
 	add hl, de
 	ld a, [hl]
 	call SetEntitySpriteVariant
 	ret
 
 
+;@ path: boss/final_nightmare/ganon
+;@ Fire bat sprites for RenderActiveEntitySpritesPair: 4 variants of 4 bytes (tile, attributes
+;@ per 8x16 half): 0 a spark $1E (right half flipped both ways), 1 a flame $34, 2-3 the bat
+;@ flapping $54 and $56 (each with its mirror image).
 GanonBatSprites::
 	db $1e, $00, $1e, $60, $34, $00, $34, $20, $54, $00, $54, $20, $56, $00, $56, $20
 
+;@ def GanonBat(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ A fire bat of Ganon's shadow (entity $E6 with wEntityPrivate1 = 2), drawn with its palette
+;@ flickering every 4 frames. States: 0 a spark that bursts into flame, 1 a flapping bat.
+;@ test: skip jumps through a table
 GanonBat::
+;> hActiveEntityFlipAttribute = (hFrameCounter << 2) & 0x10   # flicker
 	ldh a, [hFrameCounter]
 	rla
 	rla
 	and $10
 	ldh [hActiveEntityFlipAttribute], a
-	ld de, $6d7c
+;> DrawEntity16x16(GanonBatSprites)
+	ld de, GanonBatSprites
 	call DrawEntity16x16
+;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
+;> GanonBatStates[hActiveEntityState]()
 	ldh a, [hActiveEntityState]
 	rst $00
 
+;@ path: boss/final_nightmare/ganon
+;@ States of a fire bat (rst $00 table indexed by wEntityState): 0 appear, 1 fly.
 GanonBatStates::
 	dw GanonBatSpark
 	dw GanonBatFly
 
+;@ def GanonBatSpark(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ Bat state 0: a spark for $18 frames, then a flame; when its timer runs out it becomes a bat
+;@ (state 1, timer $20).
+;@ test: skip calls routines in other banks
 GanonBatSpark::
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_015_6dae
-
+;> if t == 0:
+	jr nz, .frame
+;>     wEntityTimer[slot] = 0x20
 	ld [hl], $20
+;>     return IncrementEntityState(slot)
 	jp IncrementEntityState
 
-
-jr_015_6dae:
+.frame
+;>@g1 SetEntitySpriteVariant(0 if t >= 0x18 else 1)
 	ld e, $00
 	cp $18
-	jr nc, jr_015_6db6
-
+	jr nc, .set
 	ld e, $01
 
-jr_015_6db6:
+.set
+;=@g1
 	ld a, e
 	call SetEntitySpriteVariant
 	ret
 
 
+;@ def GanonBatFly(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ Bat state 1: flaps its wings; when its timer gets to 1 it shrieks (noise $28) and aims at
+;@ Link once with speed $30. It moves on every other frame (alternating by slot), hurts Link on
+;@ contact, and is gone once it leaves the room (x $A8 or more, y $88 or more).
+;@ test: skip calls routines in other banks
 GanonBatFly::
+;>@va SetEntitySpriteVariant(2 + ((hFrameCounter >> 3) & 1))
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
 	add $02
+;=@va
 	call SetEntitySpriteVariant
+;> if GetEntityTimer(slot) == 1:
 	call GetEntityTimer
 	cp $01
-	jr nz, jr_015_6dd7
-
+	jr nz, .move
+;>     hNoiseSfx = 0x28
 	ld a, $28
 	ldh [hNoiseSfx], a
+;>     SetEntitySpeedTowardsLink(0x30)
 	ld a, $30
 	call SetEntitySpeedTowardsLink
 
-jr_015_6dd7:
+.move
+;> if (hFrameCounter ^ slot) & 1:
 	ldh a, [hFrameCounter]
 	xor c
 	rra
-	jr nc, jr_015_6de3
-
+	jr nc, .bounds
+;>     UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
+;>     EntityCheckContactDamage(slot)
 	call EntityCheckContactDamage
 
-jr_015_6de3:
+.bounds
+;> if hActiveEntityX >= 0xA8: return ClearEntityStatus_15(slot)
 	ldh a, [hActiveEntityX]
 	cp $a8
 	jp nc, ClearEntityStatus_15
-
+;> if hActiveEntityDrawY >= 0x88: return ClearEntityStatus_15(slot)
 	ldh a, [hActiveEntityDrawY]
 	cp $88
 	jp nc, ClearEntityStatus_15
-
 	ret
 
+;@ path: boss/final_nightmare/dethi
+;@ Frame of DethI's eye while it opens, by wEntityTimer1 / 16 (the timer counts down from $7F,
+;@ so read backwards): 1, 2, 3 (wide open: the only time it can be hurt), 3, 3, 3, 2, 1.
+DethIEyeFrames::
+	db $01, $02, $03, $03, $03, $03, $02, $01
 
-	db $01, $02, $03, $03, $03, $03, $02, $01, $20, $23, $26, $29, $2c, $2f, $32, $35
+;@ path: boss/final_nightmare/dethi
+;@ Turning speed of the first arm (added up in wEntityPrivateCounter; every overflow turns the
+;@ arm one step of 32), by damage taken (24 entries, up to $17 points): $20, $23, ... $35,
+;@ then $38 - the arms swing faster as DethI is hurt.
+DethIArmSpeedsA::
+	db $20, $23, $26, $29, $2c, $2f, $32, $35
 	db $38, $38, $38, $38, $38, $38, $38, $38, $38, $38, $38, $38, $38, $38, $38, $38
+;@ path: boss/final_nightmare/dethi
+;@ Turning speed of the second arm (added up in wEntityPrivate3), by damage taken (24 entries):
+;@ $20, $23, ... $32, then $34.
+DethIArmSpeedsB::
 	db $20, $23, $26, $29, $2c, $2f, $32, $34, $34, $34, $34, $34, $34, $34, $34, $34
-	db $34, $34, $34, $34, $34, $34, $34, $34, $28, $27, $26, $25, $24, $23, $22, $21
+	db $34, $34, $34, $34, $34, $34, $34, $34
+
+;@ path: boss/final_nightmare/dethi
+;@ Frames between two heartbeat sounds (jingle $3D), by damage taken (24 entries): $28 down to
+;@ $18 - the heart beats faster as DethI is hurt.
+DethIHeartbeatPeriods::
+	db $28, $27, $26, $25, $24, $23, $22, $21
 	db $20, $1f, $1e, $1d, $1c, $1b, $1a, $19, $18, $18, $18, $18, $18, $18, $18, $18
+;@ path: boss/final_nightmare/dethi
+;@ Gel frame of the shadow taking DethI's shape, by wEntityTimer2 / 8 (the timer counts down
+;@ from $3F, so read backwards): 0, 0, 0, 0, 0, 1, 2, 3.
+DethIAppearFrames::
 	db $03, $02, $01, $00, $00, $00, $00, $00
 
-Jump_15_6E4A::
+;@ def NightmareDethI(slot: c)
+;@ path: boss/final_nightmare/dethi
+;@ Form 5, the last form of the final boss: DethI, a giant eye with two arms of balls that swing
+;@ around it. While wEntityTimer2 runs the shadow takes its shape (the sound of a new form at
+;@ $10); then it is drawn and runs its states.
+;@ test: skip jumps through a table
+NightmareDethI::
+;> t = wEntityTimer2[slot]
 	ld hl, wEntityTimer2
 	add hl, bc
 	ld a, [hl]
+;> if t:
 	and a
-	jr z, jr_015_6e6e
-
+	jr z, .fight
+;>     if t == 0x10:
 	cp $10
-	jr nz, jr_015_6e5c
-
+	jr nz, .shape
+;>         wEntityTimer2[slot] -= 1           # (so the sound plays once)
 	dec [hl]
+;>         PlayNightmareFormSfx()
 	call PlayNightmareFormSfx
 	ld a, $10
 
-jr_015_6e5c:
+.shape
+;>@fr     hActiveEntitySpriteVariant = mem[DethIAppearFrames + ((t >> 3) & 7)]
 	rra
 	rra
 	rra
 	and $07
 	ld e, a
 	ld d, b
-	ld hl, $6e42
+;=@fr
+	ld hl, DethIAppearFrames
 	add hl, de
 	ld a, [hl]
 	ldh [hActiveEntitySpriteVariant], a
+;>     return DrawNightmareGel(slot)
 	call DrawNightmareGel
 	ret
 
-
-jr_015_6e6e:
-	call Call_15_7070
+.fight
+;> DrawNightmareDethI(slot)
+	call DrawNightmareDethI
+;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
+;> NightmareDethIStates[hActiveEntityState]()
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_15_6E77::
-	dw Jump_15_6E7D
-	dw Jump_15_6FB9
-	dw Jump_15_6FD6
+;@ path: boss/final_nightmare/dethi
+;@ States of DethI (rst $00 table indexed by wEntityState): 0 fight, 1 beaten (its last words),
+;@ 2 the arms pull in and it bursts.
+NightmareDethIStates::
+	dw NightmareDethIFight
+	dw NightmareDethIDefeated
+	dw NightmareDethIRetractArms
 
-Jump_15_6E7D::
+;@ def NightmareDethIFight(slot: c)
+;@ path: boss/final_nightmare/dethi
+;@ State 0: DethI hovers 32 pixels above Link (steering its speed by 1 every 16 frames, every 8
+;@ once it has taken 8 points of damage, towards a speed of 8), its two arms swinging around it
+;@ in opposite directions, faster as it is hurt, with a heartbeat that speeds up too. The arms
+;@ grow one ball every 16 frames up to 4 ($D223; the final battle music starts with the first).
+;@ Every $20-$2F frames it may open its eye ($7F frames, half of the time); only while the eye is
+;@ wide open can weapons hurt it. After 16 points of damage it is beaten: it speaks its last
+;@ words (dialog $F6), music $5E, and goes to state 1 (timer $80, flashing).
+;@ test: skip calls routines in other banks
+NightmareDethIFight::
+;> if wEntityHealth[slot] < 0xF0:             # 16 points of damage
 	ld hl, wEntityHealth
 	add hl, bc
 	ld a, [hl]
 	cp $f0
-	jr nc, jr_015_6eb3
-
+	jr nc, .alive
+;>     wDelayedWaveSfxTimer = 3
 	ld a, $03
 	ld [wDelayedWaveSfxTimer], a
+;>     OpenDialog(0xF6)                       # its last words
 	ld a, $f6
 	call OpenDialog
+;>     wMusicTrackToPlay = 0x5E
 	ld a, $5e
 	ld [wMusicTrackToPlay], a
+;>     wEntityTimer[slot] = 0x80
 	call GetEntityTimer
 	ld [hl], $80
+;>     wEntityFlashTimer[slot] = 0x80
 	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld [hl], $80
+;>     wEntityHitboxFlags[slot] &= ~0x80
 	ld hl, wEntityHitboxFlags
 	add hl, bc
 	res 7, [hl]
+;>     wEntityPhysicsFlags[slot] |= 0x40
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	set 6, [hl]
+;>     ResetSoundEngine()
 	call ResetSoundEngine
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
+;>     return
 	ret
 
-
-jr_015_6eb3:
+.alive
+;> if hFrameCounter & 0x0F == 0 and mem[0xD223] < 4:   # grow the arms
 	ldh a, [hFrameCounter]
 	and $0f
-	jr nz, jr_015_6ecd
-
+	jr nz, .damage
 	ld a, [$d223]
 	cp $04
-	jr nc, jr_015_6ecd
-
+	jr nc, .damage
+;>     mem[0xD223] += 1
 	inc a
 	ld [$d223], a
+;>     if mem[0xD223] == 1: wMusicTrackToPlay = 0x50
 	cp $01
-	jr nz, jr_015_6ecd
-
+	jr nz, .damage
 	ld hl, wMusicTrackToPlay
 	ld [hl], $50
 
-jr_015_6ecd:
+.damage
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
+;>@g1 d = min(0xFF - wEntityHealth[slot], 0x17)   # damage taken
 	ld hl, wEntityHealth
 	add hl, bc
 	ld a, [hl]
 	cpl
 	cp $17
-	jr c, jr_015_6edc
-
+	jr c, .speeds
+;=@g1
 	ld a, $17
 
-jr_015_6edc:
+.speeds
+;>@g2 wEntityPrivate1[slot] = mem[DethIArmSpeedsA + d]
 	ld e, a
 	ld d, b
-	ld hl, $6dfa
+	ld hl, DethIArmSpeedsA
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntityPrivate1
+;=@g2
 	add hl, bc
 	ld [hl], a
-	ld hl, $6e12
+;> wEntityPrivate2[slot] = mem[DethIArmSpeedsB + d]
+	ld hl, DethIArmSpeedsB
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld [hl], a
-	ld hl, $6e2a
+;> beat = wSongShowTimer + 1                  # (scratch here: the heartbeat counter)
+	ld hl, DethIHeartbeatPeriods
 	add hl, de
 	ld a, [wSongShowTimer]
 	inc a
+;> if beat >= mem[DethIHeartbeatPeriods + d]:
 	cp [hl]
-	jr c, jr_015_6f02
-
+	jr c, .beat
+;>     hJingle = 0x3D                         # heartbeat
 	ld a, $3d
 	ldh [hJingle], a
+;>     beat = 0
 	xor a
 
-jr_015_6f02:
+.beat
+;> wSongShowTimer = beat
 	ld [wSongShowTimer], a
+;> SetEntitySpriteVariant(0)                  # eye shut
 	ld a, $00
 	call SetEntitySpriteVariant
+;> if wEntityDropTimer[slot] == 0:
 	call GetEntityDropTimer
-	jr nz, jr_015_6f23
-
+	jr nz, .shield
+;>     wEntityDropTimer[slot] = (GetRandomByte() & 0x0F) + 0x20
 	call GetRandomByte
 	and $0f
 	add $20
 	ld [hl], a
+;>     if GetRandomByte() & 1 == 0: wEntityTimer1[slot] = 0x7F   # open the eye
 	call GetRandomByte
 	and $01
-	jr nz, jr_015_6f23
-
+	jr nz, .shield
 	call GetEntityTimer1
 	ld [hl], $7f
 
-jr_015_6f23:
+.shield
+;> wEntityHitboxFlags[slot] |= 0x80           # weapons bounce off
 	ld hl, wEntityHitboxFlags
 	add hl, bc
 	set 7, [hl]
+;> t = wEntityTimer1[slot]
 	call GetEntityTimer1
-	jr z, jr_015_6f48
-
+;> if t:
+	jr z, .hits
+;>@ey     frame = mem[DethIEyeFrames + ((t >> 4) & 7)]
 	rra
 	rra
 	rra
 	rra
 	and $07
 	ld e, a
+;=@ey
 	ld d, b
-	ld hl, $6df2
+	ld hl, DethIEyeFrames
 	add hl, de
 	ld a, [hl]
+;>     SetEntitySpriteVariant(frame)
 	call SetEntitySpriteVariant
+;>     if frame == 3: wEntityHitboxFlags[slot] &= ~0x80   # wide open: it can be hurt
 	cp $03
-	jr nz, jr_015_6f48
-
+	jr nz, .hits
 	ld hl, wEntityHitboxFlags
 	add hl, bc
 	res 7, [hl]
 
-jr_015_6f48:
+.hits
+;> EntityCheckHits(slot)
 	call EntityCheckHits
+;> mask = 0x0F
 	ld e, $0f
+;> if wEntityHealth[slot] < 0xF8: mask = 0x07
 	ld hl, wEntityHealth
 	add hl, bc
 	ld a, [hl]
 	cp $f8
-	jr nc, jr_015_6f58
-
+	jr nc, .steer
 	ld e, $07
 
-jr_015_6f58:
+.steer
+;> if hFrameCounter & mask == 0:
 	ldh a, [hFrameCounter]
 	and e
-	jr nz, jr_015_6f88
-
+	jr nz, .move
+;>     link_y = hLinkY
 	ldh a, [hLinkY]
 	push af
+;>     hLinkY = u8(hLinkY - 0x20)             # aim 32 pixels above Link
 	sub $20
 	ldh [hLinkY], a
+;>     GetVectorTowardsLink(0x08)             # into hMultiPurpose0 (y), hMultiPurpose1 (x)
 	ld a, $08
 	call GetVectorTowardsLink
+;>@sy     wEntitySpeedY[slot] += -1 if (hMultiPurpose0 - wEntitySpeedY[slot]) & 0x80 else 1
 	ldh a, [hMultiPurpose0]
 	ld hl, wEntitySpeedY
 	add hl, bc
 	sub [hl]
 	and $80
-	jr nz, jr_015_6f76
-
+	jr nz, .decY
+;=@sy
 	inc [hl]
 	inc [hl]
 
-jr_015_6f76:
+.decY
+;=@sy
 	dec [hl]
+;>@sx     wEntitySpeedX[slot] += -1 if (hMultiPurpose1 - wEntitySpeedX[slot]) & 0x80 else 1
 	ldh a, [hMultiPurpose1]
 	ld hl, wEntitySpeedX
 	add hl, bc
 	sub [hl]
 	and $80
-	jr nz, jr_015_6f84
-
+	jr nz, .decX
+;=@sx
 	inc [hl]
 	inc [hl]
 
-jr_015_6f84:
+.decX
+;=@sx
 	dec [hl]
+;>     hLinkY = link_y
 	pop af
 	ldh [hLinkY], a
 
-jr_015_6f88:
+.move
+;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
+;> EntityCheckWalls(slot)
 	call EntityCheckWalls
+;>@aa total = wEntityPrivateCounter[slot] + wEntityPrivate1[slot]
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld e, [hl]
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
+;=@aa
 	add e
+;> wEntityPrivateCounter[slot] = u8(total)
 	ld [hl], a
-	jr nc, jr_015_6fa3
-
+;> if total > 0xFF: mem[0xD221] += 1          # the first arm turns clockwise
+	jr nc, .armB
 	ld a, [$d221]
 	inc a
 	ld [$d221], a
 
-jr_015_6fa3:
+.armB
+;>@ab total = wEntityPrivate3[slot] + wEntityPrivate2[slot]
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld e, [hl]
 	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
+;=@ab
 	add e
+;> wEntityPrivate3[slot] = u8(total)
 	ld [hl], a
-	jr nc, jr_015_6fb8
-
+;> if total > 0xFF: mem[0xD222] -= 1          # the second arm the other way
+	jr nc, .done
 	ld a, [$d222]
 	dec a
 	ld [$d222], a
 
-jr_015_6fb8:
+.done
 	ret
 
 
-Jump_15_6FB9::
+;@ def NightmareDethIDefeated(slot: c)
+;@ path: boss/final_nightmare/dethi
+;@ State 1: waits while its last words are shown and it flashes; at timer 2 music $5F starts.
+;@ When the timer runs out: noise $3D, wave sound $10, and the arms pull in (state 2, timer
+;@ $80).
+;@ test: skip calls routines in other banks
+NightmareDethIDefeated::
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
+;> if t == 2: wMusicTrackToPlay = 0x5F
 	cp $02
-	jr nz, jr_015_6fc5
-
+	jr nz, .wait
 	ld hl, wMusicTrackToPlay
 	ld [hl], $5f
 
-jr_015_6fc5:
+.wait
+;> if t: return
 	and a
-	jr nz, jr_015_6fd5
-
+	jr nz, .done
+;> wEntityTimer[slot] = 0x80
 	ld [hl], $80
+;> hNoiseSfx = 0x3D
 	ld a, $3d
 	ldh [hNoiseSfx], a
+;> hWaveSfx = 0x10
 	ld a, $10
 	ldh [hWaveSfx], a
+;> IncrementEntityState(slot)
 	call IncrementEntityState
 
-jr_015_6fd5:
+.done
 	ret
 
 
-Jump_15_6FD6::
+;@ def NightmareDethIRetractArms(slot: c)
+;@ path: boss/final_nightmare/dethi
+;@ State 2: every 16 frames one ball of the arms disappears ($D223); when none is left DethI
+;@ bursts into gel pieces with a clink and leaves the light that ends the fight (entity $E6 with
+;@ wEntityPrivate5 = 2 at X $50, Y $30, FinalNightmareExit).
+;@ test: skip calls routines in other banks
+NightmareDethIRetractArms::
+;> if wEntityTimer[slot] & 0x0F: return
 	call GetEntityTimer
 	and $0f
-	jr nz, jr_015_700f
-
+	jr nz, .wait
+;> if mem[0xD223] == 0:
 	ld a, [$d223]
 	cp $00
-	jr nz, jr_015_700b
-
+	jr nz, .retract
+;>     PlayClinkNoise()
 	call PlayClinkNoise
+;>     SpawnNightmareGelPieces(slot)
 	call SpawnNightmareGelPieces
+;>     ClearEntityStatus_15(slot)
 	call ClearEntityStatus_15
+;>     _, light = SpawnEntity(0xE6)
 	ld a, $e6
 	call SpawnEntity
+;>     wEntityPrivate5[light] = 2             # the light after the fight
 	ld hl, wEntityPrivate5
 	add hl, de
 	ld [hl], $02
+;>     wEntityY[light] = 0x30
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $30
+;>     wEntityX[light] = 0x50
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], $50
+;>     wEntitySpriteVariant[light] = 0xFF
 	ld hl, wEntitySpriteVariant
 	add hl, de
 	ld [hl], $ff
+;>     return
 	ret
 
-
-jr_015_700b:
+.retract
+;> else: mem[0xD223] -= 1                     # one ball less
 	dec a
 	ld [$d223], a
 
-jr_015_700f:
+.wait
+;> return
 	ret
 
 
+;@ path: boss/final_nightmare/dethi
+;@ The top of DethI for RenderActiveEntitySpritesRect, by frame counter / 8: 4 frames of 12
+;@ bytes, each 3 OAM entries of 4 bytes (y offset, x offset, tile, attributes) in a row 16
+;@ pixels up: $60 $62 $60, $64 $66 $64, $68 $6A $68, $64 $66 $64 (the last of each row
+;@ mirrored) - it pulses.
+DethIBrowSprites::
 	db $f0, $fc, $60, $00, $f0, $04, $62, $00, $f0, $0c, $60, $20, $f0, $fc, $64, $00
 	db $f0, $04, $66, $00, $f0, $0c, $64, $20, $f0, $fc, $68, $00, $f0, $04, $6a, $00
 	db $f0, $0c, $68, $20, $f0, $fc, $64, $00, $f0, $04, $66, $00, $f0, $0c, $64, $20
+;@ path: boss/final_nightmare/dethi
+;@ DethI's eye for RenderActiveEntitySpritesRect, by sprite variant: 4 frames of 12 bytes (3 OAM
+;@ entries: y offset, x offset, tile, attributes): 0 shut ($6C $6E $6C), 1-3 opening ($70 $72,
+;@ $74 $76, $78 $7A; the last of each row mirrored).
+DethIEyeSprites::
 	db $00, $fc, $6c, $00, $00, $04, $6e, $00, $00, $0c, $6c, $20, $00, $fc, $70, $00
 	db $00, $04, $72, $00, $00, $0c, $70, $20, $00, $fc, $74, $00, $00, $04, $76, $00
 	db $00, $0c, $74, $20, $00, $fc, $78, $00, $00, $04, $7a, $00, $00, $0c, $78, $20
 
-Call_15_7070::
+;@ def DrawNightmareDethI(slot: c)
+;@ path: boss/final_nightmare/dethi
+;@ Draws DethI: the pulsing top, the eye (sprite variant), then the arms around a point 8
+;@ pixels above its position.
+;@ test: skip calls routines in other banks
+DrawNightmareDethI::
+;>@br offset = ((hFrameCounter >> 3) & 3) * 12
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $03
 	rla
+;=@br
 	rla
 	and $fc
 	ld e, a
 	rla
 	and $f8
 	add e
+;=@br
 	ld e, a
 	ld d, b
-	ld hl, $7010
+;> DrawEntitySprites(DethIBrowSprites + offset, 3)
+	ld hl, DethIBrowSprites
 	add hl, de
 	ld c, $03
 	call DrawEntitySprites
+;> ReserveOAMEntriesFar(3)
 	ld a, $03
 	call ReserveOAMEntriesFar
+;>@ey offset = hActiveEntitySpriteVariant * 12
 	ldh a, [hActiveEntitySpriteVariant]
 	rla
 	rla
 	and $fc
 	ld e, a
 	rla
+;=@ey
 	and $f8
 	add e
 	ld e, a
 	ld d, b
-	ld hl, $7040
+;> DrawEntitySprites(DethIEyeSprites + offset, 3)
+	ld hl, DethIEyeSprites
 	add hl, de
 	ld c, $03
 	call DrawEntitySprites
+;> ReserveOAMEntriesFar(3)
 	ld a, $03
 	call ReserveOAMEntriesFar
+;> y = wEntityY[slot]
 	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	push af
 	push hl
+;> wEntityY[slot] = u8(y - 8)
 	sub $08
 	ld [hl], a
+;> LoadEntityPosition(slot)
 	call LoadEntityPosition
-	call Call_15_7196
+;> DrawDethIArms(slot)
+	call DrawDethIArms
+;> wEntityY[slot] = y
 	pop hl
 	pop af
 	ld [hl], a
+;> LoadEntityPosition(slot)
 	call LoadEntityPosition
 	ret
 
 
-	db $d0, $d1, $d4, $d9, $df, $e6, $ee, $f7, $00, $09, $12, $1a, $21, $27, $2c, $2f
+;@ path: boss/final_nightmare/dethi
+;@ Positions on the outer ring of an arm (radius $30), by angle 0-31 (0 = straight up, then
+;@ clockwise): y offsets, 32 entries that run on into DethIRing4X (a sine table).
+DethIRing4Y::
+	db $d0, $d1, $d4, $d9, $df, $e6, $ee, $f7
+
+;@ path: boss/final_nightmare/dethi
+;@ X offsets on the outer ring (radius $30) by angle (32 entries; 8 = straight right).
+DethIRing4X::
+	db $00, $09, $12, $1a, $21, $27, $2c, $2f
 	db $30, $2f, $2c, $27, $21, $1a, $12, $09, $00, $f7, $ee, $e6, $df, $d9, $d4, $d1
-	db $d0, $d1, $d4, $d9, $df, $e6, $ee, $f7, $da, $db, $dd, $e1, $e6, $eb, $f2, $f9
+	db $d0, $d1, $d4, $d9, $df, $e6, $ee, $f7
+
+;@ path: boss/final_nightmare/dethi
+;@ Y offsets on the third ring (radius $26) by angle (32 entries running on into DethIRing3X).
+DethIRing3Y::
+	db $da, $db, $dd, $e1, $e6, $eb, $f2, $f9
+;@ path: boss/final_nightmare/dethi
+;@ X offsets on the third ring (radius $26) by angle (32 entries).
+DethIRing3X::
 	db $00, $07, $0e, $15, $1a, $1f, $23, $25, $26, $25, $23, $1f, $1a, $15, $0e, $07
 	db $00, $f9, $f2, $eb, $e6, $e1, $dd, $db, $da, $db, $dd, $e1, $e6, $eb, $f2, $f9
-	db $e4, $e5, $e7, $e9, $ed, $f1, $f6, $fb, $00, $05, $0a, $0f, $13, $17, $19, $1b
+;@ path: boss/final_nightmare/dethi
+;@ Y offsets on the second ring (radius $1C) by angle (32 entries running on into DethIRing2X).
+DethIRing2Y::
+	db $e4, $e5, $e7, $e9, $ed, $f1, $f6, $fb
+
+;@ path: boss/final_nightmare/dethi
+;@ X offsets on the second ring (radius $1C) by angle (32 entries).
+DethIRing2X::
+	db $00, $05, $0a, $0f, $13, $17, $19, $1b
 	db $1c, $1b, $19, $17, $13, $0f, $0a, $05, $00, $fb, $f6, $f1, $ed, $e9, $e7, $e5
-	db $e4, $e5, $e7, $e9, $ed, $f1, $f6, $fb, $ee, $ef, $f0, $f2, $f4, $f6, $fa, $fd
+	db $e4, $e5, $e7, $e9, $ed, $f1, $f6, $fb
+
+;@ path: boss/final_nightmare/dethi
+;@ Y offsets on the inner ring (radius $12) by angle (32 entries running on into DethIRing1X).
+DethIRing1Y::
+	db $ee, $ef, $f0, $f2, $f4, $f6, $fa, $fd
+;@ path: boss/final_nightmare/dethi
+;@ X offsets on the inner ring (radius $12) by angle (32 entries).
+DethIRing1X::
 	db $00, $03, $06, $0a, $0c, $0e, $10, $11, $12, $11, $10, $0e, $0c, $0a, $06, $03
 	db $00, $fd, $fa, $f6, $f4, $f2, $f0, $ef, $ee, $ef, $f0, $f2, $f4, $f6, $fa, $fd
+;@ path: boss/final_nightmare/dethi
+;@ A fifth ring of the same layout (radius 8: 8 y offsets running on into 32 x offsets) that
+;@ nothing reads.
+DethIUnusedRing::
 	db $f8, $f9, $fa, $fb, $fb, $fc, $fd, $ff, $00, $01, $03, $04, $05, $05, $06, $07
 	db $08, $07, $06, $05, $05, $04, $03, $01, $00, $ff, $fd, $fc, $fb, $fb, $fa, $f9
-	db $f8, $f9, $fa, $fb, $fb, $fc, $fd, $ff, $4e, $00, $4e, $20, $4c, $00, $4c, $20
+	db $f8, $f9, $fa, $fb, $fb, $fc, $fd, $ff
+
+;@ path: boss/final_nightmare/dethi
+;@ The balls of the arms for RenderActiveEntitySpritesPair: 3 variants of 4 bytes (tile,
+;@ attributes per 8x16 half, each with its mirror image): 0 $4E (next to the eye), 1 $4C,
+;@ 2 $7C (the end of the arm).
+DethIArmBallSprites::
+	db $4e, $00, $4e, $20, $4c, $00, $4c, $20
 	db $7c, $00, $7c, $20
 
-Call_15_7196::
+;@ def DrawDethIArms(slot: c)
+;@ path: boss/final_nightmare/dethi
+;@ Draws DethI's two arms as straight lines of balls at the angles in $D221 (first arm) and
+;@ $D222 (second arm): with $D223 balls per arm, from the outer ring (variant 2) inwards. The
+;@ innermost ball blinks while the arm points down-right to down-left (angles 7-9 of 16), the
+;@ two arms on alternate frames.
+;@ test: skip calls routines in other banks
+DrawDethIArms::
+;> if mem[0xD223] >= 4:
 	ld a, [$d223]
 	cp $04
-	jr c, jr_015_71bb
-
+	jr c, .a3
+;>     a = mem[0xD221] & 0x1F
 	ld a, [$d221]
 	and $1f
 	ld e, a
 	ld d, b
-	ld hl, $70ca
+;>     hActiveEntityX = u8(hActiveEntityX + mem[DethIRing4X + a])
+	ld hl, DethIRing4X
 	add hl, de
 	ldh a, [hActiveEntityX]
 	add [hl]
 	ldh [hActiveEntityX], a
-	ld hl, $70c2
+;>     hActiveEntityDrawY = u8(hActiveEntityDrawY + mem[DethIRing4Y + a])
+	ld hl, DethIRing4Y
 	add hl, de
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ldh [hActiveEntityDrawY], a
+;>     DrawDethIArmBall(2)
 	ld a, $02
-	call Call_15_72ED
+	call DrawDethIArmBall
 
-jr_015_71bb:
+.a3
+;> if mem[0xD223] >= 3:
 	ld a, [$d223]
 	cp $03
-	jr c, jr_015_71e0
-
+	jr c, .a2
+;>     a = mem[0xD221] & 0x1F
 	ld a, [$d221]
 	and $1f
 	ld e, a
 	ld d, b
-	ld hl, $70f2
+;>     hActiveEntityX = u8(hActiveEntityX + mem[DethIRing3X + a])
+	ld hl, DethIRing3X
 	add hl, de
 	ldh a, [hActiveEntityX]
 	add [hl]
 	ldh [hActiveEntityX], a
-	ld hl, $70ea
+;>     hActiveEntityDrawY = u8(hActiveEntityDrawY + mem[DethIRing3Y + a])
+	ld hl, DethIRing3Y
 	add hl, de
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ldh [hActiveEntityDrawY], a
+;>     DrawDethIArmBall(1)
 	ld a, $01
-	call Call_15_72ED
+	call DrawDethIArmBall
 
-jr_015_71e0:
+.a2
+;> if mem[0xD223] >= 2:
 	ld a, [$d223]
 	cp $02
-	jr c, jr_015_7205
-
+	jr c, .a1
+;>     a = mem[0xD221] & 0x1F
 	ld a, [$d221]
 	and $1f
 	ld e, a
 	ld d, b
-	ld hl, $711a
+;>     hActiveEntityX = u8(hActiveEntityX + mem[DethIRing2X + a])
+	ld hl, DethIRing2X
 	add hl, de
 	ldh a, [hActiveEntityX]
 	add [hl]
 	ldh [hActiveEntityX], a
-	ld hl, $7112
+;>     hActiveEntityDrawY = u8(hActiveEntityDrawY + mem[DethIRing2Y + a])
+	ld hl, DethIRing2Y
 	add hl, de
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ldh [hActiveEntityDrawY], a
+;>     DrawDethIArmBall(1)
 	ld a, $01
-	call Call_15_72ED
+	call DrawDethIArmBall
 
-jr_015_7205:
+.a1
+;> if mem[0xD223] >= 1:
 	ld a, [$d223]
 	cp $01
-	jr c, jr_015_7241
-
+	jr c, .b4
+;>@ia     if mem[0xD221] & 0x0F not in (7, 8, 9) or hFrameCounter & 1 == 0:
 	ld a, [$d221]
 	and $0f
 	cp $07
-	jr z, jr_015_721d
-
+	jr z, .blinkA
 	cp $08
-	jr z, jr_015_721d
-
+	jr z, .blinkA
+;=@ia
 	cp $09
-	jr nz, jr_015_7223
+	jr nz, .drawA1
 
-jr_015_721d:
+.blinkA
+;=@ia
 	ldh a, [hFrameCounter]
 	and $01
-	jr nz, jr_015_7241
+	jr nz, .b4
 
-jr_015_7223:
+.drawA1
+;>         a = mem[0xD221] & 0x1F
 	ld a, [$d221]
 	and $1f
 	ld e, a
 	ld d, b
-	ld hl, $7142
+;>         hActiveEntityX = u8(hActiveEntityX + mem[DethIRing1X + a])
+	ld hl, DethIRing1X
 	add hl, de
 	ldh a, [hActiveEntityX]
 	add [hl]
 	ldh [hActiveEntityX], a
-	ld hl, $713a
+;>         hActiveEntityDrawY = u8(hActiveEntityDrawY + mem[DethIRing1Y + a])
+	ld hl, DethIRing1Y
 	add hl, de
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ldh [hActiveEntityDrawY], a
+;>         DrawDethIArmBall(0)
 	ld a, $00
-	call Call_15_72ED
+	call DrawDethIArmBall
 
-jr_015_7241:
+.b4
+;> if mem[0xD223] >= 4:                       # the second arm
 	ld a, [$d223]
 	cp $04
-	jr c, jr_015_7266
-
+	jr c, .b3
+;>     a = mem[0xD222] & 0x1F
 	ld a, [$d222]
 	and $1f
 	ld e, a
 	ld d, b
-	ld hl, $70ca
+;>     hActiveEntityX = u8(hActiveEntityX + mem[DethIRing4X + a])
+	ld hl, DethIRing4X
 	add hl, de
 	ldh a, [hActiveEntityX]
 	add [hl]
 	ldh [hActiveEntityX], a
-	ld hl, $70c2
+;>     hActiveEntityDrawY = u8(hActiveEntityDrawY + mem[DethIRing4Y + a])
+	ld hl, DethIRing4Y
 	add hl, de
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ldh [hActiveEntityDrawY], a
+;>     DrawDethIArmBall(2)
 	ld a, $02
-	call Call_15_72ED
+	call DrawDethIArmBall
 
-jr_015_7266:
+.b3
+;> if mem[0xD223] >= 3:
 	ld a, [$d223]
 	cp $03
-	jr c, jr_015_728b
-
+	jr c, .b2
+;>     a = mem[0xD222] & 0x1F
 	ld a, [$d222]
 	and $1f
 	ld e, a
 	ld d, b
-	ld hl, $70f2
+;>     hActiveEntityX = u8(hActiveEntityX + mem[DethIRing3X + a])
+	ld hl, DethIRing3X
 	add hl, de
 	ldh a, [hActiveEntityX]
 	add [hl]
 	ldh [hActiveEntityX], a
-	ld hl, $70ea
+;>     hActiveEntityDrawY = u8(hActiveEntityDrawY + mem[DethIRing3Y + a])
+	ld hl, DethIRing3Y
 	add hl, de
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ldh [hActiveEntityDrawY], a
+;>     DrawDethIArmBall(1)
 	ld a, $01
-	call Call_15_72ED
+	call DrawDethIArmBall
 
-jr_015_728b:
+.b2
+;> if mem[0xD223] >= 2:
 	ld a, [$d223]
 	cp $02
-	jr c, jr_015_72b0
-
+	jr c, .b1
+;>     a = mem[0xD222] & 0x1F
 	ld a, [$d222]
 	and $1f
 	ld e, a
 	ld d, b
-	ld hl, $711a
+;>     hActiveEntityX = u8(hActiveEntityX + mem[DethIRing2X + a])
+	ld hl, DethIRing2X
 	add hl, de
 	ldh a, [hActiveEntityX]
 	add [hl]
 	ldh [hActiveEntityX], a
-	ld hl, $7112
+;>     hActiveEntityDrawY = u8(hActiveEntityDrawY + mem[DethIRing2Y + a])
+	ld hl, DethIRing2Y
 	add hl, de
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ldh [hActiveEntityDrawY], a
+;>     DrawDethIArmBall(1)
 	ld a, $01
-	call Call_15_72ED
+	call DrawDethIArmBall
 
-jr_015_72b0:
+.b1
+;> if mem[0xD223] >= 1:
 	ld a, [$d223]
 	cp $01
-	jr c, jr_015_72ec
-
+	jr c, .done
+;>@ib     if mem[0xD222] & 0x0F not in (7, 8, 9) or hFrameCounter & 1:
 	ld a, [$d222]
 	and $0f
 	cp $07
-	jr z, jr_015_72c8
-
+	jr z, .blinkB
 	cp $08
-	jr z, jr_015_72c8
-
+	jr z, .blinkB
+;=@ib
 	cp $09
-	jr nz, jr_015_72ce
+	jr nz, .drawB1
 
-jr_015_72c8:
+.blinkB
+;=@ib
 	ldh a, [hFrameCounter]
 	and $01
-	jr z, jr_015_72ec
+	jr z, .done
 
-jr_015_72ce:
+.drawB1
+;>         a = mem[0xD222] & 0x1F
 	ld a, [$d222]
 	and $1f
 	ld e, a
 	ld d, b
-	ld hl, $7142
+;>         hActiveEntityX = u8(hActiveEntityX + mem[DethIRing1X + a])
+	ld hl, DethIRing1X
 	add hl, de
 	ldh a, [hActiveEntityX]
 	add [hl]
 	ldh [hActiveEntityX], a
-	ld hl, $713a
+;>         hActiveEntityDrawY = u8(hActiveEntityDrawY + mem[DethIRing1Y + a])
+	ld hl, DethIRing1Y
 	add hl, de
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ldh [hActiveEntityDrawY], a
+;>         DrawDethIArmBall(0)
 	ld a, $00
-	call Call_15_72ED
+	call DrawDethIArmBall
 
-jr_015_72ec:
+.done
 	ret
 
 
-Call_15_72ED::
+;@ def DrawDethIArmBall(slot: c, variant: a)
+;@ path: boss/final_nightmare/dethi
+;@ Draws one ball of DethI's arms at the current draw position and, if it is within 8 pixels of
+;@ Link while he is neither invincible nor in the air, hurts him for 8 and knocks him away at
+;@ speed $20 ($10 frames pushed, $30 frames invincible, wave sound 3). Restores the draw
+;@ position.
+;@ test: skip calls routines in other banks
+DrawDethIArmBall::
+;> hActiveEntitySpriteVariant = variant
 	ldh [hActiveEntitySpriteVariant], a
-	ld de, $718a
+;> DrawEntity16x16(DethIArmBallSprites)
+	ld de, DethIArmBallSprites
 	call DrawEntity16x16
+;> ReserveOAMEntriesFar(2)
 	ld a, $02
 	call ReserveOAMEntriesFar
+;>@hx if -8 <= hActiveEntityX - hLinkX < 8 and -8 <= hActiveEntityDrawY - hLinkY < 8:
 	ld hl, hLinkX
 	ldh a, [hActiveEntityX]
 	sub [hl]
 	add $08
 	cp $10
-	jr nc, jr_015_733b
-
+	jr nc, .done
+;=@hx
 	ld hl, hLinkY
 	ldh a, [hActiveEntityDrawY]
 	sub [hl]
 	add $08
 	cp $10
-	jr nc, jr_015_733b
-
+	jr nc, .done
+;>     if not wInvincibilityCounter and not wIsLinkInTheAir:
 	ld hl, wIsLinkInTheAir
 	ld a, [wInvincibilityCounter]
 	or [hl]
-	jr nz, jr_015_733b
-
+	jr nz, .done
+;>         wSubtractHealthBuffer = 8
 	ld a, $08
 	ld [wSubtractHealthBuffer], a
+;>         GetVectorTowardsLink(0x20)
 	ld a, $20
 	call GetVectorTowardsLink
+;>         hLinkSpeedY = hMultiPurpose0       # knocked away
 	ldh a, [hMultiPurpose0]
 	ldh [hLinkSpeedY], a
+;>         hLinkSpeedX = hMultiPurpose1
 	ldh a, [hMultiPurpose1]
 	ldh [hLinkSpeedX], a
+;>         wLinkPushedTimer = 0x10
 	ld a, $10
 	ld [wLinkPushedTimer], a
+;>         wInvincibilityCounter = 0x30
 	ld a, $30
 	ld [wInvincibilityCounter], a
+;>         hWaveSfx = 0x03
 	ld a, $03
 	ldh [hWaveSfx], a
 
-jr_015_733b:
+.done
+;> return LoadEntityPosition(slot)
 	jp LoadEntityPosition
 
 
@@ -10696,7 +11046,7 @@ RatHop::
 OAMFlickerStartOffsets_15::
 	db $00, $08, $10, $18, $20, $28, $30, $38
 
-;@ def ReserveEntityOAM_15(slot: c)
+;@ def ReserveEntityOAM_15(slot: bc)
 ;@ path: entity/draw
 ;@ Hands out the OAM entries the entity in `slot` has just drawn: the low nibble of its physics
 ;@ flags says how many sprites its type uses. Called by the bank-0 sprite drawers after they wrote
@@ -10722,7 +11072,7 @@ ReserveOAMEntries_15::
 	sla a
 	sla a
 	ld e, a
-;> index = wOAMNextIndex + size
+;> index = u8(wOAMNextIndex + size)
 	ld a, [wOAMNextIndex]
 	add e
 ;> if index >= 0x60:                           # past the 24 entries of the entity area
@@ -11103,7 +11453,7 @@ CheckLinkTalksToEntity_15::
 	or [hl]
 	ld hl, wIsLinkInTheAir
 	or [hl]
-;> if busy or mem[0xC134]: return False
+;> if busy or wDialogCooldown: return False
 	ld hl, $c134
 	or [hl]
 	jr nz, .no
@@ -11149,7 +11499,7 @@ ReturnIfGameFrozen_15::
 	ld a, [wGameplayType]
 	cp $07
 	jr z, .stop
-;> if wDialogState or mem[0xC1A8] or wInventoryAppearing: return_from_caller()
+;> if wDialogState or wLinkShowItemPoseActive or wInventoryAppearing: return_from_caller()
 	ld hl, wLinkShowItemPoseActive
 	ld a, [wDialogState]
 	or [hl]
@@ -11239,7 +11589,7 @@ ApplyRecoilIfNeeded_15::
 	ret
 
 
-;@ def UpdateEntityPosWithSpeed_15(slot: c)
+;@ def UpdateEntityPosWithSpeed_15(slot: bc)
 ;@ path: entity/engine
 ;@ Moves the entity by its x and y speeds (1/16 pixel units).
 ;@ test: slot = rand(0, 15)
@@ -11248,7 +11598,7 @@ UpdateEntityPosWithSpeed_15::
 	call AddEntitySpeedToPosX_15
 ;> AddEntitySpeedToPosY_15(slot)              # falls through
 
-;@ def AddEntitySpeedToPosY_15(slot: c)
+;@ def AddEntitySpeedToPosY_15(slot: bc)
 ;@ path: entity/engine
 ;@ Moves the entity by its y speed: the x routine run on the arrays 16 bytes further on
 ;@ (wEntitySpeedY, wEntitySpeedYAcc, wEntityY).
@@ -11265,7 +11615,7 @@ AddEntitySpeedToPosY_15::
 	ret
 
 
-;@ def AddEntitySpeedToPosX_15(slot: c)
+;@ def AddEntitySpeedToPosX_15(slot: bc)
 ;@ path: entity/engine
 ;@ Moves the entity by its x speed: a signed number of 1/16 pixels; the fraction (low nibble)
 ;@ is added into wEntitySpeedXAcc and its carry moves the entity one more pixel.
@@ -11313,7 +11663,7 @@ AddEntitySpeedToPosX_15::
 	ret
 
 
-;@ def AddEntityZSpeedToPos_15(slot: c)
+;@ def AddEntityZSpeedToPos_15(slot: bc)
 ;@ path: entity/engine
 ;@ Moves the entity up or down in height by its z speed (same 1/16 pixel units as
 ;@ AddEntitySpeedToPosX_15, whose tail it shares).
@@ -11341,7 +11691,7 @@ AddEntityZSpeedToPos_15::
 	ld hl, wEntityZ
 	jr AddEntitySpeedToPosX_15.addToPos
 
-;@ def GetEntityXDistanceToLink_15(slot: c) -> (e, d)
+;@ def GetEntityXDistanceToLink_15(slot: bc) -> (e, d)
 ;@ path: entity/engine
 ;@ Horizontal distance from the entity to Link: d = Link x - entity x (signed), e = 0 when Link
 ;@ is to the right (or level), 1 when he is to the left (the facing direction towards him).
@@ -11366,7 +11716,7 @@ GetEntityXDistanceToLink_15::
 	ret
 
 
-;@ def GetEntityYDistanceToLink_15(slot: c) -> (e, d)
+;@ def GetEntityYDistanceToLink_15(slot: bc) -> (e, d)
 ;@ path: entity/engine
 ;@ Vertical distance from the entity to Link: d = Link y - entity y (signed), e = 2 when Link is
 ;@ above, 3 when he is below (or level) - the facing direction towards him.
@@ -11414,7 +11764,7 @@ UnusedGetEntityDrawYDistanceToLink_15::
 	ld d, a
 	ret
 
-;@ def GetEntityDirectionToLink_15(slot: c) -> e
+;@ def GetEntityDirectionToLink_15(slot: bc) -> e
 ;@ path: entity/engine
 ;@ The direction (0 right, 1 left, 2 up, 3 down) from the entity towards Link, along the axis on
 ;@ which he is farther away. Also leaves the horizontal side in hMultiPurpose0 and the vertical
@@ -11464,7 +11814,7 @@ GetEntityDirectionToLink_15::
 	ret
 
 
-;@ def ClearEntityStatus_15(slot: c)
+;@ def ClearEntityStatus_15(slot: bc)
 ;@ path: entity/engine
 ;@ Removes the entity: its slot becomes free.
 ;@ test: slot = rand(0, 15)
@@ -11509,7 +11859,7 @@ BossDefeatStart_15::
 	ld [hl], $ff
 ;> IncrementBossDefeatStep_15(slot)           # falls through
 
-;@ def IncrementBossDefeatStep_15(slot: c)
+;@ def IncrementBossDefeatStep_15(slot: bc)
 ;@ path: boss/defeat
 ;@ Goes on to the next step of the boss defeat.
 ;@ test: slot = rand(0, 15)
@@ -11676,7 +12026,7 @@ UnusedSpawnType36Drop_15::
 ;@ the room is finished, so it stays that way) and its copy hRoomStatus. Overworld rooms use
 ;@ the first 256 bytes of wRoomStatus, indoor maps $06-$19 the third block, other indoor maps
 ;@ the second.
-;@ test: hMapRoom = rand(0, 255)
+;@ test: hMapRoom = rand(0, 255); wIsIndoor = rand(0, 1); hMapId = rand(0, 0x1F)
 SetRoomEventFlag_15::
 ;> group = wIsIndoor
 	ld hl, wRoomStatus

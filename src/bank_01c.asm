@@ -11,40 +11,40 @@ DialogTablesStart::
 	db $01
 
 ;@ path: text/dialog
-;@ The address of each of the 640 dialogs ($000-$27F; OpenDialog opens $000-$0FF, OpenDialogTable1 $100-$1FF, OpenDialogTable2 $200-$27F), one word per dialog; the bank comes from DialogBanks. Read by DialogStateDrawChar. Addresses without a label lie in bank $14; $0000 marks an unused number. Text format: one byte per character, mostly ASCII (^ is the apostrophe, # types the next letter of the player's name, other codes are symbols and item pictures of the font, see DialogCharGlyphs); the box shows 16 characters per line, 2 lines at a time, so the texts are padded with spaces; $FF ends a text, $FE ends it with a choice of two answers.
+;@ The address of each of the 640 dialogs ($000-$27F; OpenDialog opens $000-$0FF, OpenDialogTable1 $100-$1FF, OpenDialogTable2 $200-$27F), one word per dialog; the bank comes from DialogBanks. Read by DialogStateDrawChar. $0000 marks an unused number. Text format: one byte per character, mostly ASCII (^ is the apostrophe, # types the next letter of the player's name, other codes are symbols and item pictures of the font, see DialogCharGlyphs); the box shows 16 characters per line, 2 lines at a time, so the texts are padded with spaces; $FF ends a text, $FE ends it with a choice of two answers.
 DialogPointers::
-	dw $5c00, $5c59, $5d1a, $5db9  ; dialog $000-$003
-	dw $5e45, $5e93, $5eda, $5f86  ; dialog $004-$007
-	dw $5fc5, $6012, $6072, $6117  ; dialog $008-$00B
-	dw $6164, $61ac, $61fa, $6284  ; dialog $00C-$00F
-	dw $62ee, $633e, $636f, $6415  ; dialog $010-$013
-	dw $6471, $64d7, $6511, $657d  ; dialog $014-$017
-	dw $65da, $6619, $6658, $6701  ; dialog $018-$01B
-	dw $6737, $6762, $67bc, $67f6  ; dialog $01C-$01F
-	dw $681e, $6827, $6868, $6881  ; dialog $020-$023
-	dw $689a, $68f3, $694f, $69ab  ; dialog $024-$027
-	dw $6a29, $6a80, $6ae1, $6b2c  ; dialog $028-$02B
-	dw $6b2c, $6b5c, $6b8b, $6bca  ; dialog $02C-$02F
-	dw $6bf7, $6c38, $6c67, $6c96  ; dialog $030-$033
-	dw $6cc5, $6d14, $6d34, $6d6e  ; dialog $034-$037
-	dw $6d6e, $6db6, $6e06, $6e06  ; dialog $038-$03B
-	dw $6e32, $6e9d, $6ecc, $6ee8  ; dialog $03C-$03F
-	dw $6ef3, $6f23, $6f6b, $6fac  ; dialog $040-$043
-	dw $700b, $7057, $70b8, $70e7  ; dialog $044-$047
-	dw $7167, $71a8, $71e9, $724a  ; dialog $048-$04B
-	dw $7296, $72c7, $7333, $73a1  ; dialog $04C-$04F
-	dw $73c2, $7413, $7449, $7484  ; dialog $050-$053
-	dw $74cb, $7588, $7638, $7657  ; dialog $054-$057
-	dw $7678, $7699, $76ba, $76db  ; dialog $058-$05B
-	dw $76fc, $771d, $773e, $774f  ; dialog $05C-$05F
-	dw $774f, $7760, $777c, $778a  ; dialog $060-$063
-	dw $77a7, $77b6, $77c7, $77e8  ; dialog $064-$067
-	dw $77f7, $7806, $7816, $7827  ; dialog $068-$06B
-	dw $7838, $7859, $786a, $787b  ; dialog $06C-$06F
-	dw $788c, $789d, $78ae, $78bf  ; dialog $070-$073
-	dw $78cf, $78de, $78ee, $78fe  ; dialog $074-$077
-	dw $790e, $791e, $792e, $793f  ; dialog $078-$07B
-	dw $795b, $796c, $799c, $79bd  ; dialog $07C-$07F
+	dw Dialog000, Dialog001, Dialog002, Dialog003  ; dialog $000-$003
+	dw Dialog004, Dialog005, Dialog006, Dialog007  ; dialog $004-$007
+	dw Dialog008, Dialog009, Dialog00A, Dialog00B  ; dialog $008-$00B
+	dw Dialog00C, Dialog00D, Dialog00E, Dialog00F  ; dialog $00C-$00F
+	dw Dialog010, Dialog011, Dialog012, Dialog013  ; dialog $010-$013
+	dw Dialog014, Dialog015, Dialog016, Dialog017  ; dialog $014-$017
+	dw Dialog018, Dialog019, Dialog01A, Dialog01B  ; dialog $018-$01B
+	dw Dialog01C, Dialog01D, Dialog01E, Dialog01F  ; dialog $01C-$01F
+	dw Dialog020, Dialog021, Dialog022, Dialog023  ; dialog $020-$023
+	dw Dialog024, Dialog025, Dialog026, Dialog027  ; dialog $024-$027
+	dw Dialog028, Dialog029, Dialog02A, Dialog02B  ; dialog $028-$02B
+	dw Dialog02B, Dialog02D, Dialog02E, Dialog02F  ; dialog $02C-$02F
+	dw Dialog030, Dialog031, Dialog032, Dialog033  ; dialog $030-$033
+	dw Dialog034, Dialog035, Dialog036, Dialog037  ; dialog $034-$037
+	dw Dialog037, Dialog039, Dialog03A, Dialog03A  ; dialog $038-$03B
+	dw Dialog03C, Dialog03D, Dialog03E, Dialog03F  ; dialog $03C-$03F
+	dw Dialog040, Dialog041, Dialog042, Dialog043  ; dialog $040-$043
+	dw Dialog044, Dialog045, Dialog046, Dialog047  ; dialog $044-$047
+	dw Dialog048, Dialog049, Dialog04A, Dialog04B  ; dialog $048-$04B
+	dw Dialog04C, Dialog04D, Dialog04E, Dialog04F  ; dialog $04C-$04F
+	dw Dialog050, Dialog051, Dialog052, Dialog053  ; dialog $050-$053
+	dw Dialog054, Dialog055, Dialog056, Dialog057  ; dialog $054-$057
+	dw Dialog058, Dialog059, Dialog05A, Dialog05B  ; dialog $058-$05B
+	dw Dialog05C, Dialog05D, Dialog05E, Dialog05F  ; dialog $05C-$05F
+	dw Dialog05F, Dialog061, Dialog062, Dialog063  ; dialog $060-$063
+	dw Dialog064, Dialog065, Dialog066, Dialog067  ; dialog $064-$067
+	dw Dialog068, Dialog069, Dialog06A, Dialog06B  ; dialog $068-$06B
+	dw Dialog06C, Dialog06D, Dialog06E, Dialog06F  ; dialog $06C-$06F
+	dw Dialog070, Dialog071, Dialog072, Dialog073  ; dialog $070-$073
+	dw Dialog074, Dialog075, Dialog076, Dialog077  ; dialog $074-$077
+	dw Dialog078, Dialog079, Dialog07A, Dialog07B  ; dialog $078-$07B
+	dw Dialog07C, Dialog07D, Dialog07E, Dialog07F  ; dialog $07C-$07F
 	dw Dialog080, Dialog081, Dialog082, Dialog083  ; dialog $080-$083
 	dw Dialog084, Dialog085, Dialog086, Dialog087  ; dialog $084-$087
 	dw Dialog088, Dialog089, Dialog08A, Dialog08B  ; dialog $088-$08B
