@@ -8,40 +8,66 @@ SECTION "ROM Bank $01f", ROMX[$4000], BANK[$1f]
 	jp InitSoundEngine
 
 
+;@ def SoundEntryStopAll()
+;@ path: sound/sfx/engine
+;@ The entry points at the start of the sound effect bank: $4000 jumps to InitSoundEngine, $4003 (here) to
+;@ StopAllSound, $4006 to UpdateSoundEffects (once a frame).
+;@ test: skip resets the whole sound state
 SoundEntryStopAll::
+;> return StopAllSound()
 	jp StopAllSound
 
-
+;> # ($4006: jp UpdateSoundEffects, the per-frame entry)
 	jp UpdateSoundEffects
 
 
+;@ def InitSoundEngine()
+;@ path: sound/sfx/engine
+;@ Entry $4000: clears all of the sound engines' RAM ($D300-$D3FF) and switches the sound on, at full volume
+;@ on both sides, every channel on both speakers.
 InitSoundEngine::
+;> fill(0xD300, 0, 0x100)                     # wMusicTranspose up to $D3FF
 	ld hl, wMusicTranspose
-
-jr_01f_400c:
+.clear
 	ld [hl], $00
 	inc l
-	jr nz, jr_01f_400c
-
+	jr nz, .clear
+;> rNR52 = 0x80                               # sound on
 	ld a, $80
 	ldh [rNR52], a
+;> rNR50 = 0x77                               # full volume left and right
 	ld a, $77
 	ldh [rNR50], a
+;> rNR51 = 0xFF                               # every channel on both speakers
 	ld a, $ff
 	ldh [rNR51], a
 	ret
 
 
+;@ def UpdateSoundEffects()
+;@ path: sound/sfx/engine
+;@ The sound effect engine for one frame (entry $4006): the square, wave and noise channel effects each
+;@ start the new request or play on, then the three requests are cleared. Each channel plays one effect at a
+;@ time; an effect takes its channel away from the music while it plays.
+;@ test: skip runs the effect routines through their tables
 UpdateSoundEffects::
+;> UpdateJingle()
 	call UpdateJingle
+;> UpdateWaveSfx()
 	call UpdateWaveSfx
+;> UpdateNoiseSfx()
 	call UpdateNoiseSfx
+;> wJingleToPlay = 0
 	xor a
 	ld [wJingleToPlay], a
+;> wWaveSfxToPlay = 0
 	ld [wWaveSfxToPlay], a
+;> wNoiseSfxToPlay = 0
 	ld [wNoiseSfxToPlay], a
 	ret
 
+;@ path: unused
+;@ Unused space ($FF bytes).
 Padding_1F_4032::
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
@@ -56,6 +82,10 @@ Padding_1F_4032::
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
+;@ path: sound/sfx/engine
+;@ The start routines of the square-channel effects, one per effect number ($01-$41): UpdateJingle jumps to
+;@ entry n-1 when effect n is requested. JingleUpdates right after it: the routines that play each effect
+;@ on, once a frame (effect $10 ends at once).
 JingleStarts::
 	dw Jingle01_Start, Jingle02_Start, Jingle03_Start, Jingle04_Start, Jingle05_Start, Jingle06_Start, Jingle07_Start, Jingle08_Start
 	dw Jingle09_Start, Jingle0A_Start, Jingle0B_Start, Jingle0C_Start, Jingle0D_Start, Jingle0E_Start, Jingle0F_Start, Jingle10_Start
@@ -77,104 +107,186 @@ JingleUpdates:
 	dw Jingle39_Update, Jingle3A_Update, Jingle3B_Update, Jingle3C_Update, Jingle3D_Update, Jingle3E_Update, Jingle3F_Update, Jingle40_Update
 	dw Jingle41_Update
 
+;@ def UpdateJingle()
+;@ path: sound/sfx/engine
+;@ The square-channel effects for one frame. A request in wJingleToPlay starts that effect (its routine in
+;@ JingleStarts) unless a locked effect plays - effect 1 starts anyway; without a request the effect in
+;@ wActiveJingle plays on (its routine in JingleUpdates). Every routine gets de = wJingleTimer and bc =
+;@ wJingleStep.
+;@ test: skip jumps through a table of routines
 UpdateJingle::
+;> request = wJingleToPlay
 	ld hl, wJingleToPlay
 	ld a, [hl]
+;> if request:
 	and a
-	jr z, .x421c
+	jr z, .playOn
+;>     if request != 1 and wJingleLocked: return IgnoreJingle()
 	cp $01
-	jr z, .x4216
+	jr z, .start
 	ld a, [wJingleLocked]
 	and a
 	jp nz, IgnoreJingle
-.x4216
+;>     table, index = JingleStarts, request
+.start
 	ld a, [hl]
 	ld hl, JingleStarts
-	jr .x4223
-.x421c
+	jr .call
+;> else:
+;>     if wActiveJingle == 0: return
+.playOn
 	inc hl
 	ld a, [hl]
 	and a
 	ret z
+;>     table, index = JingleUpdates, wActiveJingle
 	ld hl, JingleUpdates
-.x4223
+;> routine = GetSfxTableEntry(index, table)
+.call
 	call GetSfxTableEntry
+;> return routine(timer=wJingleTimer, step=wJingleStep)   # jp hl: the effect's start or update
 	ld de, wJingleTimer
 	ld bc, wJingleStep
 	jp hl
 
+;@ def Jingle01_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $01, Gift chord (someone hands over or takes a trade item (the witch, Tarin,
+;@ Kiki, Grandma Ulrira)). It locks its channel, so that other effects of the channel are ignored until it
+;@ ends; loads wave pattern SfxWave2.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle01_Start::
+;> wWaveSfxToPlay = 0
 	xor a
 	ld [wWaveSfxToPlay], a
+;> wActiveWaveSfx = 0
 	ld [wActiveWaveSfx], a
+;> rNR30 = 0
 	ldh [rNR30], a
+;> wWaveSfxLocked = 0x01
 	ld a, $01
 	ld [wWaveSfxLocked], a
+;> wMusicChannel2[0x0F] |= 0x80
 	ld hl, wMusicChannel2 + $0F
 	set 7, [hl]
+;> wMusicChannel3[0x0F] |= 0x80
 	ld hl, wMusicChannel3 + $0F
 	set 7, [hl]
+;> WriteSquare2Regs(Jingle01_Sq2, timer)
 	ld hl, Jingle01_Sq2
 	call WriteSquare2Regs
+;> LoadSfxWave2()
 	call LoadSfxWave2
+;> WriteWaveRegs(Jingle01_Wave, timer)
 	ld hl, Jingle01_Wave
 	call WriteWaveRegs
+;> return StartLockedJingle(Jingle01_Sq1, timer)
 	ld hl, Jingle01_Sq1
 	jp StartLockedJingle
 
+;@ def Jingle01_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $01 (Gift chord) on: each time its timer runs out, the next step. At the end
+;@ the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle01_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 1:
 	cp $01
-	jr z, .x4273
+	jr z, .case1
+.part1
+;=@t1
 	cp $02
-	jr z, .x4285
+	jr z, .case2
+.part2
+;=@t2
 	cp $03
-	jr z, .x4297
+	jr z, .case3
+.part3
+;=@t3
 	cp $04
-	jr z, .x42a9
-	jr .x42bb
-.x4273
+	jr z, .case4
+.part4
+;=@t4
+	jr .part5
+;>     WriteSquare1Regs(Jingle01_Sq1_2, timer)
+.case1
 	ld hl, Jingle01_Sq1_2
 	call WriteSquare1Regs
+;>     WriteSquare2Regs(Jingle01_Sq2_2, timer)
 	ld hl, Jingle01_Sq2_2
 	call WriteSquare2Regs
+;>     return WriteWaveRegs(Jingle01_Wave_2, timer)
 	ld hl, Jingle01_Wave_2
 	jp WriteWaveRegs
-.x4285
+;>@t1 if wJingleStep == 2:
+;>     WriteSquare1Regs(Jingle01_Sq1_3, timer)
+.case2
 	ld hl, Jingle01_Sq1_3
 	call WriteSquare1Regs
+;>     WriteSquare2Regs(Jingle01_Sq2_3, timer)
 	ld hl, Jingle01_Sq2_3
 	call WriteSquare2Regs
+;>     return WriteWaveRegs(Jingle01_Wave_3, timer)
 	ld hl, Jingle01_Wave_3
 	jp WriteWaveRegs
-.x4297
+;>@t2 if wJingleStep == 3:
+;>     WriteSquare1Regs(Jingle01_Sq1_4, timer)
+.case3
 	ld hl, Jingle01_Sq1_4
 	call WriteSquare1Regs
+;>     WriteSquare2Regs(Jingle01_Sq2_4, timer)
 	ld hl, Jingle01_Sq2_4
 	call WriteSquare2Regs
+;>     return WriteWaveRegs(Jingle01_Wave_4, timer)
 	ld hl, Jingle01_Wave_4
 	jp WriteWaveRegs
-.x42a9
+;>@t3 if wJingleStep == 4:
+;>     WriteSquare1Regs(Square1Off, timer)
+.case4
 	ld hl, Square1Off
 	call WriteSquare1Regs
+;>     WriteSquare2Regs(Square2Off, timer)
 	ld hl, Square2Off
 	call WriteSquare2Regs
+;>     return WriteWaveRegs(Square1Off, timer)
 	ld hl, Square1Off
 	jp WriteWaveRegs
-.x42bb
+.part5
+;=@t4
 	ld hl, wMusicChannel2 + $0F
 	res 7, [hl]
+;>@t4 wMusicChannel2[0x0F] &= 0x7F
+;> wMusicChannel3[0x0F] &= 0x7F
 	ld hl, wMusicChannel3 + $0F
 	res 7, [hl]
+;> rNR30 = 0
 	xor a
 	ldh [rNR30], a
+;> wWaveSfxLocked = 0
 	ld [wWaveSfxLocked], a
+;> wWaveRamDirty = 0x01
 	ld a, $01
 	ld [wWaveRamDirty], a
+;> return EndJingle()
 	jp EndJingle
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $01 (Gift chord), read by Jingle01_Start / Jingle01_Update.
+;@ Jingle01_Sq1, Jingle01_Sq1_2, Jingle01_Sq1_3, Jingle01_Sq1_4, Square1Off: square 1 register records, 6
+;@ bytes each: NR10 sweep, NR11 duty and length, NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7
+;@ restarts the sound), then the frames until the next step.
+;@ Jingle01_Sq2, Jingle01_Sq2_2, Jingle01_Sq2_3, Jingle01_Sq2_4, Square2Off: square 2 register records, 5
+;@ bytes each: NR21 duty and length, NR22 volume envelope, NR23 / NR24 frequency (NR24 bit 7 restarts the
+;@ sound), then the frames until the next step.
+;@ Jingle01_Wave, Jingle01_Wave_2, Jingle01_Wave_3, Jingle01_Wave_4: wave channel register records, 6 bytes
+;@ each: NR30 on ($80) / off, NR31 length, NR32 level, NR33 / NR34 frequency (NR34 bit 7 restarts the
+;@ sound), then the frames until the next step.
 Jingle01_Data::
 Jingle01_Sq1:
 	db $00, $80, $80, $89, $86, $0a
@@ -205,24 +317,52 @@ Square1Off:
 Square2Off:
 	db $3f, $00, $00, $c1, $20
 
+;@ def Jingle02_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $02, Secret chime (a puzzle is solved or a secret appears (room events,
+;@ Kiki's bridge, the mermaid statue, the signpost maze)). It locks its channel, so that other effects of
+;@ the channel are ignored until it ends.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle02_Start::
+;> return StartLockedJingle(Jingle02_Sq1, timer)
 	ld hl, Jingle02_Sq1
 	jp StartLockedJingle
 
+;@ def Jingle02_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $02 (Secret chime) on: each time its timer runs out, the next step. At the
+;@ end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle02_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 8: return EndJingle()
 	cp $08
 	jp z, EndJingle
+;> record = mem16[Jingle02_Sq1FreqTable + 2 * (wJingleStep - 1)]
 	ld hl, Jingle02_Sq1FreqTable
 	call GetSfxTableEntry
+;> rNR11 = 0x80
 	ld a, $80
 	ldh [rNR11], a
+;> rNR12 = 0xF1
 	ld a, $f1
 	ldh [rNR12], a
+;> return WriteSquare1Freq(record, timer)
 	jp WriteSquare1Freq
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $02 (Secret chime), read by Jingle02_Start / Jingle02_Update.
+;@ Jingle02_Sq1FreqTable: one pointer per step (the first for step 1) to its record (square 1 notes).
+;@ Jingle02_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
+;@ Jingle02_Sq1Freq, Jingle02_Sq1Freq_2, Jingle02_Sq1Freq_3, Jingle02_Sq1Freq_4, Jingle02_Sq1Freq_5,
+;@ Jingle02_Sq1Freq_6, Jingle02_Sq1Freq_7: square 1 notes, 3 bytes each: NR13 / NR14 frequency, then the
+;@ frames until the next step.
 Jingle02_Data::
 Jingle02_Sq1FreqTable:
 	dw Jingle02_Sq1Freq, Jingle02_Sq1Freq_2, Jingle02_Sq1Freq_3, Jingle02_Sq1Freq_4, Jingle02_Sq1Freq_5, Jingle02_Sq1Freq_6, Jingle02_Sq1Freq_7
@@ -243,18 +383,38 @@ Jingle02_Sq1Freq_6:
 Jingle02_Sq1Freq_7:
 	db $be, $c7, $20
 
+;@ def Jingle03_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $03, BowWow bite (BowWow bites).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle03_Start::
+;> SaveSquare1Freq(Jingle03_Sq1)
 	ld hl, Jingle03_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle03_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle03_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $03 (BowWow bite) on, a step every frame. The frequency slides by a table of
+;@ steps. At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle03_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 13: return SilenceJingle(timer)
 	cp $0d
 	jp z, SilenceJingle
+;> return SlideSquare1(Jingle03_Slide, step)
 	ld hl, Jingle03_Slide
 	jp SlideSquare1
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $03 (BowWow bite), read by Jingle03_Start / Jingle03_Update.
+;@ Jingle03_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle03_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle03_Data::
 Jingle03_Slide:
 	db $ff, $c0, $ff, $80, $ff, $00, $fe, $00, $01, $00, $ff, $00, $01, $00, $ff, $00
@@ -262,255 +422,501 @@ Jingle03_Slide:
 Jingle03_Sq1:
 	db $00, $00, $c0, $80, $86, $01
 
+;@ def Jingle04_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $04, Sword charged (the sword is fully charged for a spin attack). Its steps
+;@ run 14 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle04_Start::
+;> wJingleRepeat = 14
 	ld a, $0e
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle04_Sq1)
 	ld hl, Jingle04_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle04_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle04_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $04 (Sword charged) on: each time its timer runs out, the next step. The
+;@ frequency slides by a table of steps. At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle04_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> if wActiveNoiseSfx == 0x02: return SilenceJingle(timer)
 	ld a, [wActiveNoiseSfx]
 	cp $02
 	jp z, SilenceJingle
+;> wJingleTimer = 2
 	ld a, $02
 	ld [de], a
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 3:
 	cp $03
-	jr z, .x43cd
-.x43c7
+	jr z, .case1
+.part1
+;=@t1
 	ld hl, Jingle04_Slide
 	jp SlideSquare1
-.x43cd
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return EndJingle()
 	jp z, EndJingle
+;>     wJingleStep = 1
 	ld a, $01
 	ld [bc], a
-	jr .x43c7
+	jr .part1
+;>@t1 return SlideSquare1(Jingle04_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $04 (Sword charged), read by Jingle04_Start / Jingle04_Update.
+;@ Jingle04_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle04_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle04_Data::
 Jingle04_Slide:
 	db $00, $20, $ff, $f0
 Jingle04_Sq1:
 	db $00, $80, $87, $c0, $86, $02
 
+;@ def Jingle05_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $05, Magic powder (Link sprinkles magic powder). Its steps run 4 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle05_Start::
+;> wJingleRepeat = 4
 	ld a, $04
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle05_Sq1)
 	ld hl, Jingle05_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle05_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle05_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $05 (Magic powder) on: each time its timer runs out, the next step. The
+;@ frequency slides by a table of steps. At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle05_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleTimer = 4
 	ld a, $04
 	ld [de], a
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 5:
 	cp $05
-	jr z, .x4404
-.x43fe
+	jr z, .case1
+.part1
+;=@t1
 	ld hl, Jingle05_Slide
 	jp SlideSquare1
-.x4404
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return EndJingle()
 	jp z, EndJingle
+;>     wJingleStep = 1
 	ld a, $01
 	ld [bc], a
-	jr .x43fe
+	jr .part1
+;>@t1 return SlideSquare1(Jingle05_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $05 (Magic powder), read by Jingle05_Start / Jingle05_Update.
+;@ Jingle05_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle05_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle05_Data::
 Jingle05_Slide:
 	db $00, $06, $00, $04, $00, $02, $ff, $f4
 Jingle05_Sq1:
 	db $00, $00, $c5, $d8, $87, $04
 
+;@ def Jingle06_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $06, Magic appearance (the genie leaves its bottle, the Mad Batter appears).
+;@ It locks its channel, so that other effects of the channel are ignored until it ends; its steps run 10
+;@ times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle06_Start::
+;> wJingleRepeat = 10
 	ld a, $0a
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle06_Sq1)
 	ld hl, Jingle06_Sq1
 	call SaveSquare1Freq
+;> return StartLockedJingle(Jingle06_Sq1, timer)
 	jp StartLockedJingle
 
+;@ def Jingle06_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $06 (Magic appearance) on, a step every frame. The frequency slides by a
+;@ table of steps. At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle06_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 9:
 	cp $09
-	jr z, .x4438
-.x4432
+	jr z, .case1
+.part1
+;=@t1
 	ld hl, Jingle06_Slide
 	jp SlideSquare1
-.x4438
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return SilenceJingle(timer)
 	jp z, SilenceJingle
+;>     wJingleStep = 1
 	ld a, $01
 	ld [bc], a
-	jr .x4432
+	jr .part1
+;>@t1 return SlideSquare1(Jingle06_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $06 (Magic appearance), read by Jingle06_Start / Jingle06_Update.
+;@ Jingle06_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle06_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle06_Data::
 Jingle06_Slide:
 	db $00, $40, $00, $80, $00, $80, $00, $40, $ff, $d0, $ff, $a0, $ff, $a0, $ff, $d0
 Jingle06_Sq1:
 	db $00, $80, $1b, $00, $82, $01
 
+;@ def Jingle07_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $07, Clink (the sword, the shovel or the boomerang hits something hard).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle07_Start::
+;> return StartJingle(Jingle07_Sq1, timer)
 	ld hl, Jingle07_Sq1
 	jp StartJingle
 
+;@ def Jingle07_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $07 (Clink) on: each time its timer runs out, the next step. At the end the
+;@ channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle07_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 2: return EndJingle()
 	cp $02
 	jp z, EndJingle
+;> return WriteSquare1Regs(Jingle07_Sq1_2, timer)
 	ld hl, Jingle07_Sq1_2
 	jp WriteSquare1Regs
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $07 (Clink), read by Jingle07_Start / Jingle07_Update.
+;@ Jingle07_Sq1, Jingle07_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle07_Data::
 Jingle07_Sq1:
 	db $00, $3d, $f0, $d8, $c7, $03
 Jingle07_Sq1_2:
 	db $00, $00, $81, $e0, $87, $08
 
+;@ def Jingle08_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $08, Throw (something is grabbed or thrown (Mad Bomber, Monkey, Smasher,
+;@ Hinox, the walrus rolling)).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle08_Start::
+;> return StartJingle(Jingle08_Sq1, timer)
 	ld hl, Jingle08_Sq1
 	jp StartJingle
 
+;@ def Jingle08_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $08 (Throw) on: each time its timer runs out, the next step. At the end the
+;@ channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle08_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 2: return EndJingle()
 	cp $02
 	jp z, EndJingle
+;> return WriteSquare1Regs(Jingle08_Sq1_2, timer)
 	ld hl, Jingle08_Sq1_2
 	jp WriteSquare1Regs
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $08 (Throw), read by Jingle08_Start / Jingle08_Update.
+;@ Jingle08_Sq1, Jingle08_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle08_Data::
 Jingle08_Sq1:
 	db $3f, $9e, $29, $80, $c7, $08
 Jingle08_Sq1_2:
 	db $1f, $9f, $81, $20, $87, $10
 
+;@ def Jingle09_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $09, Bonk (a bomb is put down, a coconut or Pokey segment bounces, the map
+;@ cursor cannot move).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle09_Start::
+;> SaveSquare1Freq(Jingle09_Sq1)
 	ld hl, Jingle09_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle09_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle09_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $09 (Bonk) on, a step every frame. The frequency slides by a table of steps.
+;@ At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle09_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 9: return SilenceJingle(timer)
 	cp $09
 	jp z, SilenceJingle
+;> return SlideSquare1(Jingle09_Slide, step)
 	ld hl, Jingle09_Slide
 	jp SlideSquare1
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $09 (Bonk), read by Jingle09_Start / Jingle09_Update.
+;@ Jingle09_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle09_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle09_Data::
 Jingle09_Slide:
 	db $01, $00, $00, $c0, $00, $80, $00, $40, $ff, $c0, $ff, $80, $ff, $40, $ff, $00
 Jingle09_Sq1:
 	db $00, $9f, $a0, $00, $c2, $01
 
+;@ def Jingle0A_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $0A, Cursor (a menu cursor or a dialog choice moves). Some running effects
+;@ keep their channel (the request is then ignored).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle0A_Start::
+;> if wActiveJingle == 0x13: return IgnoreJingle()
 	ld a, [wActiveJingle]
 	cp $13
 	jp z, IgnoreJingle
+;> if rNR50 != 0x77:
 	ldh a, [rNR50]
 	cp $77
-	jr nz, .x44e2
+	jr nz, .case1
+;>@t1     record = Jingle0A_Sq1_2
+;> else:
+;>     record = Jingle0A_Sq1
+.part1
 	ld hl, Jingle0A_Sq1
-.x44df
+;> return StartJingle(record, timer)
+.part2
 	jp StartJingle
-.x44e2
+.case1
+;=@t1
 	ld hl, Jingle0A_Sq1_2
-	jr .x44df
+	jr .part2
 
+;@ def Jingle0A_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $0A (Cursor) on: each time its timer runs out, the next step. At the end the
+;@ channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle0A_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 2: return EndJingle()
 	cp $02
 	jp z, EndJingle
+;> if rNR50 != 0x77:
 	ldh a, [rNR50]
 	cp $77
-	jr nz, .x4505
+	jr nz, .case1
+;>@t1     value = 0x20
+;> else:
+;>     value = 0x10
+.part1
 	ld a, $10
-.x44fb
+;> rNR12 = value
+.part2
 	ldh [rNR12], a
+;> rNR14 = 0xC7
 	ld a, $c7
 	ldh [rNR14], a
+;> wJingleTimer = 8
 	ld a, $08
 	ld [de], a
+;> return
 	ret
-.x4505
+.case1
+;=@t1
 	ld a, $20
-	jr .x44fb
+	jr .part2
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $0A (Cursor), read by Jingle0A_Start / Jingle0A_Update.
+;@ Jingle0A_Sq1, Jingle0A_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle0A_Data::
 Jingle0A_Sq1:
 	db $00, $9f, $80, $a0, $c7, $02
 Jingle0A_Sq1_2:
 	db $00, $9f, $f0, $a0, $c7, $02
 
+;@ def Jingle0B_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $0B, Stomp (a heavy boss lands or charges (Slime Eye, Armos Knight, Moblin
+;@ King)). It locks its channel, so that other effects of the channel are ignored until it ends; its steps
+;@ run 5 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle0B_Start::
+;> wJingleRepeat = 5
 	ld a, $05
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle0B_Sq1)
 	ld hl, Jingle0B_Sq1
 	call SaveSquare1Freq
+;> return StartLockedJingle(Jingle0B_Sq1, timer)
 	jp StartLockedJingle
 
+;@ def Jingle0B_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $0B (Stomp) on: each time its timer runs out, the next step. The frequency
+;@ slides by a table of steps. At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle0B_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleTimer = 2
 	ld a, $02
 	ld [de], a
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 7:
 	cp $07
-	jr z, .x4537
-.x4531
+	jr z, .case1
+.part1
+;=@t1
 	ld hl, Jingle0B_Slide
 	jp SlideSquare1
-.x4537
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return EndJingle()
 	jp z, EndJingle
+;>     wJingleStep = 1
 	ld a, $01
 	ld [bc], a
-	jr .x4531
+	jr .part1
+;>@t1 return SlideSquare1(Jingle0B_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $0B (Stomp), read by Jingle0B_Start / Jingle0B_Update.
+;@ Jingle0B_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle0B_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle0B_Data::
 Jingle0B_Slide:
 	db $ff, $c0, $ff, $80, $ff, $40, $00, $c0, $00, $80, $00, $40
 Jingle0B_Sq1:
 	db $00, $80, $f4, $80, $83, $01
 
+;@ def Jingle0C_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $0C (bank $02). Its steps run 22 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle0C_Start::
+;> wJingleRepeat = 22
 	ld a, $16
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle0C_Sq1)
 	ld hl, Jingle0C_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle0C_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle0C_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $0C on, a step every frame. The frequency slides by a table of steps. At the
+;@ end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle0C_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 4:
 	cp $04
-	jr z, .x456f
-.x4569
+	jr z, .case1
+.part1
+;=@t2
 	ld hl, Jingle0C_Slide
 	jp SlideSquare1
-.x456f
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return EndJingle()
 	jp z, EndJingle
+;>     if wJingleRepeat == 8:
 	cp $08
-	jr z, .x457e
+	jr z, .case2
+.part2
+;=@t1
 	ld a, $01
 	ld [bc], a
-	jr .x4569
-.x457e
+	jr .part1
+;>         wJingleStep = 0
+.case2
 	xor a
 	ld [bc], a
+;>         SaveSquare1Freq(Jingle0C_Sq1_2)
 	ld hl, Jingle0C_Sq1_2
 	call SaveSquare1Freq
+;>         return WriteSquare1Regs(Jingle0C_Sq1_2, timer)
 	jp WriteSquare1Regs
+;>@t1     wJingleStep = 1
+;>@t2 return SlideSquare1(Jingle0C_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $0C, read by Jingle0C_Start / Jingle0C_Update.
+;@ Jingle0C_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle0C_Sq1, Jingle0C_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle0C_Data::
 Jingle0C_Slide:
 	db $00, $28, $00, $00, $ff, $f0
@@ -519,87 +925,182 @@ Jingle0C_Sq1:
 Jingle0C_Sq1_2:
 	db $00, $83, $47, $00, $87, $02
 
+;@ def Jingle0D_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $0D, Jump (Link jumps with Roc's Feather).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle0D_Start::
+;> return StartJingle(Jingle0D_Sq1, timer)
 	ld hl, Jingle0D_Sq1
 	jp StartJingle
 
+;@ def Jingle0D_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $0D (Jump) on: each time its timer runs out, the next step. At the end the
+;@ channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle0D_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> return EndJingle()
 	jp EndJingle
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $0D (Jump), read by Jingle0D_Start / Jingle0D_Update.
+;@ Jingle0D_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle0D_Sq1::
 	db $27, $80, $c2, $48, $86, $18
 
+;@ def Jingle0E_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $0E, Splash (something splashes into water (Link, fish, a Zora, the
+;@ mermaid)). Some running effects keep their channel (the request is then ignored).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle0E_Start::
+;> if wActiveJingle != 0x08:
 	ld a, [wActiveJingle]
 	cp $08
-	jr z, .x45b9
+	jr z, .case1
+;>     if wActiveJingle: return IgnoreJingle()
+.part1
 	and a
 	jp nz, IgnoreJingle
-.x45b9
+;> return StartJingle(Jingle0E_Sq1, timer)
+.case1
 	ld hl, Jingle0E_Sq1
 	jp StartJingle
 
+;@ def Jingle0E_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $0E (Splash) on: each time its timer runs out, the next step. At the end the
+;@ channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle0E_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> return EndJingle()
 	jp EndJingle
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $0E (Splash), read by Jingle0E_Start / Jingle0E_Update.
+;@ Jingle0E_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle0E_Sq1::
 	db $16, $ab, $20, $80, $c6, $05
 
+;@ def Jingle0F_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $0F, Swim stroke (Link swims).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle0F_Start::
+;> return StartJingle(Jingle0F_Sq1, timer)
 	ld hl, Jingle0F_Sq1
 	jp StartJingle
 
+;@ def Jingle0F_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $0F (Swim stroke) on: each time its timer runs out, the next step. At the end
+;@ the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle0F_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 2: return EndJingle()
 	cp $02
 	jp z, EndJingle
+;> return WriteSquare1Regs(Jingle0F_Sq1_2, timer)
 	ld hl, Jingle0F_Sq1_2
 	jp WriteSquare1Regs
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $0F (Swim stroke), read by Jingle0F_Start / Jingle0F_Update.
+;@ Jingle0F_Sq1, Jingle0F_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle0F_Data::
 Jingle0F_Sq1:
 	db $17, $80, $0b, $00, $85, $10
 Jingle0F_Sq1_2:
 	db $17, $80, $0e, $00, $c5, $10
 
+;@ def Jingle10_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $10, Stop all sound (its start routine is StopAllSound).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle10_Start::
+;> return StopAllSound()
 	jp StopAllSound
 
+;@ def Jingle11_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $11, Inventory opens (the inventory slides in). Its steps run 23 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle11_Start::
+;> wJingleRepeat = 23
 	ld a, $17
 	ld [wJingleRepeat], a
+;> wMusicChannel2[0x0F] |= 0x80
 	ld hl, wMusicChannel2 + $0F
 	set 7, [hl]
+;> SaveSquare2Freq(Jingle11_Sq2)
 	ld hl, Jingle11_Sq2
 	call SaveSquare2Freq
+;> WriteSquare2Regs(Jingle11_Sq2, timer)
 	call WriteSquare2Regs
+;> SaveSquare1Freq(Jingle11_Sq1)
 	ld hl, Jingle11_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle11_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle11_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $11 (Inventory opens) on, a step every frame. The frequency slides by a table
+;@ of steps.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle11_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 2:
 	cp $02
-	jr z, .x4625
-.x4616
+	jr z, .case1
+.part1
+;=@t1
 	ld hl, Jingle11_Slide
 	call SlideSquare2
+;=@t2
 	ld bc, wJingleStep
 	ld hl, Jingle11_Slide
 	jp SlideSquare1
-.x4625
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return Jingle11_End(timer)
 	jp z, Jingle11_End
+;>     wJingleStep = 1
 	ld a, $01
 	ld [bc], a
-	jr .x4616
+	jr .part1
+;>@t1 SlideSquare2(Jingle11_Slide, step)
+;>@t2 return SlideSquare1(Jingle11_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $11 (Inventory opens), read by Jingle11_Start / Jingle11_Update.
+;@ Jingle11_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle11_Sq2: square 2 register records, 5 bytes each: NR21 duty and length, NR22 volume envelope, NR23 /
+;@ NR24 frequency (NR24 bit 7 restarts the sound), then the frames until the next step.
+;@ Jingle11_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle11_Data::
 Jingle11_Slide:
 	db $00, $21
@@ -608,45 +1109,86 @@ Jingle11_Sq2:
 Jingle11_Sq1:
 	db $00, $85, $0b, $00, $81, $12
 
+;@ def Jingle11_End(timer: de)
+;@ path: sound/sfx/square
+;@ Part of square-channel effect $11 (Inventory opens), shared by more than one of its routines.
+;@ test: timer = 0xD390
 Jingle11_End::
+;> wMusicChannel2[0x0F] &= 0x7F
 	ld hl, wMusicChannel2 + $0F
 	res 7, [hl]
+;> WriteSquare2Regs(Square2Off, timer)
 	ld hl, Square2Off
 	call WriteSquare2Regs
+;> return SilenceJingle(timer)
 	jp SilenceJingle
 
+;@ def Jingle12_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $12, Inventory closes (the inventory slides out). Its steps run 8 times;
+;@ some running effects keep their channel (the request is then ignored).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle12_Start::
+;> if wActiveJingle == 0x13: return IgnoreJingle()
 	ld a, [wActiveJingle]
 	cp $13
 	jp z, IgnoreJingle
+;> wJingleRepeat = 8
 	ld a, $08
 	ld [wJingleRepeat], a
+;> wMusicChannel2[0x0F] |= 0x80
 	ld hl, wMusicChannel2 + $0F
 	set 7, [hl]
+;> SaveSquare2Freq(Jingle12_Sq2)
 	ld hl, Jingle12_Sq2
 	call SaveSquare2Freq
+;> WriteSquare2Regs(Jingle12_Sq2, timer)
 	call WriteSquare2Regs
+;> SaveSquare1Freq(Jingle12_Sq1)
 	ld hl, Jingle12_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle12_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle12_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $12 (Inventory closes) on, a step every frame. The frequency slides by a
+;@ table of steps.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle12_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 2:
 	cp $02
-	jr z, .x4685
-.x4676
+	jr z, .case1
+.part1
+;=@t1
 	ld hl, Jingle12_Slide
 	call SlideSquare2
+;=@t2
 	ld bc, wJingleStep
 	ld hl, Jingle12_Slide
 	jp SlideSquare1
-.x4685
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return Jingle11_End(timer)
 	jp z, Jingle11_End
+;>     wJingleStep = 1
 	ld a, $01
 	ld [bc], a
-	jr .x4676
+	jr .part1
+;>@t1 SlideSquare2(Jingle12_Slide, step)
+;>@t2 return SlideSquare1(Jingle12_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $12 (Inventory closes), read by Jingle12_Start / Jingle12_Update.
+;@ Jingle12_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle12_Sq2: square 2 register records, 5 bytes each: NR21 duty and length, NR22 volume envelope, NR23 /
+;@ NR24 frequency (NR24 bit 7 restarts the sound), then the frames until the next step.
+;@ Jingle12_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle12_Data::
 Jingle12_Slide:
 	db $ff, $d0
@@ -655,38 +1197,74 @@ Jingle12_Sq2:
 Jingle12_Sq1:
 	db $00, $80, $09, $c0, $86, $12
 
+;@ def Jingle13_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $13, Confirm (a menu choice is confirmed (file select, save menu), a
+;@ glinting tile). Its steps run 5 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle13_Start::
+;> wJingleRepeat = 5
 	ld a, $05
 	ld [wJingleRepeat], a
+;> if rNR50 != 0x77:
 	ldh a, [rNR50]
 	cp $77
-	jr nz, .x46b1
+	jr nz, .case1
+;>@t1     record = Jingle13_Sq1_2
+;> else:
+;>     record = Jingle13_Sq1
+.part1
 	ld hl, Jingle13_Sq1
-.x46ab
+;> SaveSquare1Freq(record)
+.part2
 	call SaveSquare1Freq
+;> return StartJingle(record, timer)
 	jp StartJingle
-.x46b1
+.case1
+;=@t1
 	ld hl, Jingle13_Sq1_2
-	jr .x46ab
+	jr .part2
 
+;@ def Jingle13_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $13 (Confirm) on: each time its timer runs out, the next step. The frequency
+;@ slides by a table of steps. At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle13_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleTimer = 3
 	ld a, $03
 	ld [de], a
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 4:
 	cp $04
-	jr z, .x46ca
-.x46c4
+	jr z, .case1
+.part1
+;=@t1
 	ld hl, Jingle13_Slide
 	jp SlideSquare1
-.x46ca
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return SilenceJingle(timer)
 	jp z, SilenceJingle
+;>     wJingleStep = 1
 	ld a, $01
 	ld [bc], a
-	jr .x46c4
+	jr .part1
+;>@t1 return SlideSquare1(Jingle13_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $13 (Confirm), read by Jingle13_Start / Jingle13_Update.
+;@ Jingle13_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle13_Sq1, Jingle13_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle13_Data::
 Jingle13_Slide:
 	db $00, $22, $00, $19, $ff, $c5
@@ -695,35 +1273,76 @@ Jingle13_Sq1:
 Jingle13_Sq1_2:
 	db $00, $80, $f3, $7b, $87, $03
 
+;@ def Jingle14_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $14 (not requested directly). Some running effects keep their channel (the
+;@ request is then ignored).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle14_Start::
+;> if wActiveJingle: return IgnoreJingle()
 	ld a, [wActiveJingle]
 	and a
 	jp nz, IgnoreJingle
+;> return StartJingle(Jingle14_Sq1, timer)
 	ld hl, Jingle14_Sq1
 	jp StartJingle
 
+;@ def Jingle14_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $14 on: each time its timer runs out, the next step. At the end the channel
+;@ goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle14_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> return EndJingle()
 	jp EndJingle
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $14, read by Jingle14_Start / Jingle14_Update.
+;@ Jingle14_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle14_Sq1::
 	db $35, $b0, $60, $20, $c7, $04
 
+;@ def Jingle15_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $15, Dialog jingle (a dialog plays its jingle).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle15_Start::
+;> return StartJingle(Jingle15_Sq1, timer)
 	ld hl, Jingle15_Sq1
 	jp StartJingle
 
+;@ def Jingle15_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $15 (Dialog jingle) on: each time its timer runs out, the next step. At the
+;@ end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle15_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 3: return EndJingle()
 	cp $03
 	jp z, EndJingle
+;> record = mem16[Jingle15_Sq1Table + 2 * (wJingleStep - 1)]
 	ld hl, Jingle15_Sq1Table
 	call GetSfxTableEntry
+;> return WriteSquare1Regs(record, timer)
 	jp WriteSquare1Regs
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $15 (Dialog jingle), read by Jingle15_Start / Jingle15_Update.
+;@ Jingle15_Sq1Table: one pointer per step (the first for step 1) to its record (square 1 register records).
+;@ Jingle15_Sq1, Jingle15_Sq1_2, Jingle15_Sq1_3: square 1 register records, 6 bytes each: NR10 sweep, NR11
+;@ duty and length, NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the
+;@ frames until the next step.
 Jingle15_Data::
 Jingle15_Sq1Table:
 	dw Jingle15_Sq1_2, Jingle15_Sq1_3
@@ -734,88 +1353,181 @@ Jingle15_Sq1_2:
 Jingle15_Sq1_3:
 	db $00, $b0, $29, $9d, $c7, $03
 
+;@ def Jingle16_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $16 (bank $03).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle16_Start::
+;> return StartJingle(Jingle16_Sq1, timer)
 	ld hl, Jingle16_Sq1
 	jp StartJingle
 
+;@ def Jingle16_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $16 on: each time its timer runs out, the next step. At the end the channel
+;@ goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle16_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> return EndJingle()
 	jp EndJingle
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $16, read by Jingle16_Start / Jingle16_Update.
+;@ Jingle16_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle16_Sq1::
 	db $00, $00, $81, $bb, $c7, $20
 
+;@ def Jingle17_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $17, Item held up (Link holds up a new item). It locks its channel, so that
+;@ other effects of the channel are ignored until it ends; its steps run 42 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle17_Start::
+;> wJingleRepeat = 42
 	ld a, $2a
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle17_Sq1)
 	ld hl, Jingle17_Sq1
 	call SaveSquare1Freq
+;> return StartLockedJingle(Jingle17_Sq1, timer)
 	jp StartLockedJingle
 
+;@ def Jingle17_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $17 (Item held up) on, a step every frame. The frequency slides by a table of
+;@ steps. At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle17_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 3:
 	cp $03
-	jr z, .x4760
-.x475a
+	jr z, .case1
+.part1
+;=@t2
 	ld hl, Jingle17_Slide
 	jp SlideSquare1
-.x4760
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return EndJingle()
 	jp z, EndJingle
+;>     if wJingleRepeat in (14, 28):
 	cp $0e
-	jr z, .x4773
+	jr z, .case2
+.part2
 	cp $1c
-	jr z, .x4773
+	jr z, .case2
+.part3
+;=@t1
 	ld a, $01
 	ld [bc], a
-	jr .x475a
-.x4773
+	jr .part1
+;>         SlideSquare1(Jingle17_Slide, step)
+.case2
 	ld hl, Jingle17_Slide
 	call SlideSquare1
+;>         wJingleStep = 0
 	xor a
 	ld [wJingleStep], a
+;>         return
 	ret
+;>@t1     wJingleStep = 1
+;>@t2 return SlideSquare1(Jingle17_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $17 (Item held up), read by Jingle17_Start / Jingle17_Update.
+;@ Jingle17_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle17_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle17_Data::
 Jingle17_Slide:
 	db $00, $20, $ff, $e8, $ff, $90
 Jingle17_Sq1:
 	db $00, $80, $d7, $68, $87, $01
 
+;@ def Jingle18_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $18, Key falls (a key falls into a pit).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle18_Start::
+;> return StartJingle(Jingle18_Sq1, timer)
 	ld hl, Jingle18_Sq1
 	jp StartJingle
 
+;@ def Jingle18_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $18 (Key falls) on: each time its timer runs out, the next step. At the end
+;@ the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle18_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 2: return SilenceJingle(timer)
 	cp $02
 	jp z, SilenceJingle
+;> return WriteSquare1Regs(Jingle18_Sq1_2, timer)
 	ld hl, Jingle18_Sq1_2
 	jp WriteSquare1Regs
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $18 (Key falls), read by Jingle18_Start / Jingle18_Update.
+;@ Jingle18_Sq1, Jingle18_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle18_Data::
 Jingle18_Sq1:
 	db $2f, $80, $60, $e0, $86, $14
 Jingle18_Sq1_2:
 	db $2f, $80, $10, $e0, $86, $14
 
+;@ def Jingle19_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $19, Heart piece (a piece of heart is collected). It locks its channel, so
+;@ that other effects of the channel are ignored until it ends.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle19_Start::
+;> return StartLockedJingle(Jingle19_Sq1, timer)
 	ld hl, Jingle19_Sq1
 	jp StartLockedJingle
 
+;@ def Jingle19_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $19 (Heart piece) on: each time its timer runs out, the next step. At the end
+;@ the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle19_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 5: return EndJingle()
 	cp $05
 	jp z, EndJingle
+;> record = mem16[Jingle19_Sq1Table + 2 * (wJingleStep - 1)]
 	ld hl, Jingle19_Sq1Table
 	call GetSfxTableEntry
+;> return WriteSquare1Regs(record, timer)
 	jp WriteSquare1Regs
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $19 (Heart piece), read by Jingle19_Start / Jingle19_Update.
+;@ Jingle19_Sq1Table: one pointer per step (the first for step 1) to its record (square 1 register records).
+;@ Jingle19_Sq1, Jingle19_Sq1_2, Jingle19_Sq1_3, Jingle19_Sq1_4, Jingle19_Sq1_5: square 1 register records,
+;@ 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7
+;@ restarts the sound), then the frames until the next step.
 Jingle19_Data::
 Jingle19_Sq1Table:
 	dw Jingle19_Sq1_2, Jingle19_Sq1_3, Jingle19_Sq1_4, Jingle19_Sq1_5
@@ -830,60 +1542,121 @@ Jingle19_Sq1_4:
 Jingle19_Sq1_5:
 	db $00, $80, $a3, $c5, $87, $20
 
+;@ def Jingle1A_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $1A (bank $06). Some running effects keep their channel (the request is then
+;@ ignored).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle1A_Start::
+;> if wActiveJingle == 0x1A: return IgnoreJingle()
 	ld a, [wActiveJingle]
 	cp $1a
 	jp z, IgnoreJingle
+;> return StartJingle(Jingle1A_Sq1, timer)
 	ld hl, Jingle1A_Sq1
 	jp StartJingle
 
+;@ def Jingle1A_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $1A on: each time its timer runs out, the next step. At the end the channel
+;@ goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle1A_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 2: return SilenceJingle(timer)
 	cp $02
 	jp z, SilenceJingle
+;> return WriteSquare1Freq(Jingle1A_Sq1Freq, timer)
 	ld hl, Jingle1A_Sq1Freq
 	jp WriteSquare1Freq
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $1A, read by Jingle1A_Start / Jingle1A_Update.
+;@ Jingle1A_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
+;@ Jingle1A_Sq1Freq: square 1 notes, 3 bytes each: NR13 / NR14 frequency, then the frames until the next step.
 Jingle1A_Data::
 Jingle1A_Sq1:
 	db $00, $80, $34, $90, $87, $01
 Jingle1A_Sq1Freq:
 	db $c8, $07, $04
 
+;@ def Jingle1B_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $1B, Shutters: shutter doors open. It locks its channel, so that other
+;@ effects of the channel are ignored until it ends; its steps run 3 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle1B_Start::
+;> wJingleRepeat = 3
 	ld a, $03
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle1B_Sq1)
 	ld hl, Jingle1B_Sq1
 	call SaveSquare1Freq
+;> return StartLockedJingle(Jingle1B_Sq1, timer)
 	jp StartLockedJingle
 
+;@ def Jingle1B_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $1B (Shutters) on: each time its timer runs out, the next step. The frequency
+;@ slides by a table of steps. At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle1B_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleTimer = 4
 	ld a, $04
 	ld [de], a
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 8:
 	cp $08
-	jr z, .x483a
+	jr z, .case1
+.part1
+;=@t2
 	ld hl, Jingle1B_Slide
 	jp SlideSquare1
-.x483a
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return SilenceJingle(timer)
 	jp z, SilenceJingle
+;>     if wJingleRepeat == 2:
 	cp $02
-	jr z, .x4850
+	jr z, .case2
+;>@t1         record = Jingle1B_Sq1_2
+;>     else:
+;>         record = Jingle1B_Sq1_3
+.part2
 	ld hl, Jingle1B_Sq1_3
-.x4847
+;>     SaveSquare1Freq(record)
+.part3
 	call SaveSquare1Freq
+;>     wJingleStep = 4
 	ld a, $04
 	ld [bc], a
+;>     return WriteSquare1Regs(record, timer)
 	jp WriteSquare1Regs
-.x4850
+.case2
+;=@t1
 	ld hl, Jingle1B_Sq1_2
-	jr .x4847
+	jr .part3
+;>@t2 return SlideSquare1(Jingle1B_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $1B (Shutters), read by Jingle1B_Start / Jingle1B_Update.
+;@ Jingle1B_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle1B_Sq1, Jingle1B_Sq1_2, Jingle1B_Sq1_3: square 1 register records, 6 bytes each: NR10 sweep, NR11
+;@ duty and length, NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the
+;@ frames until the next step.
 Jingle1B_Data::
 Jingle1B_Slide:
 	db $00, $2a, $00, $2e, $00, $25, $00, $07, $00, $15, $00, $17, $00, $13
@@ -894,44 +1667,83 @@ Jingle1B_Sq1_2:
 Jingle1B_Sq1_3:
 	db $00, $80, $10, $7b, $87, $04
 
+;@ def Jingle1C_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $1C, Warp: a warp hole takes Link. Its steps run 44 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle1C_Start::
+;> wJingleRepeat = 44
 	ld a, $2c
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle1C_Sq1)
 	ld hl, Jingle1C_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle1C_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle1C_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $1C (Warp) on, one slide step per frame. Each round of steps counts
+;@ wJingleRepeat down; at 24 the sound starts over from its second record, at 23 and after that each round
+;@ ends in a second part, until the counter runs out.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle1C_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 3:
 	cp $03
-	jr z, .x4894
+	jr z, .third
+;=@t5
 	cp $05
-	jr z, .x48b0
-.x488e
+	jr z, .nextRound
+.slide
+;=@t6
 	ld hl, Jingle1C_Slide
 	jp SlideSquare1
-.x4894
+;>     wJingleRepeat -= 1
+.third
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 24:
 	cp $18
-	jr z, .x48a4
+	jr z, .restart
+;=@t1
 	cp $17
-	jr z, .x48b0
+	jr z, .nextRound
+;=@t2
 	ld a, $01
 	ld [bc], a
-	jr .x488e
-.x48a4
+	jr .slide
+;>         wJingleStep = 2
+.restart
 	ld a, $02
 	ld [bc], a
+;>         SaveSquare1Freq(Jingle1C_Sq1_2)
 	ld hl, Jingle1C_Sq1_2
 	call SaveSquare1Freq
+;>         return WriteSquare1Regs(Jingle1C_Sq1_2, timer)
 	jp WriteSquare1Regs
-.x48b0
+;>@t1     if wJingleRepeat != 23:
+;>@t2         wJingleStep = 1
+;>         return SlideSquare1(Jingle1C_Slide, step)
+;>@t5 if wJingleStep in (3, 5):                 # step 3 gets here once the counter is at 23
+;>     wJingleRepeat -= 1
+.nextRound
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return EndJingle()
 	jp z, EndJingle
+;>     wJingleStep = 3
 	ld a, $03
 	ld [bc], a
-	jr .x488e
+	jr .slide
+;>@t6 return SlideSquare1(Jingle1C_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $1C (Warp), read by Jingle1C_Start / Jingle1C_Update.
+;@ Jingle1C_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle1C_Sq1, Jingle1C_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle1C_Data::
 Jingle1C_Slide:
 	db $00, $ae, $ff, $60, $00, $aa, $ff, $60
@@ -940,31 +1752,62 @@ Jingle1C_Sq1:
 Jingle1C_Sq1_2:
 	db $00, $40, $a4, $40, $86, $01
 
+;@ def Jingle1D_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $1D, Error: an item has no ammo left, a wrong signpost. Its steps run 8
+;@ times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle1D_Start::
+;> wJingleRepeat = 8
 	ld a, $08
 	ld [wJingleRepeat], a
+;> return StartJingle(Jingle1D_Sq1, timer)
 	ld hl, Jingle1D_Sq1
 	jp StartJingle
 
+;@ def Jingle1D_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $1D (Error) on: each time its timer runs out, the next step. At the end the
+;@ channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle1D_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> rNR11 = 0x79
 	ld a, $79
 	ldh [rNR11], a
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 3:
 	cp $03
-	jr z, .x48f2
-.x48e9
+	jr z, .case1
+.part1
+;=@t1
 	ld hl, Jingle1D_Sq1FreqTable
 	call GetSfxTableEntry
+;=@t2
 	jp WriteSquare1Freq
-.x48f2
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return EndJingle()
 	jp z, EndJingle
+;>     wJingleStep = 2
 	ld a, $02
 	ld [bc], a
-	jr .x48e9
+	jr .part1
+;>@t1 record = mem16[Jingle1D_Sq1FreqTable + 2 * (wJingleStep - 1)]
+;>@t2 return WriteSquare1Freq(record, timer)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $1D (Error), read by Jingle1D_Start / Jingle1D_Update.
+;@ Jingle1D_Sq1FreqTable: one pointer per step (the first for step 1) to its record (square 1 notes).
+;@ Jingle1D_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
+;@ Jingle1D_Sq1Freq, Jingle1D_Sq1Freq_2: square 1 notes, 3 bytes each: NR13 / NR14 frequency, then the
+;@ frames until the next step.
 Jingle1D_Data::
 Jingle1D_Sq1FreqTable:
 	dw Jingle1D_Sq1Freq_2, Jingle1D_Sq1Freq
@@ -975,20 +1818,44 @@ Jingle1D_Sq1Freq:
 Jingle1D_Sq1Freq_2:
 	db $c0, $c4, $0c
 
+;@ def Jingle1E_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $1E (not requested directly). It locks its channel, so that other effects of
+;@ the channel are ignored until it ends.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle1E_Start::
+;> return StartLockedJingle(Jingle1E_Sq1, timer)
 	ld hl, Jingle1E_Sq1
 	jp StartLockedJingle
 
+;@ def Jingle1E_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $1E on: each time its timer runs out, the next step. At the end the channel
+;@ goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle1E_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 5: return EndJingle()
 	cp $05
 	jp z, EndJingle
+;> record = mem16[Jingle1E_Sq1FreqTable + 2 * (wJingleStep - 1)]
 	ld hl, Jingle1E_Sq1FreqTable
 	call GetSfxTableEntry
+;> return WriteSquare1Freq(record, timer)
 	jp WriteSquare1Freq
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $1E, read by Jingle1E_Start / Jingle1E_Update.
+;@ Jingle1E_Sq1FreqTable: one pointer per step (the first for step 1) to its record (square 1 notes).
+;@ Jingle1E_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
+;@ Jingle1E_Sq1Freq, Jingle1E_Sq1Freq_2: square 1 notes, 3 bytes each: NR13 / NR14 frequency, then the
+;@ frames until the next step.
 Jingle1E_Data::
 Jingle1E_Sq1FreqTable:
 	dw Jingle1E_Sq1Freq, Jingle1E_Sq1Freq, Jingle1E_Sq1Freq_2, Jingle1E_Sq1Freq_2
@@ -999,103 +1866,197 @@ Jingle1E_Sq1Freq:
 Jingle1E_Sq1Freq_2:
 	db $00, $c6, $18
 
+;@ def Jingle1F_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $1F, Genie into the bottle: the genie goes back into its bottle. It locks
+;@ its channel, so that other effects of the channel are ignored until it ends; its steps run 10 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle1F_Start::
+;> wJingleRepeat = 10
 	ld a, $0a
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle1F_Sq1)
 	ld hl, Jingle1F_Sq1
 	call SaveSquare1Freq
+;> return StartLockedJingle(Jingle1F_Sq1, timer)
 	jp StartLockedJingle
 
+;@ def Jingle1F_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $1F (Genie into the bottle) on, a step every frame. The frequency slides by a
+;@ table of steps. At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle1F_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 9:
 	cp $09
-	jr z, .x4954
-.x494e
+	jr z, .case1
+.part1
+;=@t1
 	ld hl, Jingle1F_Slide
 	jp SlideSquare1
-.x4954
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return SilenceJingle(timer)
 	jp z, SilenceJingle
+;>     wJingleStep = 1
 	ld a, $01
 	ld [bc], a
-	jr .x494e
+	jr .part1
+;>@t1 return SlideSquare1(Jingle1F_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $1F (Genie into the bottle), read by Jingle1F_Start / Jingle1F_Update.
+;@ Jingle1F_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle1F_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle1F_Data::
 Jingle1F_Slide:
 	db $00, $30, $00, $60, $00, $60, $00, $30, $ff, $c0, $ff, $80, $ff, $80, $ff, $c0
 Jingle1F_Sq1:
 	db $00, $80, $0b, $20, $86, $01
 
+;@ def Jingle20_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $20, Thud: a boulder bounces, a boss hops (Genie's bottle, Slime Eye, Hinox,
+;@ Armos Knight, the final Nightmare). Its steps run 8 times; some running effects keep their channel (the
+;@ request is then ignored).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle20_Start::
+;> if wActiveJingle != 0x20:
 	ld a, [wActiveJingle]
 	cp $20
-	jr z, .x4980
+	jr z, .case1
+;>     if wActiveJingle: return IgnoreJingle()
+.part1
 	and a
 	jp nz, IgnoreJingle
-.x4980
+;> wJingleRepeat = 8
+.case1
 	ld a, $08
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle20_Sq1)
 	ld hl, Jingle20_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle20_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle20_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $20 (Thud) on, a step every frame. The frequency slides by a table of steps.
+;@ At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle20_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 3:
 	cp $03
-	jr z, .x499b
-.x4995
+	jr z, .case1
+.part1
+;=@t1
 	ld hl, Jingle20_Slide
 	jp SlideSquare1
-.x499b
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return EndJingle()
 	jp z, EndJingle
+;>     wJingleStep = 1
 	ld a, $01
 	ld [bc], a
-	jr .x4995
+	jr .part1
+;>@t1 return SlideSquare1(Jingle20_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $20 (Thud), read by Jingle20_Start / Jingle20_Update.
+;@ Jingle20_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle20_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle20_Data::
 Jingle20_Slide:
 	db $00, $c0, $ff, $a0
 Jingle20_Sq1:
 	db $00, $80, $f1, $80, $83, $01
 
+;@ def Jingle21_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $21, Seagull: a seagull cries in the ending. Its steps run 28 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle21_Start::
+;> wJingleRepeat = 28
 	ld a, $1c
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle21_Sq1)
 	ld hl, Jingle21_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle21_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle21_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $21 (Seagull) on, a step every frame. The frequency slides by a table of
+;@ steps. At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle21_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 2:
 	cp $02
-	jr z, .x49cb
-.x49c5
+	jr z, .case1
+.part1
+;=@t3
 	ld hl, Jingle21_Slide
 	jp SlideSquare1
-.x49cb
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return SilenceJingle(timer)
 	jp z, SilenceJingle
+;>     if wJingleRepeat == 20:
 	cp $14
-	jr z, .x49de
+	jr z, .case2
+.part2
+;=@t1
 	cp $0a
-	jr z, .x49e9
+	jr z, .case3
+.part3
+;=@t2
 	ld a, $01
 	ld [bc], a
-	jr .x49c5
-.x49de
+	jr .part1
+;>         wJingleStep = 0
+.case2
 	xor a
 	ld [bc], a
+;>         SaveSquare1Freq(Jingle21_Sq1_2)
 	ld hl, Jingle21_Sq1_2
 	call SaveSquare1Freq
+;>         return WriteSquare1Regs(Jingle21_Sq1_2, timer)
 	jp WriteSquare1Regs
-.x49e9
+;>@t1     if wJingleRepeat == 10:
+;>         wJingleStep = 0
+.case3
 	xor a
 	ld [bc], a
+;>         SaveSquare1Freq(Jingle21_Sq1_3)
 	ld hl, Jingle21_Sq1_3
 	call SaveSquare1Freq
+;>         return WriteSquare1Regs(Jingle21_Sq1_3, timer)
 	jp WriteSquare1Regs
+;>@t2     wJingleStep = 1
+;>@t3 return SlideSquare1(Jingle21_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $21 (Seagull), read by Jingle21_Start / Jingle21_Update.
+;@ Jingle21_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle21_Sq1, Jingle21_Sq1_2, Jingle21_Sq1_3: square 1 register records, 6 bytes each: NR10 sweep, NR11
+;@ duty and length, NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the
+;@ frames until the next step.
 Jingle21_Data::
 Jingle21_Slide:
 	db $ff, $ff
@@ -1106,50 +2067,83 @@ Jingle21_Sq1_2:
 Jingle21_Sq1_3:
 	db $00, $00, $10, $a7, $87, $01
 
+;@ def Jingle22_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $22, Bees: the bees chase Link (each start a step higher) (unless it plays
+;@ already). Each start counts wJingle22Count up and picks the pitch from it: four records that go up and
+;@ down again over twelve starts.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle22_Start::
+;> if wActiveJingle == 0x22: return IgnoreJingle()
 	ld a, [wActiveJingle]
 	cp $22
 	jp z, IgnoreJingle
+;> wJingle22Count += 1
 	ld bc, wJingle22Count
 	call NextSfxStep
+;> if wJingle22Count < 4:
 	cp $04
-	jr nc, .x4a20
-.x4a1a
+	jr nc, .not1
+;>     return StartJingle(Jingle22_Sq1, timer)
+.first
 	ld hl, Jingle22_Sq1
 	jp StartJingle
-.x4a20
+;> if wJingle22Count < 6:
+.not1
 	cp $06
-	jr nc, .x4a2a
-.x4a24
+	jr nc, .not2
+;>     return StartJingle(Jingle22_Sq1_2, timer)
+.second
 	ld hl, Jingle22_Sq1_2
 	jp StartJingle
-.x4a2a
+;> if wJingle22Count < 8:
+.not2
 	cp $08
-	jr nc, .x4a34
-.x4a2e
+	jr nc, .not3
+;>     return StartJingle(Jingle22_Sq1_3, timer)
+.third
 	ld hl, Jingle22_Sq1_3
 	jp StartJingle
-.x4a34
+;> if wJingle22Count < 9:
+.not3
 	cp $09
-	jr nc, .x4a3e
+	jr nc, .not4
+;>     return StartJingle(Jingle22_Sq1_4, timer)
 	ld hl, Jingle22_Sq1_4
 	jp StartJingle
-.x4a3e
+;> if wJingle22Count < 11:
+.not4
 	cp $0b
-	jr nc, .x4a44
-	jr .x4a2e
-.x4a44
+	jr nc, .not5
+;>     return StartJingle(Jingle22_Sq1_3, timer)  # down again
+	jr .third
+;> if wJingle22Count != 13:
+.not5
 	cp $0d
-	jr z, .x4a4a
-	jr .x4a24
-.x4a4a
+	jr z, .again
+;>     return StartJingle(Jingle22_Sq1_2, timer)
+	jr .second
+;> wJingle22Count = 1                          # over again from the bottom
+.again
 	ld a, $01
 	ld [bc], a
-	jr .x4a1a
+;> return StartJingle(Jingle22_Sq1, timer)
+	jr .first
 
+;@ def Jingle22_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $22 (Bees) on, a step every frame. At the end the channel goes back to the
+;@ music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle22_Update::
+;> return EndJingle()
 	jp EndJingle
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $22 (Bees), read by Jingle22_Start / Jingle22_Update.
+;@ Jingle22_Sq1, Jingle22_Sq1_2, Jingle22_Sq1_3, Jingle22_Sq1_4: square 1 register records, 6 bytes each:
+;@ NR10 sweep, NR11 duty and length, NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the
+;@ sound), then the frames until the next step.
 Jingle22_Data::
 Jingle22_Sq1:
 	db $15, $38, $30, $40, $c6, $02
@@ -1161,29 +2155,61 @@ Jingle22_Sq1_4:
 	db $15, $38, $90, $34, $c6, $02
 	db $15, $38, $d0, $30, $c6, $02
 
+;@ def Jingle23_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $23, Rumble: a gate opens, the weathervane slides, an instrument appears. It
+;@ locks its channel, so that other effects of the channel are ignored until it ends.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle23_Start::
+;> wMusicChannel2[0x0F] |= 0x80
 	ld hl, wMusicChannel2 + $0F
 	set 7, [hl]
+;> return StartLockedJingle(Jingle23_Sq1, timer)
 	ld hl, Jingle23_Sq1
 	jp StartLockedJingle
 
+;@ def Jingle23_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $23 (Rumble) on: each time its timer runs out, the next step. At the end the
+;@ channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle23_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 8:
 	cp $08
-	jr z, .x4a97
+	jr z, .case1
+;>@t1     wMusicChannel2[0x0F] &= 0x7F
+;>@t2     return SilenceJingle(timer)
+;> record = mem16[Jingle23_Sq2Table + 2 * (wJingleStep - 1)]
+.part1
 	ld hl, Jingle23_Sq2Table
 	call GetSfxTableEntry
+;> if (wJingleStep & 0x01): return WriteSquare2Regs(record, timer)
 	ld a, [wJingleStep]
 	and $01
 	jp nz, WriteSquare2Regs
+;> return WriteSquare1Regs(record, timer)
 	jp WriteSquare1Regs
-.x4a97
+.case1
+;=@t1
 	ld hl, wMusicChannel2 + $0F
 	res 7, [hl]
+;=@t2
 	jp SilenceJingle
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $23 (Rumble), read by Jingle23_Start / Jingle23_Update.
+;@ Jingle23_Sq2Table: one pointer per step (the first for step 1) to its record (square 2 register records).
+;@ Jingle23_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
+;@ Jingle23_Sq2, Jingle23_Sq2_2, Jingle23_Sq2_3, Jingle23_Sq2_4, Jingle23_Sq2_5, Jingle23_Sq2_6,
+;@ Jingle23_Sq2_7: square 2 register records, 5 bytes each: NR21 duty and length, NR22 volume envelope, NR23
+;@ / NR24 frequency (NR24 bit 7 restarts the sound), then the frames until the next step.
 Jingle23_Data::
 Jingle23_Sq2Table:
 	dw Jingle23_Sq2, Jingle23_Sq2_2, Jingle23_Sq2_3, Jingle23_Sq2_4, Jingle23_Sq2_5, Jingle23_Sq2_6, Jingle23_Sq2_7
@@ -1207,47 +2233,101 @@ Jingle23_Sq2_6:
 Jingle23_Sq2_7:
 	db $80, $e2, $be, $87, $10
 
+;@ def Jingle24_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $24, Hop: something hops or wakes (Slime Eye, Evil Eagle's gust, Armos
+;@ Knight, Stalfos, the walrus).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle24_Start::
+;> return StartJingle(Jingle24_Sq1, timer)
 	ld hl, Jingle24_Sq1
 	jp StartJingle
 
+;@ def Jingle24_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $24 (Hop) on: each time its timer runs out, the next step. At the end the
+;@ channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle24_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> return EndJingle()
 	jp EndJingle
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $24 (Hop), read by Jingle24_Start / Jingle24_Update.
+;@ Jingle24_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle24_Sq1::
 	db $27, $80, $83, $00, $86, $18
 
+;@ def Jingle25_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $25 (not requested directly). It locks its channel, so that other effects of
+;@ the channel are ignored until it ends; its steps run 7 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle25_Start::
+;> wJingleRepeat = 7
 	ld a, $07
 	ld [wJingleRepeat], a
+;> return StartLockedJingle(Jingle25_Sq1, timer)
 	ld hl, Jingle25_Sq1
 	jp StartLockedJingle
 
+;@ def Jingle25_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $25 on: each time its timer runs out, the next step. At the end the channel
+;@ goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle25_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 6:
 	cp $06
-	jr z, .x4b0f
+	jr z, .case1
+.part1
+;=@t1
 	cp $07
-	jr z, .x4b1a
-.x4b06
+	jr z, .case2
+.part2
+;=@t2
 	ld hl, Jingle25_Sq1FreqTable
 	call GetSfxTableEntry
+;=@t3
 	jp WriteSquare1Freq
-.x4b0f
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return SilenceJingle(timer)
 	jp z, SilenceJingle
+;>     wJingleStep = 6
 	ld a, $06
 	ld [bc], a
-	jr .x4b06
-.x4b1a
+	jr .part2
+;> else:
+;>@t1     if wJingleStep == 7:
+;>         wJingleStep = 3
+.case2
 	ld a, $03
 	ld [bc], a
-	jr .x4b06
+	jr .part2
+;>@t2 record = mem16[Jingle25_Sq1FreqTable + 2 * (wJingleStep - 1)]
+;>@t3 return WriteSquare1Freq(record, timer)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $25, read by Jingle25_Start / Jingle25_Update.
+;@ Jingle25_Sq1FreqTable: one pointer per step (the first for step 1) to its record (square 1 notes).
+;@ Jingle25_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
+;@ Jingle25_Sq1Freq, Jingle25_Sq1Freq_2, Jingle25_Sq1Freq_3, Jingle25_Sq1Freq_4, Jingle25_Sq1Freq_5,
+;@ Jingle25_Sq1Freq_6: square 1 notes, 3 bytes each: NR13 / NR14 frequency, then the frames until the next
+;@ step.
 Jingle25_Data::
 Jingle25_Sq1FreqTable:
 	dw Jingle25_Sq1Freq, Jingle25_Sq1Freq_2, Jingle25_Sq1Freq_3, Jingle25_Sq1Freq_4, Jingle25_Sq1Freq_5, Jingle25_Sq1Freq_6
@@ -1266,39 +2346,75 @@ Jingle25_Sq1Freq_5:
 Jingle25_Sq1Freq_6:
 	db $06, $07, $02
 
+;@ def Jingle26_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $26, Owl flies off: the owl flies away. It locks its channel, so that other
+;@ effects of the channel are ignored until it ends; its steps run 14 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle26_Start::
+;> wJingleRepeat = 14
 	ld a, $0e
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle26_Sq1)
 	ld hl, Jingle26_Sq1
 	call SaveSquare1Freq
+;> return StartLockedJingle(Jingle26_Sq1, timer)
 	jp StartLockedJingle
 
+;@ def Jingle26_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $26 (Owl flies off) on: each time its timer runs out, the next step. The
+;@ frequency slides by a table of steps. At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle26_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleTimer = 3
 	ld a, $03
 	ld [de], a
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 4:
 	cp $04
-	jr z, .x4b65
-.x4b5f
+	jr z, .case1
+.part1
+;=@t2
 	ld hl, Jingle26_Slide
 	jp SlideSquare1
-.x4b65
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return EndJingle()
 	jp z, EndJingle
+;>     if wJingleRepeat == 9:
 	cp $09
-	jr z, .x4b74
+	jr z, .case2
+.part2
+;=@t1
 	ld a, $01
 	ld [bc], a
-	jr .x4b5f
-.x4b74
+	jr .part1
+;>         wJingleStep = 0
+.case2
 	xor a
 	ld [bc], a
+;>         SaveSquare1Freq(Jingle26_Sq1_2)
 	ld hl, Jingle26_Sq1_2
 	call SaveSquare1Freq
+;>         return WriteSquare1Regs(Jingle26_Sq1_2, timer)
 	jp WriteSquare1Regs
+;>@t1     wJingleStep = 1
+;>@t2 return SlideSquare1(Jingle26_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $26 (Owl flies off), read by Jingle26_Start / Jingle26_Update.
+;@ Jingle26_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle26_Sq1, Jingle26_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle26_Data::
 Jingle26_Slide:
 	db $ff, $e0, $00, $20, $ff, $fc
@@ -1307,41 +2423,87 @@ Jingle26_Sq1:
 Jingle26_Sq1_2:
 	db $00, $00, $a7, $dc, $87, $03
 
+;@ def Jingle27_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $27 (not requested directly).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle27_Start::
+;> return StartJingle(Jingle27_Sq1, timer)
 	ld hl, Jingle27_Sq1
 	jp StartJingle
 
+;@ def Jingle27_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $27 on: each time its timer runs out, the next step. At the end the channel
+;@ goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle27_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 2: return SilenceJingle(timer)
 	cp $02
 	jp z, SilenceJingle
+;> rNR10 = 0x1E
 	ld a, $1e
 	ldh [rNR10], a
+;> wJingleTimer = 24
 	ld a, $18
 	ld [de], a
+;> return
 	ret
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $27, read by Jingle27_Start / Jingle27_Update.
+;@ Jingle27_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle27_Sq1::
 	db $14, $40, $c0, $00, $81, $0c
 
+;@ def Jingle28_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $28 (bank $07).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle28_Start::
+;> return StartJingle(Jingle28_Sq1, timer)
 	ld hl, Jingle28_Sq1
 	jp StartJingle
 
+;@ def Jingle28_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $28 on: each time its timer runs out, the next step. At the end the channel
+;@ goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle28_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 8: return EndJingle()
 	cp $08
 	jp z, EndJingle
+;> record = mem16[Jingle28_Sq1FreqTable + 2 * (wJingleStep - 1)]
 	ld hl, Jingle28_Sq1FreqTable
 	call GetSfxTableEntry
+;> rNR11 = 0xBD
 	ld a, $bd
 	ldh [rNR11], a
+;> return WriteSquare1Freq(record, timer)
 	jp WriteSquare1Freq
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $28, read by Jingle28_Start / Jingle28_Update.
+;@ Jingle28_Sq1FreqTable: one pointer per step (the first for step 1) to its record (square 1 notes).
+;@ Jingle28_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
+;@ Jingle28_Sq1Freq, Jingle28_Sq1Freq_2, Jingle28_Sq1Freq_3, Jingle28_Sq1Freq_4, Jingle28_Sq1Freq_5,
+;@ Jingle28_Sq1Freq_6, Jingle28_Sq1Freq_7: square 1 notes, 3 bytes each: NR13 / NR14 frequency, then the
+;@ frames until the next step.
 Jingle28_Data::
 Jingle28_Sq1FreqTable:
 	dw Jingle28_Sq1Freq, Jingle28_Sq1Freq_2, Jingle28_Sq1Freq_3, Jingle28_Sq1Freq_4, Jingle28_Sq1Freq_5, Jingle28_Sq1Freq_6, Jingle28_Sq1Freq_7
@@ -1362,66 +2524,137 @@ Jingle28_Sq1Freq_6:
 Jingle28_Sq1Freq_7:
 	db $20, $c7, $03
 
+;@ def Jingle29_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $29 (bank $05).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle29_Start::
+;> return StartJingle(Jingle29_Sq1, timer)
 	ld hl, Jingle29_Sq1
 	jp StartJingle
 
+;@ def Jingle29_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $29 on: each time its timer runs out, the next step. At the end the channel
+;@ goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle29_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 2: return EndJingle()
 	cp $02
 	jp z, EndJingle
+;> rNR10 = 0x1E
 	ld a, $1e
 	ldh [rNR10], a
+;> wJingleTimer = 6
 	ld a, $06
 	ld [de], a
+;> return
 	ret
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $29, read by Jingle29_Start / Jingle29_Update.
+;@ Jingle29_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle29_Sq1::
 	db $17, $96, $49, $60, $c6, $04
 
+;@ def Jingle2A_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $2A, Dodongo crawl: a Dodongo snake crawls.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle2A_Start::
+;> return StartJingle(Jingle2A_Sq1, timer)
 	ld hl, Jingle2A_Sq1
 	jp StartJingle
 
+;@ def Jingle2A_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $2A (Dodongo crawl) on: each time its timer runs out, the next step. At the
+;@ end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle2A_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> return SilenceJingle(timer)
 	jp SilenceJingle
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $2A (Dodongo crawl), read by Jingle2A_Start / Jingle2A_Update.
+;@ Jingle2A_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle2A_Sq1::
 	db $16, $00, $f0, $00, $c2, $10
 
+;@ def Jingle2B_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $2B, Instrument notes: an instrument plays its notes. Its steps run 44
+;@ times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle2B_Start::
+;> wJingleRepeat = 44
 	ld a, $2c
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle2B_Sq1)
 	ld hl, Jingle2B_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle2B_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle2B_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $2B (Instrument notes) on, a step every frame. The frequency slides by a
+;@ table of steps. At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle2B_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 11:
 	cp $0b
-	jr z, .x4c47
-.x4c41
+	jr z, .case1
+.part1
+;=@t2
 	ld hl, Jingle2B_Slide
 	jp SlideSquare1
-.x4c47
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return SilenceJingle(timer)
 	jp z, SilenceJingle
+;>     if wJingleRepeat == 12:
 	cp $0c
-	jr z, .x4c56
+	jr z, .case2
+.part2
+;=@t1
 	ld a, $01
 	ld [bc], a
-	jr .x4c41
-.x4c56
+	jr .part1
+;>         wJingleStep = 0
+.case2
 	xor a
 	ld [bc], a
+;>         SaveSquare1Freq(Jingle2B_Sq1_2)
 	ld hl, Jingle2B_Sq1_2
 	call SaveSquare1Freq
+;>         return WriteSquare1Regs(Jingle2B_Sq1_2, timer)
 	jp WriteSquare1Regs
+;>@t1     wJingleStep = 1
+;>@t2 return SlideSquare1(Jingle2B_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $2B (Instrument notes), read by Jingle2B_Start / Jingle2B_Update.
+;@ Jingle2B_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle2B_Sq1, Jingle2B_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle2B_Data::
 Jingle2B_Slide:
 	db $00, $08, $ff, $f0, $00, $08, $ff, $fc, $00, $06, $ff, $f8, $00, $06, $ff, $fa
@@ -1431,42 +2664,81 @@ Jingle2B_Sq1:
 Jingle2B_Sq1_2:
 	db $00, $00, $f7, $f0, $87, $04
 
+;@ def Jingle2C_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $2C, Ocarina: Link plays the ocarina. It locks its channel, so that other
+;@ effects of the channel are ignored until it ends; its steps run 34 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle2C_Start::
+;> wJingleRepeat = 34
 	ld a, $22
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle2C_Sq1)
 	ld hl, Jingle2C_Sq1
 	call SaveSquare1Freq
+;> return StartLockedJingle(Jingle2C_Sq1, timer)
 	jp StartLockedJingle
 
+;@ def Jingle2C_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $2C (Ocarina) on, a step every frame. The frequency slides by a table of
+;@ steps. At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle2C_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 7:
 	cp $07
-	jr z, .x4c9c
-.x4c96
+	jr z, .case1
+.part1
+;=@t3
 	ld hl, Jingle2C_Slide
 	jp SlideSquare1
-.x4c9c
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return EndJingle()
 	jp z, EndJingle
+;>     if wJingleRepeat == 30:
 	cp $1e
-	jr z, .x4cb2
+	jr z, .case2
+.part2
+;=@t1
 	cp $06
-	jr z, .x4cbe
+	jr z, .case3
+.part3
+;=@t2
 	ld a, $01
 	ld bc, wJingleStep
 	ld [bc], a
-	jr .x4c96
-.x4cb2
+	jr .part1
+;>         wJingleStep = 1
+.case2
 	ld hl, Jingle2C_Sq1_2
-.x4cb5
+.part4
 	ld a, $01
 	ld [bc], a
+;>         SaveSquare1Freq(Jingle2C_Sq1_2)
 	call SaveSquare1Freq
+;>         return WriteSquare1Regs(Jingle2C_Sq1_2, timer)
 	jp WriteSquare1Regs
-.x4cbe
+;>@t1     if wJingleRepeat == 6:
+;>         wJingleStep = 1
+.case3
 	ld hl, Jingle2C_Sq1_3
-	jr .x4cb5
+	jr .part4
+;>         SaveSquare1Freq(Jingle2C_Sq1_3)
+;>         return WriteSquare1Regs(Jingle2C_Sq1_3, timer)
+;>@t2     wJingleStep = 1
+;>@t3 return SlideSquare1(Jingle2C_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $2C (Ocarina), read by Jingle2C_Start / Jingle2C_Update.
+;@ Jingle2C_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle2C_Sq1, Jingle2C_Sq1_2, Jingle2C_Sq1_3: square 1 register records, 6 bytes each: NR10 sweep, NR11
+;@ duty and length, NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the
+;@ frames until the next step.
 Jingle2C_Data::
 Jingle2C_Slide:
 	db $00, $02, $00, $01, $ff, $f0, $ff, $e0, $ff, $c0, $00, $71
@@ -1477,73 +2749,137 @@ Jingle2C_Sq1_2:
 Jingle2C_Sq1_3:
 	db $00, $00, $47, $70, $87, $01
 
+;@ def Jingle2D_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $2D (the followers, bank $19). It locks its channel, so that other effects
+;@ of the channel are ignored until it ends; its steps run 3 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle2D_Start::
+;> wJingleRepeat = 3
 	ld a, $03
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle2D_Sq1)
 	ld hl, Jingle2D_Sq1
 	call SaveSquare1Freq
+;> return StartLockedJingle(Jingle2D_Sq1, timer)
 	jp StartLockedJingle
 
+;@ def Jingle2D_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $2D on: every 8 frames a slide step, rounds of 4 steps until wJingleRepeat
+;@ runs out; the last round plays with a fading envelope.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle2D_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleTimer = 8
 	ld a, $08
 	ld [de], a
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 5:
 	cp $05
-	jr z, .x4d03
-.x4cfd
+	jr z, .round
+.slide
+;=@t3
 	ld hl, Jingle2D_Slide
 	jp SlideSquare1
-.x4d03
+;>     wJingleRepeat -= 1
+.round
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return EndJingle()
 	jp z, EndJingle
+;>     if wJingleRepeat == 1:
 	cp $01
-	jr z, .x4d12
-.x4d0d
+	jr z, .last
+.again
+;=@t2
 	ld a, $01
 	ld [bc], a
-	jr .x4cfd
-.x4d12
+	jr .slide
+;>         rNR12 = 0x65                          # the last round fades out
+.last
 	ld a, $65
 	ldh [rNR12], a
-	jr .x4d0d
+	jr .again
+;>@t2     wJingleStep = 1
+;>@t3 return SlideSquare1(Jingle2D_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $2D, read by Jingle2D_Start / Jingle2D_Update.
+;@ Jingle2D_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle2D_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle2D_Data::
 Jingle2D_Slide:
 	db $00, $04, $ff, $dd, $00, $06, $00, $19
 Jingle2D_Sq1:
 	db $00, $80, $1f, $b6, $87, $08
 
+;@ def Jingle2E_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $2E (bank $19). Its steps run 9 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle2E_Start::
+;> wJingleRepeat = 9
 	ld a, $09
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle2E_Sq1)
 	ld hl, Jingle2E_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle2E_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle2E_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $2E on, a step every frame. The frequency slides by a table of steps. At the
+;@ end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle2E_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 41:
 	cp $29
-	jr z, .x4d41
-.x4d3b
+	jr z, .case1
+.part1
+;=@t2
 	ld hl, Jingle2E_Slide
 	jp SlideSquare1
-.x4d41
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return EndJingle()
 	jp z, EndJingle
+;>     if wJingleRepeat == 3:
 	cp $03
-	jr z, .x4d50
+	jr z, .case2
+.part2
+;=@t1
 	ld a, $01
 	ld [bc], a
-	jr .x4d3b
-.x4d50
+	jr .part1
+;>         wJingleStep = 0
+.case2
 	xor a
 	ld [bc], a
+;>         SaveSquare1Freq(Jingle2E_Sq1_2)
 	ld hl, Jingle2E_Sq1_2
 	call SaveSquare1Freq
+;>         return WriteSquare1Regs(Jingle2E_Sq1_2, timer)
 	jp WriteSquare1Regs
+;>@t1     wJingleStep = 1
+;>@t2 return SlideSquare1(Jingle2E_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $2E, read by Jingle2E_Start / Jingle2E_Update.
+;@ Jingle2E_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle2E_Sq1, Jingle2E_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle2E_Data::
 Jingle2E_Slide:
 	db $00, $30, $00, $30, $00, $30, $00, $30, $00, $28, $00, $28, $00, $28, $00, $28
@@ -1556,79 +2892,157 @@ Jingle2E_Sq1:
 Jingle2E_Sq1_2:
 	db $00, $80, $f7, $00, $81, $10
 
+;@ def Jingle2F_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $2F, Roll: the hole filler rolls, a Pokey segment bounces, the final
+;@ Nightmare leaves. Its steps run 7 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle2F_Start::
+;> wJingleRepeat = 7
 	ld a, $07
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle2F_Sq1)
 	ld hl, Jingle2F_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle2F_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle2F_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $2F (Roll) on, a step every frame. The frequency slides by a table of steps.
+;@ At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle2F_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 7:
 	cp $07
-	jr z, .x4dd2
-.x4dcc
+	jr z, .case1
+.part1
+;=@t1
 	ld hl, Jingle2F_Slide
 	jp SlideSquare1
-.x4dd2
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return SilenceJingle(timer)
 	jp z, SilenceJingle
+;>     wJingleStep = 1
 	ld a, $01
 	ld [bc], a
-	jr .x4dcc
+	jr .part1
+;>@t1 return SlideSquare1(Jingle2F_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $2F (Roll), read by Jingle2F_Start / Jingle2F_Update.
+;@ Jingle2F_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle2F_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle2F_Data::
 Jingle2F_Slide:
 	db $00, $80, $00, $60, $00, $40, $ff, $c0, $ff, $a0, $ff, $88
 Jingle2F_Sq1:
 	db $00, $80, $f2, $00, $85, $01
 
+;@ def Jingle30_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $30 (not requested directly). Its steps run 10 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle30_Start::
+;> wJingleRepeat = 10
 	ld a, $0a
 	ld [wJingleRepeat], a
+;> return StartJingle(Jingle30_Sq1, timer)
 	ld hl, Jingle30_Sq1
 	jp StartJingle
 
+;@ def Jingle30_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $30 on: each time its timer runs out, the next step. At the end the channel
+;@ goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle30_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleRepeat -= 1
 	call CountDownJingleRepeat
+;> if wJingleRepeat == 0: return EndJingle()
 	jp z, EndJingle
+;> return WriteSquare1Regs(Jingle30_Sq1, timer)
 	ld hl, Jingle30_Sq1
 	jp WriteSquare1Regs
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $30, read by Jingle30_Start / Jingle30_Update.
+;@ Jingle30_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle30_Sq1::
 	db $17, $bc, $64, $44, $c7, $02
 
+;@ def Jingle31_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $31, Grim Creeper: the Grim Creeper calls its bats. Its steps run 20 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle31_Start::
+;> wJingleRepeat = 20
 	ld a, $14
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle31_Sq1)
 	ld hl, Jingle31_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle31_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle31_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $31 (Grim Creeper) on, a step every frame. The frequency slides by a table of
+;@ steps. At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle31_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 3:
 	cp $03
-	jr z, .x4e2b
-.x4e25
+	jr z, .case1
+.part1
+;=@t2
 	ld hl, Jingle31_Slide
 	jp SlideSquare1
-.x4e2b
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return EndJingle()
 	jp z, EndJingle
+;>     if wJingleRepeat == 16:
 	cp $10
-	jr z, .x4e3a
+	jr z, .case2
+.part2
+;=@t1
 	ld a, $01
 	ld [bc], a
-	jr .x4e25
-.x4e3a
+	jr .part1
+;>         wJingleStep = 1
+.case2
 	ld hl, Jingle31_Sq1_2
 	ld a, $01
 	ld [bc], a
+;>         SaveSquare1Freq(Jingle31_Sq1_2)
 	call SaveSquare1Freq
+;>         return WriteSquare1Regs(Jingle31_Sq1_2, timer)
 	jp WriteSquare1Regs
+;>@t1     wJingleStep = 1
+;>@t2 return SlideSquare1(Jingle31_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $31 (Grim Creeper), read by Jingle31_Start / Jingle31_Update.
+;@ Jingle31_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle31_Sq1, Jingle31_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle31_Data::
 Jingle31_Slide:
 	db $ff, $fc, $00, $02
@@ -1637,20 +3051,43 @@ Jingle31_Sq1:
 Jingle31_Sq1_2:
 	db $00, $00, $47, $e0, $87, $01
 
+;@ def Jingle32_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $32, Hot Head jump: Hot Head jumps. It locks its channel, so that other
+;@ effects of the channel are ignored until it ends.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle32_Start::
+;> return StartLockedJingle(Jingle32_Sq1, timer)
 	ld hl, Jingle32_Sq1
 	jp StartLockedJingle
 
+;@ def Jingle32_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $32 (Hot Head jump) on: each time its timer runs out, the next step. At the
+;@ end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle32_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 3: return SilenceJingle(timer)
 	cp $03
 	jp z, SilenceJingle
+;> record = mem16[Jingle32_Sq1Table + 2 * (wJingleStep - 1)]
 	ld hl, Jingle32_Sq1Table
 	call GetSfxTableEntry
+;> return WriteSquare1Regs(record, timer)
 	jp WriteSquare1Regs
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $32 (Hot Head jump), read by Jingle32_Start / Jingle32_Update.
+;@ Jingle32_Sq1Table: one pointer per step (the first for step 1) to its record (square 1 register records).
+;@ Jingle32_Sq1, Jingle32_Sq1_2, Jingle32_Sq1_3: square 1 register records, 6 bytes each: NR10 sweep, NR11
+;@ duty and length, NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the
+;@ frames until the next step.
 Jingle32_Data::
 Jingle32_Sq1Table:
 	dw Jingle32_Sq1_2, Jingle32_Sq1_3
@@ -1661,76 +3098,145 @@ Jingle32_Sq1_2:
 Jingle32_Sq1_3:
 	db $1f, $8d, $20, $a0, $c7, $0c
 
+;@ def Jingle33_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $33 (not requested directly). Its steps run 2 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle33_Start::
+;> wJingleRepeat = 2
 	ld a, $02
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle33_Sq1)
 	ld hl, Jingle33_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle33_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle33_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $33 on: each time its timer runs out, the next step. The frequency slides by
+;@ a table of steps. At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle33_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleTimer = 8
 	ld a, $08
 	ld [de], a
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 4:
 	cp $04
-	jr z, .x4ead
+	jr z, .case1
+.part1
+;=@t1
 	cp $05
-	jr z, .x4eb8
-.x4ea7
+	jr z, .case2
+.part2
+;=@t2
 	ld hl, Jingle33_Slide
 	jp SlideSquare1
-.x4ead
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return SilenceJingle(timer)
 	jp z, SilenceJingle
+;>     wJingleStep = 4
 	ld a, $04
-.x4eb5
+.part3
 	ld [bc], a
-	jr .x4ea7
-.x4eb8
+	jr .part2
+;> else:
+;>@t1     if wJingleStep == 5:
+;>         wJingleStep = 1
+.case2
 	ld a, $01
-	jr .x4eb5
+	jr .part3
+;>@t2 return SlideSquare1(Jingle33_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $33, read by Jingle33_Start / Jingle33_Update.
+;@ Jingle33_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle33_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle33_Data::
 Jingle33_Slide:
 	db $00, $08, $ff, $fd, $00, $03, $ff, $f8
 Jingle33_Sq1:
 	db $00, $00, $60, $d1, $87, $08
 
+;@ def Jingle34_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $34 (not requested directly). Its steps run 12 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle34_Start::
+;> wJingleRepeat = 12
 	ld a, $0c
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle34_Sq1)
 	ld hl, Jingle34_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle34_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle34_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $34 on, a step every frame. The frequency slides by a table of steps. At the
+;@ end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle34_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 9:
 	cp $09
-	jr z, .x4ee9
+	jr z, .case1
+.part1
+;=@t2
 	cp $0a
-	jr z, .x4f00
-.x4ee3
+	jr z, .case3
+.part2
+;=@t1
 	ld hl, Jingle34_Slide
 	jp SlideSquare1
-.x4ee9
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return SilenceJingle(timer)
 	jp z, SilenceJingle
+;>     if wJingleRepeat == 9:
 	cp $09
-	jr z, .x4ef5
-	jr .x4ee3
-.x4ef5
+	jr z, .case2
+.part3
+;=@t1
+	jr .part2
+;>         wJingleStep = 0
+.case2
 	xor a
 	ld [bc], a
+;>         SaveSquare1Freq(Jingle34_Sq1_2)
 	ld hl, Jingle34_Sq1_2
 	call SaveSquare1Freq
+;>         return WriteSquare1Regs(Jingle34_Sq1_2, timer)
 	jp WriteSquare1Regs
-.x4f00
+;>@t1     return SlideSquare1(Jingle34_Slide, step)
+;>@t2 if wJingleStep == 10:
+;>     wJingleStep = 1
+.case3
 	ld a, $01
 	ld [bc], a
-	jr .x4ee3
+	jr .part2
+;> return SlideSquare1(Jingle34_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $34, read by Jingle34_Start / Jingle34_Update.
+;@ Jingle34_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle34_Sq1, Jingle34_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle34_Data::
 Jingle34_Slide:
 	db $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01, $00, $01
@@ -1740,44 +3246,84 @@ Jingle34_Sq1:
 Jingle34_Sq1_2:
 	db $00, $00, $a7, $d8, $87, $01
 
+;@ def Jingle35_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $35, Nightmare jingle: the final Nightmare. Its steps run 5 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle35_Start::
+;> wJingleRepeat = 5
 	ld a, $05
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle35_Sq1)
 	ld hl, Jingle35_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle35_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle35_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $35 (Nightmare jingle) on: each time its timer runs out, the next step. The
+;@ frequency slides by a table of steps. At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle35_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleTimer = 2
 	ld a, $02
 	ld [de], a
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 9:
 	cp $09
-	jr z, .x4f49
+	jr z, .case1
+.part1
+;=@t2
 	cp $0a
-	jr z, .x4f56
-.x4f43
+	jr z, .case2
+.part2
+;=@t1
 	ld hl, Jingle35_Slide
 	jp SlideSquare1
-.x4f49
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return SilenceJingle(timer)
 	jp z, SilenceJingle
+;>     if wJingleRepeat == 3:
 	cp $03
-	jr z, .x4f5b
+	jr z, .case3
+.part3
+;=@t1
 	ld a, [bc]
-	jr .x4f43
-.x4f56
+	jr .part2
+.case2
+;=@t3
 	ld a, $01
 	ld [bc], a
-	jr .x4f43
-.x4f5b
+	jr .part2
+;>         wJingleStep = 0
+.case3
 	xor a
 	ld [bc], a
+;>         SaveSquare1Freq(Jingle35_Sq1_2)
 	ld hl, Jingle35_Sq1_2
 	call SaveSquare1Freq
+;>         return WriteSquare1Regs(Jingle35_Sq1_2, timer)
 	jp WriteSquare1Regs
+;>@t1     return SlideSquare1(Jingle35_Slide, step)
+;>@t2 if wJingleStep == 10:
+;>@t3     wJingleStep = 1
+;> return SlideSquare1(Jingle35_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $35 (Nightmare jingle), read by Jingle35_Start / Jingle35_Update.
+;@ Jingle35_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle35_Sq1, Jingle35_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle35_Data::
 Jingle35_Slide:
 	db $00, $10, $00, $10, $00, $10, $00, $10, $00, $0c, $00, $08, $00, $04, $00, $02
@@ -1787,98 +3333,178 @@ Jingle35_Sq1:
 Jingle35_Sq1_2:
 	db $00, $80, $87, $a0, $86, $02
 
+;@ def Jingle36_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $36 (bank $15). Its steps run 11 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle36_Start::
+;> wJingleRepeat = 11
 	ld a, $0b
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle36_Sq1)
 	ld hl, Jingle36_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle36_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle36_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $36 on, a slide step every frame. Each round (wJingleRepeat frames) counts
+;@ wJingleSubStep up; the rounds get shorter, step 5 sets a new envelope, and from sub-step 13 on the slide
+;@ uses other steps. After sub-step $22 the effect ends.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle36_Update::
+;> wJingleRepeat -= 1
 	call CountDownJingleRepeat
-	jr z, .x4fbb
-.x4f97
+;> if wJingleRepeat == 0:                     # a round is over
+	jr z, .nextRound
+;>@t2     wJingleSubStep += 1
+;>@t3     if wJingleSubStep == 5:
+;>@t4         rNR12 = 0xA0
+;>@t5         n = 5
+;>@t6     elif wJingleSubStep == 0x22: return SilenceJingle(timer)
+;>@t7     elif wJingleSubStep >= 0x11:
+;>@t8         n = 0x11
+;>     else:
+;>         n = wJingleSubStep
+;>@t9     wJingleRepeat = u8(11 - (n >> 1))     # the rounds get shorter
+;> if wJingleSubStep < 13:
+.pick
 	ld a, [wJingleSubStep]
 	cp $0d
-	jr nc, .x4faf
+	jr nc, .late
+;>@t10     value = 1 if (wJingleSubStep & 1) == 0 else 2
 	and $01
-	jr nz, .x4fab
+	jr nz, .odd
 	ld a, $01
-.x4fa4
+;> else:
+;>@t11     value = 3 if (wJingleSubStep & 1) == 0 else 4
+;> wJingleStep = value
+.setStep
 	ld [bc], a
+;> return SlideSquare1(Jingle36_Slide, step)
 	ld hl, Jingle36_Slide
 	jp SlideSquare1
-.x4fab
+.odd
+;=@t10
 	ld a, $02
-	jr .x4fa4
-.x4faf
+	jr .setStep
+.late
+;=@t11
 	and $01
-	jr nz, .x4fb7
+	jr nz, .late4
 	ld a, $03
-	jr .x4fa4
-.x4fb7
+	jr .setStep
+.late4
+;=@t11
 	ld a, $04
-	jr .x4fa4
-.x4fbb
+	jr .setStep
+.nextRound
+;=@t2
 	push bc
 	ld bc, wJingleSubStep
 	call NextSfxStep
 	pop bc
+;=@t3
 	cp $05
-	jr z, .x4fdb
+	jr z, .five
+;=@t6
 	cp $22
 	jp z, SilenceJingle
+;=@t7
 	cp $11
-	jr nc, .x4fe3
-.x4fd0
+	jr nc, .cap
+.repeat
+;=@t9
 	sra a
 	ld e, a
 	ld a, $0b
 	sub e
 	ld [wJingleRepeat], a
-	jr .x4f97
-.x4fdb
+	jr .pick
+.five
+;=@t4
 	ld a, $a0
 	ldh [rNR12], a
+;=@t5
 	ld a, $05
-	jr .x4fd0
-.x4fe3
+	jr .repeat
+.cap
+;=@t8
 	ld a, $11
-	jr .x4fd0
+	jr .repeat
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $36, read by Jingle36_Start / Jingle36_Update.
+;@ Jingle36_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle36_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle36_Data::
 Jingle36_Slide:
 	db $00, $20, $ff, $e8, $00, $1c, $ff, $f0
 Jingle36_Sq1:
 	db $00, $40, $1f, $80, $83, $01
 
+;@ def Jingle37_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $37, Nightmare powdered: magic powder hits the final Nightmare's gel form.
+;@ It locks its channel, so that other effects of the channel are ignored until it ends; its steps run 16
+;@ times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle37_Start::
+;> wJingleRepeat = 16
 	ld a, $10
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle37_Sq1)
 	ld hl, Jingle37_Sq1
 	call SaveSquare1Freq
+;> return StartLockedJingle(Jingle37_Sq1, timer)
 	jp StartLockedJingle
 
+;@ def Jingle37_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $37 (Nightmare powdered) on, a step every frame. The frequency slides by a
+;@ table of steps. At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle37_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 9:
 	cp $09
-	jr z, .x5014
+	jr z, .case1
+.part1
+;=@t1
 	cp $0a
-	jr z, .x501f
-.x500e
+	jr z, .case2
+.part2
+;=@t2
 	ld hl, Jingle37_Slide
 	jp SlideSquare1
-.x5014
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return SilenceJingle(timer)
 	jp z, SilenceJingle
+;>     wJingleStep = 9
 	ld a, $09
 	ld [bc], a
-	jr .x500e
-.x501f
+	jr .part2
+;> else:
+;>@t1     if wJingleStep == 10:
+;>         wJingleStep = 1
+.case2
 	ld a, $01
 	ld [bc], a
-	jr .x500e
+	jr .part2
+;>@t2 return SlideSquare1(Jingle37_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $37 (Nightmare powdered), read by Jingle37_Start / Jingle37_Update.
+;@ Jingle37_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle37_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle37_Data::
 Jingle37_Slide:
 	db $00, $40, $00, $30, $00, $20, $ff, $e0, $ff, $d0, $ff, $c0, $ff, $a0, $ff, $80
@@ -1886,35 +3512,68 @@ Jingle37_Slide:
 Jingle37_Sq1:
 	db $00, $80, $80, $00, $86, $01
 
+;@ def Jingle38_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $38 (bank $15 (with a fast variant, wSfxFastVariant)). Some running effects
+;@ keep their channel (the request is then ignored).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle38_Start::
+;> if wActiveJingle: return IgnoreJingle()
 	ld a, [wActiveJingle]
 	and a
 	jp nz, IgnoreJingle
+;> if wSfxFastVariant:
 	ld a, [wSfxFastVariant]
 	and a
-	jr nz, .x5052
+	jr nz, .case1
+;>@t1     record = Jingle38_Sq1_2
+;> else:
+;>     record = Jingle38_Sq1
+.part1
 	ld hl, Jingle38_Sq1
-.x504c
+;> SaveSquare1Freq(record)
+.part2
 	call SaveSquare1Freq
+;> return StartJingle(record, timer)
 	jp StartJingle
-.x5052
+.case1
+;=@t1
 	ld hl, Jingle38_Sq1_2
-	jr .x504c
+	jr .part2
 
+;@ def Jingle38_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $38 on, a step every frame. The frequency slides by a table of steps.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle38_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 11:
 	cp $0b
-	jr z, .x5064
+	jr z, .case1
+.part1
+;=@t1
 	ld hl, Jingle38_Slide
 	jp SlideSquare1
-.x5064
+;>     wJingleToPlay = 0x38
+.case1
 	ld hl, wJingleToPlay
 	ld a, $38
 	ld [hli], a
+;>     wActiveJingle = 0
 	xor a
 	ld [hl], a
+;>     return Jingle38_Start(timer, step)
 	jr Jingle38_Start
+;>@t1 return SlideSquare1(Jingle38_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $38, read by Jingle38_Start / Jingle38_Update.
+;@ Jingle38_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle38_Sq1, Jingle38_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle38_Data::
 Jingle38_Slide:
 	db $00, $c0, $00, $90, $00, $60, $00, $30, $00, $18, $ff, $e8, $ff, $d0, $ff, $a0
@@ -1924,48 +3583,91 @@ Jingle38_Sq1:
 Jingle38_Sq1_2:
 	db $00, $80, $c0, $00, $83, $01
 
+;@ def Jingle39_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $39 (not requested directly). It locks its channel, so that other effects of
+;@ the channel are ignored until it ends; its steps run 4 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle39_Start::
+;> wJingleRepeat = 4
 	ld a, $04
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle39_Sq1)
 	ld hl, Jingle39_Sq1
 	call SaveSquare1Freq
+;> return StartLockedJingle(Jingle39_Sq1, timer)
 	jp StartLockedJingle
 
+;@ def Jingle39_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $39 on, a slide step every frame: rounds of 13 steps, the last ones with a
+;@ second slide; at the round where wJingleRepeat is 1 the sound starts over from its second record.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle39_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 14:
 	cp $0e
-	jr z, .x50ba
+	jr z, .round
+;>@t1     wJingleRepeat -= 1
+;>@t2     if wJingleRepeat == 0: return SilenceJingle(timer)
+;>@t3     wJingleStep = 14
+;> elif wJingleStep == 15:
 	cp $0f
-	jr z, .x50c5
-.x50a7
+	jr z, .s15
+;>@t4     if wJingleRepeat == 1:
+;>@t5         wJingleStep = 0
+;>@t6         SaveSquare1Freq(Jingle39_Sq1_2)
+;>@t7         return WriteSquare1Regs(Jingle39_Sq1_2, timer)
+;>@t8     wJingleStep = 1
+;> if wJingleRepeat < 3:
+.slide
 	ld a, [wJingleRepeat]
 	cp $03
-	jr c, .x50b4
+	jr c, .slow
+;>@t9     return SlideSquare1(Jingle39_Slide_2, step)
+;> return SlideSquare1(Jingle39_Slide, step)
 	ld hl, Jingle39_Slide
 	jp SlideSquare1
-.x50b4
+.slow
+;=@t9
 	ld hl, Jingle39_Slide_2
 	jp SlideSquare1
-.x50ba
+.round
+;=@t1
 	call CountDownJingleRepeat
+;=@t2
 	jp z, SilenceJingle
+;=@t3
 	ld a, $0e
 	ld [bc], a
-	jr .x50a7
-.x50c5
+	jr .slide
+.s15
+;=@t4
 	ld a, [wJingleRepeat]
 	cp $01
-	jr z, .x50d1
+	jr z, .restart
+;=@t8
 	ld a, $01
 	ld [bc], a
-	jr .x50a7
-.x50d1
+	jr .slide
+.restart
+;=@t5
 	xor a
 	ld [bc], a
+;=@t6
 	ld hl, Jingle39_Sq1_2
 	call SaveSquare1Freq
+;=@t7
 	jp WriteSquare1Regs
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $39, read by Jingle39_Start / Jingle39_Update.
+;@ Jingle39_Slide, Jingle39_Slide_2: frequency slide steps: big-endian 16-bit values, entry n is added to
+;@ the effect's frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle39_Sq1, Jingle39_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle39_Data::
 Jingle39_Slide:
 	db $00, $c0, $00, $a0, $00, $80, $00, $60, $00, $40, $00, $20, $ff, $e0, $ff, $e0
@@ -1978,33 +3680,63 @@ Jingle39_Sq1:
 Jingle39_Sq1_2:
 	db $00, $80, $20, $c0, $84, $01
 
+;@ def Jingle3A_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $3A (not requested directly). Its steps run 4 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle3A_Start::
+;> wJingleRepeat = 4
 	ld a, $04
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle3A_Sq1)
 	ld hl, Jingle3A_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle3A_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle3A_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $3A on, a step every frame. The frequency slides by a table of steps. At the
+;@ end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle3A_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 9:
 	cp $09
-	jr z, .x513f
+	jr z, .case1
+.part1
+;=@t1
 	cp $0a
-	jr z, .x514a
-.x5139
+	jr z, .case2
+.part2
+;=@t2
 	ld hl, Jingle3A_Slide
 	jp SlideSquare1
-.x513f
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return EndJingle()
 	jp z, EndJingle
+;>     wJingleStep = 9
 	ld a, $09
 	ld [bc], a
-	jr .x5139
-.x514a
+	jr .part2
+;> else:
+;>@t1     if wJingleStep == 10:
+;>         wJingleStep = 1
+.case2
 	ld a, $01
 	ld [bc], a
-	jr .x5139
+	jr .part2
+;>@t2 return SlideSquare1(Jingle3A_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $3A, read by Jingle3A_Start / Jingle3A_Update.
+;@ Jingle3A_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle3A_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle3A_Data::
 Jingle3A_Slide:
 	db $00, $12, $00, $0e, $00, $0a, $00, $08, $00, $06, $00, $04, $00, $02, $00, $01
@@ -2012,33 +3744,64 @@ Jingle3A_Slide:
 Jingle3A_Sq1:
 	db $00, $00, $a4, $00, $87, $01
 
+;@ def Jingle3B_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $3B, Sword beam: the sword shoots a beam, the Mad Batter leaves. Its steps
+;@ run 5 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle3B_Start::
+;> wJingleRepeat = 5
 	ld a, $05
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle3B_Sq1)
 	ld hl, Jingle3B_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle3B_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle3B_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $3B (Sword beam) on, a slide step every frame: steps 1-11 once, then step 12
+;@ again and again until wJingleRepeat runs out.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle3B_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 12:
 	cp $0c
-	jr z, .x518b
+	jr z, .round
+;>@t1     wJingleRepeat -= 1
+;>@t2     if wJingleRepeat == 0: return SilenceJingle(timer)
+;>@t3     wJingleStep = 12
+;> elif wJingleStep == 13:
 	cp $0d
-	jr z, .x5186
-.x5180
+	jr z, .wrap
+;>@t4     wJingleStep = 1
+;> return SlideSquare1(Jingle3B_Slide, step)
+.slide
 	ld hl, Jingle3B_Slide
 	jp SlideSquare1
-.x5186
+.wrap
+;=@t4
 	ld a, $01
 	ld [bc], a
-	jr .x5180
-.x518b
+	jr .slide
+.round
+;=@t1
 	call CountDownJingleRepeat
+;=@t2
 	jp z, SilenceJingle
+;=@t3
 	ld a, $0c
 	ld [bc], a
-	jr .x5180
+	jr .slide
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $3B (Sword beam), read by Jingle3B_Start / Jingle3B_Update.
+;@ Jingle3B_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle3B_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle3B_Data::
 Jingle3B_Slide:
 	db $ff, $c0, $ff, $a0, $00, $80, $ff, $c0, $ff, $a0, $00, $80, $ff, $c0, $ff, $a0
@@ -2046,28 +3809,57 @@ Jingle3B_Slide:
 Jingle3B_Sq1:
 	db $00, $00, $87, $80, $87, $01
 
+;@ def Jingle3C_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $3C, Pairodd: a Pairodd vanishes. Its steps run 2 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle3C_Start::
+;> wJingleRepeat = 2
 	ld a, $02
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle3C_Sq1)
 	ld hl, Jingle3C_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle3C_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle3C_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $3C (Pairodd) on, a step every frame. The frequency slides by a table of
+;@ steps. At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle3C_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 9:
 	cp $09
-	jr z, .x51cf
+	jr z, .case1
+.part1
+;=@t1
 	ld hl, Jingle3C_Slide
 	jp SlideSquare1
-.x51cf
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return SilenceJingle(timer)
 	jp z, SilenceJingle
+;>     wJingleStep = 0
 	xor a
 	ld [bc], a
+;>     SaveSquare1Freq(Jingle3C_Sq1_2)
 	ld hl, Jingle3C_Sq1_2
 	call SaveSquare1Freq
+;>     return WriteSquare1Regs(Jingle3C_Sq1_2, timer)
 	jp WriteSquare1Regs
+;>@t1 return SlideSquare1(Jingle3C_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $3C (Pairodd), read by Jingle3C_Start / Jingle3C_Update.
+;@ Jingle3C_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle3C_Sq1, Jingle3C_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle3C_Data::
 Jingle3C_Slide:
 	db $00, $02, $00, $02, $00, $02, $00, $02, $00, $01, $00, $01, $00, $01, $00, $01
@@ -2076,54 +3868,101 @@ Jingle3C_Sq1:
 Jingle3C_Sq1_2:
 	db $00, $40, $10, $d0, $87, $01
 
+;@ def Jingle3D_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $3D (bank $15 (it requests itself again)). Its steps run 10 times; some
+;@ running effects keep their channel (the request is then ignored).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle3D_Start::
+;> if wActiveJingle == 0x04: return IgnoreJingle()
 	ld a, [wActiveJingle]
 	cp $04
 	jp z, IgnoreJingle
+;> if wActiveJingle == 0x05: return IgnoreJingle()
 	cp $05
 	jp z, IgnoreJingle
+;> if wActiveJingle == 0x07: return IgnoreJingle()
 	cp $07
 	jp z, IgnoreJingle
+;> if wActiveJingle == 0x03: return IgnoreJingle()
 	cp $03
 	jp z, IgnoreJingle
+;> if wActiveJingle == 0x0D: return IgnoreJingle()
 	cp $0d
 	jp z, IgnoreJingle
+;> wJingleRepeat = 10
 	ld a, $0a
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle3D_Sq1)
 	ld hl, Jingle3D_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle3D_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle3D_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $3D on, a step every frame. The frequency slides by a table of steps.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle3D_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 4:
 	cp $04
-	jr z, .x523c
+	jr z, .case2
+.part1
+;=@t4
 	cp $05
-	jr z, .x5237
-.x5231
+	jr z, .case1
+.part2
+;=@t3
 	ld hl, Jingle3D_Slide
 	jp SlideSquare1
-.x5237
+.case1
+;=@t5
 	ld a, $01
 	ld [bc], a
-	jr .x5231
-.x523c
+	jr .part2
+;>     wJingleRepeat -= 1
+.case2
 	call CountDownJingleRepeat
-	jp z, .x5253
+;>     if wJingleRepeat == 0:
+	jp z, .case4
+;>@t1         wJingleToPlay = 0x3D
+;>@t2         return Jingle3D_Start(timer, step)
+;>     if wJingleRepeat == 7:
+.part3
 	cp $07
-	jr z, .x5248
-	jr .x5231
-.x5248
+	jr z, .case3
+.part4
+;=@t3
+	jr .part2
+;>         wJingleStep = 0
+.case3
 	xor a
 	ld [bc], a
+;>         SaveSquare1Freq(Jingle3D_Sq1_2)
 	ld hl, Jingle3D_Sq1_2
 	call SaveSquare1Freq
+;>         return WriteSquare1Regs(Jingle3D_Sq1_2, timer)
 	jp WriteSquare1Regs
-.x5253
+.case4
+;=@t1
 	ld a, $3d
 	ld [wJingleToPlay], a
+;=@t2
 	jr Jingle3D_Start
+;>@t3     return SlideSquare1(Jingle3D_Slide, step)
+;>@t4 if wJingleStep == 5:
+;>@t5     wJingleStep = 1
+;> return SlideSquare1(Jingle3D_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $3D, read by Jingle3D_Start / Jingle3D_Update.
+;@ Jingle3D_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle3D_Sq1, Jingle3D_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle3D_Data::
 Jingle3D_Slide:
 	db $00, $c0, $00, $80, $00, $40, $fe, $80
@@ -2132,56 +3971,114 @@ Jingle3D_Sq1:
 Jingle3D_Sq1_2:
 	db $00, $40, $86, $80, $83, $01
 
+;@ def Jingle3E_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $3E, Scrape: the hole filler moves, an urchin is pushed. Some running
+;@ effects keep their channel (the request is then ignored).
+;@ test: timer = 0xD390; step = 0xD394
 Jingle3E_Start::
+;> if wActiveJingle == 0x3E: return IgnoreJingle()
 	ld a, [wActiveJingle]
 	cp $3e
 	jp z, IgnoreJingle
+;> return StartJingle(Jingle3E_Sq1, timer)
 	ld hl, Jingle3E_Sq1
 	jp StartJingle
 
+;@ def Jingle3E_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $3E (Scrape) on: each time its timer runs out, the next step. At the end the
+;@ channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle3E_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> return EndJingle()
 	jp EndJingle
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $3E (Scrape), read by Jingle3E_Start / Jingle3E_Update.
+;@ Jingle3E_Sq1: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length, NR12 volume
+;@ envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the next step.
 Jingle3E_Sq1::
 	db $27, $be, $60, $c0, $c7, $03
 
+;@ def Jingle3F_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $3F, Buzz: Facade's flying tiles buzz. Its steps run 9 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle3F_Start::
+;> wJingleRepeat = 9
 	ld a, $09
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle3F_Sq1)
 	ld hl, Jingle3F_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle3F_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle3F_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $3F (Buzz) on, a step every frame. The frequency slides by a table of steps.
+;@ At the end the channel goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle3F_Update::
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 3:
 	cp $03
-	jr z, .x52a8
+	jr z, .case1
+.part1
+;=@t3
 	cp $04
-	jr z, .x52b7
-.x52a2
+	jr z, .case2
+.part2
+;=@t2
 	ld hl, Jingle3F_Slide
 	jp SlideSquare1
-.x52a8
+;>     wJingleRepeat -= 1
+.case1
 	call CountDownJingleRepeat
+;>     if wJingleRepeat == 0: return SilenceJingle(timer)
 	jp z, SilenceJingle
+;>     if wJingleRepeat == 6:
 	cp $06
-	jr z, .x52bc
+	jr z, .case3
+.part3
+;=@t1
 	ld a, $03
 	ld [bc], a
-	jr .x52a2
-.x52b7
+;=@t2
+	jr .part2
+.case2
+;=@t4
 	ld a, $01
 	ld [bc], a
-	jr .x52a2
-.x52bc
+	jr .part2
+;>         wJingleStep = 0
+.case3
 	xor a
 	ld [bc], a
+;>         SaveSquare1Freq(Jingle3F_Sq1_2)
 	ld hl, Jingle3F_Sq1_2
 	call SaveSquare1Freq
+;>         return WriteSquare1Regs(Jingle3F_Sq1_2, timer)
 	jp WriteSquare1Regs
+;>@t1     wJingleStep = 3
+;>@t2     return SlideSquare1(Jingle3F_Slide, step)
+;>@t3 if wJingleStep == 4:
+;>@t4     wJingleStep = 1
+;> return SlideSquare1(Jingle3F_Slide, step)
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $3F (Buzz), read by Jingle3F_Start / Jingle3F_Update.
+;@ Jingle3F_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle3F_Sq1, Jingle3F_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle3F_Data::
 Jingle3F_Slide:
 	db $00, $60, $00, $40, $ff, $70
@@ -2190,47 +4087,89 @@ Jingle3F_Sq1:
 Jingle3F_Sq1_2:
 	db $00, $80, $d1, $10, $86, $01
 
+;@ def Jingle40_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $40 (not requested directly). Its steps run 4 times.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle40_Start::
+;> wJingleRepeat = 4
 	ld a, $04
 	ld [wJingleRepeat], a
+;> SaveSquare1Freq(Jingle40_Sq1)
 	ld hl, Jingle40_Sq1
 	call SaveSquare1Freq
+;> return StartJingle(Jingle40_Sq1, timer)
 	jp StartJingle
 
+;@ def Jingle40_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $40 on, a slide step every frame. Every 4 frames a round ends and counts
+;@ wJingleSubStep up: at 6 the sound starts over from its second record, from 6 on the slide uses its second
+;@ step, at 20 the effect ends.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle40_Update::
+;> wJingleRepeat -= 1
 	call CountDownJingleRepeat
-	jr z, .x5300
-.x52ec
+;> if wJingleRepeat == 0:
+	jr z, .round
+;>@t2     wJingleSubStep += 1
+;>@t3     if wJingleSubStep == 20: return EndJingle()
+;>@t4     if wJingleSubStep == 6:
+;>@t5         wJingleRepeat = 4
+;>@t6         SaveSquare1Freq(Jingle40_Sq1_2)
+;>@t7         return WriteSquare1Regs(Jingle40_Sq1_2, timer)
+;>@t8     wJingleRepeat = 4
+;> if wJingleSubStep < 6:
+.pick
 	ld a, [wJingleSubStep]
 	cp $06
-	jr nc, .x52fc
+	jr nc, .late
+;>     wJingleStep = 1
 	ld a, $01
-.x52f5
+.setStep
 	ld [bc], a
+;> else:
+;>@t9     wJingleStep = 2
+;> return SlideSquare1(Jingle40_Slide, step)
 	ld hl, Jingle40_Slide
 	jp SlideSquare1
-.x52fc
+.late
+;=@t9
 	ld a, $02
-	jr .x52f5
-.x5300
+	jr .setStep
+.round
+;=@t2
 	push bc
 	ld bc, wJingleSubStep
 	call NextSfxStep
 	pop bc
+;=@t3
 	cp $14
 	jp z, EndJingle
+;=@t4
 	cp $06
-	jp z, .x5319
+	jp z, .restart
+;=@t8
 	ld a, $04
 	ld [wJingleRepeat], a
-	jr .x52ec
-.x5319
+	jr .pick
+.restart
+;=@t5
 	ld a, $04
 	ld [wJingleRepeat], a
+;=@t6
 	ld hl, Jingle40_Sq1_2
 	call SaveSquare1Freq
+;=@t7
 	jp WriteSquare1Regs
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $40, read by Jingle40_Start / Jingle40_Update.
+;@ Jingle40_Slide: frequency slide steps: big-endian 16-bit values, entry n is added to the effect's
+;@ frequency at step n and the sum goes to the channel's frequency registers.
+;@ Jingle40_Sq1, Jingle40_Sq1_2: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and length,
+;@ NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames until the
+;@ next step.
 Jingle40_Data::
 Jingle40_Slide:
 	db $00, $10, $ff, $f8
@@ -2239,20 +4178,44 @@ Jingle40_Sq1:
 Jingle40_Sq1_2:
 	db $00, $80, $e5, $10, $84, $01
 
+;@ def Jingle41_Start(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Starts square-channel effect $41 (not requested directly). It locks its channel, so that other effects of
+;@ the channel are ignored until it ends.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle41_Start::
+;> return StartLockedJingle(Jingle41_Sq1, timer)
 	ld hl, Jingle41_Sq1
 	jp StartLockedJingle
 
+;@ def Jingle41_Update(timer: de, step: bc)
+;@ path: sound/sfx/square
+;@ Plays square-channel effect $41 on: each time its timer runs out, the next step. At the end the channel
+;@ goes back to the music.
+;@ test: timer = 0xD390; step = 0xD394
 Jingle41_Update::
+;> wJingleTimer -= 1
 	call CountDownSfxTimer
+;> if wJingleTimer: return
 	ret nz
+;> wJingleStep += 1
 	call NextSfxStep
+;> if wJingleStep == 8: return EndJingle()
 	cp $08
 	jp z, EndJingle
+;> record = mem16[Jingle41_Sq1Table + 2 * (wJingleStep - 1)]
 	ld hl, Jingle41_Sq1Table
 	call GetSfxTableEntry
+;> return WriteSquare1Regs(record, timer)
 	jp WriteSquare1Regs
 
+;@ path: sound/sfx/square
+;@ The data of square-channel effect $41, read by Jingle41_Start / Jingle41_Update.
+;@ Jingle41_Sq1Table: one pointer per step (the first for step 1) to its record (square 1 register records).
+;@ Jingle41_Sq1, Jingle41_Sq1_2, Jingle41_Sq1_3, Jingle41_Sq1_4, Jingle41_Sq1_5, Jingle41_Sq1_6,
+;@ Jingle41_Sq1_7, Jingle41_Sq1_8: square 1 register records, 6 bytes each: NR10 sweep, NR11 duty and
+;@ length, NR12 volume envelope, NR13 / NR14 frequency (NR14 bit 7 restarts the sound), then the frames
+;@ until the next step.
 Jingle41_Data::
 Jingle41_Sq1Table:
 	dw Jingle41_Sq1_5, Jingle41_Sq1_2, Jingle41_Sq1_6, Jingle41_Sq1_3, Jingle41_Sq1_7, Jingle41_Sq1_4, Jingle41_Sq1_8

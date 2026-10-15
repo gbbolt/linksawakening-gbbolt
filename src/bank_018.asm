@@ -5,7 +5,7 @@
 
 SECTION "ROM Bank $018", ROMX[$4000], BANK[$18]
 
-;@ def MamuEntityHandler(slot: c)
+;@ def MamuEntityHandler(slot: bc)
 ;@ path: npc/mamu
 ;@ Entity $C3: Mamu, the singing frog in the cave of the Signpost Maze area, and his two backing
 ;@ frogs (the same entity type: the one standing at x = $48 is Mamu, the others are frogs, see
@@ -52,7 +52,7 @@ MamuStates::
 	dw MamuTeachSong
 	dw MamuFinish
 
-;@ def MamuWaitForLink(slot: c)
+;@ def MamuWaitForLink(slot: bc)
 ;@ path: npc/mamu
 ;@ State 0. Once Link knows the Frog's Song of Soul, talking to Mamu only gives his closing words
 ;@ (dialogue $E0). Before that, Link is stopped when he walks up to the line y = $4C in front of
@@ -127,7 +127,7 @@ MamuWaitForLink::
 ;> MamuOpenDialog(0xDC)           # the offer: a song for 300 rupees
 	ld a, $dc
 	call MamuOpenDialog
-;> IncrementEntityState()                    # next state: MamuAskToPlay
+;> IncrementEntityState(slot)                    # next state: MamuAskToPlay
 	call IncrementEntityState
 ;> MamuAnimate()                  # falls through
 
@@ -143,7 +143,7 @@ MamuAnimate::
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(v)                   # set the sprite variant
+;> SetEntitySpriteVariant(slot, v)                   # set the sprite variant
 	call SetEntitySpriteVariant
 	ret
 
@@ -170,7 +170,7 @@ MamuOpenDialog::
 	ret
 
 
-;@ def MamuAskToPlay(slot: c)
+;@ def MamuAskToPlay(slot: bc)
 ;@ path: npc/mamu
 ;@ State 1: waits for the answer to the offer. "No", or fewer than 300 rupees: dialogue $DE and
 ;@ back to state 0. "Yes": 300 rupees are taken, the music stops, the performance variables are
@@ -186,7 +186,7 @@ MamuAskToPlay::
 ;>     return
 	jr nz, .done
 
-;> IncrementEntityState()                    # next state
+;> IncrementEntityState(slot)                    # next state
 	call IncrementEntityState
 ;>@cond if wDialogAnswer != 0 or wRupeeCountHigh < 3:   # "no", or not enough money
 	ld a, [wDialogAnswer]
@@ -230,7 +230,7 @@ MamuAskToPlay::
 .done
 	ret
 
-;@ def MamuWaitBeforeSong(slot: c)
+;@ def MamuWaitBeforeSong(slot: bc)
 ;@ path: npc/mamu
 ;@ State 2: Link is frozen while the timer runs; then the song (music $35) starts, the frogs
 ;@ follow Mamu's dance (wSongShowPlaying) and the performance begins (state 3).
@@ -251,7 +251,7 @@ MamuWaitBeforeSong::
 ;>     wSongShowPlaying = 1
 	ld a, $01
 	ld [wSongShowPlaying], a
-;>     return IncrementEntityState()         # next state
+;>     return IncrementEntityState(slot)         # next state
 	jp IncrementEntityState
 
 .wait
@@ -344,7 +344,7 @@ MamuDanceFrogFramesB::
 	db $05, $01, $04, $01, $05, $01, $04, $01, $05, $01, $04, $01, $05, $01, $04, $01
 	db $05, $01, $04, $04, $04, $04
 
-;@ def MamuPerformSong(slot: c)
+;@ def MamuPerformSong(slot: bc)
 ;@ path: npc/mamu
 ;@ State 3: the performance. Link is frozen. On frames 0 and 1 the big light above Mamu turns on,
 ;@ on frames $38 and $70 the small lights above the frogs (all drawn into the alternate
@@ -409,7 +409,7 @@ MamuPerformSong::
 ;>     wAlternateBackgroundEnabled = 0   # lights off
 	xor a
 	ld [wAlternateBackgroundEnabled], a
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 ;>     return
 	ret
@@ -436,7 +436,7 @@ MamuPerformSong::
 	ld a, [wSongShowStep]
 	ld e, a
 	ld d, b
-;> SetEntitySpriteVariant(MamuDanceFrames[step])   # Mamu's sprite variant
+;> SetEntitySpriteVariant(slot, MamuDanceFrames[step])   # Mamu's sprite variant
 	ld hl, MamuDanceFrames
 	add hl, de
 	ld a, [hl]
@@ -455,7 +455,7 @@ MamuPerformSong::
 
 	ret                             ; never reached
 
-;@ def MamuEndSong(slot: c)
+;@ def MamuEndSong(slot: bc)
 ;@ path: npc/mamu
 ;@ State 4: when the closing dialogue is gone, the frogs go back to their own animation, the
 ;@ teaching jingle (music $10) plays and state 5 runs for $70 frames.
@@ -474,14 +474,14 @@ MamuEndSong::
 ;>     wMusicTrackToPlay = 0x10
 	ld a, $10
 	ld [wMusicTrackToPlay], a
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 
 .animate
 ;> return MamuAnimate()
 	jp MamuAnimate
 
-;@ def MamuTeachSong(slot: c)
+;@ def MamuTeachSong(slot: bc)
 ;@ path: npc/mamu
 ;@ State 5: Link holds up what he learnt (pose $6C, SongLearntSprite above his head). With 8
 ;@ frames left, dialogue $DF says that he learnt the song; at the end the Frog's Song of Soul
@@ -499,7 +499,7 @@ MamuTeachSong::
 ;>     wOcarinaSongFlags |= 0x01  # Frog's Song of Soul
 	ld hl, wOcarinaSongFlags
 	set 0, [hl]
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 ;>     return
 	ret
@@ -538,7 +538,7 @@ MamuTeachSong::
 ;> return MamuAnimate()
 	jp MamuAnimate
 
-;@ def MamuFinish(slot: c)
+;@ def MamuFinish(slot: bc)
 ;@ path: npc/mamu
 ;@ State 6: once the dialogue is closed, Link is free again, Mamu goes back to state 0 and gives
 ;@ his closing words (dialogue $E0) - also shown whenever Link talks to him afterwards
@@ -612,7 +612,7 @@ DrawMamu::
 	ret
 
 
-;@ def MamuFrogHandler(slot: c)
+;@ def MamuFrogHandler(slot: bc)
 ;@ path: npc/mamu
 ;@ The two backing frogs (entity $C3 away from x = $48): they stand on the stage at y = $4A, are
 ;@ solid, and croak on their own (MamuFrogIdle) except during the song, when Mamu sets their
@@ -643,26 +643,26 @@ MamuFrogStates::
 	dw MamuFrogInit
 	dw MamuFrogIdle
 
-;@ def MamuFrogInit(slot: c)
+;@ def MamuFrogInit(slot: bc)
 ;@ path: npc/mamu
 ;@ State 0: starts the frog's animation counter at a random value (the frogs do not croak in step)
 ;@ and goes on to state 1 at once.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 MamuFrogInit::
 ;> wEntityPrivateCounter[slot] = GetRandomByte()   # random byte
 	call GetRandomByte
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld [hl], a
-;> IncrementEntityState()                    # next state
+;> IncrementEntityState(slot)                    # next state
 	call IncrementEntityState
 ;> MamuFrogIdle(slot)             # falls through
 
-;@ def MamuFrogIdle(slot: c)
+;@ def MamuFrogIdle(slot: bc)
 ;@ path: npc/mamu
 ;@ State 1: unless Mamu's song plays, the frog shows sprite variant 1, and variant 0 for 16 of
 ;@ every 64 frames of its counter.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 MamuFrogIdle::
 ;> if wSongShowPlaying:
 	ld a, [wSongShowPlaying]
@@ -683,7 +683,7 @@ MamuFrogIdle::
 	inc e
 
 .set
-;> SetEntitySpriteVariant(variant)
+;> SetEntitySpriteVariant(slot, variant)
 	ld a, e
 	call SetEntitySpriteVariant
 	ret
@@ -985,7 +985,7 @@ DrawLightSmall::
 	ld [hl], $00
 	ret
 
-;@ def ManboEntityHandler(slot: c)
+;@ def ManboEntityHandler(slot: bc)
 ;@ path: npc/manbo
 ;@ Entity $C7: Manbo, the fish who dances in his pond, and the fishes of the pond (the same type:
 ;@ an entity drawn at y $50 or lower is a fish, see ManboFishHandler). Manbo teaches Link's
@@ -1041,7 +1041,7 @@ ManboStates::
 	dw ManboEndSong
 	dw ManboTeachSong
 
-;@ def ManboWaitForLink(slot: c)
+;@ def ManboWaitForLink(slot: bc)
 ;@ path: npc/manbo
 ;@ State 0. Once Link knows Manbo's Mambo, talking to Manbo gives dialogue $189. Before that,
 ;@ Link is stopped when he walks up to x = $30 and Manbo greets him (dialogue $185, state 1).
@@ -1078,7 +1078,7 @@ ManboWaitForLink::
 ;> OpenDialogTable1(0x85)         # Manbo greets Link: dialogue $185
 	ld a, $85
 	call OpenDialogTable1
-;> IncrementEntityState()                    # next state: ManboAskToPlay
+;> IncrementEntityState(slot)                    # next state: ManboAskToPlay
 	call IncrementEntityState
 ;> ManboAnimate()                 # falls through
 
@@ -1093,12 +1093,12 @@ ManboAnimate::
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(v)                   # set the sprite variant
+;> SetEntitySpriteVariant(slot, v)                   # set the sprite variant
 	call SetEntitySpriteVariant
 	ret
 
 
-;@ def ManboAskToPlay(slot: c)
+;@ def ManboAskToPlay(slot: bc)
 ;@ path: npc/manbo
 ;@ State 1: after the question, "yes" with an ocarina (item 9 on a button or in the inventory)
 ;@ leads to dialogue $187 and state 2; "no", or no ocarina, to dialogue $18A and state 0.
@@ -1121,7 +1121,7 @@ ManboAskToPlay::
 
 .search
 ;>         if mem[0xDB00 + i] == 9:   # the ocarina
-;>@has             IncrementEntityState()            # next state: ManboStartSong
+;>@has             IncrementEntityState(slot)            # next state: ManboStartSong
 	ld a, [hli]
 	cp $09
 	jr z, .hasOcarina
@@ -1153,7 +1153,7 @@ ManboAskToPlay::
 	jp OpenDialogTable1
 
 
-;@ def ManboStartSong(slot: c)
+;@ def ManboStartSong(slot: bc)
 ;@ path: npc/manbo
 ;@ State 2: when the dialogue is closed, Manbo's Mambo starts (music $30) and the dance begins
 ;@ (state 3) with the performance variables reset (ResetSongShow, also used by Mamu).
@@ -1168,7 +1168,7 @@ ManboStartSong::
 ;> wMusicTrackToPlay = 0x30
 	ld a, $30
 	ld [wMusicTrackToPlay], a
-;> IncrementEntityState()                    # next state
+;> IncrementEntityState(slot)                    # next state
 	call IncrementEntityState
 ;> ResetSongShow()                # falls through
 
@@ -1230,7 +1230,7 @@ ManboFishDanceFrames::
 	db $03, $02, $03, $02, $04, $05, $04, $05, $03, $02, $03, $02, $03, $02, $03, $02
 	db $01, $01, $01, $01, $01, $01, $00, $00, $00, $00
 
-;@ def ManboPerformSong(slot: c)
+;@ def ManboPerformSong(slot: bc)
 ;@ path: npc/manbo
 ;@ State 3: the dance. Link is frozen; every $14 frames the dance goes one step on, setting
 ;@ Manbo's frame, the splash below him and the fishes' frame from the three dance tables. At
@@ -1261,7 +1261,7 @@ ManboPerformSong::
 	cp $f0
 	jr nz, .dance
 
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 ;>     wEntityTimer[slot] = 0x20
 	call GetEntityTimer
@@ -1291,7 +1291,7 @@ ManboPerformSong::
 	ld a, [wSongShowStep]
 	ld e, a
 	ld d, b
-;> SetEntitySpriteVariant(ManboDanceFrames[step])   # Manbo's sprite variant
+;> SetEntitySpriteVariant(slot, ManboDanceFrames[step])   # Manbo's sprite variant
 	ld hl, ManboDanceFrames
 	add hl, de
 	ld a, [hl]
@@ -1357,7 +1357,7 @@ ManboPerformSong::
 ManboWaterSpray::
 	db $00, $00, $40, $00, $00, $08, $42, $00, $00, $10, $44, $00
 
-;@ def ManboEndSong(slot: c)
+;@ def ManboEndSong(slot: bc)
 ;@ path: npc/manbo
 ;@ State 4: after the timer, the teaching jingle (music $10) plays and state 5 runs for $70
 ;@ frames. Link stays frozen.
@@ -1372,7 +1372,7 @@ ManboEndSong::
 ;>     wMusicTrackToPlay = 0x10
 	ld a, $10
 	ld [wMusicTrackToPlay], a
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 
 .wait
@@ -1390,7 +1390,7 @@ ManboEndSong::
 SongLearntSprite::
 	db $90, $10
 
-;@ def ManboTeachSong(slot: c)
+;@ def ManboTeachSong(slot: bc)
 ;@ path: npc/manbo
 ;@ State 5: Link holds up what he learnt (pose $6C, SongLearntSprite above his head); with 8
 ;@ frames left, dialogue $188 says he learnt it; at the end Manbo's Mambo (song 1) is learnt and
@@ -1474,7 +1474,7 @@ ManboSplashPairs::
 	db $ff, $ff, $ff, $ff, $64, $00, $66, $00, $64, $40, $66, $40, $66, $60, $64, $60
 	db $66, $20, $64, $20
 
-;@ def DrawManbo(slot: c)
+;@ def DrawManbo(slot: bc)
 ;@ path: npc/manbo
 ;@ Draws the splash pair below Manbo, Manbo himself (frame 3 while he sprays water, else his
 ;@ sprite variant; 9 sprites) and, while wEntityTimer1 runs, the water spray up and to his left.
@@ -1595,14 +1595,14 @@ ManboFishHandler::
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(v)                   # set the sprite variant
+;> SetEntitySpriteVariant(slot, v)                   # set the sprite variant
 	call SetEntitySpriteVariant
 ;> if wSongShowPlaying:
 	ld a, [wSongShowPlaying]
 	and a
 	jr z, .done
 
-;>     SetEntitySpriteVariant(wSongShowPlaying)   # the dance frame
+;>     SetEntitySpriteVariant(slot, wSongShowPlaying)   # the dance frame
 	call SetEntitySpriteVariant
 
 .done
@@ -1678,7 +1678,7 @@ DrawManboFish::
 MermaidStatueSprites::
 	db $f0, $00, $70, $00, $f0, $08, $72, $00, $00, $00, $74, $00, $00, $08, $76, $00
 
-;@ def MermaidStatueEntityHandler(slot: c)
+;@ def MermaidStatueEntityHandler(slot: bc)
 ;@ path: object/mermaid_statue
 ;@ Entity $CE: the mermaid statue in Martha's Bay. Link puts the mermaid's scale (trading item
 ;@ $0D) into it; it slides 16 pixels to the left, uncovering the way to the magnifying lens
@@ -1701,10 +1701,10 @@ MermaidStatueStates::
 	dw MermaidStatueWaitForScale
 	dw MermaidStatueSlide
 
-;@ def MermaidStatueInit(slot: c)
+;@ def MermaidStatueInit(slot: bc)
 ;@ path: object/mermaid_statue
 ;@ State 0: if the statue was already moved (room event done), it starts 16 pixels to the left.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 MermaidStatueInit::
 ;> if hRoomStatus & 0x20:
 	ldh a, [hRoomStatus]
@@ -1719,12 +1719,12 @@ MermaidStatueInit::
 	ld [hl], a
 
 .next
-;> IncrementEntityState()                    # next state
+;> IncrementEntityState(slot)                    # next state
 	call IncrementEntityState
 	ret
 
 
-;@ def MermaidStatueWaitForScale(slot: c)
+;@ def MermaidStatueWaitForScale(slot: bc)
 ;@ path: object/mermaid_statue
 ;@ State 1: the statue is solid. When Link talks to it (examines it) holding the mermaid's scale,
 ;@ the scale is put in: trading item $0E, a trade scene runs (wTradeSceneState), noise effect 4,
@@ -1767,7 +1767,7 @@ MermaidStatueWaitForScale::
 ;>     OpenDialogTable1(0x16)     # dialogue $116
 	ld a, $16
 	call OpenDialogTable1
-;>     return IncrementEntityState()         # next state
+;>     return IncrementEntityState(slot)         # next state
 	jp IncrementEntityState
 
 ;> OpenDialogTable1(0x9C)         # dialogue $19C
@@ -1779,7 +1779,7 @@ MermaidStatueWaitForScale::
 	ret
 
 
-;@ def MermaidStatueSlide(slot: c)
+;@ def MermaidStatueSlide(slot: bc)
 ;@ path: object/mermaid_statue
 ;@ State 2: Link is frozen while the timer runs; for its last $40 frames the statue slides left
 ;@ (speed -4, a quarter pixel per frame; noise effect $11 at the start). Then a jingle plays,
@@ -1840,7 +1840,7 @@ ZoraSpritePairs::
 	db $ff, $ff, $ff, $ff, $54, $00, $54, $60, $54, $40, $54, $20, $56, $00, $56, $20
 	db $52, $00, $52, $20
 
-;@ def ZoraEntityHandler(slot: c)
+;@ def ZoraEntityHandler(slot: bc)
 ;@ path: enemy/zora
 ;@ Entity $CB: the Zora, who surfaces at random spots of deep water, spits a fireball at Link
 ;@ and dives again.
@@ -1866,7 +1866,7 @@ ZoraStates::
 	dw ZoraRipple
 	dw ZoraSurface
 
-;@ def ZoraPickSpot(slot: c)
+;@ def ZoraPickSpot(slot: bc)
 ;@ path: enemy/zora
 ;@ State 0: under water (physics flag bit 6: not touchable), moves to one of 8 spots picked at
 ;@ random from the spot tables at $6352 (y) and $635A (x); when the room object there is deep
@@ -1913,14 +1913,14 @@ ZoraPickSpot::
 	and $7f
 	or $40
 	ld [hl], a
-;> return IncrementEntityState()             # next state
+;> return IncrementEntityState(slot)             # next state
 	jp IncrementEntityState
 
 
-;@ def ZoraWaitUnderwater(slot: c)
+;@ def ZoraWaitUnderwater(slot: bc)
 ;@ path: enemy/zora
 ;@ State 1: waits under water, then shows ripples for $60 frames (state 2).
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 ZoraWaitUnderwater::
 ;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
@@ -1928,18 +1928,18 @@ ZoraWaitUnderwater::
 
 ;>     wEntityTimer[slot] = 0x60
 	ld [hl], $60
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 
 .done
 	ret
 
 
-;@ def ZoraRipple(slot: c)
+;@ def ZoraRipple(slot: bc)
 ;@ path: enemy/zora
 ;@ State 2: ripples on the water (variants 1 and 2, switching every 4 frames); then the Zora
 ;@ comes up and can be hit (state 3, $60 frames).
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 ZoraRipple::
 ;> t = wEntityTimer[slot]
 	call GetEntityTimer
@@ -1956,11 +1956,11 @@ ZoraRipple::
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	res 6, [hl]
-;>     return IncrementEntityState()         # next state
+;>     return IncrementEntityState(slot)         # next state
 	jp IncrementEntityState
 
 .ripple
-;> return SetEntitySpriteVariant(2 if t & 4 else 1)   # set the sprite variant
+;> return SetEntitySpriteVariant(slot, 2 if t & 4 else 1)   # set the sprite variant
 	and $04
 	ld a, $01
 	jr z, .set
@@ -1977,7 +1977,7 @@ ZoraRipple::
 ZoraBobHeights::
 	db $00, $00, $01, $02, $02, $02, $01, $00
 
-;@ def ZoraSurface(slot: c)
+;@ def ZoraSurface(slot: bc)
 ;@ path: enemy/zora
 ;@ State 3: the Zora is out of the water, bobbing, and hurts Link on contact. With $30 frames
 ;@ left it spits a fireball (entity $7D) aimed at Link at speed $18; it shows its spitting frame
@@ -2005,7 +2005,7 @@ ZoraSurface::
 	ld hl, wEntityZ
 	add hl, bc
 	ld [hl], a
-;> EntityCheckHits()                    # collision with Link: hurts him
+;> EntityCheckHits(slot)                    # collision with Link: hurts him
 	call EntityCheckHits
 ;> t = wEntityTimer[slot]
 	call GetEntityTimer
@@ -2015,7 +2015,7 @@ ZoraSurface::
 ;>     wEntityState[slot] = 0
 	call IncrementEntityState
 	ld [hl], b
-;>     SetEntitySpriteVariant(0)               # sprite variant 0: nothing
+;>     SetEntitySpriteVariant(slot, 0)               # sprite variant 0: nothing
 	xor a
 	call SetEntitySpriteVariant
 ;>     hJingle = 0x0E
@@ -2039,10 +2039,10 @@ ZoraSurface::
 	cp $30
 	jr nz, .pose
 
-;>     ok, ball = SpawnEntity(0x7D)  # spawn the fireball; position of the spawner in hMultiPurpose0/1
+;>     ball, failed = SpawnEntity(0x7D)  # spawn the fireball; position of the spawner in hMultiPurpose0/1
 	ld a, $7d
 	call SpawnEntity
-;>     if ok:
+;>     if not failed:
 	jr c, .pose
 
 ;>         wEntityX[ball] = hMultiPurpose0
@@ -2059,7 +2059,7 @@ ZoraSurface::
 	ld hl, wEntityPrivate1
 	add hl, de
 	inc [hl]
-;>         SetEntitySpeedTowardsLink(ball, 0x18)  # aim it at Link with speed $18
+;>         SetEntitySpeedTowardsLink(slot, ball, 0x18)  # aim it at Link with speed $18
 	push bc
 	push de
 	pop bc
@@ -2081,7 +2081,7 @@ ZoraSurface::
 	inc e
 
 .set
-;> return SetEntitySpriteVariant(v)
+;> return SetEntitySpriteVariant(slot, v)
 	ld a, e
 	jp SetEntitySpriteVariant
 
@@ -2107,7 +2107,7 @@ ChristineTableHibiscus::
 ChristineTableEmpty::
 	db $7e, $00, $7e, $20
 
-;@ def ChristineEntityHandler(slot: c)
+;@ def ChristineEntityHandler(slot: bc)
 ;@ path: npc/christine
 ;@ Entity $76: Christine the goat in Animal Village, who trades the hibiscus (trading item 8)
 ;@ for her letter (9). In room $A8 the same entity type is Mr. Write (MrWriteHandler). She is
@@ -2139,7 +2139,7 @@ ChristineEntityHandler::
 	rra
 	rra
 	rra
-;> SetEntitySpriteVariant(v & 1)               # set the sprite variant
+;> SetEntitySpriteVariant(slot, v & 1)               # set the sprite variant
 	and $01
 	call SetEntitySpriteVariant
 ;> ey, dy = GetEntityYDistanceToLink_18(slot)
@@ -2156,7 +2156,7 @@ ChristineEntityHandler::
 	cp $20
 	jr nc, .solid
 
-;>         SetEntitySpriteVariant(ex + 2)      # look to Link's side
+;>         SetEntitySpriteVariant(slot, ex + 2)      # look to Link's side
 	ld a, e
 	add $02
 	call SetEntitySpriteVariant
@@ -2208,7 +2208,7 @@ ChristineStates::
 	dw ChristineAnswer
 	dw ChristineGiveLetter
 
-;@ def ChristineWaitForTalk(slot: c)
+;@ def ChristineWaitForTalk(slot: bc)
 ;@ path: npc/christine
 ;@ State 0: talking to Christine gives dialogue $166 before Link has the hibiscus, $16B after the
 ;@ trade; with the hibiscus she asks for it (dialogue $167, state 1).
@@ -2227,7 +2227,7 @@ ChristineWaitForTalk::
 ;>     OpenDialogTable1(0x67)     # dialogue $167
 	ld a, $67
 	call OpenDialogTable1
-;>     return IncrementEntityState()         # next state
+;>     return IncrementEntityState(slot)         # next state
 	jp IncrementEntityState
 
 ;> OpenDialogTable1(0x66 if wTradeSequenceItem < 8 else 0x6B)
@@ -2244,7 +2244,7 @@ ChristineWaitForTalk::
 	ret
 
 
-;@ def ChristineAnswer(slot: c)
+;@ def ChristineAnswer(slot: bc)
 ;@ path: npc/christine
 ;@ State 1: "yes": dialogue $168 and state 2; "no": dialogue $169 and state 0.
 ;@ test: skip opens dialogues
@@ -2254,7 +2254,7 @@ ChristineAnswer::
 	and a
 	jr nz, .no
 
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 ;>     if wDialogAnswer == 0:
 	ld a, [wDialogAnswer]
@@ -2273,7 +2273,7 @@ ChristineAnswer::
 	jp OpenDialogTable1
 
 
-;@ def ChristineGiveLetter(slot: c)
+;@ def ChristineGiveLetter(slot: bc)
 ;@ path: npc/christine
 ;@ State 2: after the dialogue Link gets the letter: it is shown over his head
 ;@ (SpawnHeldItemEntity), the trading item becomes 9 and the inventory icon is redrawn.
@@ -2301,7 +2301,7 @@ ChristineGiveLetter::
 	ret
 
 
-;@ def MrWriteHandler(slot: c)
+;@ def MrWriteHandler(slot: bc)
 ;@ path: npc/mr_write
 ;@ Entity $76 in room $A8: Mr. Write, who trades the letter (trading item 9) for the broom ($0A)
 ;@ after showing the picture of the letter's sender (game mode 8).
@@ -2324,7 +2324,7 @@ MrWriteStates::
 	dw MrWriteAnswer
 	dw MrWriteDone
 
-;@ def MrWriteWaitForTalk(slot: c)
+;@ def MrWriteWaitForTalk(slot: bc)
 ;@ path: npc/mr_write
 ;@ State 0: with the letter, dialogue $134 and state 1; before it dialogue $133, after the trade
 ;@ $139.
@@ -2343,7 +2343,7 @@ MrWriteWaitForTalk::
 ;>     OpenDialogTable1(0x34)     # dialogue $134
 	ld a, $34
 	call OpenDialogTable1
-;>     return IncrementEntityState()         # next state
+;>     return IncrementEntityState(slot)         # next state
 	jp IncrementEntityState
 
 ;> OpenDialogTable1(0x33 if wTradeSequenceItem < 9 else 0x39)
@@ -2360,17 +2360,17 @@ MrWriteWaitForTalk::
 	ret
 
 
-;@ def MrWriteWaitDialog(slot: c)
+;@ def MrWriteWaitDialog(slot: bc)
 ;@ path: npc/mr_write
 ;@ State 1: goes on once the dialogue is closed.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 MrWriteWaitDialog::
 ;> if not wDialogState:
 	ld a, [wDialogState]
 	and a
 	jr nz, .done
 
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 	ret
 
@@ -2378,12 +2378,12 @@ MrWriteWaitDialog::
 	ret
 
 
-;@ def MrWriteShowPicture(slot: c)
+;@ def MrWriteShowPicture(slot: bc)
 ;@ path: npc/mr_write
 ;@ State 2: switches to game mode 8, the picture of the letter's sender.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 MrWriteShowPicture::
-;> IncrementEntityState()                    # next state
+;> IncrementEntityState(slot)                    # next state
 	call IncrementEntityState
 ;> StartGameplayType_18(8)        # falls through
 	ld a, $08
@@ -2405,10 +2405,10 @@ StartGameplayType_18::
 	ret
 
 
-;@ def MrWriteAfterPicture(slot: c)
+;@ def MrWriteAfterPicture(slot: bc)
 ;@ path: npc/mr_write
 ;@ State 3: back from the picture (fade finished, step 4) he asks for the letter (dialogue $135).
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 MrWriteAfterPicture::
 ;> if wTransitionSequenceCounter == 4 and not wDialogState:
 	ld a, [wTransitionSequenceCounter]
@@ -2419,7 +2419,7 @@ MrWriteAfterPicture::
 	and a
 	jr nz, .done
 
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 ;>     OpenDialogTable1(0x35)     # dialogue $135
 	ld a, $35
@@ -2429,7 +2429,7 @@ MrWriteAfterPicture::
 	ret
 
 
-;@ def MrWriteAnswer(slot: c)
+;@ def MrWriteAnswer(slot: bc)
 ;@ path: npc/mr_write
 ;@ State 4: "yes": Link gets the broom (trading item $0A, shown over his head) and Mr. Write goes
 ;@ to state 5; "no": dialogue $137 and the question again.
@@ -2441,7 +2441,7 @@ MrWriteAnswer::
 ;>     return
 	jr nz, .done
 
-;> IncrementEntityState()                    # next state
+;> IncrementEntityState(slot)                    # next state
 	call IncrementEntityState
 ;> if wDialogAnswer == 0:
 	ld a, [wDialogAnswer]
@@ -2470,7 +2470,7 @@ MrWriteAnswer::
 	ret
 
 
-;@ def MrWriteDone(slot: c)
+;@ def MrWriteDone(slot: bc)
 ;@ path: npc/mr_write
 ;@ State 5: after the trade, talking to him gives dialogue $138.
 ;@ test: skip opens dialogues
@@ -2507,7 +2507,7 @@ UlriraPairsB::
 UlriraBroomSprite::
 	db $9a, $10, $9c, $10
 
-;@ def GrandmaUlriraEntityHandler(slot: c)
+;@ def GrandmaUlriraEntityHandler(slot: bc)
 ;@ path: npc/grandma_ulrira
 ;@ Entity $75: Grandma Ulrira, who trades the broom (trading item $0A) for the fishing hook
 ;@ ($0B). She only appears in room $B1, or in room $CD when bit 1 of $DB69 is set. Her pairs
@@ -2579,7 +2579,7 @@ GrandmaUlriraEntityHandler::
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(v)                   # set the sprite variant
+;> SetEntitySpriteVariant(slot, v)                   # set the sprite variant
 	call SetEntitySpriteVariant
 ;> PushLinkOutOfEntity_18(slot)
 	call PushLinkOutOfEntity_18
@@ -2596,7 +2596,7 @@ GrandmaUlriraStates::
 	dw UlriraSweep
 	dw UlriraGiveHook
 
-;@ def UlriraWaitForTalk(slot: c)
+;@ def UlriraWaitForTalk(slot: bc)
 ;@ path: npc/grandma_ulrira
 ;@ State 0: with Bow-Wow following Link she says dialogue $178. Otherwise: not wanting the broom,
 ;@ dialogue $15A (before the trade) or $15F (after); wanting it, $15B - or, when Link has the
@@ -2640,7 +2640,7 @@ UlriraWaitForTalk::
 ;>     OpenDialogTable1(0x5C)     # dialogue $15C
 	ld a, $5c
 	call OpenDialogTable1
-;>     return IncrementEntityState()         # next state
+;>     return IncrementEntityState(slot)         # next state
 	jp IncrementEntityState
 
 ;> OpenDialogTable1(0x5B)         # dialogue $15B
@@ -2652,7 +2652,7 @@ UlriraWaitForTalk::
 	ret
 
 
-;@ def UlriraAnswer(slot: c)
+;@ def UlriraAnswer(slot: bc)
 ;@ path: npc/grandma_ulrira
 ;@ State 1: "yes": a jingle, the trade scene starts and she sweeps for $80 frames (state 2);
 ;@ "no": dialogue $159 and state 0.
@@ -2671,7 +2671,7 @@ UlriraAnswer::
 ;>     wEntityTimer[slot] = 0x80
 	call GetEntityTimer
 	ld [hl], $80
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 ;>     return
 	ret
@@ -2686,7 +2686,7 @@ UlriraAnswer::
 	ret
 
 
-;@ def UlriraSweep(slot: c)
+;@ def UlriraSweep(slot: bc)
 ;@ path: npc/grandma_ulrira
 ;@ State 2: Link is frozen while she holds up the broom (UlriraBroomSprite above her, variant
 ;@ 2). At the end Link gets the fishing hook (trading item $0B), with dialogue $15D (state 3).
@@ -2705,7 +2705,7 @@ UlriraSweep::
 ;>     OpenDialogTable1(0x5D)     # dialogue $15D
 	ld a, $5d
 	call OpenDialogTable1
-;>     return IncrementEntityState()         # next state
+;>     return IncrementEntityState(slot)         # next state
 	jp IncrementEntityState
 
 .holding
@@ -2730,12 +2730,12 @@ UlriraSweep::
 	call DrawEntity16x16
 ;> LoadEntityPosition()                    # reload the position
 	call LoadEntityPosition
-;> return SetEntitySpriteVariant(2)
+;> return SetEntitySpriteVariant(slot, 2)
 	ld a, $02
 	jp SetEntitySpriteVariant
 
 
-;@ def UlriraGiveHook(slot: c)
+;@ def UlriraGiveHook(slot: bc)
 ;@ path: npc/grandma_ulrira
 ;@ State 3: after the dialogue the trade scene ends, Link is free, the hook is shown over his
 ;@ head (SpawnHeldItemEntity) and she goes back to state 0.
@@ -2773,7 +2773,7 @@ MamashaSpriteFrames::
 MamashaUnusedBytes::
 	db $02, $00, $06, $04
 
-;@ def MamashaEntityHandler(slot: c)
+;@ def MamashaEntityHandler(slot: bc)
 ;@ path: npc/mamasha
 ;@ Entity $74: Mamasha, the mother in Mabe Village, who trades the Yoshi doll (trading item 1)
 ;@ for the ribbon (2). Drawn as 3 sprites, solid.
@@ -2801,7 +2801,7 @@ MamashaEntityHandler::
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(v)                   # set the sprite variant
+;> SetEntitySpriteVariant(slot, v)                   # set the sprite variant
 	call SetEntitySpriteVariant
 ;> ReturnIfNonInteractive_18()
 	call ReturnIfNonInteractive_18
@@ -2818,7 +2818,7 @@ MamashaStates::
 	dw MamashaAnswer
 	dw MamashaGiveRibbon
 
-;@ def MamashaWaitForTalk(slot: c)
+;@ def MamashaWaitForTalk(slot: bc)
 ;@ path: npc/mamasha
 ;@ State 0: dialogue $12A before the trading sequence started, $12C with another trading item;
 ;@ with the Yoshi doll she asks for it (dialogue $12B, state 1).
@@ -2842,7 +2842,7 @@ MamashaWaitForTalk::
 	cp $01
 	jr nz, .open
 
-;>         IncrementEntityState()            # next state
+;>         IncrementEntityState(slot)            # next state
 	call IncrementEntityState
 ;>         dialog = 0x2B
 	ld e, $2b
@@ -2856,7 +2856,7 @@ MamashaWaitForTalk::
 	ret
 
 
-;@ def MamashaAnswer(slot: c)
+;@ def MamashaAnswer(slot: bc)
 ;@ path: npc/mamasha
 ;@ State 1: "yes": the trading item becomes the ribbon (2), dialogue $128 and state 2; "no":
 ;@ dialogue $127 and state 0.
@@ -2882,7 +2882,7 @@ MamashaAnswer::
 ;>     OpenDialogTable1(0x28)     # dialogue $128
 	ld a, $28
 	call OpenDialogTable1
-;>     return IncrementEntityState()         # next state
+;>     return IncrementEntityState(slot)         # next state
 	jp IncrementEntityState
 
 .no
@@ -2897,7 +2897,7 @@ MamashaAnswer::
 	ret
 
 
-;@ def MamashaGiveRibbon(slot: c)
+;@ def MamashaGiveRibbon(slot: bc)
 ;@ path: npc/mamasha
 ;@ State 2: after the dialogue the ribbon is shown over Link's head and she goes back to state 0.
 ;@ test: skip spawns an entity
@@ -2917,7 +2917,7 @@ MamashaGiveRibbon::
 	ret
 
 
-;@ def MadBatterEntityHandler(slot: c)
+;@ def MadBatterEntityHandler(slot: bc)
 ;@ path: npc/mad_batter
 ;@ Entity $CA: the Mad Batter. Sprinkling magic powder on his pot wakes him (state 1): he rises
 ;@ in a cloud, offers to "curse" Link - each of his three huts raises one capacity: magic powder
@@ -2940,7 +2940,7 @@ MadBatterEntityHandler::
 ;>     return ClearEntityStatus_18(slot)
 	jp nz, ClearEntityStatus_18
 
-;> DecrementEntityIgnoreHitsTimer()
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
 ;> return MadBatterStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
@@ -2961,11 +2961,11 @@ MadBatterStates::
 	dw MadBatterCurse
 	dw MadBatterLeave
 
-;@ def MadBatterWaitForPowder(slot: c)
+;@ def MadBatterWaitForPowder(slot: bc)
 ;@ path: npc/mad_batter
 ;@ State 0: hidden in his pot until the magic powder reaches it (that sets state 1 from
 ;@ outside). Once all three capacities are at their new maximum he is gone for good.
-;@ test: c = rand(0, 15); wMaxMagicPowder = rand(0x20, 0x40); wMaxBombs = rand(0x30, 0x60); wMaxArrows = rand(0x30, 0x60)
+;@ test: skip reads a ROM table
 MadBatterWaitForPowder::
 ;> if wMaxMagicPowder == MadBatterMaxValues[0]:
 	ld a, [wMaxMagicPowder]
@@ -2990,7 +2990,7 @@ MadBatterWaitForPowder::
 	ret
 
 
-;@ def MadBatterAppear(slot: c)
+;@ def MadBatterAppear(slot: bc)
 ;@ path: npc/mad_batter
 ;@ State 1: a puff of smoke (transient effect 2) and jingle 6; he rises for $90 frames (state 2).
 ;@ test: skip adds a transient effect
@@ -3010,12 +3010,12 @@ MadBatterAppear::
 ;> hJingle = 6
 	ld a, $06
 	ldh [hJingle], a
-;> IncrementEntityState()                    # next state
+;> IncrementEntityState(slot)                    # next state
 	call IncrementEntityState
 	ret
 
 
-;@ def MadBatterRise(slot: c)
+;@ def MadBatterRise(slot: bc)
 ;@ path: npc/mad_batter
 ;@ State 2: the pot (DrawMadBatterPot) rises in a zigzag: y speed -4, x speed +4 and -4
 ;@ switching every 16 frames. Then it waits $60 frames (state 3).
@@ -3030,7 +3030,7 @@ MadBatterRise::
 
 ;>     wEntityTimer[slot] = 0x60
 	ld [hl], $60
-;>     return IncrementEntityState()         # next state
+;>     return IncrementEntityState(slot)         # next state
 	jp IncrementEntityState
 
 .rise
@@ -3056,7 +3056,7 @@ MadBatterRise::
 	ret
 
 
-;@ def MadBatterPuff(slot: c)
+;@ def MadBatterPuff(slot: bc)
 ;@ path: npc/mad_batter
 ;@ State 3: after the wait a bomb (entity 2) that explodes at once (timer $20) bursts at his place
 ;@ - the puff out of which he appears - and he waits $48 frames (state 4).
@@ -3087,14 +3087,14 @@ MadBatterPuff::
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $20
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 
 .done
 	ret
 
 
-;@ def MadBatterGreet(slot: c)
+;@ def MadBatterGreet(slot: bc)
 ;@ path: npc/mad_batter
 ;@ State 4: when the timer runs out he speaks (dialogue $E1).
 ;@ test: skip opens a dialogue
@@ -3108,7 +3108,7 @@ MadBatterGreet::
 ;>     MadBatterOpenDialog(0xE1)
 	ld a, $e1
 	call MadBatterOpenDialog
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 
 .done
@@ -3128,7 +3128,7 @@ MadBatterMaxValues::
 MadBatterUpgradeDialogs::
 	db $e2, $e3, $e4
 
-;@ def MadBatterChooseUpgrade(slot: c)
+;@ def MadBatterChooseUpgrade(slot: bc)
 ;@ path: npc/mad_batter
 ;@ State 5: after the greeting, offers the next capacity in turn (wEntityPrivate1 cycles
 ;@ 0, 1, 2) that is not raised yet; the chosen index is kept in wSmasherBallSlot (the shared
@@ -3178,14 +3178,14 @@ MadBatterChooseUpgrade::
 	add hl, de
 	ld a, [hl]
 	call MadBatterOpenDialog
-;> IncrementEntityState()                    # next state
+;> IncrementEntityState(slot)                    # next state
 	call IncrementEntityState
 
 .done
 	ret
 
 
-;@ def MadBatterAnswer(slot: c)
+;@ def MadBatterAnswer(slot: bc)
 ;@ path: npc/mad_batter
 ;@ State 6: "yes": the lightning bolt appears (a second Mad Batter entity with wEntityPrivate3 = 1
 ;@ and timer $C0, noise effect $26) and he waits $C0 frames (state 7). "No": back to state 4,
@@ -3200,7 +3200,7 @@ MadBatterAnswer::
 ;>     return
 	ret nz
 
-;> IncrementEntityState()                    # next state
+;> IncrementEntityState(slot)                    # next state
 	call IncrementEntityState
 ;> if wDialogAnswer == 0:
 	ld a, [wDialogAnswer]
@@ -3244,7 +3244,7 @@ MadBatterAnswer::
 	ret
 
 
-;@ def MadBatterCurse(slot: c)
+;@ def MadBatterCurse(slot: bc)
 ;@ path: npc/mad_batter
 ;@ State 7: during the bolt he stands still (frame 0). Then dialogue $E5 and the capacity is
 ;@ raised: the new maximum, and the count filled up to it - for the magic powder also the powder
@@ -3267,7 +3267,7 @@ MadBatterCurse::
 ;> MadBatterOpenDialog(0xE5)
 	ld a, $e5
 	call MadBatterOpenDialog
-;> IncrementEntityState()                    # next state
+;> IncrementEntityState(slot)                    # next state
 	call IncrementEntityState
 ;> i = wSmasherBallSlot           # the chosen capacity
 	ld a, [wSmasherBallSlot]
@@ -3290,9 +3290,9 @@ MadBatterCurse::
 ;>     wMagicPowderCount = new
 	ld hl, wMagicPowderCount
 	ld [hl], d
-;>     Call_3E95(0x0C)            # give the magic powder (item $0C)
+;>     GiveInventoryItemFar(0x0C)            # give the magic powder (item $0C)
 	ld d, $0c
-	call Call_3E95
+	call GiveInventoryItemFar
 ;>     wHasToadstool = 0
 	xor a
 	ld [wHasToadstool], a
@@ -3320,7 +3320,7 @@ MadBatterCurse::
 	ret
 
 
-;@ def MadBatterLeave(slot: c)
+;@ def MadBatterLeave(slot: bc)
 ;@ path: npc/mad_batter
 ;@ State 8: after the dialogue he flies up and away, faster and faster (y speed -3 each frame,
 ;@ jingle $3B at the start). Once he is above the screen the room event is marked done, Link is
@@ -3470,7 +3470,7 @@ FreezeLinkForMadBatter::
 	ret
 
 
-;@ def MadBatterBoltHandler(slot: c)
+;@ def MadBatterBoltHandler(slot: bc)
 ;@ path: npc/mad_batter
 ;@ The lightning bolt (a Mad Batter entity with wEntityPrivate3 = 1): drawn while its timer runs,
 ;@ with the background palette flashing between $E4 and $44 every 2 frames; then it is removed.
@@ -3519,7 +3519,7 @@ MadBatterBoltFrame1::
 MadBatterBoltSpriteCounts::
 	db $0c, $0c, $04, $02
 
-;@ def DrawMadBatterBolt(slot: c)
+;@ def DrawMadBatterBolt(slot: bc)
 ;@ path: npc/mad_batter
 ;@ Draws the lightning bolt 5 pixels higher than the entity: all 12 sprites, or fewer while it
 ;@ grows (MadBatterBoltSpriteCounts), switching between the two palettes every 4 frames.
@@ -3573,7 +3573,7 @@ DrawMadBatterBolt::
 MusicalNoteSprite::
 	db $0e, $00
 
-;@ def MusicalNoteEntityHandler(slot: c)
+;@ def MusicalNoteEntityHandler(slot: bc)
 ;@ path: link/ocarina
 ;@ Entity $C9: a musical note that rises from Link while he plays the ocarina (spawned by the
 ;@ ocarina code in bank 2 with its speed). It sways: every other frame its x speed changes by
@@ -3625,7 +3625,7 @@ MusicalNoteEntityHandler::
 AnimalSpritePairsD0::
 	db $50, $00, $52, $00, $52, $20, $50, $20, $54, $00, $56, $00, $56, $20, $54, $20
 
-;@ def AnimalD0EntityHandler(slot: c)
+;@ def AnimalD0EntityHandler(slot: bc)
 ;@ path: npc/animal_village
 ;@ Entity $D0: an animal of Animal Village that is only there while Marin sings in the village.
 ;@ It turns towards Marin (down while she is lower on the screen, else up), sways every 32
@@ -3660,7 +3660,7 @@ AnimalD0EntityHandler::
 	rra
 	rra
 	rra
-;> SetEntitySpriteVariant((v & 1) + e)
+;> SetEntitySpriteVariant(slot, (v & 1) + e)
 	and $01
 	add e
 	call SetEntitySpriteVariant
@@ -3680,11 +3680,11 @@ AnimalTalkToLink:
 	ret
 
 
-;@ def RemoveUnlessMarinInVillage(slot: c)
+;@ def RemoveUnlessMarinInVillage(slot: bc)
 ;@ path: npc/animal_village
 ;@ The animals that listen to Marin exist only while she is in Animal Village: otherwise the
 ;@ entity is removed (its handler still finishes this frame).
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 RemoveUnlessMarinInVillage::
 ;> if not wIsMarinInAnimalVillage:
 	ld a, [wIsMarinInAnimalVillage]
@@ -3701,7 +3701,7 @@ RemoveUnlessMarinInVillage::
 AnimalSpritePairsD1::
 	db $74, $00, $76, $00, $70, $00, $72, $00, $76, $20, $74, $20, $72, $20, $70, $20
 
-;@ def AnimalD1EntityHandler(slot: c)
+;@ def AnimalD1EntityHandler(slot: bc)
 ;@ path: npc/animal_village
 ;@ Entity $D1: another animal listening to Marin in Animal Village; it turns left or right
 ;@ towards her, sways every 32 frames and talks like AnimalD0EntityHandler.
@@ -3735,7 +3735,7 @@ AnimalD1EntityHandler::
 	rra
 	rra
 	rra
-;> SetEntitySpriteVariant((v & 1) + e)
+;> SetEntitySpriteVariant(slot, (v & 1) + e)
 	and $01
 	add e
 	call SetEntitySpriteVariant
@@ -3750,7 +3750,7 @@ AnimalSpritePairsD3::
 	db $50, $00, $52, $00, $52, $20, $50, $20, $54, $00, $56, $00, $56, $20, $54, $20
 	db $58, $00, $5a, $00, $58, $00, $5a, $00, $5a, $20, $58, $20, $5a, $20, $58, $20
 
-;@ def AnimalD3EntityHandler(slot: c)
+;@ def AnimalD3EntityHandler(slot: bc)
 ;@ path: npc/animal_village
 ;@ Entity $D3: an animal hopping about in Animal Village while Marin is not there. It turns to
 ;@ Link every 64 frames, hops every 32 frames, is solid and talks: dialogue $24A-$251 (table 2)
@@ -3884,7 +3884,7 @@ AnimalD3EntityHandler::
 AnimalSpritePairsD2::
 	db $78, $00, $7a, $00, $7c, $00, $7e, $00, $7a, $20, $78, $20, $7e, $20, $7c, $20
 
-;@ def AnimalD2EntityHandler(slot: c)
+;@ def AnimalD2EntityHandler(slot: bc)
 ;@ path: npc/animal_village
 ;@ Entity $D2: a third animal listening to Marin, turning left or right towards her, like
 ;@ AnimalD1EntityHandler.
@@ -3918,7 +3918,7 @@ AnimalD2EntityHandler::
 	rra
 	rra
 	rra
-;> SetEntitySpriteVariant((v & 1) + e)
+;> SetEntitySpriteVariant(slot, (v & 1) + e)
 	and $01
 	add e
 	call SetEntitySpriteVariant
@@ -3932,7 +3932,7 @@ AnimalD2EntityHandler::
 BunnySpritePairs::
 	db $5a, $20, $58, $20, $5e, $20, $5c, $20, $58, $00, $5a, $00, $5c, $00, $5e, $00
 
-;@ def BunnyCallingMarinEntityHandler(slot: c)
+;@ def BunnyCallingMarinEntityHandler(slot: bc)
 ;@ path: npc/bunny
 ;@ Entity $C8: the bunny from Animal Village who, after the walrus is gone, runs in from the
 ;@ left, hops about, asks Marin to come and sing in the village and leads her away. Link is
@@ -3948,7 +3948,7 @@ BunnyCallingMarinEntityHandler::
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(v)                   # set the sprite variant
+;> SetEntitySpriteVariant(slot, v)                   # set the sprite variant
 	call SetEntitySpriteVariant
 ;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
@@ -3992,7 +3992,7 @@ BunnyStates::
 	dw BunnyAsk
 	dw BunnyLeaveWithMarin
 
-;@ def BunnyRunIn(slot: c)
+;@ def BunnyRunIn(slot: bc)
 ;@ path: npc/bunny
 ;@ State 0: after the start timer it runs right (speed $0C). At x $20 Marin and Link turn left
 ;@ to look at it; at x $48 it stops for $40 frames (state 1).
@@ -4035,11 +4035,11 @@ BunnyRunIn::
 ;>     wEntityTimer[slot] = 0x40
 	call GetEntityTimer
 	ld [hl], $40
-;>     return IncrementEntityState()         # next state
+;>     return IncrementEntityState(slot)         # next state
 	jp IncrementEntityState
 
 
-;@ def BunnyGreet(slot: c)
+;@ def BunnyGreet(slot: bc)
 ;@ path: npc/bunny
 ;@ State 1: after the pause it speaks (dialogue $1E3) and goes on to state 2; it keeps hopping.
 ;@ test: skip opens a dialogue
@@ -4054,15 +4054,15 @@ BunnyGreet::
 ;>     wEntityTimer[slot] = 0x10
 	call GetEntityTimer
 	ld [hl], $10
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 ;> BunnyHop(slot)                 # falls through
 
-;@ def BunnyHop(slot: c)
+;@ def BunnyHop(slot: bc)
 ;@ path: npc/bunny
 ;@ Hops: after landing it waits on the ground for 9 frames (wEntityPrivate4 counts down), then
 ;@ jumps with height speed $12.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 BunnyHop::
 ;> if hBGTilesRequestCopy:         # on the ground
 	ldh a, [hBGTilesRequestCopy]
@@ -4090,7 +4090,7 @@ BunnyHop::
 	ret
 
 
-;@ def BunnyAsk(slot: c)
+;@ def BunnyAsk(slot: bc)
 ;@ path: npc/bunny
 ;@ State 2: Marin looks up and then right while the timer runs; then the bunny asks her to come
 ;@ along (dialogue $1E5, state 3).
@@ -4114,7 +4114,7 @@ BunnyAsk::
 ;>     OpenDialogTable1(0xE5)     # dialogue $1E5
 	ld a, $e5
 	call OpenDialogTable1
-;>     return IncrementEntityState()         # next state
+;>     return IncrementEntityState(slot)         # next state
 	jp IncrementEntityState
 
 .look
@@ -4134,7 +4134,7 @@ BunnyAsk::
 	ret
 
 
-;@ def BunnyLeaveWithMarin(slot: c)
+;@ def BunnyLeaveWithMarin(slot: bc)
 ;@ path: npc/bunny
 ;@ State 3: Marin looks left and up; then she is marked as in Animal Village and both run off
 ;@ to the left (the bunny at speed -20 until x $E0, Marin at -12 with her walking frames). When
@@ -4166,7 +4166,7 @@ BunnyLeaveWithMarin::
 	jp SetFollowerFacing
 
 .leave
-;>@run SetEntitySpriteVariant(2 + ((hFrameCounter >> 3) & 1))   # running left
+;>@run SetEntitySpriteVariant(slot, 2 + ((hFrameCounter >> 3) & 1))   # running left
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -4240,7 +4240,7 @@ BunnyLeaveWithMarin::
 	ret
 
 
-;@ def LeverEntityHandler(slot: c)
+;@ def LeverEntityHandler(slot: bc)
 ;@ path: object/lever
 ;@ Entity $69: a pull handle hanging on a chain from the wall. Link cannot walk through it from
 ;@ below; standing right under it and holding the button of the Power Bracelet (item 3) he grabs
@@ -4406,7 +4406,7 @@ LeverHandlePairs::
 LeverChainPairs::
 	db $46, $00, $46, $20, $76, $00, $76, $20
 
-;@ def DrawLever(slot: c)
+;@ def DrawLever(slot: bc)
 ;@ path: object/lever
 ;@ Draws the handle (variant 1 in dungeon map 1) and the chain from 4 pixels above its anchor
 ;@ (wEntityPrivate2) down to the handle, one link per 16 pixels.
@@ -4464,7 +4464,7 @@ DrawLever::
 WalrusSnoreSprites::
 	db $24, $00, $3e, $00
 
-;@ def WalrusSnoreHandler(slot: c)
+;@ def WalrusSnoreHandler(slot: bc)
 ;@ path: npc/walrus
 ;@ A snore "Z" of the walrus (entity $C4 with wEntityPrivate1 set): it drifts up and to the left
 ;@ (moving every 4th frame; faster up during 32 of every 64 frames), shows its second look from
@@ -4504,7 +4504,7 @@ WalrusSnoreHandler::
 	dec e
 
 .set
-;> SetEntitySpriteVariant(v)
+;> SetEntitySpriteVariant(slot, v)
 	ld a, e
 	call SetEntitySpriteVariant
 ;>@sy wEntitySpeedY[slot] = 0xFC if wEntityTimer[slot] & 0x20 else 0xFE
@@ -4534,7 +4534,7 @@ WalrusSnoreHandler::
 	ret
 
 
-;@ def WalrusEntityHandler(slot: c)
+;@ def WalrusEntityHandler(slot: bc)
 ;@ path: npc/walrus
 ;@ Entity $C4: the walrus sleeping across the way to the Yarna Desert. It snores; when Marin
 ;@ follows Link and they come close, Marin offers to sing; her Ballad wakes it, it rolls over
@@ -4602,7 +4602,7 @@ WalrusStates::
 	dw WalrusCallBunny
 	dw WalrusIdle
 
-;@ def WalrusSleep(slot: c)
+;@ def WalrusSleep(slot: bc)
 ;@ path: npc/walrus
 ;@ State 0: every 128 frames a snore "Z" rises (a walrus entity with wEntityPrivate1 = 1, timer
 ;@ $60, physics flags $C1, 8 pixels left and 2 lower). Without Marin, talking to it gives
@@ -4620,10 +4620,10 @@ WalrusSleep::
 	and [hl]
 	jr nz, .marin
 
-;>     ok, z = SpawnEntity(0xC4)    # spawn a snore; the walrus's position in hMultiPurpose0/1
+;>     z, failed = SpawnEntity(0xC4)    # spawn a snore; the walrus's position in hMultiPurpose0/1
 	ld a, $c4
 	call SpawnEntity
-;>     if ok:
+;>     if not failed:
 	jr c, .marin
 
 ;>         wEntityX[z] = hMultiPurpose0 - 8
@@ -4708,7 +4708,7 @@ WalrusSleep::
 ;>     return
 	ret nz
 
-;> IncrementEntityState()                    # next state
+;> IncrementEntityState(slot)                    # next state
 	call IncrementEntityState
 ;> OpenDialogTable1(0xE1)         # dialogue $1E1: Marin offers to sing
 	ld a, $e1
@@ -4718,7 +4718,7 @@ WalrusSleep::
 	ret
 
 
-;@ def WalrusAskMarin(slot: c)
+;@ def WalrusAskMarin(slot: bc)
 ;@ path: npc/walrus
 ;@ State 1: "yes": Marin sings the Ballad of the Wind Fish (music $2F, wMarinSinging) for $50
 ;@ frames of the drop timer (state 2); "no": dialogue $1E4 and the walrus stays in state 8
@@ -4731,7 +4731,7 @@ WalrusAskMarin::
 ;>     return
 	jr nz, .done
 
-;> IncrementEntityState()                    # next state
+;> IncrementEntityState(slot)                    # next state
 	call IncrementEntityState
 ;> if wDialogAnswer == 0:
 	ld a, [wDialogAnswer]
@@ -4760,7 +4760,7 @@ WalrusAskMarin::
 	ret
 
 
-;@ def WalrusListen(slot: c)
+;@ def WalrusListen(slot: bc)
 ;@ path: npc/walrus
 ;@ State 2: Link is frozen while Marin starts singing; the walrus stirs (variant 0 and 1, now and
 ;@ then a blink, frame 2 at the end). Then state 3 for $C0 frames.
@@ -4779,7 +4779,7 @@ WalrusListen::
 
 ;>     wEntityDropTimer[slot] = 0xC0
 	ld [hl], $c0
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 ;>     return
 	ret
@@ -4815,7 +4815,7 @@ WalrusListen::
 	ld e, $01
 
 .set
-;> SetEntitySpriteVariant(v)
+;> SetEntitySpriteVariant(slot, v)
 	ld a, e
 	call SetEntitySpriteVariant
 	ret
@@ -4832,7 +4832,7 @@ WalrusWakeFrames::
 	db $01, $02, $01, $02, $01, $01, $02, $02, $01, $02, $01, $02, $01, $01, $02, $02
 	db $01, $02, $01, $02, $01, $01, $02, $02, $01, $02, $01, $02, $01, $01, $02, $02
 
-;@ def WalrusWakeUp(slot: c)
+;@ def WalrusWakeUp(slot: bc)
 ;@ path: npc/walrus
 ;@ State 3: while Marin sings the walrus wriggles (WalrusWakeFrames) and every 128 frames (up to
 ;@ step $60) hops with jingle $24; on frame 2 it groans (jingle $27 every 64 frames). In the air
@@ -4858,10 +4858,10 @@ WalrusWakeUp::
 ;>     wEntityTimer[slot] = 8
 	call GetEntityTimer
 	ld [hl], $08
-;>     SetEntitySpriteVariant(2)
+;>     SetEntitySpriteVariant(slot, 2)
 	ld a, $02
 	call SetEntitySpriteVariant
-;>     return IncrementEntityState()         # next state
+;>     return IncrementEntityState(slot)         # next state
 	jp IncrementEntityState
 
 .wriggle
@@ -4915,7 +4915,7 @@ WalrusWakeUp::
 	ld a, $02
 
 .set
-;> SetEntitySpriteVariant(v)
+;> SetEntitySpriteVariant(slot, v)
 	call SetEntitySpriteVariant
 ;> if wEntityZ[slot]:             # in the air
 	ld hl, wEntityZ
@@ -4924,7 +4924,7 @@ WalrusWakeUp::
 	and a
 	jr z, .done
 
-;>@air     SetEntitySpriteVariant(1 if wEntitySpeedZ[slot] < -8 else 2)   # (signed)
+;>@air     SetEntitySpriteVariant(slot, 1 if wEntitySpeedZ[slot] < -8 else 2)   # (signed)
 	ld e, $01
 	ld hl, wEntitySpeedZ
 	add hl, bc
@@ -4944,11 +4944,11 @@ WalrusWakeUp::
 	ret
 
 
-;@ def WalrusRoll(slot: c)
+;@ def WalrusRoll(slot: bc)
 ;@ path: npc/walrus
 ;@ State 4: every 16 frames the walrus rolls one frame further towards the sea (y + 4, variant +
 ;@ 1); after frame 3 it leaps (height $18, y + $18, jingle 8; state 5).
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 WalrusRoll::
 ;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
@@ -4988,14 +4988,14 @@ WalrusRoll::
 ;>         hJingle = 8
 	ld a, $08
 	ldh [hJingle], a
-;>         IncrementEntityState()            # next state
+;>         IncrementEntityState(slot)            # next state
 	call IncrementEntityState
 
 .done
 	ret
 
 
-;@ def WalrusLand(slot: c)
+;@ def WalrusLand(slot: bc)
 ;@ path: npc/walrus
 ;@ State 5: when the walrus is down in the water, a splash (WalrusSplashes) and state 6 after 8
 ;@ frames.
@@ -5012,7 +5012,7 @@ WalrusLand::
 ;>     return
 	jr nz, WalrusSplashes.done
 
-;> IncrementEntityState()                    # next state
+;> IncrementEntityState(slot)                    # next state
 	call IncrementEntityState
 ;> wEntityTimer[slot] = 8
 	call GetEntityTimer
@@ -5054,7 +5054,7 @@ WalrusSplashes::
 	ret
 
 
-;@ def WalrusGone(slot: c)
+;@ def WalrusGone(slot: bc)
 ;@ path: npc/walrus
 ;@ State 6: the walrus shows its diving frame (5) until the timer runs out; then it is gone
 ;@ (variant $FF), the area music comes back, Marin says dialogue $1E2 and she and Link turn down
@@ -5063,15 +5063,15 @@ WalrusSplashes::
 WalrusGone::
 ;> if wEntityTimer[slot]:
 	call GetEntityTimer
-;>     return SetEntitySpriteVariant(5)
+;>     return SetEntitySpriteVariant(slot, 5)
 	jr nz, .diving
 
-;> IncrementEntityState()                    # next state
+;> IncrementEntityState(slot)                    # next state
 	call IncrementEntityState
 ;> wMusicTrackToPlay = hDefaultMusicTrack
 	ldh a, [hDefaultMusicTrack]
 	ld [wMusicTrackToPlay], a
-;> SetEntitySpriteVariant(0xFF)                # not drawn any more
+;> SetEntitySpriteVariant(slot, 0xFF)                # not drawn any more
 	ld a, $ff
 	call SetEntitySpriteVariant
 ;> OpenDialogTable1(0xE2)         # dialogue $1E2
@@ -5094,7 +5094,7 @@ WalrusGone::
 	jp SetEntitySpriteVariant
 
 
-;@ def WalrusCallBunny(slot: c)
+;@ def WalrusCallBunny(slot: bc)
 ;@ path: npc/walrus
 ;@ State 7: the bunny that calls Marin (entity $C8) is placed off the left edge (x $F8, y $48,
 ;@ timer $20); the walrus entity is removed and the room event marked done.
@@ -5155,7 +5155,7 @@ WalrusSpriteFrames::
 WalrusShadowSprites::
 	db $17, $03, $26, $00, $17, $09, $26, $00, $17, $0f, $26, $00, $17, $15, $26, $00
 
-;@ def DrawWalrus(slot: c)
+;@ def DrawWalrus(slot: bc)
 ;@ path: npc/walrus
 ;@ Draws the walrus (8 sprites of its frame) and, while it is in the air, its shadow at its
 ;@ ground position.
@@ -5200,7 +5200,7 @@ DrawWalrus::
 	ret
 
 
-;@ def WalrusInSeaHandler(slot: c)
+;@ def WalrusInSeaHandler(slot: bc)
 ;@ path: npc/walrus
 ;@ The walrus after the event, out in the sea at (x $80, y $68): when Link plays the Ballad of
 ;@ the Wind Fish (song 0) it comes up with a splash, says dialogue $1E6 and dives again for good.
@@ -5227,10 +5227,10 @@ WalrusInSeaStates::
 	dw WalrusInSeaSurface
 	dw WalrusInSeaTalk
 
-;@ def WalrusInSeaInit(slot: c)
+;@ def WalrusInSeaInit(slot: bc)
 ;@ path: npc/walrus
 ;@ State 0: places the walrus at (x $80, y $68) and waits $20 frames.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 WalrusInSeaInit::
 ;> wEntityY[slot] = 0x68
 	ld hl, wEntityY
@@ -5243,11 +5243,11 @@ WalrusInSeaInit::
 ;> wEntityTimer[slot] = 0x20
 	call GetEntityTimer
 	ld [hl], $20
-;> return IncrementEntityState()             # next state
+;> return IncrementEntityState(slot)             # next state
 	jp IncrementEntityState
 
 
-;@ def WalrusInSeaWaitForSong(slot: c)
+;@ def WalrusInSeaWaitForSong(slot: bc)
 ;@ path: npc/walrus
 ;@ State 1: waits for the Ballad of the Wind Fish (selected song 0, ocarina state $40); then a
 ;@ splash and state 2.
@@ -5267,7 +5267,7 @@ WalrusInSeaWaitForSong::
 	cp $40
 	jr nz, .done
 
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 ;>     wEntityTimer[slot] = 0x20
 	call GetEntityTimer
@@ -5279,11 +5279,11 @@ WalrusInSeaWaitForSong::
 	ret
 
 
-;@ def WalrusInSeaSurface(slot: c)
+;@ def WalrusInSeaSurface(slot: bc)
 ;@ path: npc/walrus
 ;@ State 2: the walrus rises (variant 2, then 1 for the last 16 frames); then state 3 for $C8
 ;@ frames.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 WalrusInSeaSurface::
 ;> t = wEntityTimer[slot]
 	call GetEntityTimer
@@ -5292,11 +5292,11 @@ WalrusInSeaSurface::
 
 ;>     wEntityTimer[slot] = 0xC8
 	ld [hl], $c8
-;>     return IncrementEntityState()         # next state
+;>     return IncrementEntityState(slot)         # next state
 	jp IncrementEntityState
 
 .rise
-;> SetEntitySpriteVariant(1 if t < 0x10 else 2)
+;> SetEntitySpriteVariant(slot, 1 if t < 0x10 else 2)
 	cp $10
 	ld a, $01
 	jr c, .set
@@ -5308,7 +5308,7 @@ WalrusInSeaSurface::
 	ret
 
 
-;@ def WalrusInSeaTalk(slot: c)
+;@ def WalrusInSeaTalk(slot: bc)
 ;@ path: npc/walrus
 ;@ State 3: with $80 frames left the walrus speaks (dialogue $1E6); it bobs with its mouth moving
 ;@ (wEntityPrivate5) until 32 frames are left, sinks (variant 1, then 2) and finally dives with
@@ -5362,7 +5362,7 @@ WalrusInSeaTalk::
 	ld hl, wEntityPrivate5
 	add hl, bc
 	ld [hl], d
-;> SetEntitySpriteVariant(v)
+;> SetEntitySpriteVariant(slot, v)
 	ld a, e
 	call SetEntitySpriteVariant
 	ret
@@ -5386,7 +5386,7 @@ WalrusBobOffsets::
 	db $00, $00, $01, $02
 	db $03, $03, $02, $01
 
-;@ def DrawSwimmingWalrus(slot: c)
+;@ def DrawSwimmingWalrus(slot: bc)
 ;@ path: npc/walrus
 ;@ Draws the walrus in the sea, bobbing (WalrusBobOffsets); while it talks (wEntityPrivate5) its
 ;@ frame switches between 1 and 2 every 64 frames.
@@ -5493,7 +5493,7 @@ MarinSpritePairs::
 MarinDirectionVariants::
 	db $06, $04, $02, $00
 
-;@ def MarinFollowHandler(slot: c)
+;@ def MarinFollowHandler(slot: bc)
 ;@ path: npc/marin
 ;@ Entity $C1 (Marin) while she follows Link. First the moment she joins: for the timer Link
 ;@ holds her up like a found treasure (pose $6C, Marin drawn 16 pixels above his head); at 16
@@ -5620,7 +5620,7 @@ MarinFollowHandler::
 ;@ def FillFollowerTrail(table: hl, value: a)
 ;@ path: npc/marin
 ;@ Writes `value` into the 16 bytes at `table` (one of the follower trail arrays).
-;@ test: hl = 0xD155; a = rand(0, 255)
+;@ test: table = 0xD155; a = rand(0, 255)
 FillFollowerTrail::
 ;> for i in range(16):
 ;>     mem[table + i] = value
@@ -5651,7 +5651,7 @@ FollowNoteOffsetsX::
 FollowNoteSpeedsX::
 	db $06, $01
 
-;@ def MarinFollowUpdate(slot: c)
+;@ def MarinFollowUpdate(slot: bc)
 ;@ path: npc/marin
 ;@ Marin following Link, every frame. While she sings (wMarinSinging) she shows her singing
 ;@ frames and every 32 frames a musical note (entity $C9) rises from her. Then: a short comment
@@ -5685,10 +5685,10 @@ MarinFollowUpdate::
 	and $1f
 	jr nz, .draw
 
-;>         ok, note = SpawnEntity(0xC9)   # a musical note; Marin's position in hMultiPurpose0/1
+;>         note, failed = SpawnEntity(0xC9)   # a musical note; Marin's position in hMultiPurpose0/1
 	ld a, $c9
 	call SpawnEntity
-;>         if ok:
+;>         if not failed:
 	jr c, .draw
 
 ;>             wEntityY[note] = hMultiPurpose1 - 8
@@ -5857,7 +5857,7 @@ MarinFollowUpdate::
 ;>     return MarinFollowLink(slot)
 	jp z, MarinFollowLink
 
-;> EntityCheckWalls()                    # stop at walls
+;> EntityCheckWalls(slot)                    # stop at walls
 	call EntityCheckWalls
 ;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
@@ -5891,11 +5891,11 @@ MarinReunionStates::
 	dw MarinReunionTalk
 	dw MarinReunionEnd
 
-;@ def MarinReunionStart(slot: c)
+;@ def MarinReunionStart(slot: bc)
 ;@ path: npc/marin
 ;@ Step 0: once Link is no longer fading out (motion state 3), a background change ($0F), Marin
 ;@ shows variant 1 and waits $40 frames.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 MarinReunionStart::
 ;> if wLinkMotionState == 3:
 ;>     return
@@ -5909,18 +5909,18 @@ MarinReunionStart::
 ;> hBGChangeRequest = 0x0F
 	ld a, $0f
 	ldh [hBGChangeRequest], a
-;> SetEntitySpriteVariant(1)
+;> SetEntitySpriteVariant(slot, 1)
 	ld a, $01
 	call SetEntitySpriteVariant
-;> return IncrementEntityState()             # next step
+;> return IncrementEntityState(slot)             # next step
 	jp IncrementEntityState
 
 
-;@ def MarinReunionTurn(slot: c)
+;@ def MarinReunionTurn(slot: bc)
 ;@ path: npc/marin
 ;@ Step 1: after the wait she turns left (direction 1, variant 4), background change $10, and
 ;@ waits $18 frames.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 MarinReunionTurn::
 ;> if not wMarinReunionTimer:
 	ld a, [wMarinReunionTimer]
@@ -5934,24 +5934,24 @@ MarinReunionTurn::
 	ld hl, wEntityDirection
 	add hl, bc
 	ld [hl], $01
-;>     SetEntitySpriteVariant(4)
+;>     SetEntitySpriteVariant(slot, 4)
 	ld a, $04
 	call SetEntitySpriteVariant
 ;>     hBGChangeRequest = 0x10
 	ld a, $10
 	ldh [hBGChangeRequest], a
-;>     IncrementEntityState()                # next step
+;>     IncrementEntityState(slot)                # next step
 	call IncrementEntityState
 
 .done
 	ret
 
 
-;@ def MarinReunionWalk(slot: c)
+;@ def MarinReunionWalk(slot: bc)
 ;@ path: npc/marin
 ;@ Step 2: she walks left (speed -12, variants 4/5) until she is within 2 pixels of Link's x;
 ;@ then she faces up (variant 2) and waits $10 frames.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 MarinReunionWalk::
 ;> if wMarinReunionTimer:
 	ld a, [wMarinReunionTimer]
@@ -5974,7 +5974,7 @@ MarinReunionWalk::
 	inc e
 
 .set
-;> SetEntitySpriteVariant(v)
+;> SetEntitySpriteVariant(slot, v)
 	ld a, e
 	call SetEntitySpriteVariant
 ;> ex, dx = GetEntityXDistanceToLink_18(slot)
@@ -5996,14 +5996,14 @@ MarinReunionWalk::
 ;> wMarinReunionTimer = 0x10
 	ld a, $10
 	ld [wMarinReunionTimer], a
-;> IncrementEntityState()                    # next step
+;> IncrementEntityState(slot)                    # next step
 	call IncrementEntityState
 
 .done
 	ret
 
 
-;@ def MarinReunionTalk(slot: c)
+;@ def MarinReunionTalk(slot: bc)
 ;@ path: npc/marin
 ;@ Step 3: she speaks (table 2): when wLowHealth equals wMarinReunion - 1 or is 0, dialogue
 ;@ $21B, or $21D while $DB47 is below $80; otherwise $21C, or $21E one time in 64.
@@ -6050,18 +6050,18 @@ MarinReunionTalk::
 ;> OpenDialogTable2(e)
 	ld a, e
 	call OpenDialogTable2
-;> IncrementEntityState()                    # next step
+;> IncrementEntityState(slot)                    # next step
 	call IncrementEntityState
 
 .done
 	ret
 
 
-;@ def MarinReunionEnd(slot: c)
+;@ def MarinReunionEnd(slot: bc)
 ;@ path: npc/marin
 ;@ Step 4: the walk is over: wMarinReunion is cleared, Link is free, the follower trail starts
 ;@ at Marin (her x; her drawn y, one pixel less per entry; facing up) and her trail counter is $FF.
-;@ test: c = rand(0, 15); hActiveEntityDrawY = rand(0x10, 0x80)
+;@ test: slot = rand(0, 15); hActiveEntityDrawY = rand(0x10, 0x80)
 MarinReunionEnd::
 ;> wMarinReunion = 0
 	xor a
@@ -6099,7 +6099,7 @@ MarinReunionEnd::
 ;@ def FillTrail16(table: hl, value: a)
 ;@ path: npc/marin
 ;@ Writes `value` into the 16 bytes at `table` (a second copy of FillFollowerTrail).
-;@ test: hl = 0xD155; a = rand(0, 255)
+;@ test: table = 0xD155; a = rand(0, 255)
 FillTrail16::
 ;> for i in range(16):
 ;>     mem[table + i] = value
@@ -6113,7 +6113,7 @@ FillTrail16::
 	ret
 
 
-;@ def MarinFollowLink(slot: c)
+;@ def MarinFollowLink(slot: bc)
 ;@ path: npc/marin
 ;@ Marin walking behind Link. After the room's fade-in she is kept in this room; Link's
 ;@ previous position, direction and height go into the follower trail at her counter, and she
@@ -6151,7 +6151,7 @@ MarinFollowLink::
 	add hl, de
 ;=@base
 	push hl
-;>@walk SetEntitySpriteVariant(base | ((wLinkWalkingFrameCount >> 3) & 1))   # walk in step with Link
+;>@walk SetEntitySpriteVariant(slot, base | ((wLinkWalkingFrameCount >> 3) & 1))   # walk in step with Link
 	ld a, [wLinkWalkingFrameCount]
 	rra
 	rra
@@ -6288,7 +6288,7 @@ MarinFollowLink::
 ;> if old == new:
 	pop af
 	cp e
-;>     return EntityCheckWalls()         # stop at walls
+;>     return EntityCheckWalls(slot)         # stop at walls
 	jr z, .walls
 
 ;> if old == 0:                   # takes off
@@ -6296,15 +6296,15 @@ MarinFollowLink::
 	and a
 	jr z, .takeOff
 
-;>@w     return EntityCheckWalls()
+;>@w     return EntityCheckWalls(slot)
 
 ;> if new != 0:
 	ld a, e
 	and a
-;>     return EntityCheckWalls()
+;>     return EntityCheckWalls(slot)
 	jr nz, .walls
 
-;> EntityCheckWalls()                    # landed
+;> EntityCheckWalls(slot)                    # landed
 	call EntityCheckWalls
 ;> if wEntityStatus[slot] == 2:
 	ld hl, wEntityStatus
@@ -6372,7 +6372,7 @@ MarinFollowLink::
 TextDebuggerSteps::
 	db $00, $01, $ff, $00, $10, $f0
 
-;@ def TextDebuggerEntityHandler(slot: c)
+;@ def TextDebuggerEntityHandler(slot: bc)
 ;@ path: unused/text_debugger
 ;@ Entity $6B: a text debugger left in the game. Link is frozen; right/left change the low
 ;@ digit of wDebugDialogIndex, up/down the high digit; A opens that dialogue from table 0,
@@ -6493,7 +6493,7 @@ MuralSprites::
 	db $00, $f8, $50, $00, $00, $00, $52, $00, $00, $08, $54, $00
 	db $00, $10, $56, $00
 
-;@ def MuralHandler(slot: c)
+;@ def MuralHandler(slot: bc)
 ;@ path: object/mural
 ;@ Entity $42 in map $16: the wall mural. Reading it (when the room is lit, background palette
 ;@ $E4) shows the mural screen (game mode $0A); in the dark it is too dark to read (dialogue $0E6).
@@ -6517,20 +6517,20 @@ MuralStates::
 	dw MuralWaitForRead
 	dw MuralShow
 
-;@ def MuralInit(slot: c)
+;@ def MuralInit(slot: bc)
 ;@ path: object/mural
 ;@ State 0: places the mural at x $50.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 MuralInit::
 ;> wEntityX[slot] = 0x50
 	ld hl, wEntityX
 	add hl, bc
 	ld [hl], $50
-;> return IncrementEntityState()             # next state
+;> return IncrementEntityState(slot)             # next state
 	jp IncrementEntityState
 
 
-;@ def MuralWaitForRead(slot: c)
+;@ def MuralWaitForRead(slot: bc)
 ;@ path: object/mural
 ;@ State 1: when Link reads the mural: in the lit room (palette $E4) state 2, otherwise
 ;@ dialogue $0E6.
@@ -6553,7 +6553,7 @@ MuralWaitForRead::
 	cp $e4
 	jr nz, .dark
 
-;>     return IncrementEntityState()         # next state
+;>     return IncrementEntityState(slot)         # next state
 	jp IncrementEntityState
 
 .dark
@@ -6563,11 +6563,11 @@ MuralWaitForRead::
 	ret
 
 
-;@ def MuralShow(slot: c)
+;@ def MuralShow(slot: bc)
 ;@ path: object/mural
 ;@ State 2: after the dialogue, switches to the mural screen (game mode $0A), notes that the
 ;@ mural was seen (bit 4 of overworld room $AC's status) and goes back to state 0.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 MuralShow::
 ;> ReturnIfNonInteractive_18()
 	call ReturnIfNonInteractive_18
@@ -6594,7 +6594,7 @@ MuralShow::
 	ret
 
 
-;@ def OwlStatueEntityHandler(slot: c)
+;@ def OwlStatueEntityHandler(slot: bc)
 ;@ path: object/owl_statue
 ;@ Entity $42: an owl statue in a dungeon (in map $16 it is the mural, MuralHandler). It is
 ;@ solid; read without the dungeon's stone beak it says dialogue $110, with it the hint of the
@@ -6647,7 +6647,7 @@ MarinPairs::
 	db $60, $00, $62, $00, $62, $20, $60, $20, $64, $00, $66, $00, $66, $20, $64, $20
 	db $68, $00, $6a, $00, $6c, $00, $6e, $00, $6a, $20, $68, $20, $6e, $20, $6c, $20
 
-;@ def MarinSceneEntityHandler(slot: c)
+;@ def MarinSceneEntityHandler(slot: bc)
 ;@ path: npc/marin
 ;@ Entity $C2: a scene with Marin (she sets wSingingMarinSlot): only while bit 1 of
 ;@ wDungeon7Flags is set, the rooster does not follow Link and the room's bit 4 is clear. She
@@ -6743,10 +6743,10 @@ MarinSceneStates::
 	dw MarinSceneWalkLeft
 	dw MarinSceneLeave
 
-;@ def ResetEntityCounter_18(slot: c)
+;@ def ResetEntityCounter_18(slot: bc)
 ;@ path: entity/helpers
 ;@ Sets wEntityPrivateCounter to 0 (holds a walking animation on its first frame).
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 ResetEntityCounter_18::
 ;> wEntityPrivateCounter[slot] = 0
 	ld hl, wEntityPrivateCounter
@@ -6755,7 +6755,7 @@ ResetEntityCounter_18::
 	ret
 
 
-;@ def MarinSceneWait(slot: c)
+;@ def MarinSceneWait(slot: bc)
 ;@ path: npc/marin
 ;@ State 0: Marin hops and looks at Link; when he comes left of x $90 she calls him
 ;@ (dialogue $235).
@@ -6778,18 +6778,18 @@ MarinSceneWait::
 ;>     OpenDialogTable2(0x35)     # dialogue $235
 	ld a, $35
 	call OpenDialogTable2
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 
 .done
 	ret
 
 
-;@ def MarinSceneHop(slot: c)
+;@ def MarinSceneHop(slot: bc)
 ;@ path: npc/marin
 ;@ On the ground (hBGTilesRequestCopy 0 or negative), Marin hops (height speed $10) every 64
 ;@ frames.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 MarinSceneHop::
 ;> if hBGTilesRequestCopy and not hBGTilesRequestCopy & 0x80:   # in the air
 	ldh a, [hBGTilesRequestCopy]
@@ -6815,7 +6815,7 @@ MarinSceneHop::
 	ret
 
 
-;@ def MarinSceneTalk1(slot: c)
+;@ def MarinSceneTalk1(slot: bc)
 ;@ path: npc/marin
 ;@ State 1: dialogue $236 (after the first one).
 ;@ test: skip opens a dialogue
@@ -6827,11 +6827,11 @@ MarinSceneTalk1::
 ;> OpenDialogTable2(0x36)         # dialogue $236
 	ld a, $36
 	call OpenDialogTable2
-;> return IncrementEntityState()             # next state
+;> return IncrementEntityState(slot)             # next state
 	jp IncrementEntityState
 
 
-;@ def MarinSceneWaitForLink(slot: c)
+;@ def MarinSceneWaitForLink(slot: bc)
 ;@ path: npc/marin
 ;@ State 2: waits until Link is close (within 8 pixels sideways and 16 up or down).
 ;@ test: skip returns from its caller when paused
@@ -6856,12 +6856,12 @@ MarinSceneWaitForLink::
 	cp $20
 	ret nc
 
-;> IncrementEntityState()                    # next state
+;> IncrementEntityState(slot)                    # next state
 	call IncrementEntityState
 	ret
 
 
-;@ def MarinSceneHookshot(slot: c)
+;@ def MarinSceneHookshot(slot: bc)
 ;@ path: npc/marin
 ;@ State 3: Marin faces Link; while the hookshot is in use she is carried along 16 pixels right
 ;@ of him. When it is over Link's item pose ends and she waits $10 frames (state 4).
@@ -6902,11 +6902,11 @@ MarinSceneHookshot::
 ;> wEntityTimer[slot] = 0x10
 	call GetEntityTimer
 	ld [hl], $10
-;> return IncrementEntityState()             # next state
+;> return IncrementEntityState(slot)             # next state
 	jp IncrementEntityState
 
 
-;@ def MarinSceneTalk2(slot: c)
+;@ def MarinSceneTalk2(slot: bc)
 ;@ path: npc/marin
 ;@ State 4: Link is frozen and faces right; after the timer, dialogue $237.
 ;@ test: skip updates Link's pose through another bank
@@ -6934,14 +6934,14 @@ MarinSceneTalk2::
 ;>     OpenDialogTable2(0x37)     # dialogue $237
 	ld a, $37
 	call OpenDialogTable2
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 
 .done
 	ret
 
 
-;@ def MarinSceneTalk3(slot: c)
+;@ def MarinSceneTalk3(slot: bc)
 ;@ path: npc/marin
 ;@ State 5: dialogue $238.
 ;@ test: skip opens a dialogue
@@ -6956,11 +6956,11 @@ MarinSceneTalk3::
 ;> OpenDialogTable2(0x38)         # dialogue $238
 	ld a, $38
 	call OpenDialogTable2
-;> return IncrementEntityState()             # next state
+;> return IncrementEntityState(slot)             # next state
 	jp IncrementEntityState
 
 
-;@ def MarinSceneTalk4(slot: c)
+;@ def MarinSceneTalk4(slot: bc)
 ;@ path: npc/marin
 ;@ State 6: dialogue $239, and the pause counter wEntityPrivate1 starts at 0.
 ;@ test: skip opens a dialogue
@@ -6979,11 +6979,11 @@ MarinSceneTalk4::
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], b
-;> return IncrementEntityState()             # next state
+;> return IncrementEntityState(slot)             # next state
 	jp IncrementEntityState
 
 
-;@ def MarinScenePause(slot: c)
+;@ def MarinScenePause(slot: bc)
 ;@ path: npc/marin
 ;@ State 7: a pause of $A0 frames.
 ;@ test: skip returns from its caller when paused
@@ -7004,14 +7004,14 @@ MarinScenePause::
 	cp $a0
 	jr nz, .done
 
-;>     return IncrementEntityState()         # next state
+;>     return IncrementEntityState(slot)         # next state
 	jp IncrementEntityState
 
 .done
 	ret
 
 
-;@ def MarinSceneCallVisitor(slot: c)
+;@ def MarinSceneCallVisitor(slot: bc)
 ;@ path: npc/marin
 ;@ State 8: the visitor appears at the bottom left (a new entity $C2 at x $12, y $88 with
 ;@ wEntityPrivate2 = 1).
@@ -7039,14 +7039,14 @@ MarinSceneCallVisitor::
 	ld hl, wEntityPrivate2
 	add hl, de
 	inc [hl]
-;> return IncrementEntityState()             # next state
+;> return IncrementEntityState(slot)             # next state
 	jp IncrementEntityState
 
 
-;@ def MarinSceneWaitForVisitor(slot: c)
+;@ def MarinSceneWaitForVisitor(slot: bc)
 ;@ path: npc/marin
 ;@ State 9: Marin stands still; the visitor moves her on to state 10 (VisitorSendMarin).
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 MarinSceneWaitForVisitor::
 ;> ResetEntityCounter_18(slot)
 	call ResetEntityCounter_18
@@ -7056,10 +7056,10 @@ MarinSceneWaitForVisitor::
 	ret
 
 
-;@ def MarinSceneWalkDown(slot: c)
+;@ def MarinSceneWalkDown(slot: bc)
 ;@ path: npc/marin
 ;@ State 10: she walks down (speed 6) to y $3E.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 MarinSceneWalkDown::
 ;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
@@ -7069,7 +7069,7 @@ MarinSceneWalkDown::
 	cp $3e
 	jr c, .walk
 
-;>     return IncrementEntityState()         # next state
+;>     return IncrementEntityState(slot)         # next state
 	jp IncrementEntityState
 
 .walk
@@ -7085,10 +7085,10 @@ MarinSceneWalkDown::
 	jp UpdateEntityYWithSpeed_18
 
 
-;@ def MarinSceneWalkLeft(slot: c)
+;@ def MarinSceneWalkLeft(slot: bc)
 ;@ path: npc/marin
 ;@ State 11: she walks left (speed -6) until x $18, then stops for $60 frames.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 MarinSceneWalkLeft::
 ;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
@@ -7111,14 +7111,14 @@ MarinSceneWalkLeft::
 ;>     wEntityTimer[slot] = 0x60
 	call GetEntityTimer
 	ld [hl], $60
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 
 .done
 	ret
 
 
-;@ def MarinSceneLeave(slot: c)
+;@ def MarinSceneLeave(slot: bc)
 ;@ path: npc/marin
 ;@ State 12: she looks up while the timer runs, then walks off to the left (speed -12) with Link
 ;@ watching her; at x $F0 Link is free, bit 4 of overworld room $08 is set (the scene does not
@@ -7188,7 +7188,7 @@ MarinSceneVisitorPairs::
 	db $50, $00, $52, $00, $52, $20, $50, $20, $54, $00, $56, $00, $56, $20, $54, $20
 	db $58, $00, $5a, $00, $5c, $00, $5e, $00, $5a, $20, $58, $20, $5e, $20, $5c, $20
 
-;@ def MarinSceneVisitor(slot: c)
+;@ def MarinSceneVisitor(slot: bc)
 ;@ path: npc/marin
 ;@ The visitor in Marin's scene (entity $C2 with wEntityPrivate2 set): it walks up from the
 ;@ bottom, speaks (dialogues $23B and $23A, table 2) with Marin and Link looking at it, sends
@@ -7212,7 +7212,7 @@ MarinSceneVisitorStates::
 	dw VisitorSendMarin
 	dw VisitorLeave
 
-;@ def VisitorWalkUp(slot: c)
+;@ def VisitorWalkUp(slot: bc)
 ;@ path: npc/marin
 ;@ State 0: walks up (speed -12) to y $70; then dialogue $23B and Link and Marin turn down to it.
 ;@ test: skip updates Link's pose through another bank
@@ -7249,14 +7249,14 @@ VisitorWalkUp::
 	push bc
 	call UpdateLinkAnimationStateFar
 	pop bc
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 
 .done
 	ret
 
 
-;@ def VisitorTalk(slot: c)
+;@ def VisitorTalk(slot: bc)
 ;@ path: npc/marin
 ;@ State 1: Marin keeps looking down; dialogue $23A.
 ;@ test: skip opens a dialogue
@@ -7273,11 +7273,11 @@ VisitorTalk::
 ;> OpenDialogTable2(0x3A)         # dialogue $23A
 	ld a, $3a
 	call OpenDialogTable2
-;> return IncrementEntityState()             # next state
+;> return IncrementEntityState(slot)             # next state
 	jp IncrementEntityState
 
 
-;@ def VisitorSendMarin(slot: c)
+;@ def VisitorSendMarin(slot: bc)
 ;@ path: npc/marin
 ;@ State 2: Marin looks down, and left once the dialogue has reached character $22; after the
 ;@ dialogue Marin goes on to her next state and the visitor to state 3.
@@ -7307,14 +7307,14 @@ VisitorSendMarin::
 	ld hl, wEntityState
 	add hl, de
 	inc [hl]
-;> return IncrementEntityState()             # next state
+;> return IncrementEntityState(slot)             # next state
 	jp IncrementEntityState
 
 
-;@ def VisitorLeave(slot: c)
+;@ def VisitorLeave(slot: bc)
 ;@ path: npc/marin
 ;@ State 3: walks left (speed -8) and is removed at x $E0.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 VisitorLeave::
 ;> wEntityDirection[slot] = 1
 	ld hl, wEntityDirection
@@ -7338,7 +7338,7 @@ VisitorLeave::
 	ret
 
 
-;@ def MarinCompanionEntityHandler(slot: c)
+;@ def MarinCompanionEntityHandler(slot: bc)
 ;@ path: npc/marin
 ;@ Entity $C1: Marin. While she follows Link, MarinFollowHandler; while she is in Animal Village
 ;@ this entity does nothing. Otherwise she is at the beach (Toronbo Shores) - only once the
@@ -7397,10 +7397,10 @@ MarinBeachStates::
 	dw MarinBeachLookAway
 	dw MarinBeachIdle
 
-;@ def MarinBeachMusic(slot: c)
+;@ def MarinBeachMusic(slot: bc)
 ;@ path: npc/marin
 ;@ State 0: her music ($4D) plays and becomes the room's music.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 MarinBeachMusic::
 ;> wMusicTrackToPlay = 0x4D
 	ld a, $4d
@@ -7409,12 +7409,12 @@ MarinBeachMusic::
 	ldh [hDefaultMusicTrack], a
 ;> hDefaultMusicTrackAlt = 0x4D
 	ldh [hDefaultMusicTrackAlt], a
-;> IncrementEntityState()                    # next state
+;> IncrementEntityState(slot)                    # next state
 	call IncrementEntityState
 	ret
 
 
-;@ def MarinBeachWaitForLink(slot: c)
+;@ def MarinBeachWaitForLink(slot: bc)
 ;@ path: npc/marin
 ;@ State 1: when Link comes to her height (within 20 pixels), he stops and she turns to him
 ;@ ($18 frames).
@@ -7439,14 +7439,14 @@ MarinBeachWaitForLink::
 ;>     wEntityTimer[slot] = 0x18
 	call GetEntityTimer
 	ld [hl], $18
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 
 .done
 	ret
 
 
-;@ def MarinBeachTurn(slot: c)
+;@ def MarinBeachTurn(slot: bc)
 ;@ path: npc/marin
 ;@ State 2: she turns (variant 4, then 2 for the last 12 frames) and asks (dialogue $1D5).
 ;@ test: skip opens a dialogue
@@ -7465,7 +7465,7 @@ MarinBeachTurn::
 ;>     OpenDialogTable1(0xD5)     # dialogue $1D5
 	ld a, $d5
 	call OpenDialogTable1
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 
 .turn
@@ -7477,7 +7477,7 @@ MarinBeachTurn::
 	ld e, $04
 
 .set
-;> SetEntitySpriteVariant(v)
+;> SetEntitySpriteVariant(slot, v)
 	ld a, e
 	call SetEntitySpriteVariant
 
@@ -7485,7 +7485,7 @@ MarinBeachTurn::
 	ret
 
 
-;@ def MarinBeachAnswer(slot: c)
+;@ def MarinBeachAnswer(slot: bc)
 ;@ path: npc/marin
 ;@ State 3: "yes": the beach scene (game mode 9, music $4E; she waits in state 6). "No": Link is
 ;@ free again, dialogue $1D6 (state 4).
@@ -7497,7 +7497,7 @@ MarinBeachAnswer::
 ;>     return
 	jr nz, .done
 
-;> IncrementEntityState()                    # next state
+;> IncrementEntityState(slot)                    # next state
 	call IncrementEntityState
 ;> if wDialogAnswer == 0:
 	ld a, [wDialogAnswer]
@@ -7536,10 +7536,10 @@ MarinBeachAnswer::
 	ret
 
 
-;@ def MarinBeachRefused(slot: c)
+;@ def MarinBeachRefused(slot: bc)
 ;@ path: npc/marin
 ;@ State 4: after the dialogue she looks away for $60 frames.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 MarinBeachRefused::
 ;> if not wDialogState:
 	ld a, [wDialogState]
@@ -7549,24 +7549,24 @@ MarinBeachRefused::
 ;>     wEntityTimer[slot] = 0x60
 	call GetEntityTimer
 	ld [hl], $60
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 
 .done
 	ret
 
 
-;@ def MarinBeachLookAway(slot: c)
+;@ def MarinBeachLookAway(slot: bc)
 ;@ path: npc/marin
 ;@ State 5: variant 4 for the first frames, then 0 (looking out to sea), and state 6 at the end.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 MarinBeachLookAway::
 ;> t = wEntityTimer[slot]
 	call GetEntityTimer
 ;> if t == 0:
 	jr nz, .look
 
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 
 .look
@@ -7578,7 +7578,7 @@ MarinBeachLookAway::
 	ld e, $04
 
 .set
-;> SetEntitySpriteVariant(v)
+;> SetEntitySpriteVariant(slot, v)
 	ld a, e
 	call SetEntitySpriteVariant
 	ret
@@ -7612,7 +7612,7 @@ SignpostMazeDialogs::
 	db $ab, $a9, $ac, $aa
 	db $ab, $a9, $ab, $aa, $ac, $a9, $ab, $a9, $ac, $ae
 
-;@ def SignpostMazeEntityHandler(slot: c)
+;@ def SignpostMazeEntityHandler(slot: bc)
 ;@ path: npc/signpost_maze
 ;@ Entity $C0: the referee of the signpost maze. Every sign Link reads leaves its position in
 ;@ wSignpostReadPos; if it is the sign of the current step in the right room, the maze goes one
@@ -7806,7 +7806,7 @@ EmergeSpotsY::
 EmergeSpotsX::
 	db $18, $28, $38, $48, $58, $68, $78, $88
 
-;@ def ZombieEntityHandler(slot: c)
+;@ def ZombieEntityHandler(slot: bc)
 ;@ path: enemy/zombie
 ;@ Entity $BF: the zombies. The entity placed in the room is a spawner (wEntityPrivate1 = 0): when
 ;@ its timer runs out it jumps to a random spot (EmergeSpotsX/Y) and, if the ground there is of
@@ -7872,11 +7872,11 @@ ZombieEntityHandler::
 	and $3f
 	add $40
 	ld [hl], a
-;> ok, z = SpawnEntityFromSlot(0xBF, 5)     # a new zombie unless 5 are out; position in hMultiPurpose0/1
+;> z, failed = SpawnEntityFromSlot(0xBF, 5)     # a new zombie unless 5 are out; position in hMultiPurpose0/1
 	ld a, $bf
 	ld e, $05
 	call SpawnEntityFromSlot
-;> if ok:
+;> if not failed:
 	jr c, .done
 
 ;>     wEntityX[z] = hMultiPurpose0
@@ -7910,7 +7910,7 @@ ZombiePairs::
 	db $ff, $ff, $ff, $ff, $6c, $00, $6c, $20, $68, $00, $6a, $00, $60, $00, $62, $00
 	db $64, $00, $66, $00
 
-;@ def ZombieHandler(slot: c)
+;@ def ZombieHandler(slot: bc)
 ;@ path: enemy/zombie
 ;@ A zombie (entity $BF with wEntityPrivate1 = 1): it rises from the ground, walks straight at
 ;@ Link for a while and sinks back.
@@ -7935,20 +7935,20 @@ ZombieStates::
 	dw ZombieWalk
 	dw ZombieSink
 
-;@ def ZombieInit(slot: c)
+;@ def ZombieInit(slot: bc)
 ;@ path: enemy/zombie
 ;@ State 0: rising takes $30 frames.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 ZombieInit::
 ;> wEntityTimer[slot] = 0x30
 	call GetEntityTimer
 	ld [hl], $30
-;> IncrementEntityState()                    # next state
+;> IncrementEntityState(slot)                    # next state
 	call IncrementEntityState
 	ret
 
 
-;@ def ZombieRise(slot: c)
+;@ def ZombieRise(slot: bc)
 ;@ path: enemy/zombie
 ;@ State 1: it comes out of the ground (variant 1, then 2 for the last $18 frames); then it walks
 ;@ at Link for $70-$AF frames with a random speed of 5-12.
@@ -7964,12 +7964,12 @@ ZombieRise::
 	and $3f
 	add $70
 	ld [hl], a
-;>     SetEntitySpeedTowardsLink((GetRandomByte() & 7) + 5)   # speed towards Link
+;>     SetEntitySpeedTowardsLink(slot, (GetRandomByte() & 7) + 5)   # speed towards Link
 	call GetRandomByte
 	and $07
 	add $05
 	call SetEntitySpeedTowardsLink
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 
 .rising
@@ -7981,13 +7981,13 @@ ZombieRise::
 	inc e
 
 .set
-;> SetEntitySpriteVariant(v)
+;> SetEntitySpriteVariant(slot, v)
 	ld a, e
 	call SetEntitySpriteVariant
 	ret
 
 
-;@ def ZombieWalk(slot: c)
+;@ def ZombieWalk(slot: bc)
 ;@ path: enemy/zombie
 ;@ State 2: walks (variants 3 and 4 every 16 frames), stops at walls, hurts Link on contact. When
 ;@ it bumps into a wall or its time is up it sinks for $30 frames (state 3) and cannot be hit.
@@ -7995,9 +7995,9 @@ ZombieRise::
 ZombieWalk::
 ;> UpdateEntityPosWithSpeed_18(slot)
 	call UpdateEntityPosWithSpeed_18
-;> EntityCheckWalls()                    # stop at walls
+;> EntityCheckWalls(slot)                    # stop at walls
 	call EntityCheckWalls
-;> EntityCheckHits()                    # hurts Link
+;> EntityCheckHits(slot)                    # hurts Link
 	call EntityCheckHits
 ;>@s if wEntityCollisions[slot] & 0x0F or wEntityTimer[slot] == 0:
 	ld hl, wEntityCollisions
@@ -8014,7 +8014,7 @@ ZombieWalk::
 ;>     wEntityTimer[slot] = 0x30
 	call GetEntityTimer
 	ld [hl], $30
-;>     IncrementEntityState()                # next state
+;>     IncrementEntityState(slot)                # next state
 	call IncrementEntityState
 ;>     wEntityPhysicsFlags[slot] |= 0x40
 	ld hl, wEntityPhysicsFlags
@@ -8029,16 +8029,16 @@ ZombieWalk::
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(v + 3)
+;> SetEntitySpriteVariant(slot, v + 3)
 	add $03
 	call SetEntitySpriteVariant
 	ret
 
 
-;@ def ZombieSink(slot: c)
+;@ def ZombieSink(slot: bc)
 ;@ path: enemy/zombie
 ;@ State 3: it sinks (variant 2, then 1 for the last $18 frames) and is removed.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 ZombieSink::
 ;> t = wEntityTimer[slot]
 	call GetEntityTimer
@@ -8054,19 +8054,19 @@ ZombieSink::
 	inc e
 
 .set
-;> SetEntitySpriteVariant(v)
+;> SetEntitySpriteVariant(slot, v)
 	ld a, e
 	call SetEntitySpriteVariant
 	ret
 
 
-;@ def GetObjectUnderEntity_18(slot: c) -> a
+;@ def GetObjectUnderEntity_18(slot: bc) -> a
 ;@ path: entity/helpers
 ;@ The room object under the entity's feet (x - 1, y - 7): its square in wRoomObjects (row from
 ;@ the y high nibble, column from the x high nibble). Leaves x - 1 / y - 7 in hMultiPurpose4/5,
 ;@ the square's pixel position in hBGPosX/hBGPosY, the object in hRoomObjectType and its physics
 ;@ type (GetObjectPhysics) in hMultiPurpose3 and a.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 GetObjectUnderEntity_18::
 ;> x = (wEntityX[slot] - 1) & 0xFF
 	push bc
@@ -8104,7 +8104,7 @@ GetObjectUnderEntity_18::
 ;=@obj
 	ld a, [hl]
 	ldh [hRoomObjectType], a
-;> hMultiPurpose3 = GetObjectPhysics(hRoomObjectType, wIsIndoor)
+;> hMultiPurpose3 = GetObjectPhysics(wIsIndoor << 8 | hRoomObjectType)
 	ld e, a
 	ld a, [wIsIndoor]
 	ld d, a
@@ -8119,7 +8119,7 @@ GetObjectUnderEntity_18::
 BlainoSpeedsY::
 	db $ec, $14
 
-;@ def BlainoEntityHandler(slot: c)
+;@ def BlainoEntityHandler(slot: bc)
 ;@ path: boss/blaino
 ;@ Entity $BE: Blaino, the boxing mini-boss. Between attacks he hops after Link (a hop of speed
 ;@ $10 each time he lands, sideways at random, and drawn closer when Link is $28 or more away)
@@ -8139,8 +8139,8 @@ BlainoEntityHandler::
 
 ;> ReturnIfNonInteractive_18()
 	call ReturnIfNonInteractive_18
-;> Call_3F12()                    # the boss music once its delay is over
-	call Call_3F12
+;> StartBossMusic()                    # the boss music once its delay is over
+	call StartBossMusic
 ;> if not wEntityPrivate1[slot]:  # first frame: the first attack after $20 frames
 	ld hl, wEntityPrivate1
 	add hl, bc
@@ -8186,20 +8186,20 @@ BlainoEntityHandler::
 .move
 ;> ApplyRecoilIfNeeded_18(slot)
 	call ApplyRecoilIfNeeded_18
-;> EntityCheckSwordClash()                    # Link's sword against the clash box
+;> EntityCheckSwordClash(slot)                    # Link's sword against the clash box
 	call EntityCheckSwordClash
 ;> if wLinkPushedTimer == 0:
 	ld a, [wLinkPushedTimer]
 	and a
 	jr nz, .hop
 
-;>     EntityCheckHits()                # touching him hurts Link
+;>     EntityCheckHits(slot)                # touching him hurts Link
 	call EntityCheckHits
 
 .hop
 ;> UpdateEntityPosWithSpeed_18(slot)
 	call UpdateEntityPosWithSpeed_18
-;> EntityCheckWalls()                    # stop at walls
+;> EntityCheckWalls(slot)                    # stop at walls
 	call EntityCheckWalls
 ;> UpdateEntityZWithSpeed_18(slot)
 	call UpdateEntityZWithSpeed_18
@@ -8276,7 +8276,7 @@ BlainoEntityHandler::
 	cp $50
 	jr c, .pick
 
-;>         GetVectorTowardsLink(8)           # speed 8 towards Link: x part in hMultiPurpose1
+;>         GetVectorTowardsLink(slot, 8)           # speed 8 towards Link: x part in hMultiPurpose1
 	ld a, $08
 	call GetVectorTowardsLink
 ;>         wEntitySpeedX[slot] += hMultiPurpose1
@@ -8296,12 +8296,12 @@ BlainoEntityHandler::
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(v)                   # the guard stance, variants 0 and 1
+;> SetEntitySpriteVariant(slot, v)                   # the guard stance, variants 0 and 1
 	call SetEntitySpriteVariant
 	ret
 
 
-;@ def BlainoPickAttack(slot: c)
+;@ def BlainoPickAttack(slot: bc)
 ;@ path: boss/blaino
 ;@ Starts Blaino's next attack: the windmill punch (3) at once while Link is dazed; otherwise when
 ;@ wEntityDropTimer runs out - a jab (1) for the first 4 attacks, then one of 1-4 at random. A jab
@@ -8366,7 +8366,7 @@ BlainoPickAttack::
 	ret
 
 
-;@ def BlainoRunAttack(slot: c)
+;@ def BlainoRunAttack(slot: bc)
 ;@ path: boss/blaino
 ;@ Runs Blaino's current attack (wEvilEagleAttack, 0 = none) and then returns straight from
 ;@ BlainoEntityHandler (its return address is dropped), so no hopping or aiming meanwhile.
@@ -8399,7 +8399,7 @@ BlainoAttacks::
 BlainoJabFrames::
 	db $01, $01, $01, $02, $02, $03, $03, $03, $03, $03, $02, $02, $01
 
-;@ def BlainoJab(slot: c)
+;@ def BlainoJab(slot: bc)
 ;@ path: boss/blaino
 ;@ Attack 1 (and 4): plays BlainoJabFrames one frame each. Afterwards he jabs again 3 times in 4,
 ;@ otherwise the attack ends (BlainoEndAttack).
@@ -8420,7 +8420,7 @@ BlainoJab::
 
 ;>     wEntityPrivateCounter[slot] += 1
 	inc [hl]
-;>     SetEntitySpriteVariant(BlainoJabFrames[step])
+;>     SetEntitySpriteVariant(slot, BlainoJabFrames[step])
 	ld e, a
 	ld d, b
 	ld hl, BlainoJabFrames
@@ -8461,7 +8461,7 @@ BlainoDashSpeeds::
 	db $08, $10, $08, $08, $02, $00, $00, $00, $fc, $f8, $f0, $f8, $e0, $90, $a0, $00
 	db $00, $00, $00, $00, $00
 
-;@ def BlainoDashPunch(slot: c)
+;@ def BlainoDashPunch(slot: bc)
 ;@ path: boss/blaino
 ;@ Attack 2: every 3 frames the next step of BlainoDashFrames / BlainoDashSpeeds (the speed
 ;@ mirrored towards Link's side); after 21 steps the attack ends.
@@ -8483,7 +8483,7 @@ BlainoDashPunch::
 
 ;> wEntityPrivateCounter[slot] += 1
 	inc [hl]
-;> SetEntitySpriteVariant(BlainoDashFrames[step])
+;> SetEntitySpriteVariant(slot, BlainoDashFrames[step])
 	ld e, a
 	ld d, b
 	ld hl, BlainoDashFrames
@@ -8537,7 +8537,7 @@ BlainoPunchSpeeds::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	db $f0, $e0, $d0, $c0, $c0, $e0, $f0, $00, $00, $00
 
-;@ def BlainoWindmillPunch(slot: c)
+;@ def BlainoWindmillPunch(slot: bc)
 ;@ path: boss/blaino
 ;@ Attack 3: every 3 frames the next step of BlainoPunchFrames / BlainoPunchSpeeds. At step $28 it
 ;@ holds while Link is in motion state $0A (flung away by the punch). While Link is dazed and $30
@@ -8573,7 +8573,7 @@ BlainoWindmillPunch::
 	inc [hl]
 
 .frame
-;> SetEntitySpriteVariant(BlainoPunchFrames[step])
+;> SetEntitySpriteVariant(slot, BlainoPunchFrames[step])
 	ld d, b
 	ld hl, BlainoPunchFrames
 	add hl, de
@@ -8618,7 +8618,7 @@ BlainoWindmillPunch::
 	cp $18
 	jr nc, .next
 
-;>     SetEntitySpeedTowardsLink(0x10)            # straight at Link
+;>     SetEntitySpeedTowardsLink(slot, 0x10)            # straight at Link
 	ld a, $10
 	call SetEntitySpeedTowardsLink
 
@@ -8631,7 +8631,7 @@ BlainoWindmillPunch::
 	ret
 
 
-;@ def BlainoEndAttack(slot: c)
+;@ def BlainoEndAttack(slot: bc)
 ;@ path: boss/blaino
 ;@ Ends Blaino's attack; the next one comes after $0C-$1B frames (wEntityDropTimer).
 ;@ test: skip runs the entity drop timer
@@ -8728,7 +8728,7 @@ BlainoSprites::
 	db $00, $00, $60, $00, $00, $08, $62, $00
 	db $00, $00, $ff, $00, $00, $00, $ff, $00
 
-;@ def DrawBlaino(slot: c)
+;@ def DrawBlaino(slot: bc)
 ;@ path: boss/blaino
 ;@ Draws Blaino's frame (BlainoSprites[hActiveEntitySpriteVariant], 6 sprites), mirrored with
 ;@ x flip when Link is on the right, shifted by the screen shake; a sprite with tile $FF is moved
@@ -8976,12 +8976,12 @@ DrawDizzyStar::
 	ret
 
 
-;@ def VireEntityHandler(slot: c)
+;@ def VireEntityHandler(slot: bc)
 ;@ path: boss/vire
 ;@ Entity $BD: Vire, the winged demon mini-boss, and what he leaves behind. wEntityPrivate1 tells
 ;@ which: 0 Vire himself, 1 one of the two bats he splits into when beaten (VireBatHandler),
 ;@ 2 one of his fireballs (VireFireballHandler). Beaten (status 1), Vire bursts in a puff and
-;@ splits into two bats flying off left and right; his defeat is counted (Call_3F88).
+;@ splits into two bats flying off left and right; his defeat is counted (DefeatEntity).
 ;@ test: skip spawns entities and adds an effect
 VireEntityHandler::
 ;> kind = wEntityPrivate1[slot]
@@ -9023,23 +9023,23 @@ VireEntityHandler::
 	ldh [hBGTilesRequestCopy], a
 ;> VireSpawnBat()
 	call VireSpawnBat
-;> Call_3F88()                    # counts the defeat
-	call Call_3F88
+;> DefeatEntity()                    # counts the defeat
+	call DefeatEntity
 ;> return ClearEntityStatus_18(slot)
 	jp ClearEntityStatus_18
 
 
-;@ def VireSpawnBat(slot: c)
+;@ def VireSpawnBat(slot: bc)
 ;@ path: boss/vire
 ;@ Spawns one of Vire's bats (entity $BD, wEntityPrivate1 = 1) at hMultiPurpose0/1, height
 ;@ hMultiPurpose3, x speed hBGTilesRequestCopy, 1 health, waiting $20 frames; it shares Vire's
 ;@ load order (so it counts as part of him).
 ;@ test: skip spawns an entity
 VireSpawnBat::
-;> ok, bat = SpawnEntity(0xBD)
+;> bat, failed = SpawnEntity(0xBD)
 	ld a, $bd
 	call SpawnEntity
-;> if ok:
+;> if not failed:
 	jr c, .done
 
 ;>     wEntityLoadOrder[bat] = wEntityLoadOrder[slot]
@@ -9086,7 +9086,7 @@ VireSpawnBat::
 	ret
 
 
-;@ def VireMain(slot: c)
+;@ def VireMain(slot: bc)
 ;@ path: boss/vire
 ;@ Vire alive: draws him; when he has followed Link into another room he is removed once he is
 ;@ off its edges (x >= $98 or y >= $70). Then his flight (both speeds and height) and his state.
@@ -9139,11 +9139,11 @@ VireStates::
 	dw VireHit
 	dw VireBreatheFire
 
-;@ def VireInit(slot: c)
+;@ def VireInit(slot: bc)
 ;@ path: boss/vire
 ;@ State 0: 3 health; he starts flying to the right (x speed 8); the first dive comes after $80
 ;@ frames (wEntityDropTimer), the first fire after $C0.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 VireInit::
 ;> wEntityHealth[slot] = 3
 	ld hl, wEntityHealth
@@ -9162,7 +9162,7 @@ VireInit::
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], $08
-;> return IncrementEntityState()
+;> return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 
@@ -9173,7 +9173,7 @@ VireInit::
 VireWallSpeeds::
 	db $08, $f8, $08, $f8
 
-;@ def VireFly(slot: c)
+;@ def VireFly(slot: bc)
 ;@ path: boss/vire
 ;@ State 1: he flies about at height $28, turning along the walls, wings flapping. Every $40-$BF
 ;@ frames he opens his mouth for $10 frames and breathes two fireballs halfway. He dodges Link's
@@ -9196,7 +9196,7 @@ VireFly::
 	cp $40
 	jr nc, .dive
 
-;>     GetVectorTowardsLink(0x10)            # speed $10 towards Link -> hMultiPurpose0/1
+;>     GetVectorTowardsLink(slot, 0x10)            # speed $10 towards Link -> hMultiPurpose0/1
 	ld a, $10
 	call GetVectorTowardsLink
 ;>     wEntitySpeedY[slot] = -hMultiPurpose0 & 0xFF   # away from him
@@ -9346,7 +9346,7 @@ VireFly::
 	call VireShootFireballs
 
 .open
-;>     return SetEntitySpriteVariant(2)   # mouth open
+;>     return SetEntitySpriteVariant(slot, 2)   # mouth open
 	ld a, $02
 	jp SetEntitySpriteVariant
 
@@ -9365,12 +9365,12 @@ VireAnimate::
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(v)
+;> SetEntitySpriteVariant(slot, v)
 	call SetEntitySpriteVariant
 	ret
 
 
-;@ def VireDiveStart(slot: c)
+;@ def VireDiveStart(slot: bc)
 ;@ path: boss/vire
 ;@ State 2: he hovers with his mouth open for the timer, then dives at Link (speed $20, aimed $14
 ;@ above him, dropping at speed -20) for at most $30 frames (state 3). wEntityPrivate2 picks how
@@ -9390,7 +9390,7 @@ VireDiveStart::
 ;>     hLinkY = y - 0x14
 	sub $14
 	ldh [hLinkY], a
-;>     SetEntitySpeedTowardsLink(0x20)            # aim
+;>     SetEntitySpeedTowardsLink(slot, 0x20)            # aim
 	ld a, $20
 	call SetEntitySpeedTowardsLink
 ;>     hLinkY = y
@@ -9425,13 +9425,13 @@ VireDiveStart::
 .hover
 ;> VireStop()
 	call VireStop
-;> SetEntitySpriteVariant(2)      # mouth open
+;> SetEntitySpriteVariant(slot, 2)      # mouth open
 	ld a, $02
 	call SetEntitySpriteVariant
 	ret
 
 
-;@ def VireSwoop(slot: c)
+;@ def VireSwoop(slot: bc)
 ;@ path: boss/vire
 ;@ State 3: the dive and the climb back. A sword swing while he is close (within $18) and not
 ;@ just hit makes him spring back (speed $20, state 6). Fleeing (wEntityPrivate2 $FF), or after
@@ -9472,7 +9472,7 @@ VireSwoop::
 	and a
 	jr z, .steer
 
-;>     GetVectorTowardsLink(0x20)
+;>     GetVectorTowardsLink(slot, 0x20)
 	ld a, $20
 	call GetVectorTowardsLink
 ;>     wEntitySpeedY[slot] = -hMultiPurpose0 & 0xFF   # away from Link
@@ -9514,7 +9514,7 @@ VireSwoop::
 	jr nz, .climb
 
 .away
-;>     GetVectorTowardsLink(0x20)
+;>     GetVectorTowardsLink(slot, 0x20)
 	ld a, $20
 	call GetVectorTowardsLink
 ;>     target = -hMultiPurpose0 & 0xFF
@@ -9631,18 +9631,18 @@ VireSwoop::
 	and $3f
 	add $20
 	ld [hl], a
-;> return SetEntitySpriteVariant(0xFF)   # invisible
+;> return SetEntitySpriteVariant(slot, 0xFF)   # invisible
 	ld a, $ff
 	jp SetEntitySpriteVariant
 
 
-;@ def VireTouchLink(slot: c)
+;@ def VireTouchLink(slot: bc)
 ;@ path: boss/vire
 ;@ Touching Vire hurts Link. If Link's hit has just landed (wEntityFlashTimer) he stops and
 ;@ flees (wEntityPrivate2 = $FF); otherwise he keeps dodging and flapping.
 ;@ test: skip runs collisions through bank 3
 VireTouchLink::
-;> EntityCheckHits()                    # hurts Link
+;> EntityCheckHits(slot)                    # hurts Link
 	call EntityCheckHits
 ;> if wEntityFlashTimer[slot]:
 	ld hl, wEntityFlashTimer
@@ -9667,10 +9667,10 @@ VireTouchLink::
 	jp VireAnimate
 
 
-;@ def VireStop(slot: c)
+;@ def VireStop(slot: bc)
 ;@ path: boss/vire
 ;@ Vire stops: x, y and Z speed 0.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 VireStop::
 ;> ClearEntitySpeed()                    # x and y speed to 0
 	call ClearEntitySpeed
@@ -9694,11 +9694,11 @@ VireReappearY::
 VireReappearX::
 	db $08, $98, $38, $78, $f8, $a8, $f8, $a8
 
-;@ def VireWaitHidden(slot: c)
+;@ def VireWaitHidden(slot: bc)
 ;@ path: boss/vire
 ;@ State 4: hidden; when the timer runs out he appears at a random place outside the room
 ;@ (VireReappearY/X) at height $28 and flies back in (state 5).
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 VireWaitHidden::
 ;> if wEntityTimer[slot]:
 ;>     return
@@ -9737,14 +9737,14 @@ VireWaitHidden::
 	ret
 
 
-;@ def VireReturn(slot: c)
+;@ def VireReturn(slot: bc)
 ;@ path: boss/vire
 ;@ State 5: he flies at Link (speed 8) until he is well inside the room (x $09-$96, y $20-$6F);
 ;@ then he turns round (both speeds negated) and flies about again (state 1), the next dive
 ;@ after $20-$5F frames.
 ;@ test: skip aims at Link through bank 3
 VireReturn::
-;> SetEntitySpeedTowardsLink(8)                   # aim at Link
+;> SetEntitySpeedTowardsLink(slot, 8)                   # aim at Link
 	ld a, $08
 	call SetEntitySpeedTowardsLink
 ;>@in if 0x09 <= hActiveEntityX < 0x97 and 0x20 <= hActiveEntityDrawY < 0x70:
@@ -9801,7 +9801,7 @@ VireFireballSpeeds::
 	db $00, $09, $12, $15, $18, $15, $12, $09, $00, $f7, $ee, $eb, $e8, $eb, $ee, $f7
 	db $00, $09, $12, $15
 
-;@ def VireHit(slot: c)
+;@ def VireHit(slot: bc)
 ;@ path: boss/vire
 ;@ State 6: springing back from Link's sword (touching him still hurts for the first frames);
 ;@ then he stops and breathes fire (state 7, $20 frames).
@@ -9833,7 +9833,7 @@ VireHit::
 	jp VireAnimate
 
 
-;@ def VireBreatheFire(slot: c)
+;@ def VireBreatheFire(slot: bc)
 ;@ path: boss/vire
 ;@ State 7: mouth open; at 8 frames before the end he breathes two fireballs. Then he flees
 ;@ (state 3 with wEntityPrivate2 = $FF).
@@ -9862,7 +9862,7 @@ VireBreatheFire::
 
 ;> VireShootFireballs(slot)       # falls through
 
-;@ def VireShootFireballs(slot: c)
+;@ def VireShootFireballs(slot: bc)
 ;@ path: boss/vire
 ;@ Vire breathes fire (noise $0D): two fireballs in neighbouring directions of the 16, aimed at
 ;@ a point 8 pixels above Link.
@@ -9877,7 +9877,7 @@ VireShootFireballs::
 ;> hLinkY = y - 8
 	sub $08
 	ldh [hLinkY], a
-;> GetVectorTowardsLink(0x1F)                # speed towards that point -> hMultiPurpose0/1
+;> GetVectorTowardsLink(slot, 0x1F)                # speed towards that point -> hMultiPurpose0/1
 	ld a, $1f
 	call GetVectorTowardsLink
 ;> hLinkY = y
@@ -9950,10 +9950,10 @@ VireShootFireball::
 ;>     return
 	jr nc, .done
 
-;> ok, f = SpawnEntity(0xBD)        # spawner position in hMultiPurpose0/1
+;> f, failed = SpawnEntity(0xBD)        # spawner position in hMultiPurpose0/1
 	ld a, $bd
 	call SpawnEntity
-;> if ok:
+;> if not failed:
 	jr c, .done
 
 ;>     wEntityX[f] = hMultiPurpose0
@@ -10013,12 +10013,12 @@ VireShootFireball::
 ;@ Sprite variant 2: Vire with his mouth open.
 ;@ test: skip sets the sprite variant through bank 0
 VireOpenMouth::
-;> return SetEntitySpriteVariant(2)
+;> return SetEntitySpriteVariant(slot, 2)
 	ld a, $02
 	jp SetEntitySpriteVariant
 
 
-;@ def VireCheckWalls(slot: c)
+;@ def VireCheckWalls(slot: bc)
 ;@ path: boss/vire
 ;@ Wall collisions for Vire at the height he is drawn (y - $28, his flying height) rather than
 ;@ at his shadow.
@@ -10034,7 +10034,7 @@ VireCheckWalls::
 	ldh a, [hActiveEntityY]
 	sub $28
 	ldh [hActiveEntityY], a
-;> EntityCheckWalls()                    # walls -> wEntityCollisions
+;> EntityCheckWalls(slot)                    # walls -> wEntityCollisions
 	call EntityCheckWalls
 ;> wEntityY[slot] += 0x28
 	ld hl, wEntityY
@@ -10047,7 +10047,7 @@ VireCheckWalls::
 	ret
 
 
-;@ def VireDodge(slot: c)
+;@ def VireDodge(slot: bc)
 ;@ path: boss/vire
 ;@ Vire dodges: for each active (status 5) arrow, bomb or hookshot (types 0, 2, 3) within $18
 ;@ sideways and $20 up or down, he darts away from it at speed $20 (an axis speed of 0 becomes
@@ -10114,7 +10114,7 @@ VireDodge::
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkX], a
-;>             GetVectorTowardsLink(0x20)
+;>             GetVectorTowardsLink(slot, 0x20)
 	push de
 	ld a, $20
 	call GetVectorTowardsLink
@@ -10178,7 +10178,7 @@ VireSprites::
 	db $00, $fc, $64, $00, $00, $04, $66, $00, $00, $0c, $64, $20
 	db $00, $fc, $68, $00, $00, $04, $6a, $00, $00, $0c, $68, $20
 
-;@ def DrawVire(slot: c)
+;@ def DrawVire(slot: bc)
 ;@ path: boss/vire
 ;@ Draws Vire's frame (VireSprites[hActiveEntitySpriteVariant], 3 sprites) and his shadow;
 ;@ nothing for variant $FF.
@@ -10217,7 +10217,7 @@ DrawVire::
 VireFireballPairs::
 	db $1e, $00, $1e, $60, $1e, $40, $1e, $20
 
-;@ def VireFireballHandler(slot: c)
+;@ def VireFireballHandler(slot: bc)
 ;@ path: boss/vire
 ;@ One of Vire's fireballs (entity $BD with wEntityPrivate1 = 2): flies straight on, spinning.
 ;@ Link's sword puts it out in a puff; it also vanishes when it hits Link, or a wall once its
@@ -10229,17 +10229,17 @@ VireFireballHandler::
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_18()
 	call ReturnIfNonInteractive_18
-;> DecrementEntityIgnoreHitsTimer()
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
-;> SetEntitySpriteVariant((hFrameCounter >> 2) & 1)
+;> SetEntitySpriteVariant(slot, (hFrameCounter >> 2) & 1)
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	and $01
 	call SetEntitySpriteVariant
-;> EntityCheckWeaponHits()                    # Link's sword hits it?
+;> EntityCheckWeaponHits(slot)                    # Link's sword hits it?
 	call EntityCheckWeaponHits
-;> if EntityCheckContactDamage():                # it hits Link
+;> if EntityCheckContactDamage(slot):                # it hits Link
 	call EntityCheckContactDamage
 ;>     return ClearEntityStatus_18(slot)
 	jr c, .remove
@@ -10273,7 +10273,7 @@ VireFireballHandler::
 	call GetEntityTimer
 	ret nz
 
-;> EntityCheckWalls()                    # walls
+;> EntityCheckWalls(slot)                    # walls
 	call EntityCheckWalls
 ;> if wEntityCollisions[slot]:
 	ld hl, wEntityCollisions
@@ -10292,7 +10292,7 @@ VireFireballHandler::
 VireBatPairs::
 	db $6c, $00, $6c, $20, $6e, $00, $6e, $20
 
-;@ def VireBatHandler(slot: c)
+;@ def VireBatHandler(slot: bc)
 ;@ path: boss/vire
 ;@ One of the two bats Vire splits into (entity $BD with wEntityPrivate1 = 1): it flutters at
 ;@ height $10 (moving 1 towards it every 4 frames), wings flapping every 8 frames.
@@ -10332,7 +10332,7 @@ VireBatHandler::
 	dec [hl]
 
 .flap
-;> SetEntitySpriteVariant((hFrameCounter >> 3) & 1)
+;> SetEntitySpriteVariant(slot, (hFrameCounter >> 3) & 1)
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -10350,10 +10350,10 @@ VireBatStates::
 	dw VireBatAim
 	dw VireBatFly
 
-;@ def VireBatWait(slot: c)
+;@ def VireBatWait(slot: bc)
 ;@ path: boss/vire
 ;@ State 0: drifts out of Vire for its timer, then stops for $20 frames.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 VireBatWait::
 ;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
@@ -10363,14 +10363,14 @@ VireBatWait::
 	ld [hl], $20
 ;>     ClearEntitySpeed()                # x and y speed to 0
 	call ClearEntitySpeed
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
 .done
 	ret
 
 
-;@ def VireBatAim(slot: c)
+;@ def VireBatAim(slot: bc)
 ;@ path: boss/vire
 ;@ State 1: after its pause it shoots at Link (speed $20).
 ;@ test: skip aims at Link through bank 3
@@ -10381,30 +10381,30 @@ VireBatAim::
 
 ;>     wEntityTimer[slot] = 0x20
 	ld [hl], $20
-;>     SetEntitySpeedTowardsLink(0x20)            # straight at Link
+;>     SetEntitySpeedTowardsLink(slot, 0x20)            # straight at Link
 	ld a, $20
 	call SetEntitySpeedTowardsLink
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
 .done
 	ret
 
 
-;@ def VireBatFly(slot: c)
+;@ def VireBatFly(slot: bc)
 ;@ path: boss/vire
 ;@ State 2: flies on, hurting Link on contact; after $20 frames it is removed when it hits a
 ;@ wall.
 ;@ test: skip runs collisions through bank 3
 VireBatFly::
-;> EntityCheckHits()                    # hurts Link
+;> EntityCheckHits(slot)                    # hurts Link
 	call EntityCheckHits
 ;> if wEntityTimer[slot]:
 ;>     return
 	call GetEntityTimer
 	ret nz
 
-;> EntityCheckWalls()                    # walls
+;> EntityCheckWalls(slot)                    # walls
 	call EntityCheckWalls
 ;> if wEntityCollisions[slot]:
 	ld hl, wEntityCollisions
@@ -10417,7 +10417,7 @@ VireBatFly::
 	ret
 
 
-;@ def GrimCreeperEntityHandler(slot: c)
+;@ def GrimCreeperEntityHandler(slot: bc)
 ;@ path: boss/grim_creeper
 ;@ Entity $BC: the Grim Creeper, the mini-boss who conducts a squad of six bats (the same entity
 ;@ type with wEntityPrivate1 = 1, GrimCreeperBatHandler). He keeps Link in the arena and cannot
@@ -10443,8 +10443,8 @@ GrimCreeperEntityHandler::
 	call DrawGrimCreeperFight
 ;> ConfineLinkToArena()
 	call ConfineLinkToArena
-;> Call_3F12()                    # the boss music once its delay is over
-	call Call_3F12
+;> StartBossMusic()                    # the boss music once its delay is over
+	call StartBossMusic
 ;> ReturnIfNonInteractive_18()
 	call ReturnIfNonInteractive_18
 ;> if not wRoomEventDone:
@@ -10525,11 +10525,11 @@ GrimCreeperInit::
 ;> wEvilEagleAttack = 7           # the formation number
 	ld a, $07
 	ld [wEvilEagleAttack], a
-;> return IncrementEntityState()
+;> return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 
-;@ def GrimCreeperNextFormation(slot: c)
+;@ def GrimCreeperNextFormation(slot: bc)
 ;@ path: boss/grim_creeper
 ;@ State 1: the next formation (0-7 in turn); the bats in place (wSmasherBallSlot) and
 ;@ wSmasherSlot back to 0; $80 frames until the bats are cleared away.
@@ -10548,11 +10548,11 @@ GrimCreeperNextFormation::
 	inc a
 	and $07
 	ld [wEvilEagleAttack], a
-;> return IncrementEntityState()
+;> return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 
-;@ def GrimCreeperClearBats(slot: c)
+;@ def GrimCreeperClearBats(slot: bc)
 ;@ path: boss/grim_creeper
 ;@ State 2: when the timer runs out, every bat still about is removed, bit 1 of his
 ;@ wEntityOptions1 is cleared and the summoning takes $FF frames (state 3).
@@ -10600,7 +10600,7 @@ GrimCreeperClearBats::
 	cp $ff
 	jr nz, .loop
 
-;> return IncrementEntityState()
+;> return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 .done
@@ -10618,7 +10618,7 @@ GrimCreeperBatStartX::
 GrimCreeperBatStartY::
 	db $00, $00, $00, $00, $00, $00
 
-;@ def GrimCreeperSummon(slot: c)
+;@ def GrimCreeperSummon(slot: bc)
 ;@ path: boss/grim_creeper
 ;@ State 3: every $20 frames of the timer he calls a bat (jingle $31), up to 6: it appears at
 ;@ GrimCreeperBatStartX/Y at height $1C, numbered by wEntityPrivateCounter, with 1 health. At
@@ -10634,7 +10634,7 @@ GrimCreeperSummon::
 	ld hl, wEntityOptions1
 	add hl, bc
 	set 1, [hl]
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 ;>     t = 0
 	xor a
@@ -10654,10 +10654,10 @@ GrimCreeperSummon::
 ;>     return GrimCreeperConduct()
 	jr nc, GrimCreeperConduct
 
-;> ok, bat = SpawnEntity(0xBC)
+;> bat, failed = SpawnEntity(0xBC)
 	ld a, $bc
 	call SpawnEntity
-;> if not ok:
+;> if failed:
 ;>     return GrimCreeperConduct()
 	jr c, GrimCreeperConduct
 
@@ -10727,12 +10727,12 @@ GrimCreeperConduct::
 ;=@v
 	rra
 	and $01
-;> SetEntitySpriteVariant(v)
+;> SetEntitySpriteVariant(slot, v)
 	call SetEntitySpriteVariant
 	ret
 
 
-;@ def GrimCreeperWaitFormation(slot: c)
+;@ def GrimCreeperWaitFormation(slot: bc)
 ;@ path: boss/grim_creeper
 ;@ State 4: conducts until all six bats are in their places (wSmasherBallSlot = 6); then $40
 ;@ frames to the signal.
@@ -10753,7 +10753,7 @@ GrimCreeperWaitFormation::
 ;>     wEntityTimer[slot] = 0x40
 	call GetEntityTimer
 	ld [hl], $40
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
 .conduct
@@ -10762,7 +10762,7 @@ GrimCreeperWaitFormation::
 	ret
 
 
-;@ def GrimCreeperSignal(slot: c)
+;@ def GrimCreeperSignal(slot: bc)
 ;@ path: boss/grim_creeper
 ;@ State 5: when the timer runs out he gives the signal (wSmasherBallSlot = $FF): the bats start
 ;@ their dives; the next formation comes $40 frames later.
@@ -10779,14 +10779,14 @@ GrimCreeperSignal::
 	ld hl, wEntityDropTimer
 	add hl, bc
 	ld [hl], $40
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
 .done
 	ret
 
 
-;@ def GrimCreeperWaitAttack(slot: c)
+;@ def GrimCreeperWaitAttack(slot: bc)
 ;@ path: boss/grim_creeper
 ;@ State 6: baton raised (variant 2) while wEntityDropTimer runs; then the next formation (state
 ;@ 1). Ends with a second, never reached ret.
@@ -10804,7 +10804,7 @@ GrimCreeperWaitAttack::
 	ld [hl], $01
 
 .raised
-;> SetEntitySpriteVariant(2)
+;> SetEntitySpriteVariant(slot, 2)
 	ld a, $02
 	call SetEntitySpriteVariant
 ;> return
@@ -10854,7 +10854,7 @@ DrawGrimCreeperFight::
 GrimCreeperBatPairs::
 	db $6e, $00, $6e, $20, $6e, $40, $6e, $60
 
-;@ def GrimCreeperBatHandler(slot: c)
+;@ def GrimCreeperBatHandler(slot: bc)
 ;@ path: boss/grim_creeper
 ;@ One of the Grim Creeper's six bats (entity $BC with wEntityPrivate1 = 1, its number 0-5 in
 ;@ wEntityPrivateCounter).
@@ -10865,7 +10865,7 @@ GrimCreeperBatHandler::
 	call DrawEntity16x16
 ;> ReturnIfNonInteractive_18()
 	call ReturnIfNonInteractive_18
-;> DecrementEntityIgnoreHitsTimer()
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
 ;> return GrimCreeperFightBatStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
@@ -10906,7 +10906,7 @@ GrimCreeperFormationY::
 	db $30, $30, $50, $50, $70, $70
 	db $40, $40, $50, $40, $50, $40
 
-;@ def GrimCreeperBatFlyToPlace(slot: c)
+;@ def GrimCreeperBatFlyToPlace(slot: bc)
 ;@ path: boss/grim_creeper
 ;@ State 0: the bat flies to its place in the current formation (every 4th frame it aims at it
 ;@ at speed $10, by pretending Link stands there); within 2 pixels it counts itself in
@@ -10948,7 +10948,7 @@ GrimCreeperBatFlyToPlace::
 	and $03
 	jr nz, .check
 
-;>     SetEntitySpeedTowardsLink(0x10)
+;>     SetEntitySpeedTowardsLink(slot, 0x10)
 	ld a, $10
 	call SetEntitySpeedTowardsLink
 
@@ -10972,7 +10972,7 @@ GrimCreeperBatFlyToPlace::
 ;>     wSmasherBallSlot += 1      # in place
 	ld hl, wSmasherBallSlot
 	inc [hl]
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
 .restore
@@ -10984,7 +10984,7 @@ GrimCreeperBatFlyToPlace::
 	ldh [hLinkX], a
 ;> GrimCreeperBatMove(slot)       # falls through
 
-;@ def GrimCreeperBatMove(slot: c)
+;@ def GrimCreeperBatMove(slot: bc)
 ;@ path: boss/grim_creeper
 ;@ Moves the bat by its speed and flaps its wings.
 ;@ test: skip sets the sprite variant through bank 0
@@ -11003,7 +11003,7 @@ GrimCreeperBatAnimate::
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(v)
+;> SetEntitySpriteVariant(slot, v)
 	call SetEntitySpriteVariant
 	ret
 
@@ -11014,7 +11014,7 @@ GrimCreeperBatAnimate::
 GrimCreeperBatDelays::
 	db $04, $0c, $14, $1c, $24, $2c, $34, $3c
 
-;@ def GrimCreeperBatWaitSignal(slot: c)
+;@ def GrimCreeperBatWaitSignal(slot: bc)
 ;@ path: boss/grim_creeper
 ;@ State 1: hovers in place until the Grim Creeper's signal (wSmasherBallSlot = $FF); then its
 ;@ delay from GrimCreeperBatDelays.
@@ -11037,7 +11037,7 @@ GrimCreeperBatWaitSignal::
 	ld hl, wEntityDropTimer
 	add hl, bc
 	ld [hl], a
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
 .flap
@@ -11045,7 +11045,7 @@ GrimCreeperBatWaitSignal::
 	jp GrimCreeperBatAnimate
 
 
-;@ def GrimCreeperBatWaitTurn(slot: c)
+;@ def GrimCreeperBatWaitTurn(slot: bc)
 ;@ path: boss/grim_creeper
 ;@ State 2: when its delay is over the bat dives at Link: speed $20, rising speed -12 (it drops
 ;@ from its height), jingle $31; from now on it can hit and be hit.
@@ -11062,7 +11062,7 @@ GrimCreeperBatWaitTurn::
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	res 6, [hl]
-;>     SetEntitySpeedTowardsLink(0x20)
+;>     SetEntitySpeedTowardsLink(slot, 0x20)
 	ld a, $20
 	call SetEntitySpeedTowardsLink
 ;>     wEntitySpeedZ[slot] = -12 & 0xFF
@@ -11072,7 +11072,7 @@ GrimCreeperBatWaitTurn::
 ;>     hJingle = 0x31
 	ld a, $31
 	ldh [hJingle], a
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
 .flap
@@ -11080,14 +11080,14 @@ GrimCreeperBatWaitTurn::
 	jp GrimCreeperBatAnimate
 
 
-;@ def GrimCreeperBatDive(slot: c)
+;@ def GrimCreeperBatDive(slot: bc)
 ;@ path: boss/grim_creeper
 ;@ State 3: the dive, straight on; the drop slows into a climb (Z speed + 1 every 4 frames, up
 ;@ to +12). Once it is off the bottom (y $88) or the right edge (x $A8) it is gone (invisible,
 ;@ state 4).
 ;@ test: skip runs collisions through bank 3
 GrimCreeperBatDive::
-;> EntityCheckHits()
+;> EntityCheckHits(slot)
 	call EntityCheckHits
 ;> GrimCreeperBatMove(slot)
 	call GrimCreeperBatMove
@@ -11120,9 +11120,9 @@ GrimCreeperBatDive::
 	ret c
 
 .gone
-;> IncrementEntityState()
+;> IncrementEntityState(slot)
 	call IncrementEntityState
-;> SetEntitySpriteVariant(0xFF)   # invisible
+;> SetEntitySpriteVariant(slot, 0xFF)   # invisible
 	ld a, $ff
 	call SetEntitySpriteVariant
 	ret
@@ -11142,7 +11142,7 @@ GrimCreeperBatGone::
 TurtleRockRubbleSprites::
 	db $7a, $10, $7e, $30, $7a, $30, $7e, $10, $7c, $10, $7c, $30
 
-;@ def TurtleRockEntityHandler(slot: c)
+;@ def TurtleRockEntityHandler(slot: bc)
 ;@ path: boss/turtle_rock
 ;@ Entity $7F: the Turtle Rock, the stone turtle head guarding the entrance of the eighth
 ;@ dungeon, and the rubble it throws off (wEntityPrivate1 not 0). Gone for good once beaten (room
@@ -11220,7 +11220,7 @@ TurtleRockEntityHandler::
 	and a
 	jr z, .alive
 
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 ;>     wEntityOptions1[slot] |= 0x84
 	ld hl, wEntityOptions1
@@ -11263,9 +11263,9 @@ TurtleRockEntityHandler::
 .active
 ;> ReturnIfNonInteractive_18()
 	call ReturnIfNonInteractive_18
-;> DecrementEntityIgnoreHitsTimer()
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
-;> EntityCheckWeaponHits()
+;> EntityCheckWeaponHits(slot)
 	call EntityCheckWeaponHits
 ;> if hActiveEntityState < 5:
 	ldh a, [hActiveEntityState]
@@ -11278,7 +11278,7 @@ TurtleRockEntityHandler::
 
 .neck
 ;> else:
-;>     EntityCheckContactDamage()
+;>     EntityCheckContactDamage(slot)
 	call EntityCheckContactDamage
 
 .states
@@ -11313,7 +11313,7 @@ TurtleRockAsleep::
 	ret
 
 
-;@ def TurtleRockWake(slot: c)
+;@ def TurtleRockWake(slot: bc)
 ;@ path: boss/turtle_rock
 ;@ State 1: the boss music ($39) starts, also as the room's music from now on; it shakes for
 ;@ $80 frames.
@@ -11331,11 +11331,11 @@ TurtleRockWake::
 	ldh [hDefaultMusicTrackAlt], a
 ;> hLastMusicTrack = 0x39
 	ldh [hLastMusicTrack], a
-;> return IncrementEntityState()
+;> return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 
-;@ def TurtleRockShake(slot: c)
+;@ def TurtleRockShake(slot: bc)
 ;@ path: boss/turtle_rock
 ;@ State 2: remembers where its neck starts (wEntityPrivate4 = x, wEntityPrivate3 = y - $14) and
 ;@ shakes from side to side (x speed 8 / -8, turning every 4 frames) for the timer.
@@ -11359,7 +11359,7 @@ TurtleRockShake::
 
 ;>     wEntityTimer[slot] = 0xFF
 	ld [hl], $ff
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 ;>     return
 	ret
@@ -11409,7 +11409,7 @@ TurtleRockRubbleSpeedsY::
 TurtleRockRubbleSpeedsZ::
 	db $10, $10, $10, $10, $10, $10
 
-;@ def TurtleRockBreakOut(slot: c)
+;@ def TurtleRockBreakOut(slot: bc)
 ;@ path: boss/turtle_rock
 ;@ State 3: every $20 frames a piece of rubble flies off (noise $13) and the head shows one stage
 ;@ further out of the rock (sprite variant + 1, up to 7). After the timer it roars (state 4,
@@ -11423,7 +11423,7 @@ TurtleRockBreakOut::
 
 ;>     wEntityTimer[slot] = 0x80
 	ld [hl], $80
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 ;>     return
 	ret
@@ -11443,7 +11443,7 @@ TurtleRockBreakOut::
 ;>     hNoiseSfx = 0x13
 	ld a, $13
 	ldh [hNoiseSfx], a
-;>     ok, r = SpawnEntity(0x7F)   # (r is used even if none was free)
+;>     r, failed = SpawnEntity(0x7F)   # (r is used even if none was free)
 	ld a, $7f
 	call SpawnEntity
 ;>     wEntitySpriteVariant[r] = v
@@ -11514,7 +11514,7 @@ TurtleRockBreakOut::
 	ret
 
 
-;@ def TurtleRockRoar(slot: c)
+;@ def TurtleRockRoar(slot: bc)
 ;@ path: boss/turtle_rock
 ;@ State 4: it opens and shuts its mouth (variant 8 open, 7 shut: timer $60+ open, $40-$5F shut,
 ;@ $30-$3F open, $20-$2F shut, below $20 open); then it stretches out (state 5, $80 frames).
@@ -11527,7 +11527,7 @@ TurtleRockRoar::
 
 ;>     wEntityTimer[slot] = 0x80
 	ld [hl], $80
-;>     return IncrementEntityState()
+;>     return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 .roar
@@ -11551,13 +11551,13 @@ TurtleRockRoar::
 	inc e
 
 .set
-;> SetEntitySpriteVariant(v)
+;> SetEntitySpriteVariant(slot, v)
 	ld a, e
 	call SetEntitySpriteVariant
 	ret
 
 
-;@ def TurtleRockStretchOut(slot: c)
+;@ def TurtleRockStretchOut(slot: bc)
 ;@ path: boss/turtle_rock
 ;@ State 5: the head moves down out of the rock on its neck (y speed 4) for the timer; then the
 ;@ fight proper: physics flag bit 7 and wEntityOptions1 bit 6 cleared, the head's home position
@@ -11578,7 +11578,7 @@ TurtleRockStretchOut::
 	ld hl, wEntityOptions1
 	add hl, bc
 	res 6, [hl]
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 ;>     wSmasherBallSlot = hActiveEntityX   # home position
 	ldh a, [hActiveEntityX]
@@ -11599,7 +11599,7 @@ TurtleRockStretchOut::
 	ret
 
 
-;@ def TurtleRockStartSway(slot: c)
+;@ def TurtleRockStartSway(slot: bc)
 ;@ path: boss/turtle_rock
 ;@ State 6: after the timer the head starts swaying to the right (x speed 8) for $20 frames.
 ;@ test: skip runs the entity timer
@@ -11614,14 +11614,14 @@ TurtleRockStartSway::
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], $08
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
 .done
 	ret
 
 
-;@ def TurtleRockSway(slot: c)
+;@ def TurtleRockSway(slot: bc)
 ;@ path: boss/turtle_rock
 ;@ State 7: sways sideways for the timer, then pauses $08-$27 frames (state 8).
 ;@ test: skip runs the entity timer
@@ -11636,7 +11636,7 @@ TurtleRockSway::
 	and $1f
 	add $08
 	ld [hl], a
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
 .move
@@ -11645,7 +11645,7 @@ TurtleRockSway::
 	ret
 
 
-;@ def TurtleRockTurn(slot: c)
+;@ def TurtleRockTurn(slot: bc)
 ;@ path: boss/turtle_rock
 ;@ State 8: after the pause, from the third sway on (wEntityPrivate5 counts them) one time in two
 ;@ it lunges (state 9, $20 frames); otherwise it sways back the other way for $40 frames (state
@@ -11702,7 +11702,7 @@ TurtleRockTurn::
 	ret
 
 
-;@ def TurtleRockAim(slot: c)
+;@ def TurtleRockAim(slot: bc)
 ;@ path: boss/turtle_rock
 ;@ State 9: after the timer it aims at Link (speed $18, always downwards) and lunges for $20
 ;@ frames (state 10).
@@ -11714,7 +11714,7 @@ TurtleRockAim::
 
 ;>     wEntityTimer[slot] = 0x20
 	ld [hl], $20
-;>     SetEntitySpeedTowardsLink(0x18)
+;>     SetEntitySpeedTowardsLink(slot, 0x18)
 	ld a, $18
 	call SetEntitySpeedTowardsLink
 ;>     if wEntitySpeedY[slot] & 0x80:
@@ -11730,14 +11730,14 @@ TurtleRockAim::
 	ld [hl], a
 
 .go
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
 .done
 	ret
 
 
-;@ def TurtleRockLunge(slot: c)
+;@ def TurtleRockLunge(slot: bc)
 ;@ path: boss/turtle_rock
 ;@ State 10: the lunge, until the timer runs out or it is hit; then it pulls back (state 11).
 ;@ test: skip runs the entity timer
@@ -11754,7 +11754,7 @@ TurtleRockLunge::
 	jr nz, .move
 
 .back
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
 .move
@@ -11763,7 +11763,7 @@ TurtleRockLunge::
 	ret
 
 
-;@ def TurtleRockPullBack(slot: c)
+;@ def TurtleRockPullBack(slot: bc)
 ;@ path: boss/turtle_rock
 ;@ State 11: the head goes back to its home position (wSmasherBallSlot / wSmasherSlot) at speed
 ;@ 8; there it waits $20 frames and sways again (state 6).
@@ -11780,7 +11780,7 @@ TurtleRockPullBack::
 ;> hLinkY = wSmasherSlot
 	ld a, [wSmasherSlot]
 	ldh [hLinkY], a
-;> SetEntitySpeedTowardsLink(8)
+;> SetEntitySpeedTowardsLink(slot, 8)
 	ld a, $08
 	call SetEntitySpeedTowardsLink
 ;>@home if (wSmasherBallSlot - hActiveEntityX + 1) & 0xFF < 2 and (wSmasherSlot - hActiveEntityDrawY + 1) & 0xFF < 2:
@@ -11865,7 +11865,7 @@ TurtleRockSprites::
 TurtleRockNeckPair::
 	db $76, $00, $76, $20
 
-;@ def DrawTurtleRock(slot: c)
+;@ def DrawTurtleRock(slot: bc)
 ;@ path: boss/turtle_rock
 ;@ Draws the head (TurtleRockSprites[hActiveEntitySpriteVariant], 6 sprites). Once it is out
 ;@ (state 5 on, or while it dies) also the neck: segments every $10 pixels from $20 above the
@@ -12057,7 +12057,7 @@ BuzzBlobShockFrames::
 CukemanFrames::
 	db $06, $07, $08, $07
 
-;@ def BuzzBlobEntityHandler(slot: c)
+;@ def BuzzBlobEntityHandler(slot: bc)
 ;@ path: enemy/buzz_blob
 ;@ Entity $B9: the Buzz Blob, which wanders about and hurts on contact. With wEntityPrivate1 set
 ;@ (sprinkled with Magic Powder) it is a Cukeman, who also talks: dialogues $27C-$27F in turn
@@ -12071,7 +12071,7 @@ BuzzBlobEntityHandler::
 	call ReturnIfNonInteractive_18
 ;> ApplyRecoilIfNeeded_18(slot)
 	call ApplyRecoilIfNeeded_18
-;> EntityCheckHits()
+;> EntityCheckHits(slot)
 	call EntityCheckHits
 ;> return BuzzBlobStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
@@ -12089,7 +12089,7 @@ BuzzBlobStates::
 BuzzBlobSpeeds::
 	db $fa, $fc, $00, $04, $06, $04, $00, $fc, $fa, $fc
 
-;@ def BuzzBlobWander(slot: c)
+;@ def BuzzBlobWander(slot: bc)
 ;@ path: enemy/buzz_blob
 ;@ State 0: every $30-$6F frames a new random direction (BuzzBlobSpeeds); it moves and stops at
 ;@ walls. A Cukeman speaks when Link talks to it.
@@ -12127,7 +12127,7 @@ BuzzBlobWander::
 .move
 ;> UpdateEntityPosWithSpeed_18(slot)
 	call UpdateEntityPosWithSpeed_18
-;> EntityCheckWalls()
+;> EntityCheckWalls(slot)
 	call EntityCheckWalls
 ;> frames = BuzzBlobFrames
 	ld hl, wEntityPrivate1
@@ -12168,7 +12168,7 @@ BuzzBlobAnimate::
 	rra
 	rra
 	and $03
-;> SetEntitySpriteVariant(frames[i])
+;> SetEntitySpriteVariant(slot, frames[i])
 	ld e, a
 	ld d, b
 	add hl, de
@@ -12177,7 +12177,7 @@ BuzzBlobAnimate::
 	ret
 
 
-;@ def BuzzBlobShock(slot: c)
+;@ def BuzzBlobShock(slot: bc)
 ;@ path: enemy/buzz_blob
 ;@ State 1: charged with electricity (after being struck) for the timer, BuzzBlobShockFrames;
 ;@ then it wanders again.
@@ -12214,7 +12214,7 @@ BomberSprites::
 BomberHeights::
 	db $10, $11, $12, $11
 
-;@ def BomberEntityHandler(slot: c)
+;@ def BomberEntityHandler(slot: bc)
 ;@ path: enemy/bomber
 ;@ Entity $BA: the Bomber, the winged enemy that flies about and drops bombs on Link (one every
 ;@ $80 frames). When Link swings his sword at it from close by while facing it, it darts away.
@@ -12263,7 +12263,7 @@ BomberEntityHandler::
 	call ApplyRecoilIfNeeded_18
 ;> UpdateEntityPosWithSpeed_18(slot)
 	call UpdateEntityPosWithSpeed_18
-;> EntityCheckWalls()
+;> EntityCheckWalls(slot)
 	call EntityCheckWalls
 ;> return BomberStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
@@ -12282,7 +12282,7 @@ BomberStates::
 BomberSpeeds::
 	db $f8, $fa, $00, $06, $08, $06, $00, $fa, $f8, $fa
 
-;@ def BomberHover(slot: c)
+;@ def BomberHover(slot: bc)
 ;@ path: enemy/bomber
 ;@ State 0: hovers for the timer; then flies off for $20-$3F frames in a random direction
 ;@ (BomberSpeeds) - every 8th time straight at Link (speed $0A) - state 1.
@@ -12325,16 +12325,16 @@ BomberHover::
 	and $07
 	jr nz, .fly
 
-;>         SetEntitySpeedTowardsLink(0x0A)
+;>         SetEntitySpeedTowardsLink(slot, 0x0A)
 	ld a, $0a
 	call SetEntitySpeedTowardsLink
 
 .fly
-;>     IncrementEntityState()
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 ;> BomberAct(slot)                # falls through
 
-;@ def BomberAct(slot: c)
+;@ def BomberAct(slot: bc)
 ;@ path: enemy/bomber
 ;@ What the Bomber does every frame: counts wEntityPrivateCounter (its bobbing) and every $80
 ;@ frames drops a bomb (entity 2, jingle 8) - at its own position and height, falling at speed 8,
@@ -12388,7 +12388,7 @@ BomberAct::
 	ld hl, wEntityPrivate4
 	add hl, de
 	ld [hl], $01
-;>     SetEntitySpeedTowardsLink(0x10)   # for the bomb's slot
+;>     SetEntitySpeedTowardsLink(slot, 0x10)   # for the bomb's slot
 	push bc
 	push de
 	pop bc
@@ -12430,7 +12430,7 @@ BomberAct::
 ;>     wEntityTimer[slot] = 0x12
 	call GetEntityTimer
 	ld [hl], $12
-;>     GetVectorTowardsLink(0x20)
+;>     GetVectorTowardsLink(slot, 0x20)
 	ld a, $20
 	call GetVectorTowardsLink
 ;>     wEntitySpeedY[slot] = -hMultiPurpose0 & 0xFF   # away from Link
@@ -12451,7 +12451,7 @@ BomberAct::
 	ret
 
 .touch
-;> EntityCheckHits()
+;> EntityCheckHits(slot)
 	call EntityCheckHits
 ;> BomberAnimate()                # falls through
 
@@ -12460,7 +12460,7 @@ BomberAct::
 ;@ The Bomber's wings: sprite variants 0-3, one step every 4 frames.
 ;@ test: skip sets the sprite variant through bank 0
 BomberAnimate::
-;> SetEntitySpriteVariant((hFrameCounter >> 2) & 3)
+;> SetEntitySpriteVariant(slot, (hFrameCounter >> 2) & 3)
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -12469,7 +12469,7 @@ BomberAnimate::
 	ret
 
 
-;@ def BomberFly(slot: c)
+;@ def BomberFly(slot: bc)
 ;@ path: enemy/bomber
 ;@ State 1: flies on for the timer; then it stops and hovers for $20 frames (state 0).
 ;@ test: skip spawns entities
@@ -12491,7 +12491,7 @@ BomberFly::
 	jp BomberAct
 
 
-;@ def BomberDodge(slot: c)
+;@ def BomberDodge(slot: bc)
 ;@ path: enemy/bomber
 ;@ State 2: darting away from Link's sword for the timer; then it hovers again.
 ;@ test: skip sets the sprite variant through bank 0
@@ -12520,7 +12520,7 @@ LitTorchTiles::
 UnlitTorchTiles::
 	db $64, $74, $65, $75
 
-;@ def MagicPowderEntityHandler(slot: c)
+;@ def MagicPowderEntityHandler(slot: bc)
 ;@ path: item/magic_powder
 ;@ Entity $08: a sprinkle of Magic Powder. While its cloud lasts (the timer) it works on enemies
 ;@ (weapon type 9) during the last $0F frames, unless wEntityPrivate4 is set. At timer 7 it acts
@@ -12701,7 +12701,7 @@ MagicPowderEntityHandler::
 ;>     wProjectileWeaponType = 9  # magic powder
 	ld a, $09
 	ld [wProjectileWeaponType], a
-;>     EntityHitOtherEntities()
+;>     EntityHitOtherEntities(slot)
 	call EntityHitOtherEntities
 
 .done
@@ -12776,7 +12776,7 @@ MagicPowderSprites::
 	db $00, $01, $24, $00, $fe, $03, $24, $10, $ff, $05, $24, $00
 	db $ff, $01, $24, $10, $fd, $03, $24, $00, $fe, $05, $24, $10
 
-;@ def DrawMagicPowder(slot: c)
+;@ def DrawMagicPowder(slot: bc)
 ;@ path: item/magic_powder
 ;@ Draws the powder cloud while the timer runs: frame (timer >> 2) & 7 of MagicPowderSprites.
 ;@ test: skip writes OAM through bank 0
@@ -12955,7 +12955,7 @@ GetSpeedDirection16_18::
 HookshotLinkPoses::
 	db $11, $10, $0f, $0e
 
-;@ def HookshotEntityHandler(slot: c)
+;@ def HookshotEntityHandler(slot: bc)
 ;@ path: item/hookshot
 ;@ Entity $03: the hookshot. While it is out Link stands still in his hookshot pose and the chain
 ;@ is drawn (DrawHookshotChain, noise $0B every 4 frames). State 0: it flies out for its timer,
@@ -13010,7 +13010,7 @@ HookshotEntityHandler::
 	and a
 	jr z, .flying
 
-;>     GetVectorTowardsLink(0x30)
+;>     GetVectorTowardsLink(slot, 0x30)
 	ld a, $30
 	call GetVectorTowardsLink
 ;>     hLinkSpeedY = -hMultiPurpose0 & 0xFF   # from Link to the hook
@@ -13038,12 +13038,12 @@ HookshotEntityHandler::
 	call GetEntityTimer
 	jr nz, .out
 
-;>     SetEntitySpeedTowardsLink(0x30)   # on its way back
+;>     SetEntitySpeedTowardsLink(slot, 0x30)   # on its way back
 	ld a, $30
 	call SetEntitySpeedTowardsLink
 
 .back
-;> if EntityTouchesLink():        # back at Link
+;> if EntityTouchesLink(slot):        # back at Link
 	call EntityTouchesLink
 	jr nc, .done
 
@@ -13060,7 +13060,7 @@ HookshotEntityHandler::
 ;> wProjectileWeaponType = 6      # the hookshot
 	ld a, $06
 	ld [wProjectileWeaponType], a
-;> EntityHitOtherEntities()
+;> EntityHitOtherEntities(slot)
 	call EntityHitOtherEntities
 ;> if wEntityCollisions[slot]:    # hit a wall
 	ld hl, wEntityCollisions
@@ -13070,7 +13070,7 @@ HookshotEntityHandler::
 ;>     return HookshotEntityHandler.clink()
 	jr nz, .clink
 
-;> EntityCheckWalls()
+;> EntityCheckWalls(slot)
 	call EntityCheckWalls
 ;> if not wIsIndoor:
 	ld a, [wIsIndoor]
@@ -13103,7 +13103,7 @@ HookshotEntityHandler::
 ;>     return
 	jr nz, .done
 
-;> ok, n = SpawnEntity(0x68)
+;> n, failed = SpawnEntity(0x68)
 	ld a, $68
 	call SpawnEntity
 ;> wEntityX[n] = hBGPosX + 8
@@ -13255,13 +13255,13 @@ DrawHookshotChain::
 	ret
 
 
-;@ def PushLinkOutOfEntity_18(slot: c) -> carry
+;@ def PushLinkOutOfEntity_18(slot: bc) -> carry
 ;@ path: entity/helpers
 ;@ Makes the entity solid: when Link touches it, Link is put back where he stood last frame
 ;@ (StopLinkAtEntity_18) and carry is returned; otherwise no carry.
 ;@ test: skip calls the bank 3 collision check
 PushLinkOutOfEntity_18::
-;> if not EntityTouchesLink():            # Link's hitbox does not touch the entity
+;> if not EntityTouchesLink(slot):            # Link's hitbox does not touch the entity
 	call EntityTouchesLink
 ;>     return False
 	jr nc, StopLinkAtEntity_18.notTouching
@@ -13317,11 +13317,11 @@ StopLinkAtEntity_18::
 DirectionSpriteVariants_18::
 	db $06, $04, $02, $00
 
-;@ def AnimateEntityByDirection_18(slot: c)
+;@ def AnimateEntityByDirection_18(slot: bc)
 ;@ path: entity/helpers
 ;@ Walking animation of a character: the sprite variant is the first frame of its facing direction
 ;@ (DirectionSpriteVariants_18) plus 0 or 1, switching every 16 frames of its own counter.
-;@ test: c = rand(0, 15); wEntityDirection[c] = rand(0, 3)
+;@ test: slot = rand(0, 15); wEntityDirection[slot] = rand(0, 3)
 AnimateEntityByDirection_18::
 ;> dir = wEntityDirection[slot]
 	ld hl, wEntityDirection
@@ -13342,7 +13342,7 @@ AnimateEntityByDirection_18::
 	rra
 	rra
 	rra
-;> SetEntitySpriteVariant(base | (step & 1))   # set the sprite variant
+;> SetEntitySpriteVariant(slot, base | (step & 1))   # set the sprite variant
 	pop hl
 	and $01
 	or [hl]
@@ -13524,7 +13524,7 @@ ReturnIfPaused_18::
 	ret
 
 
-;@ def ApplyRecoilIfNeeded_18(slot: c)
+;@ def ApplyRecoilIfNeeded_18(slot: bc)
 ;@ path: entity/helpers
 ;@ While the entity's knockback timer runs, moves it one step with its knockback speed instead of
 ;@ its own speed (stopping at walls unless option bit 5 says otherwise) and ends the calling
@@ -13542,8 +13542,8 @@ ApplyRecoilIfNeeded_18::
 ;> wEntityIgnoreHitsTimer[slot] -= 1
 	dec a
 	ld [hl], a
-;> Call_3EB8()
-	call Call_3EB8
+;> AddPowerHitTrailVfx()
+	call AddPowerHitTrailVfx
 ;> speed_x = wEntitySpeedX[slot]
 	ld hl, wEntitySpeedX
 	add hl, bc
@@ -13577,7 +13577,7 @@ ApplyRecoilIfNeeded_18::
 	and $20
 	jr nz, .restore
 
-;>     EntityCheckWalls()               # stop at walls
+;>     EntityCheckWalls(slot)               # stop at walls
 	call EntityCheckWalls
 
 .restore
@@ -13598,21 +13598,21 @@ ApplyRecoilIfNeeded_18::
 	ret
 
 
-;@ def UpdateEntityPosWithSpeed_18(slot: c)
+;@ def UpdateEntityPosWithSpeed_18(slot: bc)
 ;@ path: entity/helpers
 ;@ Moves the entity by its speed: x by wEntitySpeedX, then y by wEntitySpeedY (the y arrays lie
 ;@ 16 bytes after the x arrays, so the same routine runs with slot + 16).
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 UpdateEntityPosWithSpeed_18::
 ;> UpdateEntityXWithSpeed_18(slot)
 	call UpdateEntityXWithSpeed_18
 ;> UpdateEntityYWithSpeed_18(slot)   # falls through
 
-;@ def UpdateEntityYWithSpeed_18(slot: c)
+;@ def UpdateEntityYWithSpeed_18(slot: bc)
 ;@ path: entity/helpers
 ;@ Moves the entity vertically by wEntitySpeedY (UpdateEntityXWithSpeed_18 on slot + 16, where
 ;@ the y arrays lie).
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 UpdateEntityYWithSpeed_18::
 ;> UpdateEntityXWithSpeed_18(slot + 16)
 	push bc
@@ -13625,12 +13625,12 @@ UpdateEntityYWithSpeed_18::
 	ret
 
 
-;@ def UpdateEntityXWithSpeed_18(slot: c)
+;@ def UpdateEntityXWithSpeed_18(slot: bc)
 ;@ path: entity/helpers
 ;@ Adds the entity's x speed to its x position. The speed is signed in 1/16 pixels per frame:
 ;@ the low nibble goes into the fraction byte wEntitySpeedXAcc (its carry counts as one more
 ;@ pixel), the high nibble (sign-extended) is added to wEntityX.
-;@ test: c = rand(0, 31)
+;@ test: slot = rand(0, 15)
 UpdateEntityXWithSpeed_18::
 ;> speed = wEntitySpeedX[slot]
 	ld hl, wEntitySpeedX
@@ -13677,11 +13677,11 @@ UpdateEntityXWithSpeed_18::
 	ret
 
 
-;@ def UpdateEntityZWithSpeed_18(slot: c)
+;@ def UpdateEntityZWithSpeed_18(slot: bc)
 ;@ path: entity/helpers
 ;@ Adds the entity's height speed wEntitySpeedZ to its height wEntityZ, the same way as
 ;@ UpdateEntityXWithSpeed_18 (1/16 pixels, fraction in wEntitySpeedZAcc).
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 UpdateEntityZWithSpeed_18::
 ;> speed = wEntitySpeedZ[slot]
 	ld hl, wEntitySpeedZ
@@ -13707,11 +13707,11 @@ UpdateEntityZWithSpeed_18::
 	ld hl, wEntityZ
 	jr UpdateEntityXWithSpeed_18.addWhole
 
-;@ def GetEntityXDistanceToLink_18(slot: c) -> (e, d)
+;@ def GetEntityXDistanceToLink_18(slot: bc) -> (e, d)
 ;@ path: entity/helpers
 ;@ Horizontal distance from the entity to Link: d = hLinkX - wEntityX (signed), e = the direction
 ;@ in which Link is (0 right, 1 left).
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 GetEntityXDistanceToLink_18::
 ;> e = 0
 	ld e, $00
@@ -13733,11 +13733,11 @@ GetEntityXDistanceToLink_18::
 	ret
 
 
-;@ def GetEntityYDistanceToLink_18(slot: c) -> (e, d)
+;@ def GetEntityYDistanceToLink_18(slot: bc) -> (e, d)
 ;@ path: entity/helpers
 ;@ Vertical distance from the entity to Link: d = hLinkY - wEntityY (signed), e = the direction
 ;@ in which Link is (2 up, 3 down).
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 GetEntityYDistanceToLink_18::
 ;> e = 2
 	ld e, $02
@@ -13783,18 +13783,18 @@ GetEntityDrawYDistanceToLink_18::
 	ret
 
 
-;@ def GetEntityDirectionToLink_18(slot: c) -> e
+;@ def GetEntityDirectionToLink_18(slot: bc) -> e
 ;@ path: entity/helpers
 ;@ Direction in which Link is seen from the entity, along the axis where he is farther away:
 ;@ 0 right, 1 left, 2 up, 3 down (the x direction when both distances are equal or y is smaller).
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 GetEntityDirectionToLink_18::
 ;> ex, dx = GetEntityXDistanceToLink_18(slot)
 	call GetEntityXDistanceToLink_18
 ;> hMultiPurpose0 = ex
 	ld a, e
 	ldh [hMultiPurpose0], a
-;> adx = abs(signed(dx))
+;> adx = (dx if dx < 0x80 else 0x100 - dx)
 	ld a, d
 	bit 7, a
 	jr z, .xPositive
@@ -13809,7 +13809,7 @@ GetEntityDirectionToLink_18::
 ;> hMultiPurpose1 = ey
 	ld a, e
 	ldh [hMultiPurpose1], a
-;> ady = abs(signed(dy))
+;> ady = (dy if dy < 0x80 else 0x100 - dy)
 	ld a, d
 	bit 7, a
 	jr z, .yPositive
@@ -13836,10 +13836,10 @@ GetEntityDirectionToLink_18::
 	ret
 
 
-;@ def ClearEntityStatus_18(slot: c)
+;@ def ClearEntityStatus_18(slot: bc)
 ;@ path: entity/helpers
 ;@ Removes the entity: its slot status becomes 0 (free).
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 ClearEntityStatus_18::
 ;> wEntityStatus[slot] = 0
 	ld hl, wEntityStatus
@@ -13848,7 +13848,7 @@ ClearEntityStatus_18::
 	ret
 
 
-;@ def BossDeathSequence_18(slot: c)
+;@ def BossDeathSequence_18(slot: bc)
 ;@ path: boss/death
 ;@ Runs while a defeated boss dies; wEntityPrivate2 is the step: 0 start flashing, 1 keep
 ;@ flashing, 2 explosions and then the end of the fight (BossDeathSteps_18).
@@ -13867,10 +13867,10 @@ BossDeathSteps_18::
 	dw BossDeathFlash_18
 	dw BossDeathExplode_18
 
-;@ def BossDeathStart_18(slot: c)
+;@ def BossDeathStart_18(slot: bc)
 ;@ path: boss/death
 ;@ Step 0: the boss starts flashing for $A0 frames.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 BossDeathStart_18::
 ;> wEntityTimer[slot] = 0xA0
 	call GetEntityTimer
@@ -13881,10 +13881,10 @@ BossDeathStart_18::
 	ld [hl], $ff
 ;> BossDeathNextStep_18(slot)     # falls through
 
-;@ def BossDeathNextStep_18(slot: c)
+;@ def BossDeathNextStep_18(slot: bc)
 ;@ path: boss/death
 ;@ Goes on to the next step of the boss death (wEntityPrivate2 + 1).
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 BossDeathNextStep_18::
 ;> wEntityPrivate2[slot] += 1
 	ld hl, wEntityPrivate2
@@ -13893,11 +13893,11 @@ BossDeathNextStep_18::
 	ret
 
 
-;@ def BossDeathFlash_18(slot: c)
+;@ def BossDeathFlash_18(slot: bc)
 ;@ path: boss/death
 ;@ Step 1: when the timer runs out, flashes on for another $C0 frames and goes on to the
 ;@ explosions.
-;@ test: c = rand(0, 15)
+;@ test: slot = rand(0, 15)
 BossDeathFlash_18::
 ;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
@@ -13916,11 +13916,11 @@ BossDeathFlash_18::
 	ret
 
 
-;@ def BossDeathExplode_18(slot: c)
+;@ def BossDeathExplode_18(slot: bc)
 ;@ path: boss/death
 ;@ Step 2: explosions burst around the boss every 8 frames; when the timer runs out the fight
 ;@ ends: a sound plays, the room's event is marked done (the boss stays beaten) and the boss
-;@ is replaced by its reward (Call_3F7A).
+;@ is replaced by its reward (DefeatEntityWithDrop).
 ;@ test: skip spawns entities through other banks
 BossDeathExplode_18::
 ;> t = wEntityTimer[slot]
@@ -13934,8 +13934,8 @@ BossDeathExplode_18::
 	call SelectAreaMusicFar
 ;>     MarkRoomEventDone_18()
 	call MarkRoomEventDone_18
-;>     return Call_3F7A(slot)
-	jp Call_3F7A
+;>     return DefeatEntityWithDrop(slot)
+	jp DefeatEntityWithDrop
 
 ;> BossDeathRandomExplosion_18(t)
 .exploding
@@ -14001,7 +14001,7 @@ SpawnExplosionPuff_18::
 	ret
 
 
-;@ def UnusedSpawnHeartContainer_18(slot: c)
+;@ def UnusedSpawnHeartContainer_18(slot: bc)
 ;@ path: unused/bank18
 ;@ Not called from anywhere. Would spawn a heart container (entity $36) at (hMultiPurpose0,
 ;@ hMultiPurpose1) - in side view with an upward speed (given to the own slot, not the new one),

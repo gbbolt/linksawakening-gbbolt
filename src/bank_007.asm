@@ -5540,220 +5540,293 @@ Monkey_Land::
 	ret
 
 
+;@ def Kiki_Idle(slot: c)
+;@ path: npc/kiki
+;@ State 9: nothing.
+;@ test: c = rand(0, 15)
 Kiki_Idle::
+;> return
 	ret
 
 
+;@ path: enemy/blooper
+;@ The blooper, drawn by DrawEntity16x16 as two 8x16 sprites side by side: 2 frames of 4 bytes
+;@ (tile and attributes of the left half, then of the right half): 0 = drifting (tile $6A and its
+;@ mirror), 1 = pushing off (tile $68).
 BlooperSprites::
 	db $6a, $00, $6a, $20, $68, $00, $68, $20
 
+;@ def BlooperHandler(slot: c)
+;@ path: enemy/blooper
+;@ Entity $A9, the blooper (a squid of the side-view underwater rooms). It sinks slowly and, when
+;@ Link is above it, pushes off upwards towards him in strokes. It cannot leave the water: outside
+;@ it (wEntityGroundStatus 0) it is put back where it was this frame. States (wEntityState):
+;@ 0 sink, 1 swim up.
+;@ test: skip draws sprites and calls entity engine routines in bank 3
 BlooperHandler::
-	ld de, $5974
+;> DrawEntity16x16(BlooperSprites)
+	ld de, BlooperSprites
 	call DrawEntity16x16
+;> ReturnIfNonInteractive()
 	call ReturnIfNonInteractive
+;> ApplyRecoilIfNeeded(slot)
 	call ApplyRecoilIfNeeded
+;> EntityCheckHits()
 	call EntityCheckHits
+;> UpdateEntityPosWithSpeed(slot)
 	call UpdateEntityPosWithSpeed
+;> EntityCheckWalls()
 	call EntityCheckWalls
+;> if wEntityGroundStatus[slot] == 0:          # out of the water
 	ld hl, wEntityGroundStatus
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr nz, jr_007_59ad
-
+	jr nz, .inWater
+;>     wEntityDyingTimer[slot] = 0x10
 	ld hl, wEntityDyingTimer
 	add hl, bc
 	ld [hl], $10
+;>     wEntityX[slot] = hActiveEntityX          # undo this frame's move
 	ldh a, [hActiveEntityX]
 	ld hl, wEntityX
 	add hl, bc
 	ld [hl], a
+;>     wEntityY[slot] = hActiveEntityY
 	ldh a, [hActiveEntityY]
 	ld hl, wEntityY
 	add hl, bc
 	ld [hl], a
-
-jr_007_59ad:
+.inWater
+;> SetEntitySpriteVariant(0)
 	xor a
 	call SetEntitySpriteVariant
+;> return BlooperStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
+;@ path: enemy/blooper
+;@ States of the blooper (wEntityState), see BlooperHandler.
 BlooperStates::
 	dw Blooper_Sink
 	dw Blooper_Swim
 
+;@ def Blooper_Sink(slot: c)
+;@ path: enemy/blooper
+;@ State 0: drifts - the y speed eases towards +4 (sinking), the x speed towards 0. After the rest,
+;@ if Link is not below it, it stops and swims up for $25 frames on Link's side (state 1).
+;@ test: c = rand(0, 15)
 Blooper_Sink::
+;> if wEntityTimer[slot] == 0 and EntityLinkDiffY(slot)[1] != 3:   # Link is above
 	call GetEntityTimer
-	jr nz, jr_007_59db
-
+	jr nz, .drift
 	call EntityLinkDiffY
 	ld a, e
 	cp $03
-	jr z, jr_007_59db
-
+	jr z, .drift
+;>     ClearEntitySpeed()
 	call ClearEntitySpeed
+;>     wEntityTimer[slot] = 0x25
 	call GetEntityTimer
 	ld [hl], $25
+;>     dx, xdir = EntityLinkDiffX(slot)
 	call EntityLinkDiffX
+;>     wEntityDirection[slot] = xdir
 	ld hl, wEntityDirection
 	add hl, bc
 	ld [hl], e
+;>     wEntityState[slot] = 1
 	call IncrementEntityState
 	ld [hl], $01
+;>     return
 	ret
 
-
-jr_007_59db:
+.drift
+;> if wEntitySpeedY[slot] != 4:
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 	sub $04
-	jr z, jr_007_59eb
-
+	jr z, .xSpeed
+;>     wEntitySpeedY[slot] += 1 if (wEntitySpeedY[slot] - 4) & 0x80 else -1
 	and $80
-	jr z, jr_007_59ea
-
+	jr z, .yDown
 	inc [hl]
 	inc [hl]
-
-jr_007_59ea:
+.yDown
 	dec [hl]
-
-jr_007_59eb:
+.xSpeed
+;> if wEntitySpeedX[slot] != 0:
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_59fa
-
+	jr z, .done
+;>     wEntitySpeedX[slot] += 1 if wEntitySpeedX[slot] & 0x80 else -1
 	and $80
-	jr z, jr_007_59f9
-
+	jr z, .xDown
 	inc [hl]
 	inc [hl]
-
-jr_007_59f9:
+.xDown
 	dec [hl]
-
-jr_007_59fa:
+.done
 	ret
 
 
+;@ path: enemy/blooper
+;@ x speed change per stroke for the blooper's direction (0 right: +1, 1 left: -1).
 BlooperSwimAccelX::
 	db $01, $ff
 
+;@ def Blooper_Swim(slot: c)
+;@ path: enemy/blooper
+;@ State 1 (frame 1): on every second frame it speeds up upwards by 1 and sideways towards Link by 1;
+;@ after the time it drifts again for $40 frames (state 0).
+;@ test: c = rand(0, 15)
 Blooper_Swim::
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_007_5a09
-
+	jr nz, .swim
+;>     wEntityTimer[slot] = 0x40
 	ld [hl], $40
+;>     wEntityState[slot] = 0
 	call IncrementEntityState
 	ld [hl], b
+;>     return
 	ret
 
-
-jr_007_5a09:
+.swim
+;> if hFrameCounter & 1 == 0:
 	ldh a, [hFrameCounter]
 	and $01
-	jr nz, jr_007_5a25
-
+	jr nz, .frame
+;>     wEntitySpeedY[slot] -= 1
 	ld hl, wEntitySpeedY
 	add hl, bc
 	dec [hl]
+;>     dir = wEntityDirection[slot]
 	ld hl, wEntityDirection
 	add hl, bc
 	ld e, [hl]
 	ld d, b
-	ld hl, $59fb
+;>     step = BlooperSwimAccelX[dir]
+	ld hl, BlooperSwimAccelX
 	add hl, de
 	ld a, [hl]
+;>     wEntitySpeedX[slot] = (wEntitySpeedX[slot] + step) & 0xFF
 	ld hl, wEntitySpeedX
 	add hl, bc
 	add [hl]
 	ld [hl], a
-
-jr_007_5a25:
+.frame
+;> SetEntitySpriteVariant(1)
 	ld a, $01
 	call SetEntitySpriteVariant
 	ret
 
 
+;@ def DrawPillarSprites(sprites: hl, count: c)
+;@ path: object/tower_pillar
+;@ Draws count sprites from a list of 4-byte entries (y offset, x offset, tile, attributes) at the
+;@ entity, like DrawEntitySprites, but: the screen shake (wScreenShakeX) is applied, sprites below
+;@ y $7E are dropped (y 0), and tile $FF means an empty place (y 0). Then reserves 10 OAM entries
+;@ and restores c to the active slot. Nothing when the sprite variant is $FF.
+;@ test: skip writes the OAM buffer through pointers
 DrawPillarSprites::
+;> if hActiveEntitySpriteVariant == 0xFF:
 	ldh a, [hActiveEntitySpriteVariant]
 	inc a
-	jr z, jr_007_5a7a
-
+;>@hid     return wActiveEntitySlot
+	jr z, .hidden
+;>@oam oam = 0xC030 + wOAMNextIndex
 	push hl
 	ld a, [wOAMNextIndex]
 	ld e, a
 	ld d, $00
 	ld hl, $c030
 	add hl, de
+;=@oam
 	push hl
 	pop de
 	pop hl
-
-jr_007_5a3e:
+;>@loop for n in range(count):
+.sprite
+;>     y = hActiveEntityDrawY + mem[sprites]
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
+;>     if y >= 0x7E:
 	cp $7e
-	jr c, jr_007_5a46
-
+	jr c, .yOk
+;>         y = 0                               # below the play area: hidden
 	xor a
-
-jr_007_5a46:
+.yOk
+;>     mem[oam] = y
 	ld [de], a
 	inc hl
 	inc de
+;>@x     mem[oam + 1] = hActiveEntityX + mem[sprites + 1] - wScreenShakeX
 	push bc
 	ld a, [wScreenShakeX]
 	ld c, a
 	ldh a, [hActiveEntityX]
 	add [hl]
 	sub c
+;=@x
 	ld [de], a
 	inc hl
 	inc de
+;>     tile = mem[sprites + 2]
 	ldh a, [hActiveEntityTileOffset]
 	ld c, a
 	ld a, [hli]
+;>     mem[oam + 2] = tile + hActiveEntityTileOffset
 	push af
 	add c
 	ld [de], a
+;>     if tile == 0xFF:                       # empty place
 	pop af
 	cp $ff
-	jr nz, jr_007_5a65
-
+	jr nz, .tileOk
+;>         mem[oam] = 0
 	dec de
 	xor a
 	ld [de], a
 	inc de
-
-jr_007_5a65:
+.tileOk
+;>@a     mem[oam + 3] = mem[sprites + 3] ^ hActiveEntityFlipAttribute   # then oam and sprites move on 4 bytes
 	pop bc
 	inc de
 	ldh a, [hActiveEntityFlipAttribute]
 	xor [hl]
 	inc hl
 	ld [de], a
+;=@a
 	inc de
+;
+;
+;=@loop
 	dec c
-	jr nz, jr_007_5a3e
-
+	jr nz, .sprite
+;> c = wActiveEntitySlot
 	ld a, [wActiveEntitySlot]
 	ld c, a
+;> ReserveOAMEntriesFar(10)
 	ld a, $0a
 	call ReserveOAMEntriesFar
 	ret
 
-
-jr_007_5a7a:
+.hidden
+;=@hid
 	ld a, [wActiveEntitySlot]
 	ld c, a
 	ret
 
 
+;@ path: object/tower_pillar
+;@ The crumbling pillar of Eagle's Tower: 5 frames of 10 sprites, each sprite 4 bytes (y offset,
+;@ x offset, tile, attributes). A frame is a column two sprites wide of five rows at y 0, -$10,
+;@ -$20, -$30, -$40: frame 0 the whole pillar (base tile $4C, shaft $4A, top $48), each later frame
+;@ one row lower (tile $FF = empty).
 PillarSprites::
 	db $00, $00, $4c, $00, $00, $08, $4c, $20, $f0, $00, $4a, $00, $f0, $08, $4a, $20
 	db $e0, $00, $4a, $00, $e0, $08, $4a, $20, $d0, $00, $4a, $00, $d0, $08, $4a, $20
@@ -5769,57 +5842,78 @@ PillarSprites::
 	db $e0, $00, $ff, $00, $e0, $08, $ff, $20, $d0, $00, $ff, $00, $d0, $08, $ff, $20
 	db $c0, $00, $ff, $00, $c0, $08, $ff, $20
 
+;@ def PillarHandler(slot: c)
+;@ path: object/tower_pillar
+;@ Entity $A7, a pillar of Eagle's Tower (dungeon 7) that the iron ball can smash; also its dust
+;@ puffs (wEntityPrivate1 = 1, PillarDust) and falling debris (wEntityPrivate1 = 2, PillarDebris).
+;@ A smashed pillar crumbles away row by row; once four are down (wTowerPillarsDestroyed) the tower's
+;@ top floor collapses (the picture game mode 8, then dungeon 7 flag bit 2). It is gone if the
+;@ room's event flag (bit 5) is set, or if it is no longer in its own room. States (wEntityState):
+;@ 0 standing, 1 shaking, 2 crumbling, 3 the tower shakes, 4 collapse, 5 quake.
+;@ test: skip draws sprites and calls entity engine routines in bank 3
 PillarHandler::
+;> if wEntityPrivate1[slot] == 2:
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	cp $02
+;>     return PillarDebris(slot)
 	jp z, PillarDebris
-
+;> if wEntityPrivate1[slot] != 0:
 	and a
+;>     return PillarDust(slot)
 	jp nz, PillarDust
-
+;> if hRoomStatus & 0x20:                       # already smashed
 	ldh a, [hRoomStatus]
 	and $20
+;>     return ClearEntityStatus(slot)
 	jp nz, ClearEntityStatus
-
+;>@room if not wRoomTransitionState and wEntityRoom[slot] != hMapRoom:
 	ld a, [wRoomTransitionState]
 	and a
-	jr nz, jr_007_5b6c
-
+	jr nz, .draw
 	ld hl, wEntityRoom
 	add hl, bc
 	ldh a, [hMapRoom]
+;=@room
 	cp [hl]
+;>     return ClearEntityStatus(slot)
 	jp nz, ClearEntityStatus
-
-jr_007_5b6c:
+.draw
+;> if hActiveEntitySpriteVariant < 5:
 	ldh a, [hActiveEntitySpriteVariant]
 	cp $05
-	jr nc, jr_007_5b89
-
+	jr nc, .update
+;>@off     offset = hActiveEntitySpriteVariant * 40     # 10 sprites of 4 bytes per frame
 	rla
 	rla
 	and $fc
 	sla a
 	ld e, a
 	sla a
+;=@off
 	sla a
 	add e
+;>     DrawPillarSprites(PillarSprites + offset, 10)
 	ld e, a
 	ld d, b
-	ld hl, $5a7f
+	ld hl, PillarSprites
 	add hl, de
 	ld c, $0a
 	call DrawPillarSprites
-
-jr_007_5b89:
+.update
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
+;> EntityCheckWeaponHits()
 	call EntityCheckWeaponHits
+;> PushLinkOutOfEntity()
 	call PushLinkOutOfEntity
+;> return PillarStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
+;@ path: object/tower_pillar
+;@ States of the pillar (wEntityState), see PillarHandler.
 PillarStates::
 	dw Pillar_Idle
 	dw Pillar_Shake
@@ -5828,336 +5922,468 @@ PillarStates::
 	dw Pillar_Collapse
 	dw Pillar_Quake
 
+;@ def Pillar_Idle(slot: c)
+;@ path: object/tower_pillar
+;@ State 0: stands; the iron ball starts the shaking (state 1, IronBallCheckPillarHit).
+;@ test: c = rand(0, 15)
 Pillar_Idle::
+;> return
 	ret
 
 
+;@ def Pillar_Shake(slot: c)
+;@ path: object/tower_pillar
+;@ State 1: the screen shakes sideways while the timer runs (Link held still); then it crumbles
+;@ (state 2).
+;@ test: c = rand(0, 15); wEntityTimer[c] = rand(0, 255)
 Pillar_Shake::
+;> HoldLinkStill()
 	call HoldLinkStill
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
+;> if t != 0:
+;>     return SetScreenShakeFromTimer(t)
 	jr nz, SetScreenShakeFromTimer
-
+;> return IncrementEntityState()
 	jp IncrementEntityState
 
 
+;@ def SetScreenShakeFromTimer(t: a)
+;@ path: object/tower_pillar
+;@ Shakes the screen sideways: wScreenShakeX = 2 when bit 2 of t is set, else 0.
+;@ test: a = rand(0, 255)
 SetScreenShakeFromTimer::
+;> shake = 2 if t & 0x04 else 0
 	ld e, $00
 	and $04
-	jr z, jr_007_5bb5
-
+	jr z, .set
 	ld e, $02
-
-jr_007_5bb5:
+.set
+;> wScreenShakeX = shake
 	ld a, e
 	ld [wScreenShakeX], a
 	ret
 
 
+;@ def Pillar_Crumble(slot: c)
+;@ path: object/tower_pillar
+;@ State 2: shaking, the pillar loses a row every $20 frames (sprite variant + 1), with debris
+;@ falling (3 times in 4) and dust puffing up every 4 frames. When it is gone the pillar count goes
+;@ up: at four the whole tower shakes ($20 frames, state 3); otherwise the room's event flag is set
+;@ and the pillar removed.
+;@ test: skip spawns entities through bank 3
 Pillar_Crumble::
+;> HoldLinkStill()
 	call HoldLinkStill
+;> SetScreenShakeFromTimer(hFrameCounter)
 	ldh a, [hFrameCounter]
 	call SetScreenShakeFromTimer
+;> if hFrameCounter & 0x1F == 0:
 	ldh a, [hFrameCounter]
 	and $1f
-	jr nz, jr_007_5bde
-
+	jr nz, .dust
+;>     wEntitySpriteVariant[slot] += 1             # one row less
 	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	inc a
 	ld [hl], a
+;>     if wEntitySpriteVariant[slot] == 5:
 	cp $05
-	jp z, Jump_007_5c1e
-
+;>         return Pillar_Gone(slot)
+	jp z, .gone
+;>     if GetRandomByte() & 3:
 	call GetRandomByte
 	and $03
-	jr z, jr_007_5bde
-
+	jr z, .dust
+;>         SpawnPillarDebris()
 	call SpawnPillarDebris
-
-jr_007_5bde:
+.dust
+;> if hFrameCounter & 3 == 0:
 	ldh a, [hFrameCounter]
 	and $03
-	jr nz, jr_007_5c1d
-
+	jr nz, .done
+;>     dust = SpawnEntity(0xA7)
 	ld a, $a7
 	call SpawnEntity
-	jr c, jr_007_5c1d
-
+;>     if dust is not None:
+	jr c, .done
+;>@dy         wEntityY[dust] = hMultiPurpose1 + (GetRandomByte() & 7) - 4
 	call GetRandomByte
 	and $07
 	sub $04
 	ld hl, hMultiPurpose1
 	add [hl]
 	ld hl, wEntityY
+;=@dy
 	add hl, de
 	ld [hl], a
+;>@dx         wEntityX[dust] = hMultiPurpose0 + (GetRandomByte() & 0x1F) - 0x10
 	call GetRandomByte
 	and $1f
 	sub $10
 	ld hl, hMultiPurpose0
 	add [hl]
 	ld hl, wEntityX
+;=@dx
 	add hl, de
 	ld [hl], a
+;>         wEntityPhysicsFlags[dust] = 0xC2
 	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], $c2
+;>         wEntityTimer[dust] = 0x10
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $10
+;>         wEntityPrivate1[dust] = 1
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $01
-
-jr_007_5c1d:
+.done
 	ret
 
-
-Jump_007_5c1e:
+.gone
+;> wScreenShakeX = 0                            # (Pillar_Gone) the pillar is down
 	ld a, $00
 	ld [wScreenShakeX], a
+;> wTowerPillarsDestroyed += 1
 	ld a, [wTowerPillarsDestroyed]
 	inc a
 	ld [wTowerPillarsDestroyed], a
+;> if wTowerPillarsDestroyed >= 4:
 	cp $04
-	jr c, jr_007_5c37
-
+	jr c, .notLast
+;>     wEntityTimer[slot] = 0x20
 	call GetEntityTimer
 	ld [hl], $20
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
+;>     return
 	ret
 
-
-jr_007_5c37:
+.notLast
+;> MarkRoomEventDone()
 	call MarkRoomEventDone
+;> return ClearEntityStatus(slot)
 	jp ClearEntityStatus
 
 
+;@ def Pillar_TowerShake(slot: c)
+;@ path: object/tower_pillar
+;@ State 3 (the fourth pillar): the screen shakes; then the game switches to the picture mode (8)
+;@ showing the top of the tower falling, and the pillar waits $20 frames in state 4.
+;@ test: skip changes the game mode
 Pillar_TowerShake::
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_007_5c57
-
+;> if t == 0:
+	jr nz, .shake
+;>     wEntityTimer[slot] = 0x20
 	ld [hl], $20
+;>     wGameplayType = 8
 	ld a, $08
 	ld [wGameplayType], a
+;>     wTransitionSequenceCounter = 0
 	xor a
 	ld [wTransitionSequenceCounter], a
+;>     wTransitionFrameCounter = 0
 	ld [wTransitionFrameCounter], a
+;>     wGameplaySubtype = 0
 	ld [wGameplaySubtype], a
+;>     wEntityState[slot] += 1
 	call IncrementEntityState
+;>     return
 	ret
 
-
-jr_007_5c57:
+.shake
+;> wScreenShakeX = 2 if t & 0x04 else 0
 	ld e, $00
 	and $04
-	jr z, jr_007_5c5f
-
+	jr z, .set
 	ld e, $02
-
-jr_007_5c5f:
+.set
 	ld a, e
 	ld [wScreenShakeX], a
+;> HoldLinkStill()                              # falls through
 
+;@ def HoldLinkStill()
+;@ path: object/tower_pillar
+;@ Keeps Link from moving and holds his pose this frame.
+;@ test: skip
 HoldLinkStill::
+;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
+;> wLinkPoseLock = 2
 	ld [wLinkPoseLock], a
 	ret
 
 
+;@ def Pillar_Collapse(slot: c)
+;@ path: object/tower_pillar
+;@ State 4: after the picture, sets the room's event flag and dungeon 7 flag bit 2 (the tower's top
+;@ has fallen) and removes the pillar.
+;@ test: skip
 Pillar_Collapse::
+;> wScreenShakeX = 0
 	xor a
 	ld [wScreenShakeX], a
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_007_5c80
-
+	jr nz, .wait
+;>     MarkRoomEventDone()
 	call MarkRoomEventDone
+;>     wDungeon7Flags |= 0x04
 	ld hl, wDungeon7Flags
 	set 2, [hl]
+;>     ClearEntityStatus(slot)
 	call ClearEntityStatus
+;>     return
 	ret
 
-
-jr_007_5c80:
+.wait
+;> HoldLinkStill()
 	call HoldLinkStill
 	ret
 
 
+;@ path: object/tower_pillar
+;@ Vertical screen shake of the quake (state 5), pixels, indexed by timer & 7.
 PillarQuakeOffsets::
 	db $00, $02, $04, $06, $06, $04, $02, $00
 
+;@ def Pillar_Quake(slot: c)
+;@ path: object/tower_pillar
+;@ State 5, a quake: the screen bobs up and down (PillarQuakeOffsets) while the timer runs, with
+;@ rumbling (noise $0C every 8 frames) above $40 and falling debris every 4 frames below $20.
+;@ test: skip spawns entities through bank 3
 Pillar_Quake::
+;> wScreenShakeY = 0
 	xor a
 	ld [wScreenShakeY], a
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_007_5c98
-
+;> if t == 0:
+	jr nz, .quake
+;>     return ClearEntityStatus(slot)
 	jp ClearEntityStatus
 
-
-jr_007_5c98:
+.quake
+;>@q wScreenShakeY = PillarQuakeOffsets[t & 7]
 	push af
 	and $07
 	ld e, a
 	ld d, b
-	ld hl, $5c84
+	ld hl, PillarQuakeOffsets
 	add hl, de
+;=@q
 	ld a, [hl]
 	ld [wScreenShakeY], a
+;> if t < 0x20 and t & 3 == 0:
 	pop af
 	cp $20
-	jr nc, jr_007_5cb2
-
+	jr nc, .rumble
 	and $03
-	jr nz, jr_007_5cb2
-
+	jr nz, .rumble
+;>     SpawnPillarDebris()
 	call SpawnPillarDebris
+;>     t = 0
 	xor a
-
-jr_007_5cb2:
+.rumble
+;> if t >= 0x40 and t & 7 == 0:
 	cp $40
-	jr c, jr_007_5cbf
-
+	jr c, .done
 	and $07
-	jr nz, jr_007_5cbf
-
+	jr nz, .done
+;>     hNoiseSfx = 0x0C
 	ld hl, hNoiseSfx
 	ld [hl], $0c
-
-jr_007_5cbf:
+.done
 	ret
 
 
+;@ path: object/tower_pillar
+;@ A dust puff, drawn by DrawEntity16x16: 2 frames of 4 bytes (tile and attributes of the left
+;@ half, then of the right half): tile $30, then $32, each with its mirror image.
 PillarDustSprites::
 	db $30, $00, $30, $20, $32, $00, $32, $20
 
+;@ def PillarDust(slot: c)
+;@ path: object/tower_pillar
+;@ A dust puff of a crumbling pillar ($A7 with wEntityPrivate1 = 1): frame 1 for its last 4 frames,
+;@ gone when its timer runs out.
+;@ test: skip draws sprites through bank 0
 PillarDust::
-	ld de, $5cc0
+;> DrawEntity16x16(PillarDustSprites)
+	ld de, PillarDustSprites
 	call DrawEntity16x16
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
+;> if t == 0:
+;>     return ClearEntityStatus(slot)
 	jp z, ClearEntityStatus
-
+;> if t == 4:
 	cp $04
-	jr nz, jr_007_5cdd
-
+	jr nz, .done
+;>     SetEntitySpriteVariant(1)
 	ld a, $01
 	call SetEntitySpriteVariant
-
-jr_007_5cdd:
+.done
 	ret
 
 
+;@ def SpawnPillarDebris()
+;@ path: object/tower_pillar
+;@ Drops a piece of debris ($A7 with wEntityPrivate1 = 2) from a height of $70 at a random spot up
+;@ to 32 pixels around the pillar.
+;@ test: skip spawns an entity through bank 3
 SpawnPillarDebris::
+;> rock = SpawnEntity(0xA7)
 	ld a, $a7
 	call SpawnEntity
-	jr c, jr_007_5d17
-
+;> if rock is None:
+;>     return
+	jr c, .done
+;> wEntityPrivate1[rock] = 2
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $02
+;> wEntityPhysicsFlags[rock] = 0xD1
 	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], $d1
+;> wEntityZ[rock] = 0x70
 	ld hl, wEntityZ
 	add hl, de
 	ld [hl], $70
+;>@rx wEntityX[rock] = hMultiPurpose0 + (GetRandomByte() & 0x3F) - 0x20
 	call GetRandomByte
 	and $3f
 	sub $20
 	ld hl, hMultiPurpose0
 	add [hl]
 	ld hl, wEntityX
+;=@rx
 	add hl, de
 	ld [hl], a
+;>@ry wEntityY[rock] = hMultiPurpose1 + (GetRandomByte() & 0x3F) - 0x20
 	call GetRandomByte
 	and $3f
 	sub $20
 	ld hl, hMultiPurpose1
 	add [hl]
 	ld hl, wEntityY
+;=@ry
 	add hl, de
 	ld [hl], a
-
-jr_007_5d17:
+.done
 	ret
 
 
+;@ path: object/tower_pillar
+;@ A piece of debris, drawn by DrawEntity8x16 as one 8x16 sprite: 2 frames of 2 bytes (tile,
+;@ attributes): tile $16, then mirrored.
 PillarDebrisSprites::
 	db $16, $00, $16, $20
 
+;@ path: object/tower_pillar
+;@ Height speed of the debris after each of its 4 bounces.
 PillarDebrisBounceSpeeds::
 	db $18, $10, $0c, $08
 
+;@ path: object/tower_pillar
+;@ x speed of a bouncing piece of debris, one of 4 diagonals chosen at random.
 PillarDebrisSpeedX::
 	db $0c, $f4, $0c, $f4
 
+;@ path: object/tower_pillar
+;@ y speed of a bouncing piece of debris, for the same 4 diagonals.
 PillarDebrisSpeedY::
 	db $f4, $f4, $0c, $0c
 
+;@ def PillarDebris(slot: c)
+;@ path: object/tower_pillar
+;@ A piece of debris ($A7 with wEntityPrivate1 = 2): falls (gravity 2), drawn 8 pixels lower, and
+;@ bounces off the floor four times, each time lower and in a random diagonal; then it is gone.
+;@ wEntityState counts the bounces.
+;@ test: skip draws sprites through bank 0
 PillarDebris::
+;> hActiveEntityDrawY += 8
 	ldh a, [hActiveEntityDrawY]
 	add $08
 	ldh [hActiveEntityDrawY], a
-	ld de, $5d18
+;> DrawEntity8x16(PillarDebrisSprites)
+	ld de, PillarDebrisSprites
 	call DrawEntity8x16
+;> UpdateEntityPosWithSpeed(slot)
 	call UpdateEntityPosWithSpeed
+;> AddEntityZSpeedToPos(slot)
 	call AddEntityZSpeedToPos
+;> wEntitySpeedZ[slot] -= 2
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	dec [hl]
 	dec [hl]
+;> if wEntityZ[slot] & 0x80:                   # hits the floor
 	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and $80
-	jr z, jr_007_5d82
-
+	jr z, .done
+;>     wEntityZ[slot] = 0
 	ld [hl], b
+;>     bounce = wEntityState[slot]
 	ld hl, wEntityState
 	add hl, bc
 	ld a, [hl]
+;>     wEntityState[slot] += 1
 	inc [hl]
+;>     if bounce == 4:
 	cp $04
+;>         return ClearEntityStatus(slot)
 	jp z, ClearEntityStatus
-
+;>@bz     wEntitySpeedZ[slot] = PillarDebrisBounceSpeeds[bounce]
 	ld e, a
 	ld d, b
-	ld hl, $5d1c
+	ld hl, PillarDebrisBounceSpeeds
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedZ
+;=@bz
 	add hl, bc
 	ld [hl], a
+;>     r = GetRandomByte() & 3
 	call GetRandomByte
 	and $03
 	ld e, a
 	ld d, b
-	ld hl, $5d20
+;>     wEntitySpeedX[slot] = PillarDebrisSpeedX[r]
+	ld hl, PillarDebrisSpeedX
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
-	ld hl, $5d24
+;>     wEntitySpeedY[slot] = PillarDebrisSpeedY[r]
+	ld hl, PillarDebrisSpeedY
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
+;>     SetEntitySpriteVariant(r & 1)
 	ld a, e
 	and $01
 	call SetEntitySpriteVariant
-
-jr_007_5d82:
+.done
 	ret
 
 
-HeavyBallSprites::
+IronBallSprites::
 	db $4e, $00, $4e, $20
 
-Call_07_5D87::
+IronBallHandler::
 	ldh a, [hActiveEntityStatus]
 	cp $07
 	jr nz, jr_007_5daa
@@ -6274,26 +6500,26 @@ jr_007_5e10:
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_07_5E3C::
-	dw Jump_07_5E42
-	dw Jump_07_5EB5
-	dw Jump_07_5EB6
+IronBallStates::
+	dw IronBall_OnGround
+	dw IronBall_Held
+	dw IronBall_Thrown
 
-Jump_07_5E42::
+IronBall_OnGround::
 	ldh a, [hMultiPurposeH]
 	dec a
 	and $80
-	jr z, jr_007_5e5e
+	jr z, IronBallTryLift
 
 	ld hl, wEntitySpeedY
-	call Call_07_5E52
+	call SlowDownEntitySpeed
 	ld hl, wEntitySpeedX
 
-Call_07_5E52::
+SlowDownEntitySpeed::
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_5e5e
+	jr z, IronBallTryLift
 
 	and $80
 	jr z, jr_007_5e5d
@@ -6304,7 +6530,7 @@ Call_07_5E52::
 jr_007_5e5d:
 	dec [hl]
 
-jr_007_5e5e:
+IronBallTryLift::
 	call EntityTouchesLink
 	jr nc, jr_007_5eb4
 
@@ -6361,22 +6587,22 @@ jr_007_5eb4:
 	ret
 
 
-Jump_07_5EB5::
+IronBall_Held::
 	ret
 
 
-Jump_07_5EB6::
+IronBall_Thrown::
 	ldh a, [hBGTilesRequestCopy]
 	and a
-	jr nz, jr_007_5edb
+	jr nz, IronBallStop
 
 	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_007_5ee6
+	jr z, IronBall_Fly
 
-Call_07_5EC3::
+IronBallBounceBack::
 	ld a, $07
 	ldh [hJingle], a
 	ld hl, wEntitySpeedX
@@ -6394,7 +6620,7 @@ Call_07_5EC3::
 	sra a
 	ld [hl], a
 
-jr_007_5edb:
+IronBallStop:
 	ld hl, $c5d0
 	add hl, bc
 	ld [hl], $ff
@@ -6403,7 +6629,7 @@ jr_007_5edb:
 	ret
 
 
-jr_007_5ee6:
+IronBall_Fly::
 	call ReturnIfNonInteractive
 	ld a, $0b
 	ld [wProjectileWeaponType], a
@@ -6425,7 +6651,7 @@ jr_007_5ef4:
 	jr nz, jr_007_5f0a
 
 	push de
-	call Call_07_5F11
+	call IronBallCheckPillarHit
 	pop de
 
 jr_007_5f0a:
@@ -6437,7 +6663,7 @@ jr_007_5f0a:
 	ret
 
 
-Call_07_5F11::
+IronBallCheckPillarHit::
 	call GetEntityTimer
 	jr nz, jr_007_5f4f
 
@@ -6457,7 +6683,7 @@ Call_07_5F11::
 	cp $28
 	jr nc, jr_007_5f4f
 
-	call Call_07_5EC3
+	call IronBallBounceBack
 	ld a, $25
 	ldh [hNoiseSfx], a
 	ld a, $0b
@@ -6479,13 +6705,14 @@ jr_007_5f4f:
 	ret
 
 
+SideViewWeightSprites::
 	db $50, $00, $50, $20
 
-Call_07_5F54::
+SideViewWeightsHandler::
 	ld de, $5f50
 	call DrawEntity16x16
 	call ReturnIfNonInteractive
-	call Call_07_6103
+	call CarryLinkOnPlatform
 	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
@@ -6499,7 +6726,7 @@ Call_07_5F54::
 	and a
 	jr z, jr_007_5fcd
 
-	call Call_07_6081
+	call FindOtherWeight
 	ld hl, wEntityPrivate3
 	add hl, de
 	ld [hl], $f0
@@ -6559,7 +6786,7 @@ jr_007_5f91:
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], b
-	call Call_07_6081
+	call FindOtherWeight
 	ld hl, wEntitySpeedY
 	add hl, de
 	ld [hl], $00
@@ -6584,7 +6811,7 @@ jr_007_5fdb:
 	dec [hl]
 
 jr_007_5fdc:
-	call Call_07_6081
+	call FindOtherWeight
 	ld hl, wEntityPrivate3
 	add hl, de
 	ld [hl], $00
@@ -6692,7 +6919,7 @@ jr_007_6048:
 	ret
 
 
-Call_07_6081::
+FindOtherWeight::
 	ld hl, wEntityLoadOrder
 	add hl, bc
 	ld a, [hl]
@@ -6730,9 +6957,10 @@ jr_007_60ac:
 	ret
 
 
+MovingPlatformSprites::
 	db $00, $00, $50, $00, $00, $08, $52, $00, $00, $10, $52, $20, $00, $18, $50, $20
 
-Call_07_60BD::
+MovingPlatformHandler::
 	ld hl, $60ad
 	ld c, $04
 	call DrawEntitySprites
@@ -6745,11 +6973,11 @@ Call_07_60BD::
 	ld a, [hl]
 	and $03
 	or e
-	jr nz, Call_07_6103
+	jr nz, CarryLinkOnPlatform
 
 	ldh a, [hActiveEntityType]
 	cp $a4
-	jp z, Jump_007_6160
+	jp z, MovingPlatformVertical
 
 	ld hl, wEntityPrivate1
 	add hl, bc
@@ -6765,7 +6993,7 @@ Call_07_60BD::
 	ld hl, $615e
 	add hl, de
 	cp [hl]
-	jr nz, Call_07_6103
+	jr nz, CarryLinkOnPlatform
 
 	ld hl, wEntityPrivate1
 	add hl, bc
@@ -6775,7 +7003,7 @@ Call_07_60BD::
 	call GetEntityTimer
 	ld [hl], $6a
 
-Call_07_6103::
+CarryLinkOnPlatform::
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld [hl], b
@@ -6815,7 +7043,7 @@ Call_07_6103::
 	add [hl]
 	ld [hl], a
 	push bc
-	call Call_3E49
+	call CheckLinkLeavesRoomFar
 	pop bc
 	pop af
 	ldh [hLinkSpeedX], a
@@ -6831,9 +7059,13 @@ jr_007_615b:
 	ret
 
 
-	db $01, $ff, $06, $fa
+PlatformAccel::
+	db $01, $ff
 
-Jump_007_6160:
+PlatformSpeedLimits::
+	db $06, $fa
+
+MovingPlatformVertical::
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld e, [hl]
@@ -6859,12 +7091,13 @@ Jump_007_6160:
 	ld [hl], $6a
 
 jr_007_6185:
-	jp Call_07_6103
+	jp CarryLinkOnPlatform
 
 
+SinkingPlatformSprites::
 	db $00, $00, $50, $00, $00, $08, $52, $00, $00, $10, $52, $20, $00, $18, $50, $20
 
-Call_07_6198::
+SinkingPlatformHandler::
 	call GetEntityTimer1
 	jr z, jr_007_61a1
 
@@ -6876,7 +7109,7 @@ jr_007_61a1:
 	ld c, $04
 	call DrawEntitySprites
 	call ReturnIfNonInteractive
-	call Call_07_6103
+	call CarryLinkOnPlatform
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
@@ -6938,14 +7171,14 @@ jr_007_61f0:
 	ret
 
 
-Call_07_61FB::
+PiranhaPlantHandler::
 	ld hl, wEntityRecoilSpeedX
 	add hl, bc
 	ld [hl], b
 	ld hl, wEntityRecoilSpeedY
 	add hl, bc
 	ld [hl], b
-	call Call_07_6331
+	call DrawPiranhaPlant
 	call ReturnIfNonInteractive
 	ld hl, wEntityPrivate2
 	add hl, bc
@@ -6964,13 +7197,13 @@ jr_007_621b:
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_07_6221::
-	dw Jump_07_6229
-	dw Jump_07_624D
-	dw Jump_07_627A
-	dw Jump_07_62A3
+PiranhaPlantStates::
+	dw PiranhaPlant_Hidden
+	dw PiranhaPlant_Rise
+	dw PiranhaPlant_Bite
+	dw PiranhaPlant_Sink
 
-Jump_07_6229::
+PiranhaPlant_Hidden::
 	call GetEntityTimer
 	jr nz, jr_007_623c
 
@@ -6986,9 +7219,13 @@ jr_007_623c:
 	ret
 
 
-	db $04, $04, $03, $02, $01, $00, $00, $00, $e0, $e0, $e8, $f0, $00, $00, $00, $00
+PiranhaRiseFrames::
+	db $04, $04, $03, $02, $01, $00, $00, $00
 
-Jump_07_624D::
+PiranhaRiseOffsets::
+	db $e0, $e0, $e8, $f0, $00, $00, $00, $00
+
+PiranhaPlant_Rise::
 	call EntityCheckHits
 	call GetEntityTimer
 	jr nz, jr_007_625b
@@ -7021,7 +7258,7 @@ jr_007_625b:
 	ret
 
 
-Jump_07_627A::
+PiranhaPlant_Bite::
 	call EntityCheckHits
 	call GetEntityTimer
 	jr nz, jr_007_6287
@@ -7042,9 +7279,13 @@ jr_007_628e:
 	ret
 
 
-	db $00, $00, $00, $00, $01, $02, $03, $05, $00, $00, $00, $00, $00, $f0, $e8, $e0
+PiranhaSinkFrames::
+	db $00, $00, $00, $00, $01, $02, $03, $05
 
-Jump_07_62A3::
+PiranhaSinkOffsets::
+	db $00, $00, $00, $00, $00, $f0, $e8, $e0
+
+PiranhaPlant_Sink::
 	call EntityCheckHits
 	call GetEntityTimer
 	jr nz, jr_007_62b2
@@ -7078,6 +7319,7 @@ jr_007_62b2:
 	ret
 
 
+PiranhaPlantSprites::
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $f0, $00, $74, $00, $f0, $08, $74, $20, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $00, $00, $70, $00, $00, $08, $70, $20, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
@@ -7085,7 +7327,7 @@ jr_007_62b2:
 	db $00, $00, $70, $00, $00, $08, $70, $20, $10, $00, $72, $00, $10, $08, $72, $20
 	db $00, $00, $78, $00, $00, $08, $78, $20, $10, $00, $72, $00, $10, $08, $72, $20
 
-Call_07_6331::
+DrawPiranhaPlant::
 	ldh a, [hActiveEntitySpriteVariant]
 	rla
 	rla
@@ -7101,13 +7343,14 @@ Call_07_6331::
 	ret
 
 
+ClearScreenRowCommands::
 	db $98, $00, $53, $7f, $98, $20, $53, $7f, $98, $40, $53, $7f, $98, $60, $53, $7f
 	db $98, $80, $53, $7f, $98, $a0, $53, $7f, $98, $c0, $53, $7f, $98, $e0, $53, $7f
 	db $99, $00, $53, $7f, $99, $20, $53, $7f, $99, $40, $53, $7f, $99, $60, $53, $7f
 	db $99, $80, $53, $7f, $99, $a0, $53, $7f, $99, $c0, $53, $7f, $99, $e0, $53, $7f
 	db $9a, $00, $53, $7f, $9a, $20, $53, $7f
 
-Jump_007_638d:
+ClearScreenAndShowMapText::
 	xor a
 	ldh [hBaseScrollX], a
 	ldh [hBaseScrollY], a
@@ -7168,12 +7411,12 @@ jr_007_63d2:
 
 	db $4a, $00, $4c, $00, $4c, $20, $4a, $20, $4e, $00, $4e, $20
 
-Call_07_63F1::
+GoombaHandler::
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	and a
-	jp nz, Jump_007_638d
+	jp nz, ClearScreenAndShowMapText
 
 	ld de, $63e5
 	call DrawEntity16x16
@@ -7181,21 +7424,21 @@ Call_07_63F1::
 	call ApplyRecoilIfNeeded
 	ldh a, [hIsSideScrolling]
 	and a
-	jp nz, Jump_007_64ad
+	jp nz, GoombaSideView
 
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_07_640F::
-	dw Jump_07_641D
-	dw Jump_07_6461
-	dw Jump_07_6484
+GoombaStates::
+	dw Goomba_Pause
+	dw Goomba_Walk
+	dw Goomba_Squashed
 
 	db $08, $f8, $00, $00, $00, $00, $f8, $08
 
-Jump_07_641D::
+Goomba_Pause::
 	call EntityCheckWeaponHits
-	call Call_07_650E
+	call GoombaTouchLink
 	call GetEntityTimer
 	jr nz, jr_007_645f
 
@@ -7239,9 +7482,9 @@ jr_007_6447:
 jr_007_645f:
 	jr jr_007_6478
 
-Jump_07_6461::
+Goomba_Walk::
 	call EntityCheckWeaponHits
-	call Call_07_650E
+	call GoombaTouchLink
 	call GetEntityTimer
 	jr nz, jr_007_6472
 
@@ -7253,7 +7496,7 @@ jr_007_6472:
 	call UpdateEntityPosWithSpeed
 	call EntityCheckWalls
 
-Jump_007_6478:
+GoombaWalkAnimation:
 jr_007_6478:
 	ldh a, [hFrameCounter]
 	rra
@@ -7265,7 +7508,7 @@ jr_007_6478:
 	ret
 
 
-Jump_07_6484::
+Goomba_Squashed::
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $c2
@@ -7291,21 +7534,21 @@ jr_007_64a7:
 	ret
 
 
-Jump_007_64ad:
+GoombaSideView::
 	ldh a, [hActiveEntityState]
 	cp $02
-	jr z, Jump_07_6484
+	jr z, Goomba_Squashed
 
 	call EntityCheckWeaponHits
-	call Call_07_651A
+	call GoombaSideViewTouchLink
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_07_64BC::
-	dw Jump_07_64C0
-	dw Jump_07_64D2
+GoombaSideViewStates::
+	dw GoombaSideView_Start
+	dw GoombaSideView_Walk
 
-Jump_07_64C0::
+GoombaSideView_Start::
 	call EntityLinkDiffX
 	ld a, $08
 	dec e
@@ -7320,7 +7563,7 @@ jr_007_64ca:
 	jp IncrementEntityState
 
 
-Jump_07_64D2::
+GoombaSideView_Walk::
 	call UpdateEntityPosWithSpeed
 	ld hl, wEntitySpeedY
 	add hl, bc
@@ -7356,7 +7599,7 @@ jr_007_64ef:
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], b
-	jp Jump_007_6478
+	jp GoombaWalkAnimation
 
 
 jr_007_650a:
@@ -7364,7 +7607,7 @@ jr_007_650a:
 	jp SetEntitySpriteVariant
 
 
-Call_07_650E::
+GoombaTouchLink::
 	ldh a, [hLinkPositionZ]
 	and a
 	jp z, EntityTouchesLink
@@ -7375,7 +7618,7 @@ Call_07_650E::
 	ret
 
 
-Call_07_651A::
+GoombaSideViewTouchLink::
 	jp EntityTouchesLink
 
 
@@ -7987,7 +8230,7 @@ jr_007_695e:
 
 	call ReturnIfNonInteractive
 	call ConfineLinkToArena
-	call Call_3F12
+	call StartBossMusic
 	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld a, [hl]
@@ -9202,7 +9445,7 @@ jr_007_70c9:
 	add hl, de
 	add $08
 	ld [hl], a
-	call Call_3E64
+	call BreakIntoPiecesFar
 	ldh a, [hActiveEntityX]
 	sub $08
 	ldh [hBGPosX], a
@@ -11069,8 +11312,8 @@ ApplyRecoilIfNeeded::
 ;> wEntityIgnoreHitsTimer[slot] -= 1
 	dec a
 	ld [hl], a
-;> Call_3EB8()                   # trail effect for entities that leave one
-	call Call_3EB8
+;> AddPowerHitTrailVfx()                   # trail effect for entities that leave one
+	call AddPowerHitTrailVfx
 ;> speed_x = wEntitySpeedX[slot]
 	ld hl, wEntitySpeedX
 	add hl, bc
@@ -11436,8 +11679,8 @@ BossDefeated_Explode::
 	call PlayClinkNoise
 ;> SelectAreaMusicFar()                        # boss-defeated handling (bank 2)
 	call SelectAreaMusicFar
-;> return Call_3F7A(slot)             # removed like a killed enemy
-	jp Call_3F7A
+;> return DefeatEntityWithDrop(slot)             # removed like a killed enemy
+	jp DefeatEntityWithDrop
 
 .exploding
 ;=@ex

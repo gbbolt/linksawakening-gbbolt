@@ -616,3 +616,24 @@ DEF wNoiseSfx34CountB EQU $D3E0 ;@ u8 Repeats left of the second loop of noise e
 DEF wWaveSfx22Count EQU $D3E1 ;@ u8 Round counter of wave effect $22
 DEF wHoldNoiseSfx3E EQU $D3E8 ;@ u8 While set (by the Slime Eel), noise effect $3E holds its current step
 DEF wRoomNoiseLoop EQU $C50E ;@ u8 Set ($E9) by a room with overworld object $E9; while set, noise effect $1E starts again whenever no noise effect plays
+DEF wKidHintIndex EQU $DB7E ;@ u8 Which of their four hints (0-3) the village kids give next
+DEF wLinkPulledByDevice EQU $D45E ;@ u8 Nonzero while a tractor device moves Link this frame (cleared every frame; Link does not show the pushing pose meanwhile)
+DEF wSongMenuFrame EQU $C1B7 ;@ u8 Animation frame of the song menu (0 fully open, 1-3 opening / closing)
+DEF wGhostSawHouse EQU $DB7A ;@ u8 Set to 1 once the ghost has been back inside its house (it then wants to go to its grave); cleared when it rests there
+DEF wSceneCounter EQU $C3C4 ;@ u8 Scene counter: on the beach Marin faces Link while it is 1-$5F (counts down each frame); in the mural scene the frames before the text
+DEF wVfxSpeedX EQU $C550 ;@ u8[16] X speed of each effect slot's sprite (signed 4.4 fixed point); used by the beach scene's birds
+DEF wVfxSpeedY EQU $C560 ;@ u8[16] Y speed of each effect slot's sprite (signed 4.4 fixed point)
+DEF wVfxSubX EQU $C570 ;@ u8[16] Fraction (sixteenths) of each effect slot's x position
+DEF wVfxSubY EQU $C580 ;@ u8[16] Fraction (sixteenths) of each effect slot's y position
+DEF wMinimapTiles EQU $D480 ;@ u8[64] The dungeon minimap built for the inventory, one window tile per room (8 rows of 8)
+DEF hWallCheckOnly EQU $FFBE ;@ u8 Set by an entity for the current frame: the wall check only reports walls (wEntityCollisions) and does not push the entity back
+DEF wMarinBeachTimer EQU $C3C7 ;@ u8 Countdown of the beach scene (one step per frame while no dialogue is open): the waits between Marin's dialogues
+DEF wMarinBeachFadeStep EQU $C3C5 ;@ u8 Step of the beach scene's fade-in (0-$0C)
+DEF wEntityHitByPowerUp EQU $C4A0 ;@ u8[16] Set when the entity was hit while Link has the Piece of Power: it flies off leaving a trail and dies in the large puff
+DEF wNightmareTridentFrame EQU $D224 ;@ u8 Final boss, Ganon's form: frame + 1 of the trident drawn with the shadow (0 = none)
+DEF wNightmareTridentX EQU $D225 ;@ u8 Final boss, Ganon's form: x offset of the trident from the shadow (signed)
+DEF wNightmareTridentY EQU $D226 ;@ u8 Final boss, Ganon's form: y offset of the trident from the shadow (signed)
+DEF wKillsWithoutHit EQU $D471 ;@ u8 Enemies defeated since Link was last hurt; every 12th may drop a Guardian Acorn or Piece of Power
+DEF wPowerUpHits EQU $D47A ;@ u8 Hits Link took while a power-up is active; the third one ends it
+DEF wScrollingFloorCount EQU $C1A5 ;@ u8 Number of scrolling-floor objects ($CF-$D2) in the room, counted while it loads; while nonzero the four floor tiles in the RAM buffer at $DCC0 scroll (AnimateScrollingFloorTiles)
+DEF hSwordClashCooldown EQU $FFB6 ;@ u8 Frames until the sword can clash with an entity's weapon again ($0C after a clash)

@@ -3686,7 +3686,7 @@ FinalNightmareForms::
 	dw NightmareGel
 	dw NightmareAgahnim
 	dw NightmareMoldorm
-	dw Jump_15_63D8
+	dw NightmareGanon
 	dw Jump_15_6E4A
 
 ;@ def NightmareIntro(slot: c)
@@ -4979,30 +4979,48 @@ DrawNightmareGel::
 	ret
 
 
+;@ def NightmareAgahnim(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ Form 2 of the final boss: Agahnim's shadow. It appears at a spot, turns towards Link, charges
+;@ an energy ball in its hand and throws it, then vanishes and glides as a dark blob to another
+;@ spot. Only its own balls, struck back by Link's sword, can hurt it: four hits and it is
+;@ beaten. Entities of the same kind with wEntityPrivate4 = 1 are its balls (AgahnimBall), with
+;@ 2 an unused kind that draws nothing.
+;@ test: skip jumps through a table
 NightmareAgahnim::
+;> kind = wEntityPrivate4[slot]
 	ld hl, wEntityPrivate4
 	add hl, bc
 	ld a, [hl]
+;> if kind == 2: return AgahnimUnusedKind(slot)
 	cp $02
 	jp z, AgahnimUnusedKind
-
+;> if kind: return AgahnimBall(slot)          # an energy ball
 	and a
 	jp nz, AgahnimBall
-
+;> wSmasherBallSlot = slot                    # (scratch here: the balls find the boss by it)
 	ld a, c
 	ld [wSmasherBallSlot], a
+;> if not wFinalNightmareHidden: DrawNightmareAgahnim(slot)
 	ld a, [wFinalNightmareHidden]
 	and a
-	jr nz, jr_015_575c
-
+	jr nz, .update
 	call DrawNightmareAgahnim
 
-jr_015_575c:
+.update
+;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
+;> ApplyRecoilIfNeeded_15(slot)
 	call ApplyRecoilIfNeeded_15
+;> NightmareAgahnimStates[hActiveEntityState]()
 	ldh a, [hActiveEntityState]
 	rst $00
 
+;@ path: boss/final_nightmare/agahnim
+;@ States of Agahnim's shadow (rst $00 table indexed by wEntityState): 0 glide to the top of the
+;@ room, 1 appear, 2 watch Link, 3 charge and throw a ball, 4 vanish, 5 pick a new spot, 6 glide
+;@ there (then back to 1), 7 beaten (spins), 8 shrink, 9 glide to the top and turn into the
+;@ next form.
 NightmareAgahnimStates::
 	dw NightmareAgahnimCenter
 	dw NightmareAgahnimAppear
@@ -5015,580 +5033,855 @@ NightmareAgahnimStates::
 	dw NightmareAgahnimShrink
 	dw NightmareAgahnimLeave
 
+;@ def NightmareAgahnimCenter(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ State 0: as a dark blob, glides at speed $10 to the spot (X $50, Y $30) at the top of the
+;@ room; when it is within 3 pixels it starts to appear there (state 1, timer $50).
+;@ test: skip calls routines in other banks
 NightmareAgahnimCenter::
+;> SetEntitySpriteVariant(0)
 	xor a
 	call SetEntitySpriteVariant
+;> DrawNightmareGel(slot)                     # the blob
 	call DrawNightmareGel
+;> link_x = hLinkX
 	ldh a, [hLinkX]
 	push af
+;> link_y = hLinkY
 	ldh a, [hLinkY]
 	push af
+;> hLinkX = 0x50                             # aim at the spot instead of Link
 	ld a, $50
 	ldh [hLinkX], a
+;> hLinkY = 0x30
 	ld a, $30
 	ldh [hLinkY], a
+;> SetEntitySpeedTowardsLink(0x10)
 	ld a, $10
 	call SetEntitySpeedTowardsLink
+;>@g1 if abs(hActiveEntityDrawY - 0x30) <= 2 and abs(hActiveEntityX - 0x50) <= 2:
 	ld hl, hLinkY
 	ldh a, [hActiveEntityDrawY]
 	sub [hl]
 	add $03
 	cp $06
-	jr nc, jr_015_57b5
-
+	jr nc, .move
+;=@g1
 	ld hl, hLinkX
 	ldh a, [hActiveEntityX]
 	sub [hl]
 	add $03
 	cp $06
-	jr nc, jr_015_57b5
-
+	jr nc, .move
+;>     wEntityTimer[slot] = 0x50
 	call GetEntityTimer
 	ld [hl], $50
+;>     wEntityState[slot] = 1                 # appear
 	call IncrementEntityState
 	ld [hl], $01
 
-jr_015_57b5:
+.move
+;> hLinkY = link_y
 	pop af
 	ldh [hLinkY], a
+;> hLinkX = link_x
 	pop af
 	ldh [hLinkX], a
+;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
 	ret
 
 
+;@ path: boss/final_nightmare/agahnim
+;@ Frame of the blob while Agahnim's shadow appears, by its timer / 8 (15 entries, the timer
+;@ starts at $50 so only entries 0-9 are used): 4, 3, 2, 1, then 0 - the blob gathers.
 AgahnimAppearFrames::
 	db $04, $03, $02, $01, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
+;@ def NightmareAgahnimAppear(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ State 1: the blob gathers (AgahnimAppearFrames); when the timer runs out Agahnim's shadow
+;@ shows itself facing Link, 8 pixels higher, and watches him (state 2, timer $40). The first
+;@ time it appears it plays the sound of a new form.
+;@ test: skip calls routines in other banks
 NightmareAgahnimAppear::
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr z, jr_015_57e4
-
+;> if t:
+	jr z, .appear
+;>@g2     hActiveEntitySpriteVariant = mem[AgahnimAppearFrames + ((t >> 3) & 0x0F)]
 	rra
 	rra
 	rra
 	and $0f
 	ld e, a
 	ld d, b
-	ld hl, $57bf
+;=@g2
+	ld hl, AgahnimAppearFrames
 	add hl, de
 	ld a, [hl]
 	ldh [hActiveEntitySpriteVariant], a
+;>     return DrawNightmareGel(slot)
 	jp DrawNightmareGel
 
-
-jr_015_57e4:
+.appear
+;> wFinalNightmareHidden = 0
 	xor a
 	ld [wFinalNightmareHidden], a
+;> NightmareAgahnimFaceLink(slot)
 	call NightmareAgahnimFaceLink
+;> wEntityY[slot] -= 8
 	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	sub $08
 	ld [hl], a
+;> wEntityTimer[slot] = 0x40
 	call GetEntityTimer
 	ld [hl], $40
+;> IncrementEntityState(slot)                 # watch Link
 	call IncrementEntityState
+;> if wEntityPrivate3[slot]: return           # already appeared once
 	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	and a
 	ret nz
-
+;> wEntityPrivate3[slot] = 1
 	inc [hl]
+;> PlayNightmareFormSfx()
 	call PlayNightmareFormSfx
 	ret
 
 
+;@ path: boss/final_nightmare/agahnim
+;@ First sprite variant of Agahnim's shadow facing each direction (by direction 0 right, 1 left,
+;@ 2 up, 3 down): $0F, $0A, $05, $00. Each direction has 5 frames: 0-3 charging (arms raised
+;@ more and more), 4 after the throw.
 AgahnimFacingBase::
 	db $0f, $0a, $05, $00
 
+;@ def NightmareAgahnimWatch(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ State 2: keeps turning towards Link until the timer runs out, then starts to charge a ball
+;@ (state 3, timer $C0, wave sound $22).
+;@ test: skip calls routines in other banks
 NightmareAgahnimWatch::
+;> if GetEntityTimer(slot): return NightmareAgahnimFaceLink(slot)   # keep turning
 	call GetEntityTimer
 	jr nz, NightmareAgahnimFaceLink
-
+;> hWaveSfx = 0x22
 	ld a, $22
 	ldh [hWaveSfx], a
+;> wEntityTimer[slot] = 0xC0
 	ld [hl], $c0
+;> return IncrementEntityState(slot)          # charge
 	jp IncrementEntityState
 
 
+;@ def NightmareAgahnimFaceLink(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ Turns Agahnim's shadow towards Link: stores the direction in wNightmareFacing, the first frame
+;@ of that direction (AgahnimFacingBase) in wEntityDirection, and falls through into
+;@ NightmareAgahnimSetFrame.
+;@ test: skip calls routines in other banks
 NightmareAgahnimFaceLink::
+;> d = GetEntityDirectionToLink_15(slot)
 	call GetEntityDirectionToLink_15
+;> wNightmareFacing = d
 	ld a, e
 	ld [wNightmareFacing], a
+;>@g3 wEntityDirection[slot] = mem[AgahnimFacingBase + d]
 	ld d, b
-	ld hl, $5807
+	ld hl, AgahnimFacingBase
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntityDirection
 	add hl, bc
+;=@g3
 	ld [hl], a
+;> NightmareAgahnimSetFrame(slot)             # falls through
 
+;@ def NightmareAgahnimSetFrame(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ Sets the frame of Agahnim's shadow: the first frame of its direction (wEntityDirection) plus
+;@ the step in wEntityPrivate1.
+;@ test: wEntityDirection[c] = rand(0, 15); wEntityPrivate1[c] = rand(0, 4)
 NightmareAgahnimSetFrame::
+;>@g4 SetEntitySpriteVariant(wEntityDirection[slot] + wEntityPrivate1[slot])
 	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntityPrivate1
 	add hl, bc
 	add [hl]
+;=@g4
 	call SetEntitySpriteVariant
 	ret
 
 
+;@ path: boss/final_nightmare/agahnim
+;@ Four bytes 0, 1, 2, 3 that nothing reads.
+AgahnimUnusedSteps::
 	db $00, $01, $02, $03
 
+;@ path: boss/final_nightmare/agahnim
+;@ Frame + 1 of the ball charging in Agahnim's hand (wNightmareChargeFrame) by its timer / 16
+;@ (16 entries; the timer counts down from $C0, so the ball shows up after 16 frames and grows:
+;@ 1, then 2, then 3): 3 3 3 3, 2 2 2 2, 1 1 1 1, 0 0 0 0.
 AgahnimChargeFrames::
 	db $03, $03, $03, $03, $02, $02, $02, $02, $01, $01, $01, $01
 	db $00, $00, $00, $00
 
+;@ path: boss/final_nightmare/agahnim
+;@ Where the thrown ball starts, relative to Agahnim's shadow, by direction (0 right, 1 left,
+;@ 2 up, 3 down): x offsets $18, -$18, 0, 0.
 AgahnimBallOffsetX::
 	db $18, $e8, $00, $00
 
+;@ path: boss/final_nightmare/agahnim
+;@ The matching y offsets: 0, 0, -$10, 0.
 AgahnimBallOffsetY::
 	db $00, $00, $f0, $00
 
+;@ def NightmareAgahnimCharge(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ State 3: raises its arms in a 4-step cycle while a ball grows in its hand; until the timer
+;@ falls below $40 it turns to Link again every 32 frames. When the timer runs out it throws an
+;@ energy ball (entity $E6 with wEntityPrivate4 = 1, speed $18 towards Link) from its hand and
+;@ goes on to vanish (state 4, timer $50). After two hits, every second throw on average is a
+;@ ball that bursts against the walls instead (ball state 3, timer $1C).
+;@ test: skip calls routines in other banks
 NightmareAgahnimCharge::
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_015_58c1
-
+;> if t == 0:
+	jr nz, .charge
+;>     wNightmareChargeFrame = 0
 	ld [wNightmareChargeFrame], a
+;>     wEntityTimer[slot] = 0x50
 	ld [hl], $50
+;>     _, ball = SpawnEntity(0xE6)            # (no check for a free slot)
 	ld a, $e6
 	call SpawnEntity
+;>     wEntityPrivate4[ball] += 1             # it is a ball
 	ld hl, wEntityPrivate4
 	add hl, de
 	inc [hl]
+;>@x     wEntityX[ball] = u8(hMultiPurpose0 + mem[AgahnimBallOffsetX + wNightmareFacing])
 	push bc
 	ld a, [wNightmareFacing]
 	ld c, a
-	ld hl, $584d
+	ld hl, AgahnimBallOffsetX
 	add hl, bc
 	ldh a, [hMultiPurpose0]
+;=@x
 	add [hl]
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ld hl, $5851
+;>@g5     wEntityY[ball] = u8(hMultiPurpose1 + mem[AgahnimBallOffsetY + wNightmareFacing])
+	ld hl, AgahnimBallOffsetY
 	add hl, bc
 	ldh a, [hMultiPurpose1]
 	add [hl]
 	ld hl, wEntityY
 	add hl, de
+;=@g5
 	ld [hl], a
+;>     wEntityPhysicsFlags[ball] = 0x42
 	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], $42
+;>     wEntityHitboxFlags[ball] = 0
 	ld hl, wEntityHitboxFlags
 	add hl, de
 	ld [hl], d
+;>     hNoiseSfx = 0x38
 	ld a, $38
 	ldh [hNoiseSfx], a
+;>@g6     if wFinalNightmareHits >= 2 and (hLinkX + hFrameCounter) & 1 == 0:
 	ld a, [wFinalNightmareHits]
 	cp $02
-	jr c, jr_015_58b6
-
+	jr c, .aim
 	ldh a, [hLinkX]
 	ld hl, hFrameCounter
 	add [hl]
+;=@g6
 	and $01
-	jr nz, jr_015_58b6
-
+	jr nz, .aim
+;>         wEntityState[ball] = 3             # a ball that bursts at the walls
 	ld hl, wEntityState
 	add hl, de
 	ld [hl], $03
+;>         wEntityTimer[ball] = 0x1C
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $1c
+;>         hNoiseSfx = 0x39
 	ld a, $39
 	ldh [hNoiseSfx], a
 
-jr_015_58b6:
+.aim
+;>     SetEntitySpeedTowardsLink(ball, 0x18)
 	push de
 	pop bc
 	ld a, $18
 	call SetEntitySpeedTowardsLink
 	pop bc
+;>     return IncrementEntityState(slot)      # vanish
 	jp IncrementEntityState
 
-
-jr_015_58c1:
+.charge
+;>@g7 wEntityPrivate1[slot] = (t >> 3) & 3       # arm step
 	rra
 	rra
 	rra
 	and $03
 	ld hl, wEntityPrivate1
 	add hl, bc
+;=@g7
 	ld [hl], a
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
+;>@cf wNightmareChargeFrame = mem[AgahnimChargeFrames + ((t >> 4) & 0x0F)]
 	rra
 	rra
 	rra
 	rra
 	and $0f
 	ld e, a
+;=@cf
 	ld d, b
-	ld hl, $583d
+	ld hl, AgahnimChargeFrames
 	add hl, de
 	ld a, [hl]
 	ld [wNightmareChargeFrame], a
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
+;> if t < 0x40: return NightmareAgahnimSetFrame(slot)
 	cp $40
 	jp c, NightmareAgahnimSetFrame
-
+;> if t & 0x1F == 0: return NightmareAgahnimFaceLink(slot)
 	and $1f
 	jp z, NightmareAgahnimFaceLink
-
+;> return NightmareAgahnimSetFrame(slot)
 	jp NightmareAgahnimSetFrame
 
 
+;@ def NightmareAgahnimVanish(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ State 4: holds the throwing pose (step 4) until the timer runs out, then vanishes into a
+;@ blob 8 pixels lower (jingle $35) and goes on to pick a new spot (state 5, timer $27).
+;@ test: skip calls routines in other banks
 NightmareAgahnimVanish::
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_015_5909
-
+	jr nz, .pose
+;>     wEntityTimer[slot] = 0x27
 	ld [hl], $27
+;>     hJingle = 0x35
 	ld a, $35
 	ldh [hJingle], a
+;>     wEntityY[slot] += 8
 	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	add $08
 	ld [hl], a
+;>     wFinalNightmareHidden = 1
 	ld a, $01
 	ld [wFinalNightmareHidden], a
+;>     return IncrementEntityState(slot)
 	jp IncrementEntityState
 
-
-jr_015_5909:
+.pose
+;> wEntityPrivate1[slot] = 4                  # the throwing pose
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], $04
+;> NightmareAgahnimSetFrame(slot)
 	call NightmareAgahnimSetFrame
 	ret
 
 
+;@ path: boss/final_nightmare
+;@ The 8 spots the final boss can move to (picked at random): x positions $50, $28, $78, $18,
+;@ $88, $38, $68, $50.
 NightmareTeleportX::
 	db $50, $28, $78, $18, $88, $38, $68, $50
 
+;@ path: boss/final_nightmare
+;@ The matching y positions: $30, $30, $30, $50, $50, $70, $70, $74.
 NightmareTeleportY::
 	db $30, $30, $30, $50, $50, $70, $70, $74
+;@ path: boss/final_nightmare/agahnim
+;@ Frame of the blob while Agahnim's shadow sinks away, by its timer / 8 (the timer starts at
+;@ $27, so read backwards: 4, 3, 2, 1, 0).
 AgahnimVanishFrames::
 	db $00, $01, $02, $03, $04
 
+;@ def NightmareAgahnimPickSpot(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ State 5: the blob sinks (AgahnimVanishFrames); when the timer runs out it picks one of the 8
+;@ spots at random (NightmareTeleportX/Y) and glides there (state 6, timer $1F).
+;@ test: skip calls routines in other banks
 NightmareAgahnimPickSpot::
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_015_594c
-
+;> if t == 0:
+	jr nz, .sink
+;>     i = GetRandomByte() & 7
 	call GetRandomByte
 	and $07
 	ld e, a
 	ld d, b
-	ld hl, $5913
+;>     wFinalNightmareTargetX = mem[NightmareTeleportX + i]
+	ld hl, NightmareTeleportX
 	add hl, de
 	ld a, [hl]
 	ld [wFinalNightmareTargetX], a
-	ld hl, $591b
+;>     wFinalNightmareTargetY = mem[NightmareTeleportY + i]
+	ld hl, NightmareTeleportY
 	add hl, de
 	ld a, [hl]
 	ld [wFinalNightmareTargetY], a
+;>     wEntityTimer[slot] = 0x1F
 	call GetEntityTimer
 	ld [hl], $1f
+;>     return IncrementEntityState(slot)
 	jp IncrementEntityState
 
-
-jr_015_594c:
+.sink
+;>@g8 hActiveEntitySpriteVariant = mem[AgahnimVanishFrames + ((t >> 3) & 0x0F)]
 	rra
 	rra
 	rra
 	and $0f
 	ld e, a
 	ld d, b
-	ld hl, $5923
+;=@g8
+	ld hl, AgahnimVanishFrames
 	add hl, de
 	ld a, [hl]
 	ldh [hActiveEntitySpriteVariant], a
+;> return DrawNightmareGel(slot)
 	jp DrawNightmareGel
 
 
+;@ path: boss/final_nightmare/agahnim
+;@ Speed of the gliding blob by its timer / 4 (the timer counts down from $1F, so read
+;@ backwards: it starts at 1 and speeds up to $18): $18, $14, $10, $0C, $08, $05, $02, $01.
 AgahnimTeleportSpeeds::
 	db $18, $14, $10, $0c, $08, $05, $02, $01
 
+;@ def NightmareAgahnimGlide(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ State 6: the blob glides towards the picked spot, faster and faster (AgahnimTeleportSpeeds);
+;@ within 3 pixels of it, it appears again (state 1, timer $50).
+;@ test: skip calls routines in other banks
 NightmareAgahnimGlide::
+;> hActiveEntitySpriteVariant = 0
 	xor a
 	ldh [hActiveEntitySpriteVariant], a
+;> DrawNightmareGel(slot)
 	call DrawNightmareGel
+;> link_y = hLinkY
 	ldh a, [hLinkY]
 	push af
+;> link_x = hLinkX
 	ldh a, [hLinkX]
 	push af
+;> hLinkX = wFinalNightmareTargetX             # aim at the spot instead of Link
 	ld a, [wFinalNightmareTargetX]
 	ldh [hLinkX], a
+;> hLinkY = wFinalNightmareTargetY
 	ld a, [wFinalNightmareTargetY]
 	ldh [hLinkY], a
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
+;>@sp SetEntitySpeedTowardsLink(mem[AgahnimTeleportSpeeds + ((t >> 2) & 7)])
 	rra
 	rra
 	and $07
 	ld e, a
 	ld d, b
-	ld hl, $595d
+	ld hl, AgahnimTeleportSpeeds
+;=@sp
 	add hl, de
 	ld a, [hl]
 	call SetEntitySpeedTowardsLink
+;>@g9 if abs(hActiveEntityDrawY - hLinkY) <= 2 and abs(hActiveEntityX - hLinkX) <= 2:
 	ld hl, hLinkY
 	ldh a, [hActiveEntityDrawY]
 	sub [hl]
 	add $03
 	cp $06
-	jr nc, jr_015_59ae
-
+	jr nc, .move
+;=@g9
 	ld hl, hLinkX
 	ldh a, [hActiveEntityX]
 	sub [hl]
 	add $03
 	cp $06
-	jr nc, jr_015_59ae
-
+	jr nc, .move
+;>     wEntityTimer[slot] = 0x50
 	call GetEntityTimer
 	ld [hl], $50
+;>     wEntityState[slot] = 1                 # appear
 	call IncrementEntityState
 	ld [hl], $01
 
-jr_015_59ae:
+.move
+;> hLinkX = link_x
 	pop af
 	ldh [hLinkX], a
+;> hLinkY = link_y
 	pop af
 	ldh [hLinkY], a
+;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
 	ret
 
 
+;@ path: boss/final_nightmare/agahnim
+;@ First frame of each direction in the order the beaten shadow spins through them: $00 (down),
+;@ $0A (left), $0F (right), $05 (up).
 AgahnimSpinFacings::
 	db $00, $0a, $0f, $05
 
+;@ def NightmareAgahnimDefeated(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ State 7 (set by the fourth ball that hits it, timer $C0): spins faster and faster - the spin
+;@ speed in $D221 grows to $80, is added up in $D222, and every overflow turns it a quarter
+;@ ($D223). When the timer runs out it bursts into pieces, hides, and goes on to shrink
+;@ (state 8, timer $50).
+;@ test: skip calls routines in other banks
 NightmareAgahnimDefeated::
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_015_59d7
-
+	jr nz, .spin
+;>     NightmareBurstIntoPieces(slot)
 	call NightmareBurstIntoPieces
+;>     wFinalNightmareHidden = 1
 	ld a, $01
 	ld [wFinalNightmareHidden], a
+;>     SetEntitySpriteVariant(6)
 	ld a, $06
 	call SetEntitySpriteVariant
+;>     wEntityTimer[slot] = 0x50
 	call GetEntityTimer
 	ld [hl], $50
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 	ret
 
-
-jr_015_59d7:
+.spin
+;> if mem[0xD221] < 0x80: mem[0xD221] += 1    # spin faster
 	ld a, [$d221]
 	cp $80
-	jr nc, jr_015_59e2
-
+	jr nc, .turn
 	inc a
 	ld [$d221], a
 
-jr_015_59e2:
+.turn
+;> mem[0xD222], carry = add(mem[0xD222], mem[0xD221])
 	ld a, [$d221]
 	ld hl, $d222
 	add [hl]
 	ld [hl], a
-	jr nc, jr_015_59f0
-
+;> if carry: mem[0xD223] += 1                 # a quarter turn
+	jr nc, .face
 	ld hl, $d223
 	inc [hl]
 
-jr_015_59f0:
+.face
+;>@g10 wEntityDirection[slot] = mem[AgahnimSpinFacings + (mem[0xD223] & 3)]
 	ld a, [$d223]
 	and $03
 	ld e, a
 	ld d, b
-	ld hl, $59b8
+	ld hl, AgahnimSpinFacings
 	add hl, de
+;=@g10
 	ld a, [hl]
 	ld hl, wEntityDirection
 	add hl, bc
 	ld [hl], a
+;> wEntityPrivate1[slot] = 0
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], b
+;> NightmareAgahnimSetFrame(slot)
 	call NightmareAgahnimSetFrame
 	ret
 
 
+;@ def NightmareAgahnimShrink(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ State 8: the remains shrink (blob frames 2, 1, 0 during the last $18 frames, variant 6
+;@ before); when the timer runs out the boss jingle plays and it glides off (state 9).
+;@ test: skip calls routines in other banks
 NightmareAgahnimShrink::
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_015_5a15
-
+;> if t == 0:
+	jr nz, .shrink
+;>     PlayNightmareJingle()
 	call PlayNightmareJingle
+;>     return IncrementEntityState(slot)
 	jp IncrementEntityState
 
-
-jr_015_5a15:
+.shrink
+;>@g11 if t < 0x18: SetEntitySpriteVariant((t >> 3) & 3)
 	cp $18
-	jr nc, jr_015_5a21
-
+	jr nc, .draw
 	rra
 	rra
 	rra
 	and $03
+;=@g11
 	call SetEntitySpriteVariant
 
-jr_015_5a21:
+.draw
+;> DrawNightmareGel(slot)
 	call DrawNightmareGel
 	ret
 
 
+;@ def NightmareAgahnimLeave(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ State 9: glides to the top of the room (X $50, Y $30) at speed $10; there the next form
+;@ begins (NightmareNextForm, timer $31, full health $FF, wEntityWorkRAM2 cleared for the next
+;@ form's trail).
+;@ test: skip calls routines in other banks
 NightmareAgahnimLeave::
+;> DrawNightmareGel(slot)
 	call DrawNightmareGel
+;> link_x = hLinkX
 	ldh a, [hLinkX]
 	push af
+;> link_y = hLinkY
 	ldh a, [hLinkY]
 	push af
+;> hLinkX = 0x50
 	ld a, $50
 	ldh [hLinkX], a
+;> hLinkY = 0x30
 	ld a, $30
 	ldh [hLinkY], a
+;> SetEntitySpeedTowardsLink(0x10)
 	ld a, $10
 	call SetEntitySpeedTowardsLink
+;>@g12 if abs(hActiveEntityDrawY - 0x30) <= 2 and abs(hActiveEntityX - 0x50) <= 2:
 	ld hl, hLinkY
 	ldh a, [hActiveEntityDrawY]
 	sub [hl]
 	add $03
 	cp $06
-	jr nc, jr_015_5a64
-
+	jr nc, .move
+;=@g12
 	ld hl, hLinkX
 	ldh a, [hActiveEntityX]
 	sub [hl]
 	add $03
 	cp $06
-	jr nc, jr_015_5a64
-
+	jr nc, .move
+;>     NightmareNextForm(slot)
 	call NightmareNextForm
+;>     wEntityTimer[slot] = 0x31
 	call GetEntityTimer
 	ld [hl], $31
+;>     wEntityHealth[slot] = 0xFF
 	ld hl, wEntityHealth
 	add hl, bc
 	ld [hl], $ff
+;>     ClearNightmareWorkRAM2()
 	call ClearNightmareWorkRAM2
 
-jr_015_5a64:
+.move
+;> hLinkY = link_y
 	pop af
 	ldh [hLinkY], a
+;> hLinkX = link_x
 	pop af
 	ldh [hLinkX], a
+;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
 	ret
 
 
+;@ def DrawNightmareAgahnim(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ Draws Agahnim's shadow: the ball charging in its hand, its two hands, then the body.
+;@ test: skip calls routines in other banks
 DrawNightmareAgahnim::
+;> DrawAgahnimChargeBall(slot)
 	call DrawAgahnimChargeBall
+;> DrawAgahnimHandA(slot)
 	call DrawAgahnimHandA
+;> DrawAgahnimHandB(slot)
 	call DrawAgahnimHandB
+;> DrawAgahnimBody(slot)
 	call DrawAgahnimBody
 	ret
 
 
+;@ path: boss/final_nightmare/agahnim
+;@ Hand sprites for RenderActiveEntitySpritesPair: 4 variants of 4 bytes (tile, attributes of
+;@ the left and the right 8x16 half): 0 $6A/$6C, 1 the same mirrored, 2 $6A alone, 3 $6A
+;@ mirrored alone (tile $FF = nothing).
 AgahnimHandSprites::
 	db $6a, $00, $6c, $00, $6c, $20, $6a, $20, $6a, $00, $ff, $ff, $6a, $20, $ff, $ff
+;@ path: boss/final_nightmare/agahnim
+;@ Hand frames 4 and 5 for RenderActiveEntitySpritesRect (the hand seen from the side): 2 OAM
+;@ entries of 4 bytes each (y offset, x offset, tile, attributes): frame 4 $6A at (0, 0) and
+;@ $7A at (8, 8); frame 5 the mirror image, $7A at (8, 0) and $6A at (0, 8).
 AgahnimHandRectSprites::
 	db $00, $00, $6a, $00, $08, $08, $7a, $00, $08, $00, $7a, $20, $00, $08, $6a, $20
+;@ path: boss/final_nightmare/agahnim
+;@ Frame of the first hand by the shadow's sprite variant (20 entries: 0-4 facing down, 5-9 up,
+;@ 10-14 left, 15-19 right; in each direction 4 charging steps and the throw): frames 0-3 are
+;@ AgahnimHandSprites variants, 4-5 AgahnimHandRectSprites frames.
 AgahnimHandAFrames::
 	db $00, $00, $00, $00, $02, $00, $00, $00, $00, $02, $04, $04, $04, $04, $04, $05
 	db $05, $05, $05, $05
 
+;@ path: boss/final_nightmare/agahnim
+;@ X offset of the first hand from the shadow, by sprite variant (20 entries, signed).
 AgahnimHandAX::
 	db $f0, $f3, $f3, $f0, $f5, $f0, $f3, $f3, $f0, $f5, $f1, $f0
 	db $f1, $f2, $f0, $0f, $10, $0f, $0e, $10
 
+;@ path: boss/final_nightmare/agahnim
+;@ Y offset of the first hand (added to the shadow's drawn y + 8), by sprite variant (20
+;@ entries, signed).
 AgahnimHandAY::
 	db $ed, $ed, $f1, $f1, $fd, $ed, $ed, $f1
 	db $f1, $fd, $f4, $f6, $f7, $f6, $f8, $f4, $f6, $f7, $f6, $f8
 
+;@ path: boss/final_nightmare/agahnim
+;@ Frame of the second hand by sprite variant (20 entries, as AgahnimHandAFrames).
 AgahnimHandBFrames::
 	db $01, $01, $01, $01
 	db $03, $01, $01, $01, $01, $03, $02, $02, $02, $02, $02, $03, $03, $03, $03, $03
+;@ path: boss/final_nightmare/agahnim
+;@ X offset of the second hand by sprite variant (20 entries, signed).
 AgahnimHandBX::
 	db $10, $0d, $0d, $10, $13, $10, $0d, $0d, $10, $13, $f5, $f6, $f5, $f4, $f3, $13
 	db $12, $13, $14, $15
 
+;@ path: boss/final_nightmare/agahnim
+;@ Y offset of the second hand (added to the drawn y + 8) by sprite variant (20 entries, signed).
 AgahnimHandBY::
 	db $ed, $ed, $f1, $f1, $fd, $ed, $ed, $f1, $f1, $fd, $eb, $ec
 	db $ed, $ec, $f2, $eb, $ec, $ed, $ec, $f2
 
+;@ def DrawAgahnimHandB(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ Draws the second hand of Agahnim's shadow: moves the draw position by AgahnimHandBX/BY for
+;@ the current sprite variant and goes on into DrawAgahnimHandA's drawing part with the frame
+;@ from AgahnimHandBFrames.
+;@ test: skip calls routines in other banks
 DrawAgahnimHandB::
+;> v = wEntitySpriteVariant[slot]
 	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	ld e, a
 	ld d, b
-	ld hl, $5aeb
+;> hActiveEntityX = u8(hActiveEntityX + mem[AgahnimHandBX + v])
+	ld hl, AgahnimHandBX
 	add hl, de
 	ldh a, [hActiveEntityX]
 	add [hl]
 	ldh [hActiveEntityX], a
-	ld hl, $5aff
+;> hActiveEntityDrawY = u8(hActiveEntityDrawY + 8 + mem[AgahnimHandBY + v])
+	ld hl, AgahnimHandBY
 	add hl, de
 	ldh a, [hActiveEntityDrawY]
 	add $08
 	add [hl]
 	ldh [hActiveEntityDrawY], a
-	ld hl, $5ad7
+;> return DrawAgahnimHandA.draw(mem[AgahnimHandBFrames + v])
+	ld hl, AgahnimHandBFrames
 	add hl, de
-	jr jr_015_5b53
+	jr DrawAgahnimHandA.draw
 
+;@ def DrawAgahnimHandA(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ Draws the first hand of Agahnim's shadow at its offset (AgahnimHandAX/AY) for the current
+;@ sprite variant: frames 0-3 as a 16x16 pair, frames 4-5 as two loose 8x16 sprites; then
+;@ reserves the 2 OAM entries and restores the draw position.
+;@ test: skip calls routines in other banks
 DrawAgahnimHandA::
+;> v = wEntitySpriteVariant[slot]
 	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	ld e, a
 	ld d, b
-	ld hl, $5aaf
+;> hActiveEntityX = u8(hActiveEntityX + mem[AgahnimHandAX + v])
+	ld hl, AgahnimHandAX
 	add hl, de
 	ldh a, [hActiveEntityX]
 	add [hl]
 	ldh [hActiveEntityX], a
-	ld hl, $5ac3
+;> hActiveEntityDrawY = u8(hActiveEntityDrawY + 8 + mem[AgahnimHandAY + v])
+	ld hl, AgahnimHandAY
 	add hl, de
 	ldh a, [hActiveEntityDrawY]
 	add $08
 	add [hl]
 	ldh [hActiveEntityDrawY], a
-	ld hl, $5a9b
+;>@fa frame = mem[AgahnimHandAFrames + v]
+	ld hl, AgahnimHandAFrames
 	add hl, de
 
-jr_015_5b53:
+.draw
+;=@fa
 	ld a, [hl]
+;> if frame < 4:
 	cp $04
-	jr nc, jr_015_5b62
-
+	jr nc, .side
+;>     hActiveEntitySpriteVariant = frame
 	ldh [hActiveEntitySpriteVariant], a
-	ld de, $5a7b
+;>     DrawEntity16x16(AgahnimHandSprites)
+	ld de, AgahnimHandSprites
 	call DrawEntity16x16
-	jr jr_015_5b74
+	jr .reserve
 
-jr_015_5b62:
+.side
+;> else:
+;>@sd     DrawEntitySprites(AgahnimHandRectSprites + (frame - 4) * 8, 2)
 	sub $04
 	rla
 	rla
 	rla
 	and $f8
 	ld e, a
+;=@sd
 	ld d, b
-	ld hl, $5a8b
+	ld hl, AgahnimHandRectSprites
 	add hl, de
 	ld c, $02
 	call DrawEntitySprites
 
-jr_015_5b74:
+.reserve
+;> ReserveOAMEntriesFar(2)
 	ld a, $02
 	call ReserveOAMEntriesFar
+;> LoadEntityPosition(slot)                   # undo the offset
 	call LoadEntityPosition
 	ret
 
 
+;@ path: boss/final_nightmare/agahnim
+;@ Body of Agahnim's shadow for RenderActiveEntitySpritesRect: 14 frames of 32 bytes, each 8 OAM
+;@ entries of 4 bytes (y offset, x offset, tile, attributes; tile $FF = nothing). Frames 0-4
+;@ face down (head $60/$62, robe $6E/$64; the charging steps shift the sleeves by a pixel),
+;@ 5-9 face up (back $66, $68), 10-11 face left and 12-13 face right with 4 sprites ($72-$78,
+;@ mirrored for the right); the last frame of each direction is the throw.
 AgahnimBodySprites::
 	db $f8, $f8, $60, $00, $f8, $00, $62, $00, $f8, $08, $62, $20, $f8, $10, $60, $20
 	db $05, $f8, $6e, $00, $08, $00, $64, $00, $08, $08, $64, $20, $05, $10, $6e, $20
@@ -5618,589 +5911,890 @@ AgahnimBodySprites::
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $fa, $05, $74, $20, $fa, $0d, $72, $20, $08, $00, $78, $20, $08, $08, $76, $20
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
+;@ path: boss/final_nightmare/agahnim
+;@ Body frame (AgahnimBodySprites) by the shadow's sprite variant (20 entries): down 0-4, up
+;@ 5-9, left 10 10 10 10 then 11 for the throw, right 12 12 12 12 then 13.
 AgahnimBodyFrames::
 	db $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $0a, $0a, $0a, $0a, $0b, $0c
 	db $0c, $0c, $0c, $0d
 
+;@ def DrawAgahnimBody(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ Draws the body of Agahnim's shadow (8 sprites of the frame AgahnimBodyFrames gives for the
+;@ current sprite variant) and reserves 8 OAM entries.
+;@ test: skip calls routines in other banks
 DrawAgahnimBody::
+;>@fr frame = mem[AgahnimBodyFrames + wEntitySpriteVariant[slot]]
 	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	ld e, a
 	ld d, b
-	ld hl, $5d3d
+	ld hl, AgahnimBodyFrames
+;=@fr
 	add hl, de
 	ld a, [hl]
+;>@of offset = frame * 32
 	ld d, $00
 	ld e, a
 	sla e
 	rl d
 	sla e
 	rl d
+;=@of
 	sla e
 	rl d
 	sla e
 	rl d
 	sla e
 	rl d
-	ld hl, $5b7d
+;> DrawEntitySprites(AgahnimBodySprites + offset, 8)
+	ld hl, AgahnimBodySprites
 	add hl, de
 	ld c, $08
 	call DrawEntitySprites
+;> ReserveOAMEntriesFar(8)
 	ld a, $08
 	call ReserveOAMEntriesFar
 	ret
 
 
+;@ path: boss/final_nightmare/agahnim
+;@ The ball charging in Agahnim's hand for RenderActiveEntitySpritesPair: 3 growing variants of
+;@ 4 bytes (tile, attributes of each 8x16 half): 0 $1E (the right half flipped both ways),
+;@ 1 $7C, 2 $7E (each with its mirror image).
 AgahnimChargeSprites::
 	db $1e, $00, $1e, $60, $7c, $00, $7c, $20, $7e, $00, $7e, $20
 
+;@ path: boss/final_nightmare/agahnim
+;@ X offset of the charging ball from the shadow by wNightmareFacing (0 right, 1 left, 2 up,
+;@ 3 down): $14, -$14, 0, 0.
 AgahnimChargeOffsetX::
 	db $14, $ec, $00, $00
+;@ path: boss/final_nightmare/agahnim
+;@ The matching y offsets: 0, 0, -$10, 4.
 AgahnimChargeOffsetY::
 	db $00, $00, $f0, $04
 
+;@ def DrawAgahnimChargeBall(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ Draws the charging ball, keeping the shadow's own sprite attributes.
+;@ test: skip calls routines in other banks
 DrawAgahnimChargeBall::
+;> flip = hActiveEntityFlipAttribute
 	ldh a, [hActiveEntityFlipAttribute]
 	push af
+;> DrawAgahnimChargeBallSprite(slot)
 	call DrawAgahnimChargeBallSprite
+;> hActiveEntityFlipAttribute = flip
 	pop af
 	ldh [hActiveEntityFlipAttribute], a
 	ret
 
 
+;@ def DrawAgahnimChargeBallSprite(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ While a ball is charging (wNightmareChargeFrame), draws it in the hand on the side Agahnim's
+;@ shadow faces, flickering between palettes and flipped every 8 frames.
+;@ test: skip calls routines in other banks
 DrawAgahnimChargeBallSprite::
+;> if not wNightmareChargeFrame: return
 	ld a, [wNightmareChargeFrame]
 	and a
 	ret z
-
+;> hActiveEntitySpriteVariant = wNightmareChargeFrame - 1
 	dec a
 	ldh [hActiveEntitySpriteVariant], a
+;> hActiveEntityFlipAttribute = (hFrameCounter << 3) & 0x50   # flicker
 	ldh a, [hFrameCounter]
 	rla
 	rla
 	rla
 	and $50
 	ldh [hActiveEntityFlipAttribute], a
+;> d = wNightmareFacing
 	ld a, [wNightmareFacing]
 	ld e, a
 	ld d, b
-	ld hl, $5d8f
+;> hActiveEntityX = u8(hActiveEntityX + mem[AgahnimChargeOffsetX + d])
+	ld hl, AgahnimChargeOffsetX
 	add hl, de
 	ldh a, [hActiveEntityX]
 	add [hl]
 	ldh [hActiveEntityX], a
-	ld hl, $5d93
+;> hActiveEntityDrawY = u8(hActiveEntityDrawY + mem[AgahnimChargeOffsetY + d])
+	ld hl, AgahnimChargeOffsetY
 	add hl, de
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ldh [hActiveEntityDrawY], a
-	ld de, $5d83
+;> DrawEntity16x16(AgahnimChargeSprites)
+	ld de, AgahnimChargeSprites
 	call DrawEntity16x16
+;> ReserveOAMEntriesFar(2)
 	ld a, $02
 	call ReserveOAMEntriesFar
+;> LoadEntityPosition(slot)
 	call LoadEntityPosition
 	ret
 
 
+;@ path: boss/final_nightmare/agahnim
+;@ Sprites (tile, attributes per 8x16 half) only AgahnimUnusedKind points at: 0 $46 with its
+;@ copy flipped both ways, 1 $70 alone.
 AgahnimUnusedSprites::
 	db $46, $00, $46, $60, $70, $00, $ff, $ff
 
+;@ def AgahnimUnusedKind(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ The kind wEntityPrivate4 = 2 of the final boss in Agahnim's form, which nothing creates: it
+;@ only loads AgahnimUnusedSprites and returns without drawing.
+;@ test: skip does nothing
 AgahnimUnusedKind::
-	ld de, $5dd8
+;> return AgahnimUnusedSprites                # (left in de, never drawn)
+	ld de, AgahnimUnusedSprites
 	ret
 
 
+;@ path: boss/final_nightmare/agahnim
+;@ Energy ball sprites for RenderActiveEntitySpritesPair: 5 variants of 4 bytes (tile,
+;@ attributes per 8x16 half): 0 the thrown ball $7E, 1 a big trail spark $7C, 2 a small spark
+;@ $1E (right half flipped both ways), 3-4 the bursting ball $58 and $5A (each with its mirror
+;@ image).
 AgahnimBallSprites::
 	db $7e, $00, $7e, $20, $7c, $00, $7c, $20, $1e, $00, $1e, $60, $58, $00, $58, $20
 	db $5a, $00, $5a, $20
 
+;@ def AgahnimBall(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ An energy ball of Agahnim's shadow (entity $E6, wEntityPrivate4 = 1), drawn flickering.
+;@ States: 0 flying at Link, 1 struck back by the sword, 2 flying back (hurts the shadow),
+;@ 3 a ball that bursts into four shots at the walls, 4 a fading spark of a ball's trail
+;@ (blinks on every other frame, big for 8 frames then small, gone after $0F frames).
+;@ test: skip jumps through a table
 AgahnimBall::
+;> hActiveEntityFlipAttribute = (hFrameCounter << 3) & 0x50   # flicker
 	ldh a, [hFrameCounter]
 	rla
 	rla
 	rla
 	and $50
 	ldh [hActiveEntityFlipAttribute], a
-	ld de, $5de4
+;> DrawEntity16x16(AgahnimBallSprites)
+	ld de, AgahnimBallSprites
 	call DrawEntity16x16
+;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
+;> if hActiveEntityState == 4:                # a spark
 	ldh a, [hActiveEntityState]
 	cp $04
-	jr nz, jr_015_5e30
-
+	jr nz, .ball
+;>     t = wEntityTimer1[slot]
 	call GetEntityTimer1
+;>     if t == 0: return ClearEntityStatus_15(slot)
 	jp z, ClearEntityStatus_15
-
+;>     if (t ^ slot) & 1 == 0: variant = 0xFF   # hidden on every other frame
 	xor c
 	bit 0, a
 	ld e, $ff
-	jr z, jr_015_5e2b
-
+	jr z, .setVariant
+;>     elif GetEntityTimer1(slot) >= 8: variant = 1
 	call GetEntityTimer1
 	ld e, $01
 	cp $08
-	jr nc, jr_015_5e2b
-
+	jr nc, .setVariant
+;>     else: variant = 2
 	ld e, $02
 
-jr_015_5e2b:
+.setVariant
+;>     SetEntitySpriteVariant(variant)
 	ld a, e
 	call SetEntitySpriteVariant
+;>     return
 	ret
 
-
-jr_015_5e30:
+.ball
+;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
+;> EntityCheckWalls(slot)
 	call EntityCheckWalls
+;> AgahnimBallStates[hActiveEntityState]()
 	ldh a, [hActiveEntityState]
 	rst $00
 
+;@ path: boss/final_nightmare/agahnim
+;@ States of an energy ball (rst $00 table indexed by wEntityState; state 4, a spark, is handled
+;@ before it): 0 fly, 1 struck back, 2 fly back, 3 burst at the walls.
 AgahnimBallStates::
 	dw AgahnimBallFly
 	dw AgahnimBallReflected
 	dw AgahnimBallReturn
 	dw AgahnimSplitBall
 
+;@ def AgahnimBallFly(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ Ball state 0: flies at Link and can be struck by his sword (which sends it into state 1);
+;@ leaves a trail and falls through into AgahnimBallTrail.
+;@ test: skip calls routines in other banks
 AgahnimBallFly::
+;> EntityCheckHits(slot)
 	call EntityCheckHits
+;> AgahnimBallTrail(slot)                     # falls through
 
+;@ def AgahnimBallTrail(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ Every 4th frame leaves a spark behind the ball (entity $E6, wEntityPrivate4 = 1, state 4,
+;@ variant 1, timer1 $0F, physics flags $C2); the ball is removed when it hits a wall.
+;@ test: skip calls routines in other banks
 AgahnimBallTrail::
+;> wEntityPrivateCounter[slot] += 1
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	inc a
 	ld [hl], a
+;> if wEntityPrivateCounter[slot] & 3 == 0:
 	and $03
-	jr nz, jr_015_5e85
-
+	jr nz, .walls
+;>     full, spark = SpawnEntity(0xE6)
 	ld a, $e6
 	call SpawnEntity
+;>     if full: return
 	ret c
-
+;>     wEntityPhysicsFlags[spark] = 0xC2
 	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], $c2
+;>     wEntityHitboxFlags[spark] = 0
 	ld hl, wEntityHitboxFlags
 	add hl, de
 	ld [hl], d
+;>     wEntityPrivate4[spark] += 1            # a ball's kind
 	ld hl, wEntityPrivate4
 	add hl, de
 	inc [hl]
+;>     wEntityX[spark] = hMultiPurpose0       # at the ball
 	ldh a, [hMultiPurpose0]
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
+;>     wEntityY[spark] = hMultiPurpose1
 	ldh a, [hMultiPurpose1]
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
+;>     wEntityTimer1[spark] = 0x0F
 	ld hl, wEntityTimer1
 	add hl, de
 	ld [hl], $0f
+;>     wEntitySpriteVariant[spark] = 1
 	ld hl, wEntitySpriteVariant
 	add hl, de
 	ld [hl], $01
+;>     wEntityState[spark] = 4                # a spark
 	ld hl, wEntityState
 	add hl, de
 	ld [hl], $04
 
-jr_015_5e85:
+.walls
+;> if not wEntityCollisions[slot]: return
 	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_015_5e90
-
+	jr z, .done
+;> return ClearEntityStatus_15(slot)          # hit a wall
 	jp ClearEntityStatus_15
 
-
-jr_015_5e90:
+.done
 	ret
 
 
+;@ def AgahnimBallReflected(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ Ball state 1, after Link's sword struck the ball: it flies straight back away from Link at
+;@ speed $18 while Link is pushed back the other way for $10 frames; then state 2.
+;@ test: skip calls routines in other banks
 AgahnimBallReflected::
+;> hNoiseSfx = 0x08
 	ld a, $08
 	ldh [hNoiseSfx], a
+;> GetVectorTowardsLink(0x18)                 # into hMultiPurpose0 (y), hMultiPurpose1 (x)
 	ld a, $18
 	call GetVectorTowardsLink
+;> hLinkSpeedY = hMultiPurpose0               # Link is knocked back
 	ldh a, [hMultiPurpose0]
 	ldh [hLinkSpeedY], a
+;> wEntitySpeedY[slot] = u8(-hMultiPurpose0)  # the ball flies away from him
 	cpl
 	inc a
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
+;> hLinkSpeedX = hMultiPurpose1
 	ldh a, [hMultiPurpose1]
 	ldh [hLinkSpeedX], a
+;> wEntitySpeedX[slot] = u8(-hMultiPurpose1)
 	cpl
 	inc a
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
+;> wLinkPushedTimer = 0x10
 	ld a, $10
 	ld [wLinkPushedTimer], a
+;> IncrementEntityState(slot)
 	call IncrementEntityState
 	ret
 
 
+;@ def AgahnimBallReturn(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ Ball state 2: the struck ball flies on with its trail; if it comes within 16 pixels across
+;@ and 12 down of the visible shadow (slot in wSmasherBallSlot) it vanishes and knocks the
+;@ shadow back at twice its speed: the shadow flashes, ignores hits for $12 frames, and counts
+;@ the hit in wFinalNightmareHits. The fourth hit beats it (state 7, timer $C0, jingle $36).
+;@ test: skip calls routines in other banks
 AgahnimBallReturn::
+;> AgahnimBallTrail(slot)
 	call AgahnimBallTrail
+;> if wFinalNightmareHidden: return
 	ld a, [wFinalNightmareHidden]
 	and a
 	ret nz
-
+;> boss = wSmasherBallSlot
 	ld a, [wSmasherBallSlot]
 	ld e, a
 	ld d, b
+;>@x if not -16 <= hActiveEntityX - wEntityX[boss] < 16: return
 	ld hl, wEntityX
 	add hl, de
 	ldh a, [hActiveEntityX]
 	sub [hl]
 	add $10
 	cp $20
-	jr nc, jr_015_5f26
-
+;=@x
+	jr nc, .done
+;>@y if not -12 <= hActiveEntityDrawY - wEntityY[boss] < 12: return
 	ld hl, wEntityY
 	add hl, de
 	ldh a, [hActiveEntityDrawY]
 	sub [hl]
 	add $0c
 	cp $18
-	jr nc, jr_015_5f26
-
+;=@y
+	jr nc, .done
+;>@rx wEntityRecoilSpeedX[boss] = u8(wEntitySpeedX[slot] << 1)
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	sla a
 	ld hl, wEntityRecoilSpeedX
 	add hl, de
+;=@rx
 	ld [hl], a
+;>@ry wEntityRecoilSpeedY[boss] = u8(wEntitySpeedY[slot] << 1)
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 	sla a
 	ld hl, wEntityRecoilSpeedY
 	add hl, de
+;=@ry
 	ld [hl], a
+;> wEntityIgnoreHitsTimer[boss] = 0x12
 	ld hl, wEntityIgnoreHitsTimer
 	add hl, de
 	ld [hl], $12
+;> ClearEntityStatus_15(slot)                 # the ball is gone
 	call ClearEntityStatus_15
+;> wFinalNightmareHits += 1
 	ld a, [wFinalNightmareHits]
 	inc a
 	ld [wFinalNightmareHits], a
+;> if wFinalNightmareHits >= 4:
 	cp $04
-	jr c, jr_015_5f1c
-
+	jr c, .flash
+;>     wEntityState[boss] = 7                 # beaten
 	ld hl, wEntityState
 	add hl, de
 	ld [hl], $07
+;>     wEntityTimer[boss] = 0xC0
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $c0
+;>     hJingle = 0x36
 	ld a, $36
 	ldh [hJingle], a
 
-jr_015_5f1c:
+.flash
+;> wEntityFlashTimer[boss] = 0x14
 	ld hl, wEntityFlashTimer
 	add hl, de
 	ld [hl], $14
+;> hWaveSfx = 0x07
 	ld a, $07
 	ldh [hWaveSfx], a
 
-jr_015_5f26:
+.done
 	ret
 
 
+;@ path: boss/final_nightmare/agahnim
+;@ X speeds of the four shots a bursting ball sends out (diagonals): $20, $20, -$20, -$20.
 AgahnimBallBurstSpeedX::
 	db $20, $20, $e0, $e0
 
+;@ path: boss/final_nightmare/agahnim
+;@ The matching y speeds: $20, -$20, $20, -$20.
 AgahnimBallBurstSpeedY::
 	db $20, $e0, $20, $e0
 
+;@ def AgahnimSplitBall(slot: c)
+;@ path: boss/final_nightmare/agahnim
+;@ Ball state 3: a ball that cannot be struck back. It hurts Link on contact, pulses between two
+;@ frames every 8 frames, homes in on Link (speed $18, on every second frame while its $1C-frame
+;@ timer runs), and when it hits a wall bursts into four shots (entity $7D) flying off
+;@ diagonally (AgahnimBallBurstSpeedX/Y).
+;@ test: skip calls routines in other banks
 AgahnimSplitBall::
+;> EntityCheckContactDamage(slot)
 	call EntityCheckContactDamage
+;>@va SetEntitySpriteVariant(3 + ((hFrameCounter >> 3) & 1))
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
 	add $03
+;=@va
 	call SetEntitySpriteVariant
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
-	jr z, jr_015_5f4c
-
+;> if t and t & 1 == 0: SetEntitySpeedTowardsLink(0x18)
+	jr z, .walls
 	and $01
-	jr nz, jr_015_5f4c
-
+	jr nz, .walls
 	ld a, $18
 	call SetEntitySpeedTowardsLink
 
-jr_015_5f4c:
+.walls
+;> if not wEntityCollisions[slot]: return
 	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_015_5fa6
-
+	jr z, .done
+;> hNoiseSfx = 0x36
 	ld a, $36
 	ldh [hNoiseSfx], a
+;>@lp for i in range(4):
 	xor a
 
-jr_015_5f59:
+.shot
+;>     hBGTilesRequestCopy = i                # (scratch here)
 	ldh [hBGTilesRequestCopy], a
+;>     full, shot = SpawnEntity(0x7D)
 	ld a, $7d
 	call SpawnEntity
-	jr c, jr_015_5fa3
-
+;>     if full: break
+	jr c, .gone
+;>     wEntityX[shot] = hMultiPurpose0
 	ldh a, [hMultiPurpose0]
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
+;>     wEntityY[shot] = hMultiPurpose1
 	ldh a, [hMultiPurpose1]
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
+;>     wEntityPrivate1[shot] += 1
 	ld hl, wEntityPrivate1
 	add hl, de
 	inc [hl]
+;>     wEntityX[shot] = hMultiPurpose0        # (set a second time)
 	push bc
 	ldh a, [hMultiPurpose0]
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
+;>     wEntityY[shot] = hMultiPurpose1
 	ldh a, [hMultiPurpose1]
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
+;>@sx     wEntitySpeedX[shot] = mem[AgahnimBallBurstSpeedX + i]
 	ldh a, [hBGTilesRequestCopy]
 	ld c, a
-	ld hl, $5f27
+	ld hl, AgahnimBallBurstSpeedX
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntitySpeedX
+;=@sx
 	add hl, de
 	ld [hl], a
-	ld hl, $5f2b
+;>     wEntitySpeedY[shot] = mem[AgahnimBallBurstSpeedY + i]
+	ld hl, AgahnimBallBurstSpeedY
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntitySpeedY
 	add hl, de
 	ld [hl], a
+;=@lp
 	pop bc
 	ldh a, [hBGTilesRequestCopy]
 	inc a
 	cp $04
-	jr nz, jr_015_5f59
+	jr nz, .shot
 
-jr_015_5fa3:
+.gone
+;> ClearEntityStatus_15(slot)                 # the ball is gone
 	jp ClearEntityStatus_15
 
-
-jr_015_5fa6:
+.done
 	ret
 
 
+;@ def ClearNightmareWorkRAM2()
+;@ path: boss/final_nightmare
+;@ Clears the first $80 bytes of wEntityWorkRAM2 (the final boss's trail history of y
+;@ positions) before the next form.
+;@ test: skip writes a RAM block
 ClearNightmareWorkRAM2::
+;>@cl fill(wEntityWorkRAM2, 0, 0x80)
 	ld e, $80
 	ld hl, wEntityWorkRAM2
 
-jr_015_5fac:
+.clear
+;=@cl
 	xor a
 	ld [hli], a
 	dec e
-	jr nz, jr_015_5fac
-
+	jr nz, .clear
 	ret
 
 
+;@ path: boss/final_nightmare/moldorm
+;@ Sprite variant of Moldorm's head by its direction (16 entries, 0 = right, then clockwise in
+;@ steps of 22.5 degrees). NightmareMoldormMove sets it, but NightmareMoldormStep sets the
+;@ variant again from NightmareMoldormBodyFrames right after.
+NightmareMoldormDirFrames::
 	db $03, $03, $05, $05, $00, $00, $04, $04, $02, $02, $06, $06, $01, $01, $07, $07
-	db $00, $06, $0c, $0e, $10, $0e, $0c, $06, $00, $fa, $f4, $f2, $f0, $f2, $f4, $fa
-	db $00, $06, $0c, $0e, $06, $07, $00, $01, $02, $03, $04, $05
+;@ path: boss/final_nightmare/moldorm
+;@ Y speed of Moldorm by direction: 16 entries that run on into NightmareMoldormSpeedX (a sine
+;@ table: 0, 6, $0C, $0E, $10, ... - 0 = right, 4 = down, 8 = left, 12 = up).
+NightmareMoldormSpeedY::
+	db $00, $06, $0c, $0e
 
+;@ path: boss/final_nightmare/moldorm
+;@ X speed of Moldorm by direction (16 entries, the cosine to NightmareMoldormSpeedY): $10, $0E,
+;@ $0C, 6, 0, -6, -$0C, -$0E, -$10, -$0E, -$0C, -6, 0, 6, $0C, $0E.
+NightmareMoldormSpeedX::
+	db $10, $0e, $0c, $06, $00, $fa, $f4, $f2, $f0, $f2, $f4, $fa
+	db $00, $06, $0c, $0e
+
+;@ path: boss/final_nightmare/moldorm
+;@ Head frame (NightmareMoldormHeadSprites) by direction / 2 (8 entries): right 6, down-right 7,
+;@ down 0, down-left 1, left 2, up-left 3, up 4, up-right 5.
+NightmareMoldormBodyFrames::
+	db $06, $07, $00, $01, $02, $03, $04, $05
+
+;@ def NightmareCheckHitsIfActive(slot: c)
+;@ path: boss/final_nightmare/moldorm
+;@ Checks the weapons hitting the final boss, unless the game is paused or in a cutscene.
+;@ test: skip calls routines in other banks
 NightmareCheckHitsIfActive::
+;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
+;> return EntityCheckHits(slot)
 	jp EntityCheckHits
 
 
+;@ def NightmareMoldorm(slot: c)
+;@ path: boss/final_nightmare/moldorm
+;@ Form 3 of the final boss: a giant Moldorm. Its head crawls around the room, turning in
+;@ curves and bouncing off the walls, with three body segments and a tail following along its
+;@ path. Only the tail can be hurt; 16 points of damage beat it.
+;@ test: skip jumps through a table
 NightmareMoldorm::
+;> NightmareMoldormStates[hActiveEntityState]()
 	ldh a, [hActiveEntityState]
 	rst $00
 
+;@ path: boss/final_nightmare/moldorm
+;@ States of the Moldorm form (rst $00 table indexed by wEntityState): 0 take shape, 1 crawl,
+;@ 2 dying (crawls on until the dying timer runs out), 3 vanish and turn into the next form.
 NightmareMoldormStates::
 	dw NightmareMoldormAppear
 	dw NightmareMoldormActive
 	dw NightmareMoldormDying
 	dw NightmareMoldormVanish
 
+;@ path: boss/final_nightmare/moldorm
+;@ The shape the shadow takes between forms, for RenderActiveEntitySpritesRect: 4 frames of 24
+;@ bytes, each 6 OAM entries of 4 bytes (y offset, x offset, tile, attributes; tile $FF =
+;@ nothing). 0-2 a dot growing ($4A, $4C, $4E, each with its mirror image), 3 the coiled shape
+;@ of 6 sprites ($78, $7A, $7C and their mirror images).
+NightmareMoldormFormSprites::
 	db $00, $00, $4a, $00, $00, $08, $4a, $20, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $00, $00, $4c, $00, $00, $08, $4c, $20
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $00, $00, $4e, $00, $00, $08, $4e, $20, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $00, $f8, $78, $00, $f8, $00, $7a, $00
 	db $f8, $08, $7a, $20, $00, $10, $78, $20, $08, $00, $7c, $00, $08, $08, $7c, $20
+;@ path: boss/final_nightmare/moldorm
+;@ Frame of NightmareMoldormFormSprites while the Moldorm takes shape, by its timer / 8 (the
+;@ timer counts down from $31, so read backwards: the dot grows and coils up): 3, 3, 2, 1, 0,
+;@ 0, 0, 0.
+NightmareMoldormAppearFrames::
 	db $03, $03, $02, $01, $00, $00, $00, $00
 
+;@ def NightmareMoldormAppear(slot: c)
+;@ path: boss/final_nightmare/moldorm
+;@ State 0: the shadow grows from a dot into the coiled Moldorm (NightmareMoldormAppearFrames);
+;@ at timer $20 the sound of a new form plays; when the timer runs out it starts to crawl.
+;@ test: skip calls routines in other banks
 NightmareMoldormAppear::
+;> hActiveEntitySpriteVariant = 0
 	xor a
 	ldh [hActiveEntitySpriteVariant], a
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_015_6062
-
+;> if t == 0: return IncrementEntityState(slot)
+	jr nz, .shape
 	jp IncrementEntityState
 
-
-jr_015_6062:
+.shape
+;> if t == 0x20:
 	cp $20
-	jr nz, jr_015_606c
-
+	jr nz, .frame
+;>     wEntityTimer[slot] -= 1                # (so the sound plays once)
 	dec [hl]
+;>     PlayNightmareFormSfx()
 	call PlayNightmareFormSfx
 	ld a, $20
 
-jr_015_606c:
+.frame
+;>@g1 frames = NightmareMoldormAppearFrames + ((t >> 3) & 7)
 	rra
 	rra
 	rra
 	and $07
 	ld e, a
 	ld d, b
-	ld hl, $604f
+;=@g1
+	ld hl, NightmareMoldormAppearFrames
 
-jr_015_6076:
+.draw
+;>@of offset = mem[frames] * 24
 	add hl, de
 	ld a, [hl]
 	rla
 	rla
 	rla
 	and $f8
+;=@of
 	ld e, a
 	rla
 	and $f0
 	add e
 	ld e, a
-	ld hl, $5fef
+;> DrawEntitySprites(NightmareMoldormFormSprites + offset, 6)
+	ld hl, NightmareMoldormFormSprites
 	add hl, de
 	ld c, $06
 	call DrawEntitySprites
+;> ReserveOAMEntriesFar(6)
 	ld a, $06
 	call ReserveOAMEntriesFar
 	ret
 
 
+;@ path: boss/final_nightmare/moldorm
+;@ Frame of NightmareMoldormFormSprites while the beaten Moldorm vanishes, by its timer / 8 (the
+;@ timer counts down from $1F, so only entries 0-3 are used: 1, 1, then the dot 0, 0).
+NightmareMoldormVanishFrames::
 	db $00, $00, $01, $01, $02, $02, $03, $03
 
+;@ def NightmareMoldormVanish(slot: c)
+;@ path: boss/final_nightmare/moldorm
+;@ State 3: the remains shrink to a dot (NightmareMoldormVanishFrames); when the timer runs out
+;@ the next form begins with full health $FF and the hitbox and flags of Ganon's shadow
+;@ (physics flags $40, hitbox flags $0A, options $90).
+;@ test: skip calls routines in other banks
 NightmareMoldormVanish::
+;> hActiveEntitySpriteVariant = 0
 	xor a
 	ldh [hActiveEntitySpriteVariant], a
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_015_60c4
-
+;> if t == 0:
+	jr nz, .shrink
+;>     NightmareNextForm(slot)
 	call NightmareNextForm
+;>     PlayNightmareJingle()
 	call PlayNightmareJingle
+;>     wEntityHealth[slot] = 0xFF
 	ld hl, wEntityHealth
 	add hl, bc
 	ld [hl], $ff
+;>     wEntityPhysicsFlags[slot] = 0x40
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $40
+;>     wEntityHitboxFlags[slot] = 0x0A
 	ld hl, wEntityHitboxFlags
 	add hl, bc
 	ld [hl], $0a
+;>     wEntityOptions1[slot] = 0x90
 	ld hl, wEntityOptions1
 	add hl, bc
 	ld [hl], $90
+;>     LoadEntityHitbox(slot)
 	call LoadEntityHitbox
+;>     return
 	ret
 
-
-jr_015_60c4:
+.shrink
+;>@g2 frames = NightmareMoldormVanishFrames + ((t >> 3) & 7)
 	rra
 	rra
 	rra
 	and $07
 	ld e, a
 	ld d, b
-	ld hl, $6092
-	jr jr_015_6076
+;=@g2
+	ld hl, NightmareMoldormVanishFrames
+;> NightmareMoldormAppear.draw(frames)
+	jr NightmareMoldormAppear.draw
 
+;@ def NightmareMoldormDying(slot: c)
+;@ path: boss/final_nightmare/moldorm
+;@ State 2: the beaten Moldorm crawls on (NightmareMoldormActive) until its dying timer runs
+;@ out; then it bursts into pieces and vanishes (state 3, timer $1F).
+;@ test: skip calls routines in other banks
 NightmareMoldormDying::
+;> if wEntityDyingTimer[slot]: return NightmareMoldormActive(slot)
 	ld hl, wEntityDyingTimer
 	add hl, bc
 	ld a, [hl]
 	and a
 	jr nz, NightmareMoldormActive
-
+;> wEntityTimer[slot] = 0x1F
 	call GetEntityTimer
 	ld [hl], $1f
+;> NightmareBurstIntoPieces(slot)
 	call NightmareBurstIntoPieces
+;> return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 
+;@ def NightmareMoldormActive(slot: c)
+;@ path: boss/final_nightmare/moldorm
+;@ State 1: checks weapon hits, draws the Moldorm and crawls one step. For a while after being
+;@ hurt (wEntityTimer2) it crawls two steps a frame and its sounds play in their fast variant
+;@ (wSfxFastVariant). Its crawling sound (jingle $38) plays every 12 frames, counted in
+;@ wSmasherSlot.
+;@ test: skip calls routines in other banks
 NightmareMoldormActive::
+;> NightmareCheckHitsIfActive(slot)
 	call NightmareCheckHitsIfActive
+;> DrawNightmareMoldorm(slot)
 	call DrawNightmareMoldorm
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
+;> LoadEntityPosition(slot)
 	call LoadEntityPosition
+;> ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
+;> wSfxFastVariant = 0
 	xor a
 	ld [wSfxFastVariant], a
+;> period = 12
 	ld e, $0c
+;> if wEntityTimer2[slot]:                    # just hurt: hurry
 	ld hl, wEntityTimer2
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_015_610a
-
+	jr z, .sound
+;>     NightmareMoldormStep(slot)             # an extra step
 	call NightmareMoldormStep
+;>     wSfxFastVariant = 1
 	ld a, $01
 	ld [wSfxFastVariant], a
+;>     period = 12
 	ld e, $0c
 
-jr_015_610a:
+.sound
+;> wSmasherSlot += 1                          # (scratch here: the sound counter)
 	ld hl, wSmasherSlot
 	ld a, [hl]
 	inc a
 	ld [hl], a
+;> if wSmasherSlot >= period:
 	cp e
 	jr c, NightmareMoldormStep
-
+;>     wSmasherSlot = 0
 	ld [hl], b
+;>     hJingle = 0x38
 	ld a, $38
 	ldh [hJingle], a
+;> NightmareMoldormStep(slot)                 # falls through
 
+;@ def NightmareMoldormStep(slot: c)
+;@ path: boss/final_nightmare/moldorm
+;@ One step of the Moldorm: records the head's position in the 128-entry history
+;@ (wEntityWorkRAM x, wEntityWorkRAM2 y, at wEntityPrivateCounter) the body follows, moves the
+;@ head (NightmareMoldormMove) and picks the head frame for its direction.
+;@ test: skip calls routines in other banks
 NightmareMoldormStep::
+;> i = (wEntityPrivateCounter[slot] + 1) & 0x7F
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	inc a
 	and $7f
+;> wEntityPrivateCounter[slot] = i
 	ld [hl], a
+;> wEntityWorkRAM[i] = hActiveEntityX
 	ld e, a
 	ld d, b
 	ld hl, wEntityWorkRAM
 	add hl, de
 	ldh a, [hActiveEntityX]
 	ld [hl], a
+;> wEntityWorkRAM2[i] = hActiveEntityDrawY
 	ld hl, wEntityWorkRAM2
 	add hl, de
 	ldh a, [hActiveEntityDrawY]
 	ld [hl], a
+;> NightmareMoldormMove(slot)
 	call NightmareMoldormMove
+;>@hf SetEntitySpriteVariant(mem[NightmareMoldormBodyFrames + (wEntityPrivate1[slot] >> 1)])
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld e, [hl]
 	srl e
 	ld d, b
-	ld hl, $5fd6
+	ld hl, NightmareMoldormBodyFrames
+;=@hf
 	add hl, de
 	ld a, [hl]
 	call SetEntitySpriteVariant
 	ret
 
 
+;@ path: boss/final_nightmare/moldorm
+;@ The Moldorm's head for RenderActiveEntitySpritesRect: 8 frames of 32 bytes, each 8 OAM
+;@ entries of 4 bytes (y offset, x offset, tile, attributes) forming a 32x32 picture; frame 0
+;@ faces down, then one frame per 45 degrees clockwise (1 down-left, 2 left, 3 up-left, 4 up,
+;@ 5 up-right, 6 right, 7 down-right). The eyes ($64/$66, $68/$6A, $6C/$6E) sit on the side
+;@ it faces; $60/$62 make up the rest.
+NightmareMoldormHeadSprites::
 	db $f8, $f8, $60, $00, $f8, $00, $62, $00, $f8, $08, $62, $20, $f8, $10, $60, $20
 	db $08, $f8, $64, $00, $08, $00, $66, $00, $08, $08, $66, $20, $08, $10, $64, $20
 	db $f8, $f8, $60, $00, $f8, $00, $62, $00, $f8, $08, $62, $20, $f8, $10, $60, $20
@@ -6217,189 +6811,249 @@ NightmareMoldormStep::
 	db $08, $f8, $60, $40, $08, $00, $62, $40, $08, $08, $6a, $60, $08, $10, $68, $60
 	db $f8, $f8, $60, $00, $f8, $00, $62, $00, $f8, $08, $62, $20, $f8, $10, $60, $20
 	db $08, $f8, $60, $40, $08, $00, $62, $40, $08, $08, $6e, $20, $08, $10, $6c, $20
+;@ path: boss/final_nightmare/moldorm
+;@ Body and tail of the Moldorm for RenderActiveEntitySpritesPair: 4 variants of 4 bytes (tile,
+;@ attributes of each 8x16 half, each with its mirror image): 0 big segment $70, 1 smaller
+;@ segment $72, 2-3 the tail $74 and $76.
+NightmareMoldormTailSprites::
 	db $70, $00, $70, $20, $72, $00, $72, $20, $74, $00, $74, $20, $76, $00, $76, $20
 
+;@ def DrawNightmareMoldorm(slot: c)
+;@ path: boss/final_nightmare/moldorm
+;@ Draws the Moldorm: the head (8 sprites), then from the position history the body segments
+;@ $0C, $18 and $24 steps back and the tail $2E steps back (wiggling every 8 frames and
+;@ flickering palettes every 4). While it is alive and not flashing, the tail is where weapons
+;@ hit it (EntityCheckWeaponHits at the tail's position); once its health falls below $F0 it is
+;@ beaten (state 2, dying timer $50).
+;@ test: skip calls routines in other banks
 DrawNightmareMoldorm::
+;> wEntityPhysicsFlags[slot] = 0x48           # while the head is drawn
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $48
+;>@hd DrawEntitySprites(NightmareMoldormHeadSprites + wEntitySpriteVariant[slot] * 32, 8)
 	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	rla
 	rla
 	rla
+;=@hd
 	rla
 	rla
 	and $e0
 	ld e, a
 	ld d, b
-	ld hl, $6145
+	ld hl, NightmareMoldormHeadSprites
+;=@hd
 	add hl, de
 	ld c, $08
 	call DrawEntitySprites
+;> wEntityPhysicsFlags[slot] = 0x42
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $42
+;> now = wEntityPrivateCounter[slot]
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose0], a
+;> i = (now - 0x0C) & 0x7F                    # first segment
 	ldh a, [hMultiPurpose0]
 	sub $0c
 	and $7f
 	ld e, a
 	ld d, b
+;> hActiveEntityX = wEntityWorkRAM[i]
 	ld hl, wEntityWorkRAM
 	add hl, de
 	ld a, [hl]
 	ldh [hActiveEntityX], a
+;> hActiveEntityDrawY = wEntityWorkRAM2[i]
 	ld hl, wEntityWorkRAM2
 	add hl, de
 	ld a, [hl]
 	ldh [hActiveEntityDrawY], a
+;> hActiveEntitySpriteVariant = 0
 	ld a, $00
 	ldh [hActiveEntitySpriteVariant], a
-	ld de, $6245
+;> DrawEntity16x16(NightmareMoldormTailSprites)
+	ld de, NightmareMoldormTailSprites
 	call DrawEntity16x16
+;> i = (now - 0x18) & 0x7F                    # second segment
 	ldh a, [hMultiPurpose0]
 	sub $18
 	and $7f
 	ld e, a
 	ld d, b
+;> hActiveEntityX = wEntityWorkRAM[i]
 	ld hl, wEntityWorkRAM
 	add hl, de
 	ld a, [hl]
 	ldh [hActiveEntityX], a
+;> hActiveEntityDrawY = wEntityWorkRAM2[i]
 	ld hl, wEntityWorkRAM2
 	add hl, de
 	ld a, [hl]
 	ldh [hActiveEntityDrawY], a
+;> hActiveEntitySpriteVariant = 0
 	ld a, $00
 	ldh [hActiveEntitySpriteVariant], a
-	ld de, $6245
+;> DrawEntity16x16(NightmareMoldormTailSprites)
+	ld de, NightmareMoldormTailSprites
 	call DrawEntity16x16
+;> i = (now - 0x24) & 0x7F                    # third, smaller segment
 	ldh a, [hMultiPurpose0]
 	sub $24
 	and $7f
 	ld e, a
 	ld d, b
+;> hActiveEntityX = wEntityWorkRAM[i]
 	ld hl, wEntityWorkRAM
 	add hl, de
 	ld a, [hl]
 	ldh [hActiveEntityX], a
+;> hActiveEntityDrawY = wEntityWorkRAM2[i]
 	ld hl, wEntityWorkRAM2
 	add hl, de
 	ld a, [hl]
 	ldh [hActiveEntityDrawY], a
+;> hActiveEntitySpriteVariant = 1
 	ld a, $01
 	ldh [hActiveEntitySpriteVariant], a
-	ld de, $6245
+;> DrawEntity16x16(NightmareMoldormTailSprites)
+	ld de, NightmareMoldormTailSprites
 	call DrawEntity16x16
+;> i = (now - 0x2E) & 0x7F                    # the tail
 	ldh a, [hMultiPurpose0]
 	sub $2e
 	and $7f
 	ld e, a
 	ld d, b
+;> hActiveEntityX = wEntityWorkRAM[i]
 	ld hl, wEntityWorkRAM
 	add hl, de
 	ld a, [hl]
 	ldh [hActiveEntityX], a
+;> hActiveEntityDrawY = wEntityWorkRAM2[i]
 	ld hl, wEntityWorkRAM2
 	add hl, de
 	ld a, [hl]
 	ldh [hActiveEntityDrawY], a
+;>@tv hActiveEntitySpriteVariant = 2 + ((hFrameCounter >> 3) & 1)
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
 	add $02
+;=@tv
 	ldh [hActiveEntitySpriteVariant], a
+;>@fl hActiveEntityFlipAttribute ^= (hFrameCounter << 2) & 0x10   # palette flicker
 	ldh a, [hFrameCounter]
 	rla
 	rla
 	and $10
 	ld hl, hActiveEntityFlipAttribute
 	xor [hl]
+;=@fl
 	ld [hl], a
-	ld de, $6245
+;> DrawEntity16x16(NightmareMoldormTailSprites)
+	ld de, NightmareMoldormTailSprites
 	call DrawEntity16x16
+;> if hActiveEntityState >= 2: return         # already beaten
 	ldh a, [hActiveEntityState]
 	cp $02
-	jr nc, jr_015_6340
-
+	jr nc, .done
+;> if wEntityFlashTimer[slot]: return
 	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr nz, jr_015_6340
-
+	jr nz, .done
+;> wEntityOptions1[slot] = 0x90
 	ld hl, wEntityOptions1
 	add hl, bc
 	ld [hl], $90
+;> EntityCheckWeaponHits(slot)                # at the tail
 	call EntityCheckWeaponHits
+;> wEntityOptions1[slot] = 0xD0
 	ld hl, wEntityOptions1
 	add hl, bc
 	ld [hl], $d0
+;> if wEntityHealth[slot] < 0xF0:
 	ld hl, wEntityHealth
 	add hl, bc
 	ld a, [hl]
 	cp $f0
-	jr nc, jr_015_6340
-
+	jr nc, .done
+;>     IncrementEntityState(slot)             # beaten
 	call IncrementEntityState
+;>     wEntityDyingTimer[slot] = 0x50
 	ld hl, wEntityDyingTimer
 	add hl, bc
 	ld [hl], $50
 
-jr_015_6340:
+.done
 	ret
 
 
+;@ def NightmareMoldormMove(slot: c)
+;@ path: boss/final_nightmare/moldorm
+;@ Moves the Moldorm's head in curves: wEntityPrivate1 is its direction (0-15, 0 = right,
+;@ clockwise), wEntityPrivate2 the turn (+1 or -1) added every 6 frames. Every $10-$2F frames
+;@ it picks a new random turn; at a wall it faces straight away from it (and turns the other
+;@ way half of the time). While beaten or flashing it stays in place.
+;@ test: skip calls routines in other banks
 NightmareMoldormMove::
+;>@mv if hActiveEntityState < 2 and not wEntityFlashTimer[slot]:
 	ldh a, [hActiveEntityState]
 	cp $02
-	jr nc, jr_015_6352
-
+	jr nc, .walls
 	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld a, [hl]
+;=@mv
 	and a
-	jr nz, jr_015_6352
-
+	jr nz, .walls
+;>     UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
 
-jr_015_6352:
+.walls
+;> EntityCheckWalls(slot)
 	call EntityCheckWalls
+;> walls = wEntityCollisions[slot]
 	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
+;> if walls:
 	and a
-	jr z, jr_015_6389
-
+	jr z, .turn
+;>     if walls & 1: d = 8                    # right wall: face left
 	ld e, $08
 	bit 0, a
-	jr nz, jr_015_6371
-
+	jr nz, .bounce
+;>     elif walls & 2: d = 0                  # left wall: face right
 	ld e, $00
 	bit 1, a
-	jr nz, jr_015_6371
-
+	jr nz, .bounce
+;>     elif walls & 4: d = 4                  # wall above: face down
 	ld e, $04
 	bit 2, a
-	jr nz, jr_015_6371
-
+	jr nz, .bounce
+;>     else: d = 12                           # wall below: face up
 	ld e, $0c
 
-jr_015_6371:
+.bounce
+;>     wEntityPrivate1[slot] = d
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], e
+;>     if not GetRandomByte() & 1:
 	call GetRandomByte
 	rra
-	jr c, jr_015_6384
-
+	jr c, .wallTimer
+;>         wEntityPrivate2[slot] = u8(-wEntityPrivate2[slot])   # turn the other way
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
@@ -6407,141 +7061,186 @@ jr_015_6371:
 	inc a
 	ld [hl], a
 
-jr_015_6384:
+.wallTimer
+;>     wEntityTimer[slot] = 0x10
 	call GetEntityTimer
 	ld [hl], $10
 
-jr_015_6389:
+.turn
+;> if wEntityTimer1[slot] == 0:               # every 6 frames
 	call GetEntityTimer1
-	jr nz, jr_015_63bf
-
+	jr nz, .newTurn
+;>     wEntityTimer1[slot] = 6
 	ld [hl], $06
+;>@dr     d = (wEntityPrivate1[slot] + wEntityPrivate2[slot]) & 0x0F
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntityPrivate1
 	add hl, bc
 	add [hl]
+;=@dr
 	and $0f
+;>     wEntityPrivate1[slot] = d
 	ld [hl], a
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld e, [hl]
 	ld d, b
-	ld hl, $5fb2
+;>     SetEntitySpriteVariant(mem[NightmareMoldormDirFrames + d])
+	ld hl, NightmareMoldormDirFrames
 	add hl, de
 	ld a, [hl]
 	call SetEntitySpriteVariant
-	ld hl, $5fc2
+;>     wEntitySpeedY[slot] = mem[NightmareMoldormSpeedY + d]
+	ld hl, NightmareMoldormSpeedY
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
-	ld hl, $5fc6
+;>     wEntitySpeedX[slot] = mem[NightmareMoldormSpeedX + d]
+	ld hl, NightmareMoldormSpeedX
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
 
-jr_015_63bf:
+.newTurn
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_015_63d7
-
+	jr nz, .done
+;>     wEntityTimer[slot] = (GetRandomByte() & 0x1F) + 0x10
 	call GetRandomByte
 	and $1f
 	add $10
 	ld [hl], a
+;>     turn = u8((GetRandomByte() & 2) - 1)   # +1 or -1
 	call GetRandomByte
 	and $02
 	dec a
+;>     wEntityPrivate2[slot] = turn
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld [hl], a
 
-jr_015_63d7:
+.done
 	ret
 
 
-Jump_15_63D8::
+;@ def NightmareGanon(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ Form 4 of the final boss: Ganon's shadow. It raises its trident, sends out six fire bats,
+;@ throws the spinning trident at Link and glides to another spot while the trident flies back
+;@ to it. Every weapon hit hurts it; after 24 points of damage it bursts, turns into a dark blob
+;@ that chases Link, and once that is hit it moves on to the next form. Entities of the same
+;@ kind with wEntityPrivate1 = 1 are its trident, 2 its fire bats, 3 the blob's trail.
+;@ test: skip jumps through a table
+NightmareGanon::
+;> kind = wEntityPrivate1[slot]
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
+;> if kind == 3: return GanonBlobTrail(slot)
 	cp $03
-	jp z, Jump_015_6d5d
-
+	jp z, GanonBlobTrail
+;> if kind == 2: return GanonBat(slot)
 	cp $02
-	jp z, Jump_015_6d8c
-
+	jp z, GanonBat
+;> if kind: return GanonTrident(slot)
 	and a
-	jp nz, Jump_015_6c7e
-
+	jp nz, GanonTrident
+;> if hActiveEntityState >= 2:                # states 0-1 draw themselves
 	ldh a, [hActiveEntityState]
 	cp $02
-	jr c, jr_015_6435
-
+	jr c, .states
+;>     if hActiveEntityState in (11, 12):     # the blob
 	cp $0b
-	jr z, jr_015_63f9
-
+	jr z, .blob
 	cp $0c
-	jr nz, jr_015_6402
+	jr nz, .ganon
 
-jr_015_63f9:
+.blob
+;>         hActiveEntitySpriteVariant = 6
 	ld a, $06
 	ldh [hActiveEntitySpriteVariant], a
+;>         DrawNightmareGel(slot)
 	call DrawNightmareGel
-	jr jr_015_6405
+	jr .update
 
-jr_015_6402:
-	call Call_15_6943
+.ganon
+;>     else:
+;>         DrawNightmareGanon(slot)
+	call DrawNightmareGanon
 
-jr_015_6405:
+.update
+;>     ReturnIfNonInteractive_15()
 	call ReturnIfNonInteractive_15
+;>     DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
+;>     if hActiveEntityState < 9:             # not beaten yet
 	ldh a, [hActiveEntityState]
 	cp $09
-	jr nc, jr_015_6435
-
+	jr nc, .states
+;>         EntityCheckHits(slot)
 	call EntityCheckHits
+;>         if wEntityHealth[slot] < 0xE8:     # 24 points of damage
 	ld hl, wEntityHealth
 	add hl, bc
 	ld a, [hl]
 	cp $e8
-	jr nc, jr_015_6435
-
+	jr nc, .states
+;>             wEntityState[slot] = 9         # beaten
 	call IncrementEntityState
 	ld [hl], $09
+;>             hActiveEntityState = 9
 	ld a, $09
 	ldh [hActiveEntityState], a
+;>             hWaveSfx = 0x10
 	ld a, $10
 	ldh [hWaveSfx], a
+;>             wEntityTimer[slot] = 0x80
 	call GetEntityTimer
 	ld [hl], $80
+;>             wEntityFlashTimer[slot] = 0x80
 	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld [hl], $80
 
-jr_015_6435:
+.states
+;> NightmareGanonStates[hActiveEntityState]()
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_15_6438::
-	dw Jump_15_64CC
-	dw Jump_15_651F
-	dw Jump_15_6565
-	dw Jump_15_65B8
-	dw Jump_15_662A
-	dw Jump_15_66DE
-	dw Jump_15_6766
-	dw Jump_15_67A3
-	dw Jump_15_67F7
-	dw Jump_15_67F8
-	dw Jump_15_680F
-	dw Jump_15_6828
-	dw Jump_15_68AD
-	dw Jump_15_68FF
+;@ path: boss/final_nightmare/ganon
+;@ States of Ganon's shadow (rst $00 table indexed by wEntityState): 0 glide to the top of the
+;@ room, 1 take shape, 2 wait, 3 raise the trident, 4 send out fire bats, 5 twirl and throw the
+;@ trident, 6 pause, 7 glide to a new spot, 8 wait for the trident to come back (it sets state
+;@ 3 again), 9 beaten, 10 turn into a blob, 11 the blob chases Link, 12 glide to the top,
+;@ 13 shrink and turn into the next form.
+NightmareGanonStates::
+	dw NightmareGanonCenter
+	dw NightmareGanonAppear
+	dw NightmareGanonWait
+	dw NightmareGanonRaiseTrident
+	dw NightmareGanonSpawnBats
+	dw NightmareGanonThrowTrident
+	dw NightmareGanonAfterThrow
+	dw NightmareGanonGlide
+	dw NightmareGanonWaitTrident
+	dw NightmareGanonDefeated
+	dw NightmareGanonBecomeBlob
+	dw NightmareGanonBlob
+	dw NightmareGanonLeave
+	dw NightmareGanonShrink
 
+;@ path: boss/final_nightmare/ganon
+;@ The shadow taking Ganon's shape, for RenderActiveEntitySpritesRect: 5 frames of 24 bytes,
+;@ each 6 OAM entries of 4 bytes (y offset, x offset, tile, attributes; tile $FF = nothing).
+;@ 0-2 a growing dot ($4A, $4C, $4E with mirror images), 3 a 16x32 shape ($5C over $5E),
+;@ 4 Ganon's head and shoulders ($50, $52, $6E over $6A, $6C, $6A).
+GanonFormSprites::
 	db $00, $00, $4a, $00, $00, $08, $4a, $20, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $00, $00, $4c, $00, $00, $08, $4c, $20
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
@@ -6551,705 +7250,1017 @@ JumpTable_15_6438::
 	db $00, $fc, $6a, $00, $00, $04, $6c, $20, $00, $0c, $6a, $20, $f3, $fc, $50, $00
 	db $f3, $04, $52, $00, $f3, $0c, $6e, $00
 
-Jump_15_64CC::
+;@ def NightmareGanonCenter(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ State 0: as a blob (gel frame 0), glides at speed $10 to the top of the room (X $50, Y $30);
+;@ within 3 pixels it takes shape (state 1, timer $60).
+;@ test: skip calls routines in other banks
+NightmareGanonCenter::
+;> hActiveEntitySpriteVariant = 0
 	xor a
 	ldh [hActiveEntitySpriteVariant], a
+;> SetEntitySpriteVariant(0)
 	call SetEntitySpriteVariant
+;> DrawNightmareGel(slot)
 	call DrawNightmareGel
+;> link_x = hLinkX
 	ldh a, [hLinkX]
 	push af
+;> link_y = hLinkY
 	ldh a, [hLinkY]
 	push af
+;> hLinkX = 0x50                              # aim at the spot instead of Link
 	ld a, $50
 	ldh [hLinkX], a
+;> hLinkY = 0x30
 	ld a, $30
 	ldh [hLinkY], a
+;> SetEntitySpeedTowardsLink(0x10)
 	ld a, $10
 	call SetEntitySpeedTowardsLink
+;>@ar if abs(hActiveEntityDrawY - 0x30) <= 2 and abs(hActiveEntityX - 0x50) <= 2:
 	ld hl, hLinkY
 	ldh a, [hActiveEntityDrawY]
 	sub [hl]
 	add $03
 	cp $06
-	jr nc, jr_015_6508
-
+	jr nc, .move
+;=@ar
 	ld hl, hLinkX
 	ldh a, [hActiveEntityX]
 	sub [hl]
 	add $03
 	cp $06
-	jr nc, jr_015_6508
-
+	jr nc, .move
+;>     wEntityTimer[slot] = 0x60
 	call GetEntityTimer
 	ld [hl], $60
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
-jr_015_6508:
+.move
+;> hLinkY = link_y
 	pop af
 	ldh [hLinkY], a
+;> hLinkX = link_x
 	pop af
 	ldh [hLinkX], a
+;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
 	ret
 
 
+;@ path: boss/final_nightmare/ganon
+;@ Frame of GanonFormSprites while the shadow takes shape, by its timer / 8 (13 entries; the
+;@ timer counts down from $60, so read backwards: the dot grows into Ganon's head): 4, 3, 2,
+;@ 1, then 0.
+GanonAppearFrames::
 	db $04, $03, $02, $01, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
-Jump_15_651F::
+;@ def NightmareGanonAppear(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ State 1: the shadow takes Ganon's shape (GanonAppearFrames); when the timer runs out Ganon's
+;@ shadow stands there 8 pixels higher (variant 4, no trident), the sound of a new form plays
+;@ and it waits (state 2, timer 8).
+;@ test: skip calls routines in other banks
+NightmareGanonAppear::
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_015_653f
-
-	ld [$d224], a
+;> if t == 0:
+	jr nz, .shape
+;>     wNightmareTridentFrame = 0
+	ld [wNightmareTridentFrame], a
+;>     wEntityY[slot] -= 8
 	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	sub $08
 	ld [hl], a
+;>     wEntityTimer[slot] = 8
 	call GetEntityTimer
 	ld [hl], $08
+;>     SetEntitySpriteVariant(4)
 	ld a, $04
 	call SetEntitySpriteVariant
+;>     PlayNightmareFormSfx()
 	call PlayNightmareFormSfx
+;>     return IncrementEntityState(slot)
 	jp IncrementEntityState
 
-
-jr_015_653f:
+.shape
+;>@fr frame = mem[GanonAppearFrames + ((t >> 3) & 0x0F)]
 	rra
 	rra
 	rra
 	and $0f
 	ld e, a
 	ld d, b
-	ld hl, $6512
+;=@fr
+	ld hl, GanonAppearFrames
 	add hl, de
 	ld a, [hl]
+;>@of offset = frame * 24
 	rla
 	rla
 	rla
 	and $f8
 	ld e, a
 	rla
+;=@of
 	and $f0
 	add e
 	ld e, a
-	ld hl, $6454
+;> DrawEntitySprites(GanonFormSprites + offset, 6)
+	ld hl, GanonFormSprites
 	add hl, de
 	ld c, $06
 	call DrawEntitySprites
+;> ReserveOAMEntriesFar(6)
 	ld a, $06
 	call ReserveOAMEntriesFar
 	ret
 
 
-Jump_15_6565::
+;@ def NightmareGanonWait(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ State 2: waits for the timer, then raises the trident (state 3, timer $7F).
+;@ test: skip calls routines in other banks
+NightmareGanonWait::
+;> if GetEntityTimer(slot): return NightmareGanonWaitDone()
 	call GetEntityTimer
-	jr nz, jr_015_6577
-
+	jr nz, NightmareGanonWaitDone
+;> wEntityTimer[slot] = 0x7F
 	ld [hl], $7f
+;> return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 
-Call_15_656F::
+;@ def NightmareGanonFaceLink(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ Turns Ganon's shadow towards Link's side: wNightmareFacing = 0 when he is to the right,
+;@ 1 when he is to the left.
+;@ test: slot = rand(0, 15)
+NightmareGanonFaceLink::
+;> side, _ = GetEntityXDistanceToLink_15(slot)
 	call GetEntityXDistanceToLink_15
+;> wNightmareFacing = side
 	ld a, e
 	ld [wNightmareFacing], a
 	ret
 
 
-jr_015_6577:
+;@ def NightmareGanonWaitDone()
+;@ path: boss/final_nightmare/ganon
+;@ The return of NightmareGanonWait while its timer runs.
+;@ test: skip only returns
+NightmareGanonWaitDone::
+;> return
 	ret
 
 
+;@ path: boss/final_nightmare/ganon
+;@ Ganon's frame while he raises the trident, by timer / 4 (32 entries; the timer counts down
+;@ from $7F, so read backwards): 0 (arms down) for the first half, then 4 (arms raised).
+GanonRaiseFrames::
 	db $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+;@ path: boss/final_nightmare/ganon
+;@ wNightmareTridentFrame while he raises the trident, by timer / 4 (32 entries, read
+;@ backwards): none for a while, then frames 7, 6, 1 as the trident appears and swings up, then
+;@ 4 (held up) for the second half.
+GanonRaiseTridentFrames::
 	db $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05
 	db $02, $07, $08, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
-Jump_15_65B8::
+;@ def NightmareGanonRaiseTrident(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ State 3: facing right, Ganon's shadow raises its trident (GanonRaiseFrames,
+;@ GanonRaiseTridentFrames; the trident sits higher while held up), with a noise at timer $58
+;@ (jingle $39) and $40 (noise $19). When the timer runs out it turns to Link and sends out fire
+;@ bats (state 4, drop timer $4C).
+;@ test: skip calls routines in other banks
+NightmareGanonRaiseTrident::
+;> wNightmareFacing = 0
 	ld a, $00
 	ld [wNightmareFacing], a
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_015_65cd
-
+;> if t == 0:
+	jr nz, .raise
+;>     wEntityDropTimer[slot] = 0x4C          # (the bat timer)
 	call GetEntityDropTimer
 	ld [hl], $4c
-	call Call_15_656F
+;>     NightmareGanonFaceLink(slot)
+	call NightmareGanonFaceLink
+;>     return IncrementEntityState(slot)
 	jp IncrementEntityState
 
-
-jr_015_65cd:
+.raise
+;> if t == 0x40: hNoiseSfx = 0x19
 	cp $40
-	jr nz, jr_015_65d6
-
+	jr nz, .jingle
 	ld hl, hNoiseSfx
 	ld [hl], $19
 
-jr_015_65d6:
+.jingle
+;> if t == 0x58: hJingle = 0x39
 	cp $58
-	jr nz, jr_015_65df
-
+	jr nz, .frame
 	ld hl, hJingle
 	ld [hl], $39
 
-jr_015_65df:
+.frame
+;> i = (t >> 2) & 0x3F
 	rra
 	rra
 	and $3f
 	ld e, a
 	ld d, b
-	ld hl, $6598
+;> wNightmareTridentFrame = mem[GanonRaiseTridentFrames + i]
+	ld hl, GanonRaiseTridentFrames
 	add hl, de
 	ld a, [hl]
-	ld [$d224], a
-	ld hl, $6578
+	ld [wNightmareTridentFrame], a
+;> SetEntitySpriteVariant(mem[GanonRaiseFrames + i])
+	ld hl, GanonRaiseFrames
 	add hl, de
 	ld a, [hl]
 	call SetEntitySpriteVariant
-	ld a, [$d224]
+;> if wNightmareTridentFrame != 5:
+	ld a, [wNightmareTridentFrame]
 	cp $05
-	jr z, jr_015_6607
-
+	jr z, .held
+;>     wNightmareTridentX = -13
 	ld a, $f3
-	ld [$d225], a
+	ld [wNightmareTridentX], a
+;>     wNightmareTridentY = -16
 	ld a, $f0
-	ld [$d226], a
+	ld [wNightmareTridentY], a
+;>     return
 	ret
 
-
-jr_015_6607:
+.held
+;> else:
+;>     wNightmareTridentX = -8                # held up
 	ld a, $f8
-	ld [$d225], a
+	ld [wNightmareTridentX], a
+;>     wNightmareTridentY = -2
 	ld a, $fe
-	ld [$d226], a
+	ld [wNightmareTridentY], a
 	ret
 
 
-	db $03, $02, $01, $00, $00, $01, $02, $03, $e8, $00, $18, $18, $00, $e8, $e8, $00
+;@ path: boss/final_nightmare/ganon
+;@ wNightmareTridentFrame - 1 of the trident spinning in Ganon's hand when he faces right, by
+;@ frame counter / 8: 3, 2, 1, 0.
+GanonSpinFramesRight::
+	db $03, $02, $01, $00
+
+;@ path: boss/final_nightmare/ganon
+;@ The same when he faces left: 0, 1, 2, 3.
+GanonSpinFramesLeft::
+	db $00, $01, $02, $03
+
+;@ path: boss/final_nightmare/ganon
+;@ Y offsets (signed, then 12 pixels higher) of the six fire bats around Ganon, by bat number
+;@ (8 entries; facing right the order is reversed): -$18, 0, $18, $18, 0, -$18, -$18, 0.
+GanonBatOffsetY::
+	db $e8, $00, $18, $18, $00, $e8, $e8, $00
+;@ path: boss/final_nightmare/ganon
+;@ The matching x offsets (signed, added to the trident's x offset): $10, $18, $10, -$10, -$18,
+;@ -$10, $10, $18.
+GanonBatOffsetX::
 	db $10, $18, $10, $f0, $e8, $f0, $10, $18
 
-Jump_15_662A::
+;@ def NightmareGanonSpawnBats(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ State 4: spins the trident in its hand (two-frame body animation) and every 32 frames sends
+;@ out one of six fire bats (entity $E6 with wEntityPrivate1 = 2, timer $30) in a ring around
+;@ itself, counted in $D221. When the drop timer runs out it twirls the trident (state 5, timer
+;@ $30).
+;@ test: skip calls routines in other banks
+NightmareGanonSpawnBats::
+;> if wEntityDropTimer[slot] == 0:
 	call GetEntityDropTimer
-	jr nz, jr_015_663a
-
+	jr nz, .spin
+;>     mem[0xD221] = 0                        # bats sent out
 	ld [$d221], a
+;>     wEntityTimer[slot] = 0x30
 	call GetEntityTimer
 	ld [hl], $30
+;>     return IncrementEntityState(slot)
 	jp IncrementEntityState
 
-
-jr_015_663a:
+.spin
+;>@sx wNightmareTridentX = -11 if wNightmareFacing == 0 else 11
 	ld a, [wNightmareFacing]
 	and a
 	ld a, $f5
-	jr z, jr_015_6644
-
+	jr z, .setX
 	ld a, $0b
 
-jr_015_6644:
-	ld [$d225], a
+.setX
+;=@sx
+	ld [wNightmareTridentX], a
+;> wNightmareTridentY = -18
 	ld a, $ee
-	ld [$d226], a
+	ld [wNightmareTridentY], a
+;>@va SetEntitySpriteVariant((hFrameCounter >> 3) & 1)
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	nop
 	and $01
+;=@va
 	call SetEntitySpriteVariant
+;> spin = GanonSpinFramesRight if wNightmareFacing == 0 else GanonSpinFramesLeft
 	ld a, [wNightmareFacing]
 	and a
-	ld hl, $6612
-	jr z, jr_015_6663
+	ld hl, GanonSpinFramesRight
+	jr z, .spinFrame
+	ld hl, GanonSpinFramesLeft
 
-	ld hl, $6616
-
-jr_015_6663:
+.spinFrame
+;>@tf wNightmareTridentFrame = mem[spin + ((hFrameCounter >> 3) & 3)] + 1
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	nop
 	nop
+;=@tf
 	and $03
 	ld e, a
 	ld d, b
 	add hl, de
 	ld a, [hl]
 	inc a
-	ld [$d224], a
+;=@tf
+	ld [wNightmareTridentFrame], a
+;> if hFrameCounter & 0x1F: return
 	ldh a, [hFrameCounter]
 	and $1f
-	jr nz, jr_015_66d9
-
+	jr nz, .done
+;> if mem[0xD221] >= 6: return               # all six are out
 	ld a, [$d221]
 	cp $06
-	jr nc, jr_015_66d9
-
+	jr nc, .done
+;> full, bat = SpawnEntity(0xE6)
 	ld a, $e6
 	call SpawnEntity
+;> if full: return
 	ret c
-
+;> wEntityTimer[bat] = 0x30
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $30
+;> wEntityPrivate1[bat] = 2                   # a fire bat
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $02
+;> wEntityPhysicsFlags[bat] = 0x42
 	push bc
 	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], $42
+;> wEntityHitboxFlags[bat] = 0
 	ld hl, wEntityHitboxFlags
 	add hl, de
 	ld [hl], $00
+;> LoadEntityHitbox(bat)
 	push de
 	push de
 	pop bc
 	call LoadEntityHitbox
 	pop de
+;> n = mem[0xD221] if wNightmareFacing else mem[0xD221] ^ 7
 	ld a, [wNightmareFacing]
 	and a
 	ld a, [$d221]
-	jr nz, jr_015_66b2
-
+	jr nz, .place
 	xor $07
 
-jr_015_66b2:
+.place
+;>@bx wEntityX[bat] = u8(wNightmareTridentX + mem[GanonBatOffsetX + n] + hMultiPurpose0)
 	ld c, a
-	ld hl, $6622
+	ld hl, GanonBatOffsetX
 	add hl, bc
-	ld a, [$d225]
+	ld a, [wNightmareTridentX]
 	add [hl]
 	ld hl, hMultiPurpose0
+;=@bx
 	add [hl]
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ld hl, $661a
+;>@by wEntityY[bat] = u8(mem[GanonBatOffsetY + n] - 12 + hMultiPurpose1)
+	ld hl, GanonBatOffsetY
 	add hl, bc
 	ld a, [hl]
 	sub $0c
 	ld hl, hMultiPurpose1
 	add [hl]
+;=@by
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
+;> mem[0xD221] += 1
 	ld hl, $d221
 	inc [hl]
 	pop bc
 
-jr_015_66d9:
+.done
 	ret
 
 
+;@ path: boss/final_nightmare/ganon
+;@ wNightmareTridentFrame - 1 of the trident twirling over Ganon's head before the throw, by
+;@ frame counter / 8: $0B, $0A, 2, $0A.
+GanonTwirlFrames::
 	db $0b, $0a, $02, $0a
 
-Jump_15_66DE::
+;@ def NightmareGanonThrowTrident(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ State 5: twirls the trident over its head (GanonTwirlFrames); when the timer runs out it
+;@ throws it (entity $E6 with wEntityPrivate1 = 1, 8 pixels to the side it faces and 16 higher,
+;@ speed $18 towards Link, timer $30, noise $27) and pauses (state 6, timer $40). Its frame is 2
+;@ throughout.
+;@ test: skip calls routines in other banks
+NightmareGanonThrowTrident::
+;>@sx wNightmareTridentX = -3 if wNightmareFacing == 0 else 3
 	ld a, [wNightmareFacing]
 	and a
 	ld a, $fd
-	jr z, jr_015_66e8
-
+	jr z, .setX
 	ld a, $03
 
-jr_015_66e8:
-	ld [$d225], a
+.setX
+;=@sx
+	ld [wNightmareTridentX], a
+;> wNightmareTridentY = -20
 	ld a, $ec
-	ld [$d226], a
+	ld [wNightmareTridentY], a
+;>@tw wNightmareTridentFrame = mem[GanonTwirlFrames + ((hFrameCounter >> 3) & 3)] + 1
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	nop
 	nop
+;=@tw
 	and $03
 	ld e, a
 	ld d, b
-	ld hl, $66da
+	ld hl, GanonTwirlFrames
 	add hl, de
 	ld a, [hl]
+;=@tw
 	inc a
-	ld [$d224], a
+	ld [wNightmareTridentFrame], a
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_015_6760
-
+	jr nz, .frame
+;>     wEntityTimer[slot] = 0x40
 	ld [hl], $40
+;>     wNightmareTridentFrame = 0             # it leaves his hand
 	xor a
-	ld [$d224], a
+	ld [wNightmareTridentFrame], a
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
+;>     full, trident = SpawnEntity(0xE6)
 	ld a, $e6
 	call SpawnEntity
-	jr c, jr_015_6760
-
+;>     if not full:
+	jr c, .frame
+;>         wEntityPrivate1[trident] += 1      # the trident
 	ld hl, wEntityPrivate1
 	add hl, de
 	inc [hl]
+;>         wEntityY[trident] = u8(hMultiPurpose1 - 16)
 	ldh a, [hMultiPurpose1]
 	sub $10
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
+;>         wEntityDirection[trident] = wNightmareFacing
 	ld a, [wNightmareFacing]
 	ld hl, wEntityDirection
 	add hl, de
 	ld [hl], a
+;>         dx = 8 if wNightmareFacing else -8
 	and a
 	ld a, $08
-	jr nz, jr_015_6736
-
+	jr nz, .placeX
 	ld a, $f8
 
-jr_015_6736:
+.placeX
+;>         wEntityX[trident] = u8(hMultiPurpose0 + dx)
 	ld hl, hMultiPurpose0
 	add [hl]
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
+;>         wEntityPhysicsFlags[trident] = 0x40
 	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], $40
+;>         wEntityHitboxFlags[trident] = 0x08
 	ld hl, wEntityHitboxFlags
 	add hl, de
 	ld [hl], $08
+;>         LoadEntityHitbox(trident)
 	push bc
 	push de
 	pop bc
 	call LoadEntityHitbox
+;>         SetEntitySpeedTowardsLink(trident, 0x18)
 	ld a, $18
 	call SetEntitySpeedTowardsLink
+;>         wEntityTimer[trident] = 0x30
 	call GetEntityTimer
 	ld [hl], $30
+;>         hNoiseSfx = 0x27
 	ld a, $27
 	ldh [hNoiseSfx], a
 	pop bc
 
-jr_015_6760:
+.frame
+;> SetEntitySpriteVariant(2)
 	ld a, $02
 	call SetEntitySpriteVariant
 	ret
 
 
-Jump_15_6766::
+;@ def NightmareGanonAfterThrow(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ State 6: holds frame 3 until the timer runs out, then picks one of 8 spots at random
+;@ (wEntityPrivate2), plays the boss jingle and glides there (state 7, timer $1F).
+;@ test: skip calls routines in other banks
+NightmareGanonAfterThrow::
+;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
-	jr nz, jr_015_677d
-
+	jr nz, .frame
+;>     wEntityTimer[slot] = 0x1F
 	ld [hl], $1f
+;>     wEntityPrivate2[slot] = GetRandomByte() & 7   # the spot
 	call GetRandomByte
 	and $07
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld [hl], a
+;>     PlayNightmareJingle()
 	call PlayNightmareJingle
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
-jr_015_677d:
+.frame
+;> SetEntitySpriteVariant(3)
 	ld a, $03
 	call SetEntitySpriteVariant
 	ret
 
 
-	db $28, $50, $78, $28, $78, $28, $50, $78, $20, $28, $20, $30, $30, $50, $50, $50
+;@ path: boss/final_nightmare/ganon
+;@ The 8 spots Ganon's shadow glides to after a throw (picked at random): x positions $28,
+;@ $50, $78, $28, $78, $28, $50, $78.
+GanonSpotX::
+	db $28, $50, $78, $28, $78, $28, $50, $78
+
+;@ path: boss/final_nightmare/ganon
+;@ The matching y positions: $20, $28, $20, $30, $30, $50, $50, $50.
+GanonSpotY::
+	db $20, $28, $20, $30, $30, $50, $50, $50
+;@ path: boss/final_nightmare/ganon
+;@ Glide speed by timer / 2 (16 entries; the timer counts down from $1F, so read backwards: it
+;@ starts at 2 and speeds up to $20): $20, $1E, ... $04, $02.
+GanonGlideSpeeds::
 	db $20, $1e, $1c, $1a, $18, $16, $14, $12, $10, $0e, $0c, $0a, $08, $06, $04, $02
 
-Jump_15_67A3::
+;@ def NightmareGanonGlide(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ State 7: glides (frame 4) to the spot picked in wEntityPrivate2, faster and faster
+;@ (GanonGlideSpeeds); within 3 pixels of it it waits for the trident (state 8).
+;@ test: skip calls routines in other banks
+NightmareGanonGlide::
+;> SetEntitySpriteVariant(4)
 	ld a, $04
 	call SetEntitySpriteVariant
+;> link_x = hLinkX
 	ldh a, [hLinkX]
 	push af
+;> link_y = hLinkY
 	ldh a, [hLinkY]
 	push af
+;> spot = wEntityPrivate2[slot]
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld e, [hl]
 	ld d, b
-	ld hl, $6783
+;> hLinkX = mem[GanonSpotX + spot]            # aim at the spot instead of Link
+	ld hl, GanonSpotX
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkX], a
-	ld hl, $678b
+;> hLinkY = mem[GanonSpotY + spot]
+	ld hl, GanonSpotY
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkY], a
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
+;>@sp SetEntitySpeedTowardsLink(mem[GanonGlideSpeeds + ((t >> 1) & 0x0F)])
 	rra
 	and $0f
 	ld e, a
 	ld d, b
-	ld hl, $6793
+	ld hl, GanonGlideSpeeds
 	add hl, de
+;=@sp
 	ld a, [hl]
 	call SetEntitySpeedTowardsLink
+;>@ar if abs(hLinkX - hActiveEntityX) <= 2 and abs(hLinkY - hActiveEntityDrawY) <= 2:
 	ld hl, hActiveEntityX
 	ldh a, [hLinkX]
 	sub [hl]
 	add $03
 	cp $06
-	jr nc, jr_015_67ed
-
+	jr nc, .move
+;=@ar
 	ld hl, hActiveEntityDrawY
 	ldh a, [hLinkY]
 	sub [hl]
 	add $03
 	cp $06
-	jr nc, jr_015_67ed
-
+	jr nc, .move
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
-jr_015_67ed:
+.move
+;> hLinkY = link_y
 	pop af
 	ldh [hLinkY], a
+;> hLinkX = link_x
 	pop af
 	ldh [hLinkX], a
+;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
 	ret
 
 
-Jump_15_67F7::
+;@ def NightmareGanonWaitTrident(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ State 8: does nothing until the trident comes back to it (GanonTrident sets state 3).
+;@ test: skip only returns
+NightmareGanonWaitTrident::
+;> return
 	ret
 
 
-Jump_15_67F8::
+;@ def NightmareGanonDefeated(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ State 9 (after 24 points of damage, timer $80, flashing): when the timer runs out it bursts
+;@ into pieces, drops the trident and turns into a blob (state 10, timer $40).
+;@ test: skip calls routines in other banks
+NightmareGanonDefeated::
+;> if wEntityTimer[slot]: return
 	call GetEntityTimer
-	jr nz, jr_015_680e
-
+	jr nz, .done
+;> wEntityTimer[slot] = 0x40
 	ld [hl], $40
+;> NightmareBurstIntoPieces(slot)
 	call NightmareBurstIntoPieces
+;> IncrementEntityState(slot)
 	call IncrementEntityState
+;> SetEntitySpriteVariant(0)
 	ld a, $00
 	call SetEntitySpriteVariant
+;> wNightmareTridentFrame = 0
 	xor a
-	ld [$d224], a
+	ld [wNightmareTridentFrame], a
 
-jr_015_680e:
+.done
 	ret
 
 
-Jump_15_680F::
+;@ def NightmareGanonBecomeBlob(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ State 10: shows the blob (gel frame 6) until the timer runs out, then clears physics flag
+;@ bit 6, stops and starts chasing Link (state 11).
+;@ test: skip calls routines in other banks
+NightmareGanonBecomeBlob::
+;> hActiveEntitySpriteVariant = 6
 	ld a, $06
 	ldh [hActiveEntitySpriteVariant], a
+;> DrawNightmareGel(slot)
 	call DrawNightmareGel
+;> if wEntityTimer[slot]: return
 	call GetEntityTimer
-	jr nz, jr_015_6827
-
+	jr nz, .done
+;> wEntityPhysicsFlags[slot] &= ~0x40
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	res 6, [hl]
+;> IncrementEntityState(slot)
 	call IncrementEntityState
+;> ClearEntitySpeed(slot)
 	call ClearEntitySpeed
 
-jr_015_6827:
+.done
 	ret
 
 
-Jump_15_6828::
+;@ def NightmareGanonBlob(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ State 11: the blob chases Link, steering its speed by 1 every other frame towards a speed of
+;@ $18 aimed at him, and leaves a trail (entity $E6 with wEntityPrivate1 = 3) every 8 frames.
+;@ Once a weapon hits it (it flashes) it splits into gel pieces, the music stops (wave sound
+;@ $10), and it glides away (state 12, timer $80).
+;@ test: skip calls routines in other banks
+NightmareGanonBlob::
+;> EntityCheckHits(slot)
 	call EntityCheckHits
+;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
+;> EntityCheckWalls(slot)
 	call EntityCheckWalls
+;> if hFrameCounter & 1 == 0:
 	ldh a, [hFrameCounter]
 	and $01
-	jr nz, jr_015_6856
-
+	jr nz, .hit
+;>     GetVectorTowardsLink(0x18)             # into hMultiPurpose0 (y), hMultiPurpose1 (x)
 	ld a, $18
 	call GetVectorTowardsLink
+;>@sy     wEntitySpeedY[slot] += -1 if hMultiPurpose0 - wEntitySpeedY[slot] < 0 else 1
 	ldh a, [hMultiPurpose0]
 	ld hl, wEntitySpeedY
 	sub [hl]
 	bit 7, a
-	jr z, jr_015_6848
-
+	jr z, .incY
 	dec [hl]
+;=@sy
 	dec [hl]
 
-jr_015_6848:
+.incY
+;=@sy
 	inc [hl]
+;>@sx     wEntitySpeedX[slot] += -1 if hMultiPurpose1 - wEntitySpeedX[slot] < 0 else 1
 	ldh a, [hMultiPurpose1]
 	ld hl, wEntitySpeedX
 	sub [hl]
 	bit 7, a
-	jr z, jr_015_6855
-
+	jr z, .incX
 	dec [hl]
+;=@sx
 	dec [hl]
 
-jr_015_6855:
+.incX
+;=@sx
 	inc [hl]
 
-jr_015_6856:
+.hit
+;> if wEntityFlashTimer[slot]:                # hit
 	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_015_6876
-
+	jr z, .trail
+;>     wEntityPhysicsFlags[slot] |= 0x40
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	set 6, [hl]
+;>     wEntityTimer[slot] = 0x80
 	call GetEntityTimer
 	ld [hl], $80
+;>     ResetSoundEngine()
 	call ResetSoundEngine
+;>     hWaveSfx = 0x10
 	ld a, $10
 	ldh [hWaveSfx], a
+;>     SpawnNightmareGelPieces(slot)
 	call SpawnNightmareGelPieces
+;>     return IncrementEntityState(slot)
 	jp IncrementEntityState
 
-
-jr_015_6876:
+.trail
+;> wEntityPrivateCounter[slot] += 1
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	inc a
 	ld [hl], a
+;> if wEntityPrivateCounter[slot] & 7: return
 	and $07
 	ret nz
-
+;> full, trail = SpawnEntity(0xE6)
 	ld a, $e6
 	call SpawnEntity
+;> if full: return
 	ret c
-
+;> wEntityX[trail] = hMultiPurpose0
 	ldh a, [hMultiPurpose0]
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
+;> wEntityY[trail] = hMultiPurpose1
 	ldh a, [hMultiPurpose1]
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
+;> wEntityPrivate1[trail] = 3                 # a trail blob
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $03
+;> wEntityTimer[trail] = 0x1F
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $1f
+;> wEntityPhysicsFlags[trail] = 0xC2
 	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], $c2
+;> wEntitySpriteVariant[trail] = 1
 	ld hl, wEntitySpriteVariant
 	add hl, de
 	ld [hl], $01
 	ret
 
 
-Jump_15_68AD::
+;@ def NightmareGanonLeave(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ State 12: after the timer (the boss jingle plays at its end) the blob glides at speed $0C to
+;@ the top of the room (X $50, Y $30); there it shrinks (state 13, timer $5F).
+;@ test: skip calls routines in other banks
+NightmareGanonLeave::
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
+;> if t == 1:
 	cp $01
-	jr nz, jr_015_68b8
-
+	jr nz, .wait
+;>     wEntityTimer[slot] = 0
 	dec [hl]
+;>     return PlayNightmareJingle()
 	jp PlayNightmareJingle
 
-
-jr_015_68b8:
+.wait
+;> if t: return
 	and a
 	ret nz
-
+;> link_x = hLinkX
 	ldh a, [hLinkX]
 	push af
+;> link_y = hLinkY
 	ldh a, [hLinkY]
 	push af
+;> hLinkX = 0x50                              # aim at the spot instead of Link
 	ld a, $50
 	ldh [hLinkX], a
+;> hLinkY = 0x30
 	ld a, $30
 	ldh [hLinkY], a
+;> SetEntitySpeedTowardsLink(0x0C)
 	ld a, $0c
 	call SetEntitySpeedTowardsLink
+;>@ar if abs(hActiveEntityDrawY - 0x30) <= 2 and abs(hActiveEntityX - 0x50) <= 2:
 	ld hl, hLinkY
 	ldh a, [hActiveEntityDrawY]
 	sub [hl]
 	add $03
 	cp $06
-	jr nc, jr_015_68ed
-
+	jr nc, .move
+;=@ar
 	ld hl, hLinkX
 	ldh a, [hActiveEntityX]
 	sub [hl]
 	add $03
 	cp $06
-	jr nc, jr_015_68ed
-
+	jr nc, .move
+;>     wEntityTimer[slot] = 0x5F
 	call GetEntityTimer
 	ld [hl], $5f
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
 
-jr_015_68ed:
+.move
+;> hLinkY = link_y
 	pop af
 	ldh [hLinkY], a
+;> hLinkX = link_x
 	pop af
 	ldh [hLinkX], a
+;> UpdateEntityPosWithSpeed_15(slot)
 	call UpdateEntityPosWithSpeed_15
 	ret
 
 
+;@ path: boss/final_nightmare/ganon
+;@ Gel frame of the shrinking blob by timer / 4 (the timer is held at $1F until it gets there,
+;@ so read backwards): 2, 2, 1, 1, 1, 0, 0, 0.
+GanonShrinkFrames::
 	db $00, $00, $00, $01, $01, $01, $02, $02
 
-Jump_15_68FF::
+;@ def NightmareGanonShrink(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ State 13: the blob shrinks (GanonShrinkFrames); when the timer runs out the last form begins:
+;@ it stops, gets full health $FF, physics flags 0, options $C0, drop timer $90 and timer2 $3F,
+;@ and $D223 is cleared.
+;@ test: skip calls routines in other banks
+NightmareGanonShrink::
+;> t = wEntityTimer[slot]
 	call GetEntityTimer
-	jr nz, jr_015_692c
-
+;> if t == 0:
+	jr nz, .shrink
+;>     ClearEntitySpeed(slot)
 	call ClearEntitySpeed
+;>     NightmareNextForm(slot)
 	call NightmareNextForm
+;>     wEntityHealth[slot] = 0xFF
 	ld hl, wEntityHealth
 	add hl, bc
 	ld [hl], $ff
+;>     wEntityPhysicsFlags[slot] = 0
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $00
+;>     wEntityOptions1[slot] = 0xC0
 	ld hl, wEntityOptions1
 	add hl, bc
 	ld [hl], $c0
+;>     wEntityDropTimer[slot] = 0x90
 	call GetEntityDropTimer
 	ld [hl], $90
+;>     mem[0xD223] = 0
 	xor a
 	ld [$d223], a
+;>     wEntityTimer2[slot] = 0x3F
 	ld hl, wEntityTimer2
 	add hl, bc
 	ld [hl], $3f
+;>     return
 	ret
 
-
-jr_015_692c:
+.shrink
+;> if t >= 0x20: t = 0x1F
 	cp $20
-	jr c, jr_015_6932
-
+	jr c, .frame
 	ld a, $1f
 
-jr_015_6932:
+.frame
+;>@fr hActiveEntitySpriteVariant = mem[GanonShrinkFrames + ((t >> 2) & 7)]
 	rra
 	rra
 	and $07
 	ld e, a
 	ld d, b
-	ld hl, $68f7
+	ld hl, GanonShrinkFrames
+;=@fr
 	add hl, de
 	ld a, [hl]
 	ldh [hActiveEntitySpriteVariant], a
+;> DrawNightmareGel(slot)
 	call DrawNightmareGel
 	ret
 
 
-Call_15_6943::
+;@ def DrawNightmareGanon(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ Draws Ganon's shadow (states below 10, unless hidden by variant $FF): head and body, arms,
+;@ then the trident. Facing left (wNightmareFacing = 1) uses variants 5-9 instead of 0-4.
+;@ test: skip calls routines in other banks
+DrawNightmareGanon::
+;> if hActiveEntityState >= 10: return
 	ldh a, [hActiveEntityState]
 	cp $0a
 	ret nc
-
+;> if hActiveEntitySpriteVariant == 0xFF: return
 	ldh a, [hActiveEntitySpriteVariant]
 	inc a
 	ret z
-
+;>@g1 if wNightmareFacing: hActiveEntitySpriteVariant += 5
 	ld a, [wNightmareFacing]
 	and a
 	ldh a, [hActiveEntitySpriteVariant]
-	jr z, jr_015_6956
-
+	jr z, .draw
 	add $05
 
-jr_015_6956:
+.draw
+;=@g1
 	ldh [hActiveEntitySpriteVariant], a
-	call Call_15_69EC
-	call Call_15_6A84
-	call Call_15_6C2C
+;> DrawGanonHead(slot)
+	call DrawGanonHead
+;> DrawGanonArms(slot)
+	call DrawGanonArms
+;> DrawGanonTrident(slot)
+	call DrawGanonTrident
 	ret
 
 
+;@ path: boss/final_nightmare/ganon
+;@ Ganon's head and body for RenderActiveEntitySpritesRect: 4 frames of 32 bytes, each 7 OAM
+;@ entries of 4 bytes (y offset, x offset, tile, attributes) and 4 unused bytes: the head
+;@ ($50, $52, $6E) over the body ($6A, $6C and their mirror images); frame 1 has the head 3
+;@ pixels lower and 2 to the right, frames 2-3 are frames 0-1 with the head mirrored.
+GanonHeadSprites::
 	db $f8, $fc, $50, $00, $f8, $04, $52, $00, $f8, $0c, $6e, $00, $08, $f8, $6a, $00
 	db $08, $00, $6c, $00, $08, $08, $6c, $20, $08, $10, $6a, $20, $ff, $ff, $ff, $ff
 	db $fb, $fe, $50, $00, $fb, $06, $52, $00, $fb, $0e, $6e, $00, $08, $f8, $6a, $00
@@ -7258,31 +8269,51 @@ jr_015_6956:
 	db $08, $00, $6c, $00, $08, $08, $6c, $20, $08, $10, $6a, $20, $ff, $ff, $ff, $ff
 	db $fb, $fa, $6e, $20, $fb, $02, $52, $20, $fb, $0a, $50, $20, $08, $f8, $6a, $00
 	db $08, $00, $6c, $00, $08, $08, $6c, $20, $08, $10, $6a, $20, $ff, $ff, $ff, $ff
+;@ path: boss/final_nightmare/ganon
+;@ Head frame (GanonHeadSprites) by sprite variant (10 entries; 0-4 facing right, 5-9 facing
+;@ left): 0, 0, 2, 1, 0, 2, 2, 0, 3, 2.
+GanonHeadFrames::
 	db $00, $00, $02, $01, $00, $02, $02, $00, $03, $02
 
-Call_15_69EC::
+;@ def DrawGanonHead(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ Draws the head and body of Ganon's shadow (7 sprites of the frame GanonHeadFrames gives for
+;@ the sprite variant).
+;@ test: skip calls routines in other banks
+DrawGanonHead::
+;>@hf frame = mem[GanonHeadFrames + hActiveEntitySpriteVariant]
 	ldh a, [hActiveEntitySpriteVariant]
 	ld e, a
 	ld d, b
-	ld hl, $69e2
+	ld hl, GanonHeadFrames
 	add hl, de
 	ld a, [hl]
+;>@of offset = (frame << 5) & 0x70
 	rla
 	rla
 	rla
 	rla
 	rla
 	and $70
+;=@of
 	ld e, a
-	ld hl, $6962
+;> DrawEntitySprites(GanonHeadSprites + offset, 7)
+	ld hl, GanonHeadSprites
 	add hl, de
 	ld c, $07
 	call DrawEntitySprites
+;> ReserveOAMEntriesFar(7)
 	ld a, $07
 	call ReserveOAMEntriesFar
 	ret
 
 
+;@ path: boss/final_nightmare/ganon
+;@ Ganon's arms for RenderActiveEntitySpritesRect, by sprite variant: 10 records of 12 bytes,
+;@ each 3 OAM entries of 4 bytes (y offset, x offset, tile, attributes; tile $FF = nothing).
+;@ Variants 0-4 face right (0-1 arms out with fists $60/$62 and hand $64, 2 arm raised, 3 both
+;@ arms low $66, 4 hand up), 5-9 the same mirrored for facing left.
+GanonArmSprites::
 	db $f4, $f8, $64, $00, $fe, $11, $60, $00, $fe, $19, $62, $00, $f4, $f9, $64, $00
 	db $fe, $11, $60, $00, $fe, $19, $62, $00, $f0, $00, $64, $20, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $fb, $10, $60, $00, $fb, $18, $62, $00
@@ -7292,26 +8323,41 @@ Call_15_69EC::
 	db $ff, $ff, $ff, $ff, $fb, $f0, $62, $20, $fb, $f8, $60, $20, $fe, $f8, $66, $00
 	db $00, $10, $66, $20, $ff, $ff, $ff, $ff
 
-Call_15_6A84::
+;@ def DrawGanonArms(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ Draws the arms of Ganon's shadow (3 sprites of GanonArmSprites for the sprite variant).
+;@ test: skip calls routines in other banks
+DrawGanonArms::
+;>@of offset = hActiveEntitySpriteVariant * 12
 	ldh a, [hActiveEntitySpriteVariant]
 	rla
 	rla
 	and $fc
 	ld e, a
 	rla
+;=@of
 	and $f8
 	add e
 	ld e, a
 	ld d, b
-	ld hl, $6a0c
+;> DrawEntitySprites(GanonArmSprites + offset, 3)
+	ld hl, GanonArmSprites
 	add hl, de
 	ld c, $03
 	call DrawEntitySprites
+;> ReserveOAMEntriesFar(3)
 	ld a, $03
 	call ReserveOAMEntriesFar
 	ret
 
 
+;@ path: boss/final_nightmare/ganon
+;@ The trident for RenderActiveEntitySpritesRect: 12 frames of 32 bytes, each up to 8 OAM
+;@ entries of 4 bytes (y offset, x offset, tile, attributes; GanonTridentSpriteCounts says how
+;@ many are drawn). Frame 0 upright (prongs $70, shaft $7C), 1 and 3 diagonal (head $7E, shaft
+;@ $76/$78), 2 level ($72, $74, $7A), 4-11 the spinning trident at four angles, each in a far
+;@ and a near version (shaft $76/$78 or $72/$74).
+GanonTridentSprites::
 	db $ec, $00, $70, $00, $ec, $08, $70, $20, $f4, $00, $7c, $00, $f4, $08, $7c, $20
 	db $08, $00, $7c, $40, $08, $08, $7c, $60, $14, $00, $70, $40, $14, $08, $70, $60
 	db $00, $00, $7e, $40, $00, $08, $7e, $20, $f3, $0d, $78, $20, $f3, $15, $76, $20
@@ -7336,56 +8382,79 @@ Call_15_6A84::
 	db $00, $08, $ff, $ff, $00, $10, $ff, $ff, $00, $00, $ff, $ff, $00, $00, $ff, $ff
 	db $00, $fb, $72, $00, $00, $03, $74, $00, $00, $05, $74, $20, $00, $0d, $72, $20
 	db $00, $fc, $ff, $ff, $00, $0c, $ff, $ff, $00, $00, $ff, $ff, $00, $00, $ff, $ff
+;@ path: boss/final_nightmare/ganon
+;@ Number of OAM entries drawn for each trident frame (12 entries): 8, 6, 6, 6, then 4.
+GanonTridentSpriteCounts::
 	db $08, $06, $06, $06, $04, $04, $04, $04, $04, $04, $04, $04
 
-Call_15_6C2C::
-	ld a, [$d224]
+;@ def DrawGanonTrident(slot: c)
+;@ path: boss/final_nightmare/ganon
+;@ If wNightmareTridentFrame is set, draws that trident frame offset by (wNightmareTridentX,
+;@ wNightmareTridentY) from the entity, reserves its OAM entries and restores the draw
+;@ position. The thrown trident uses it too, with no offset.
+;@ test: skip calls routines in other banks
+DrawGanonTrident::
+;> if not wNightmareTridentFrame: return
+	ld a, [wNightmareTridentFrame]
 	and a
 	ret z
-
-	ld a, [$d225]
+;> hActiveEntityX = u8(hActiveEntityX + wNightmareTridentX)
+	ld a, [wNightmareTridentX]
 	ld hl, hActiveEntityX
 	add [hl]
 	ld [hl], a
-	ld a, [$d226]
+;> hActiveEntityDrawY = u8(hActiveEntityDrawY + wNightmareTridentY)
+	ld a, [wNightmareTridentY]
 	ld hl, hActiveEntityDrawY
 	add [hl]
 	ld [hl], a
-	ld a, [$d224]
+;> frame = wNightmareTridentFrame - 1
+	ld a, [wNightmareTridentFrame]
 	dec a
 	ld e, a
 	ld d, b
-	ld hl, $6c20
+;> count = mem[GanonTridentSpriteCounts + frame]
+	ld hl, GanonTridentSpriteCounts
 	add hl, de
 	ld c, [hl]
+;>@of offset = frame * 32
 	ld d, b
 	sla e
 	rl d
 	sla e
 	rl d
 	sla e
+;=@of
 	rl d
 	sla e
 	rl d
 	sla e
 	rl d
 	ld a, e
+;=@of
 	and $e0
 	ld e, a
-	ld hl, $6aa0
+;> DrawEntitySprites(GanonTridentSprites + offset, count)
+	ld hl, GanonTridentSprites
 	add hl, de
 	push bc
 	call DrawEntitySprites
+;> ReserveOAMEntriesFar(count)
 	pop de
 	ld a, e
 	call ReserveOAMEntriesFar
+;> LoadEntityPosition(slot)
 	call LoadEntityPosition
 	ret
 
 
-	db $03, $02, $01, $00, $00, $01, $02, $03
+GanonTridentSpinRight::
+	db $03, $02, $01, $00
 
-Jump_015_6c7e:
+GanonTridentSpinLeft::
+	db $00, $01, $02, $03
+
+GanonTrident::
 	ld a, [wSmasherBallSlot]
 	ld e, a
 	ld d, b
@@ -7417,13 +8486,13 @@ jr_015_6ca7:
 	add hl, de
 	ld a, [hl]
 	inc a
-	ld [$d224], a
+	ld [wNightmareTridentFrame], a
 	xor a
-	ld [$d225], a
-	ld [$d226], a
-	call Call_15_6C2C
+	ld [wNightmareTridentX], a
+	ld [wNightmareTridentY], a
+	call DrawGanonTrident
 	xor a
-	ld [$d224], a
+	ld [wNightmareTridentFrame], a
 	call ReturnIfNonInteractive_15
 	ldh a, [hFrameCounter]
 	and $0f
@@ -7524,9 +8593,13 @@ jr_015_6d46:
 	ret
 
 
-	db $4a, $00, $4a, $20, $4c, $00, $4c, $20, $4e, $00, $4e, $20, $00, $00, $01, $01
+GanonTrailSprites::
+	db $4a, $00, $4a, $20, $4c, $00, $4c, $20, $4e, $00, $4e, $20
 
-Jump_015_6d5d:
+GanonTrailFrames::
+	db $00, $00, $01, $01
+
+GanonBlobTrail::
 	ld de, $6d4d
 	call DrawEntity16x16
 	call ReturnIfNonInteractive_15
@@ -7546,9 +8619,10 @@ Jump_015_6d5d:
 	ret
 
 
+GanonBatSprites::
 	db $1e, $00, $1e, $60, $34, $00, $34, $20, $54, $00, $54, $20, $56, $00, $56, $20
 
-Jump_015_6d8c:
+GanonBat::
 	ldh a, [hFrameCounter]
 	rla
 	rla
@@ -7560,11 +8634,11 @@ Jump_015_6d8c:
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_15_6DA0::
-	dw Jump_15_6DA4
-	dw Jump_15_6DBB
+GanonBatStates::
+	dw GanonBatSpark
+	dw GanonBatFly
 
-Jump_15_6DA4::
+GanonBatSpark::
 	call GetEntityTimer
 	jr nz, jr_015_6dae
 
@@ -7585,7 +8659,7 @@ jr_015_6db6:
 	ret
 
 
-Jump_15_6DBB::
+GanonBatFly::
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -10110,8 +11184,8 @@ ApplyRecoilIfNeeded_15::
 ;> wEntityIgnoreHitsTimer[slot] -= 1
 	dec a
 	ld [hl], a
-;> Call_3EB8()
-	call Call_3EB8
+;> AddPowerHitTrailVfx()
+	call AddPowerHitTrailVfx
 ;> speed_x = wEntitySpeedX[slot]               # keep its own speed
 	ld hl, wEntitySpeedX
 	add hl, bc
@@ -10472,7 +11546,7 @@ BossDefeatFlash_15::
 ;@ def BossDefeatExplode_15(slot: c)
 ;@ path: boss/defeat
 ;@ Last defeat step: explosions burst around the boss every 8 frames; at the end the
-;@ boss-defeated sound plays and the entity is replaced by its reward (Call_3F7A).
+;@ boss-defeated sound plays and the entity is replaced by its reward (DefeatEntityWithDrop).
 ;@ test: skip calls routines in other banks
 BossDefeatExplode_15::
 ;> t = wEntityTimer[slot]
@@ -10481,8 +11555,8 @@ BossDefeatExplode_15::
 	jr nz, .explode
 ;>     PlayClinkNoise()                             # boss defeated sound, screen shake
 	call PlayClinkNoise
-;>     return Call_3F7A()                      # the boss dies and leaves its reward
-	jp Call_3F7A
+;>     return DefeatEntityWithDrop()                      # the boss dies and leaves its reward
+	jp DefeatEntityWithDrop
 
 
 .explode

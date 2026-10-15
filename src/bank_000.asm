@@ -260,7 +260,7 @@ HeaderGlobalChecksum::
 ;@ VBlank).
 ;@ test: skip start-up code (resets the stack, never returns)
 Init::
-;> LCDOff()
+;> DisableLCD()
 	call DisableLCD
 ;> reset_stack(0xDFFF)
 	ld sp, $dfff
@@ -970,7 +970,7 @@ LoadRequestedGraphics::
 ;>     return DrawRequestedBGMap()
 	jr z, DrawRequestedBGMap
 
-;> LCDOff()
+;> DisableLCD()
 	push af
 	call DisableLCD
 	pop af
@@ -1033,7 +1033,7 @@ TileMapLoaders::
 ;@ requests (falls into ClearGraphicsRequests).
 ;@ test: skip switches the LCD off
 DrawRequestedBGMap::
-;> LCDOff()
+;> DisableLCD()
 	call DisableLCD
 ;>@cm commands = mem16[BGMapPointers + 2 * wBGMapToLoad]
 	ld hl, BGMapPointers
@@ -1727,7 +1727,7 @@ CopyIndoorTilesJob2::
 ;>     set_rom_bank(2)
 	ld a, $02
 	ld [$2100], a
-;>     Bank02_6BB8()
+;>     Call_02_6BB8()
 	call $6bb8
 ;>     hBGTilesLoadingStage += 1
 	ld hl, hBGTilesLoadingStage
@@ -1743,7 +1743,7 @@ CopyIndoorTilesJob2::
 ;>     set_rom_bank(2)
 	ld a, $02
 	ld [$2100], a
-;>     Bank02_6B92()
+;>     Call_02_6B92()
 	call $6b92
 ;>     hBGTilesLoadingStage += 1
 	ld hl, hBGTilesLoadingStage
@@ -1759,7 +1759,7 @@ CopyIndoorTilesJob2::
 ;>     set_rom_bank(2)
 	ld a, $02
 	ld [$2100], a
-;>     Bank02_6B6C()
+;>     Call_02_6B6C()
 	call $6b6c
 ;>     hBGTilesLoadingStage += 1
 	ld hl, hBGTilesLoadingStage
@@ -1772,7 +1772,7 @@ CopyIndoorTilesJob2::
 ;>     set_rom_bank(2)
 	ld a, $02
 	ld [$2100], a
-;>     Bank02_6B46()
+;>     Call_02_6B46()
 	call $6b46
 ;>     hNeedsUpdatingBGTiles = 0            # job done
 	xor a
@@ -2010,9 +2010,10 @@ CopyTilesFromBank0C::
 
 ;@ def PlayClinkNoise()
 ;@ path: link/sword
-;@ Plays the clink noise ($0C) and starts wClinkTimer.
+;@ Plays the clink noise ($0C) and starts wClinkTimer (runs on into StartClinkTimer).
 PlayClinkNoise::
 ;> hNoiseSfx = 0x0C
+;> return StartClinkTimer()
 	ld hl, hNoiseSfx
 	ld [hl], $0c
 
@@ -2657,7 +2658,7 @@ GameModeEnding::
 ;> SwitchBank(0x17)
 	ld a, $17
 	call SwitchBank
-;> Bank17_482A()
+;> Call_17_482A()
 	call $482a
 ;> return EndGameModeFrame()
 	jp EndGameModeFrame
@@ -2806,7 +2807,7 @@ WorldGameplayFrame::
 ;>             set_rom_bank(1)
 	ld a, $01
 	ld [$2100], a
-;>             Bank01_5FA6()
+;>             Call_01_5FA6()
 	call $5fa6
 ;>             RestoreBank()
 	call RestoreBank
@@ -2904,14 +2905,14 @@ WorldGameplayFrame::
 ;> SwitchBank(0x19)
 	ld a, $19
 	call SwitchBank
-;> Bank19_769B()
+;> AnimateScrollingFloorTiles()
 	call $769b
 ;> UpdateEntities()                              # all entities
 	call UpdateEntities
 ;> SwitchBank(2)
 	ld a, $02
 	call SwitchBank
-;> Bank02_529A()
+;> Call_02_529A()
 	call $529a
 ;> if not (hFrameCounter & 3 or wDrawCommand[0]) and wLinkMotionState < 2:
 	ld hl, wDrawCommand
@@ -2941,14 +2942,14 @@ WorldGameplayFrame::
 	dec e
 
 .call61ED
-;>     Bank02_61ED(c, e)                    # does nothing unless the debug byte at $0004 is set
+;>     DrawItemSlots(c, e)                    # does nothing unless the debug byte at $0004 is set
 	call $61ed
 
 .bank14
 ;> SwitchBank(0x14)
 	ld a, $14
 	call SwitchBank
-;> Bank14_59B0()
+;> Call_14_59B0()
 	call $59b0
 ;> return EndGameModeFrame()
 
@@ -3104,7 +3105,7 @@ UpdateLinkMain::
 ;>             set_rom_bank(2)
 	ld a, $02
 	ld [$2100], a
-;>             Bank02_781B()
+;>             Call_02_781B()
 	call $781b
 ;>             DrawLinkOAM()
 	call DrawLinkOAM
@@ -3134,12 +3135,12 @@ UpdateLinkMain::
 
 .countdown2
 ;> if mem[0xFFB6]: mem[0xFFB6] -= 1
-	ldh a, [$ffb6]
+	ldh a, [hSwordClashCooldown]
 	and a
 	jr z, .checkDialog
 
 	dec a
-	ldh [$ffb6], a
+	ldh [hSwordClashCooldown], a
 
 .checkDialog
 ;> if wDialogState:
@@ -3744,24 +3745,24 @@ SetShieldHitbox::
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, $00
-;> wSwordHitboxX = u8(hLinkX + ShieldHitboxDX[d])
+;> wSwordHitboxX = u8(hLinkX + mem[ShieldHitboxDX + d])
 	ld hl, ShieldHitboxDX
 	add hl, de
 	ldh a, [hLinkX]
 	add [hl]
 	ld [wSwordHitboxX], a
-;> wSwordHitboxWidth = ShieldHitboxWidth[d]
+;> wSwordHitboxWidth = mem[ShieldHitboxWidth + d]
 	ld hl, ShieldHitboxWidth
 	add hl, de
 	ld a, [hl]
 	ld [wSwordHitboxWidth], a
-;> wSwordHitboxY = u8(wLinkDrawY + ShieldHitboxDY[d])
+;> wSwordHitboxY = u8(wLinkDrawY + mem[ShieldHitboxDY + d])
 	ld hl, ShieldHitboxDY
 	add hl, de
 	ld a, [wLinkDrawY]
 	add [hl]
 	ld [wSwordHitboxY], a
-;> wSwordHitboxHeight = ShieldHitboxHeight[d]
+;> wSwordHitboxHeight = mem[ShieldHitboxHeight + d]
 	ld hl, ShieldHitboxHeight
 	add hl, de
 	ld a, [hl]
@@ -3955,7 +3956,7 @@ UseBoomerang::
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $28
-;>@n pressed = bin(hJoypadHeld & 0x0F).count('1')     # direction buttons held
+;>@n pressed = (hJoypadHeld & 1) + (hJoypadHeld >> 1 & 1) + (hJoypadHeld >> 2 & 1) + (hJoypadHeld >> 3 & 1)   # direction buttons held
 	ld c, $04
 	ld b, $00
 	ldh a, [hJoypadHeld]
@@ -4433,7 +4434,7 @@ UseRocsFeather::
 	ret
 
 
-;@ def StartJump()
+;@ def StartJump(b: b)
 ;@ path: link/items
 ;@ Starts Link's jump: height speed $20; while dashing also a forward speed (FeatherDashSpeedX/Y).
 ;@ test: hLinkDirection = rand(0, 3)
@@ -4447,16 +4448,16 @@ StartJump::
 ;>     return
 	ret z
 
-;> d = hLinkDirection
+;> d = (b << 8) | hLinkDirection             # b is 0 at the calls
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, b
-;> hLinkSpeedX = FeatherDashSpeedX[d]
+;> hLinkSpeedX = mem[FeatherDashSpeedX + d]
 	ld hl, FeatherDashSpeedX
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkSpeedX], a
-;> hLinkSpeedY = FeatherDashSpeedY[d]
+;> hLinkSpeedY = mem[FeatherDashSpeedY + d]
 	ld hl, FeatherDashSpeedY
 	add hl, de
 	ld a, [hl]
@@ -4870,13 +4871,13 @@ SwordHitsHardObject::
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, $00
-;> hMultiPurpose0 = u8(hLinkX + SwordClinkDX[d])
+;> hMultiPurpose0 = u8(hLinkX + mem[SwordClinkDX + d])
 	ld hl, SwordClinkDX
 	add hl, de
 	ldh a, [hLinkX]
 	add [hl]
 	ldh [hMultiPurpose0], a
-;> hMultiPurpose1 = u8(hLinkY + SwordClinkDY[d])
+;> hMultiPurpose1 = u8(hLinkY + mem[SwordClinkDY + d])
 	ld hl, SwordClinkDY
 	add hl, de
 	ldh a, [hLinkY]
@@ -5173,7 +5174,7 @@ DrawLinkItemSprites::
 ;>                 SwitchBank(2)
 	ld a, $02
 	call SwitchBank
-;>                 Bank02_51C6()
+;>                 Call_02_51C6()
 	call $51c6
 
 .restore
@@ -5198,7 +5199,7 @@ SwordSpriteAttributes::
 ;@ Writes a pair of side-by-side sprites (16x16, e.g. the sword) into OAM at `oam`: position
 ;@ (hMultiPurpose1, hMultiPurpose0) plus `offset` (h = y, l = x), frame hMultiPurpose2 from
 ;@ SwordSpriteTiles / SwordSpriteAttributes, extra attribute bits hMultiPurpose3. A tile $FF
-;@ hides the left sprite (y = $F0).
+;@ hides the left sprite (x = $F0).
 ;@ test: hMultiPurpose2 = rand(0, 7)
 DrawSpritePair::
 ;> mem[oam] = u8(hMultiPurpose0 + hi(offset))
@@ -5218,22 +5219,22 @@ DrawSpritePair::
 	sla a
 	ld e, a
 	ld d, $00
-;> mem[oam + 2] = SwordSpriteTiles[f]
+;> mem[oam + 2] = mem[SwordSpriteTiles + f]
 	add hl, de
 	ld a, [hl]
 	ld [bc], a
-;> if SwordSpriteTiles[f] == 0xFF:
+;> if mem[SwordSpriteTiles + f] == 0xFF:
 	cp $ff
 	jr nz, .attr
 
-;>     mem[oam] = 0xF0                      # hidden
+;>     mem[oam + 1] = 0xF0                  # hidden (off screen to the right)
 	dec bc
 	ld a, $f0
 	ld [bc], a
 	inc bc
 
 .attr
-;> mem[oam + 3] = SwordSpriteAttributes[f] | hMultiPurpose3
+;> mem[oam + 3] = mem[SwordSpriteAttributes + f] | hMultiPurpose3
 	inc bc
 	ld hl, SwordSpriteAttributes
 	add hl, de
@@ -5255,13 +5256,13 @@ DrawSpritePair::
 	add $08
 	ld [bc], a
 	inc bc
-;> mem[oam + 6] = SwordSpriteTiles[f + 1]
+;> mem[oam + 6] = mem[SwordSpriteTiles + f + 1]
 	ld hl, SwordSpriteTiles + 1
 	add hl, de
 	ld a, [hl]
 	ld [bc], a
 	inc bc
-;>@o7 mem[oam + 7] = SwordSpriteAttributes[f + 1] | hMultiPurpose3
+;>@o7 mem[oam + 7] = mem[SwordSpriteAttributes + f + 1] | hMultiPurpose3
 	ld hl, SwordSpriteAttributes + 1
 	add hl, de
 	ld a, [hl]
@@ -5293,13 +5294,13 @@ SetDashBumpPoint::
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, $00
-;> wDashBumpX = u8(hLinkX + DashBumpDX[d])
+;> wDashBumpX = u8(hLinkX + mem[DashBumpDX + d])
 	ld hl, DashBumpDX
 	add hl, de
 	ldh a, [hLinkX]
 	add [hl]
 	ld [wDashBumpX], a
-;> wDashBumpY = u8(hLinkY + DashBumpDY[d])
+;> wDashBumpY = u8(hLinkY + mem[DashBumpDY + d])
 	ld hl, DashBumpDY
 	add hl, de
 	ldh a, [hLinkY]
@@ -5376,7 +5377,7 @@ LinkMotionMapFadeOut::
 	ld a, $04
 	call SwitchBank
 	pop af
-;>     Bank04_79FA(mem[0xC509])
+;>     Call_04_79FA(mem[0xC509])
 	call $79fa
 ;>     wIsThief += 1
 	ld hl, wIsThief
@@ -5419,7 +5420,7 @@ LinkMotionMapFadeOut::
 	ld c, $00
 
 .findWarp
-;>@fw     while c != 4 and mem[wWarpDestPosition + c] != (((hLinkY - 8) & 0xF0) | (hLinkX >> 4)):
+;>@fw     while c != 4 and mem[addr(wWarpDestPosition) + c] != (((hLinkY - 8) & 0xF0) | (hLinkX >> 4)):
 	ldh a, [hLinkX]
 	swap a
 	and $0f
@@ -5562,7 +5563,7 @@ LinkMotionMapFadeOut::
 ;>             SwitchBank(2)
 	ld a, $02
 	call SwitchBank
-;>             Bank02_6A9B()
+;>             Call_02_6A9B()
 	call $6a9b
 ;>             mem[0xFFB4] = 0x30           # the dungeon's name shows after a moment
 	ld a, $30
@@ -5650,7 +5651,7 @@ SetSpawnPoint::
 
 .copy
 ;>@c while hMultiPurpose0 != 5:
-;>     mem[wSpawnIsIndoor + hMultiPurpose0] = mem[record + hMultiPurpose0]
+;>     mem[addr(wSpawnIsIndoor) + hMultiPurpose0] = mem[record + hMultiPurpose0]
 	ld a, [hli]
 	ld [de], a
 	inc de
@@ -5775,7 +5776,7 @@ FadePalettesToWhite::
 	cp $03
 	jr z, .done
 
-;>     pal = mem[wBGPalette + hMultiPurpose0]
+;>     pal = mem[addr(wBGPalette) + hMultiPurpose0]
 	ld hl, wBGPalette
 	ld e, a
 	ld d, $00
@@ -5803,7 +5804,7 @@ FadePalettesToWhite::
 	cp $04
 	jr nz, .colour
 
-;>     mem[wBGPalette + hMultiPurpose0] = pal
+;>     mem[addr(wBGPalette) + hMultiPurpose0] = pal
 	ld a, c
 	ld [hl], a
 ;>     hMultiPurpose0 += 1
@@ -5858,7 +5859,7 @@ FadePalettesIn::
 	cp $03
 	jr z, .done
 
-;>     pal = mem[wBGPalette + hMultiPurpose0]
+;>     pal = mem[addr(wBGPalette) + hMultiPurpose0]
 	ld hl, wBGPalette
 	ld e, a
 	ld d, $00
@@ -5870,7 +5871,7 @@ FadePalettesIn::
 	ld b, $00
 
 .colour
-;>@t         if pal & 3 != PaletteFadeTargets[4 * hMultiPurpose0 + i]: pal += 1
+;>@t         if pal & 3 != mem[PaletteFadeTargets + 4 * hMultiPurpose0 + i]: pal += 1
 	ldh a, [hMultiPurpose0]
 	sla a
 	sla a
@@ -5896,7 +5897,7 @@ FadePalettesIn::
 	cp $04
 	jr nz, .colour
 
-;>     mem[wBGPalette + hMultiPurpose0] = pal
+;>     mem[addr(wBGPalette) + hMultiPurpose0] = pal
 	ld a, c
 	pop hl
 	ld [hl], a
@@ -6176,7 +6177,7 @@ UpdateAnimatedTiles::
 ;>     set_rom_bank(0x10)
 	ld a, $10
 	ld [$2100], a
-;>@ic     copy(mem16[wSceneTimer3], mem16[wSceneTimer], 0x20)   # the intro keeps source and target at $D006 / $D008
+;>@ic     copy(mem16[addr(wSceneTimer3)], mem16[addr(wSceneTimer)], 0x20)   # the intro keeps source and target at $D006 / $D008
 	ld a, [wSceneTimer]
 	ld l, a
 	ld a, [wSceneTimer + 1]
@@ -6250,13 +6251,13 @@ UpdateAnimatedTiles::
 ;>@an2     return RunAnimatedTiles()
 ;> # a background change (hBGChangeRequest 1-$10)
 .bgChange
-;> if hBGChangeRequest == 0x01: return Jump_000_3fbd()
+;> if hBGChangeRequest == 0x01: return LoadBGChangeTilesA()
 	cp $01
-	jp z, Jump_000_3fbd
+	jp z, LoadBGChangeTilesA
 
-;> if hBGChangeRequest == 0x02: return Jump_000_3fd3()
+;> if hBGChangeRequest == 0x02: return LoadBGChangeTilesB()
 	cp $02
-	jp z, Jump_000_3fd3
+	jp z, LoadBGChangeTilesB
 
 ;> if hBGChangeRequest == 0x03: return BGChangeTiles9140A()
 	cp $03
@@ -6371,7 +6372,7 @@ AnimateTilesGroup1::
 ;> set_rom_bank(1)
 	ld a, $01
 	ld [$2100], a
-;> Bank01_5F62()
+;> Call_01_5F62()
 	call $5f62
 ;> set_rom_bank(0x0C)
 	ld a, $0c
@@ -6392,7 +6393,7 @@ AnimateTilesGroup2::
 ;> page = 0x6B
 	ld h, $6b
 ;> return AnimateTilesEvery16(page)
-	jr jr_000_1bb8
+	jr AnimateTilesEvery16
 
 ;@ def AnimateTilesGroup3()
 ;@ path: gfx/animation
@@ -6402,7 +6403,7 @@ AnimateTilesGroup3::
 ;> page = 0x6C
 	ld h, $6c
 ;> return AnimateTilesEvery16(page)
-	jr jr_000_1bb8
+	jr AnimateTilesEvery16
 
 ;@ def AnimateTilesGroupC()
 ;@ path: gfx/animation
@@ -6412,11 +6413,11 @@ AnimateTilesGroupC::
 ;> page = 0x73
 	ld h, $73
 ;> return AnimateTilesEvery16(page)
-	jr jr_000_1bb8
+	jr AnimateTilesEvery16
 
 ;@ def AnimateTilesGroupB()
 ;@ path: gfx/animation
-;@ Animated tiles group $0B: page $6A every 16 frames. Its end (jr_000_1bb8) is shared by the
+;@ Animated tiles group $0B: page $6A every 16 frames. Its end (AnimateTilesEvery16) is shared by the
 ;@ groups that change every 16 frames: on a new frame it steps hAnimatedTilesStep by $40 and
 ;@ copies 64 bytes from page:hAnimatedTilesStep (Jump_000_1ba7) to $96C0.
 ;@ test: skip writes VRAM
@@ -6424,7 +6425,7 @@ AnimateTilesGroupB::
 ;> page = 0x6A
 	ld h, $6a
 
-jr_000_1bb8:
+AnimateTilesEvery16:
 ;> if hAnimatedTilesFrameCount & 0x0F:
 	ldh a, [hAnimatedTilesFrameCount]
 	and $0f
@@ -6490,7 +6491,7 @@ AnimateTilesGroup5::
 ;> page = 0x6E
 	ld h, $6e
 ;> return AnimateTilesEvery16(page)
-	jr jr_000_1bb8
+	jr AnimateTilesEvery16
 
 ;@ def AnimateTilesGroup6()
 ;@ path: gfx/animation
@@ -6543,14 +6544,14 @@ AnimateTilesGroup7::
 
 ;@ def AnimateTilesGroup8()
 ;@ path: gfx/animation
-;@ Animated tiles group 8: page $70, a new frame every 8 frames. Its end (jr_000_1c23) is shared
+;@ Animated tiles group 8: page $70, a new frame every 8 frames. Its end (AnimateTilesEvery8) is shared
 ;@ by the groups that change every 8 frames.
 ;@ test: skip writes VRAM
 AnimateTilesGroup8::
 ;> page = 0x70
 	ld h, $70
 
-jr_000_1c23:
+AnimateTilesEvery8:
 ;> if hAnimatedTilesFrameCount & 7:
 	ldh a, [hAnimatedTilesFrameCount]
 	and $07
@@ -6566,14 +6567,14 @@ jr_000_1c23:
 
 ;@ def AnimateTilesGroup9()
 ;@ path: gfx/animation
-;@ Animated tiles group 9: page $71, a new frame every 4 frames. Its end (jr_000_1c32) is shared
+;@ Animated tiles group 9: page $71, a new frame every 4 frames. Its end (AnimateTilesEvery4) is shared
 ;@ by the groups that change every 4 frames.
 ;@ test: skip writes VRAM
 AnimateTilesGroup9::
 ;> page = 0x71
 	ld h, $71
 
-jr_000_1c32:
+AnimateTilesEvery4:
 ;> if hAnimatedTilesFrameCount & 3:
 	ldh a, [hAnimatedTilesFrameCount]
 	and $03
@@ -6595,7 +6596,7 @@ AnimateTilesGroupA::
 ;> page = 0x72
 	ld h, $72
 ;> return AnimateTilesEvery4(page)
-	jr jr_000_1c32
+	jr AnimateTilesEvery4
 
 ;@ def NextAnimatedTilesStep() -> a
 ;@ path: gfx/animation
@@ -6617,7 +6618,7 @@ AnimateTilesGroupD::
 ;> page = 0x75
 	ld h, $75
 ;> return AnimateTilesEvery4(page)
-	jr jr_000_1c32
+	jr AnimateTilesEvery4
 
 ;@ def AnimateTilesGroupF()
 ;@ path: gfx/animation
@@ -6627,7 +6628,7 @@ AnimateTilesGroupF::
 ;> page = 0x74
 	ld h, $74
 ;> return AnimateTilesEvery8(page)
-	jr jr_000_1c23
+	jr AnimateTilesEvery8
 
 ;@ def AnimateTilesGroup10()
 ;@ path: gfx/animation
@@ -6637,7 +6638,7 @@ AnimateTilesGroup10::
 ;> page = 0x77
 	ld h, $77
 ;> return AnimateTilesEvery8(page)
-	jr jr_000_1c23
+	jr AnimateTilesEvery8
 
 ;@ def AnimateTilesGroupE()
 ;@ path: gfx/animation
@@ -6647,7 +6648,7 @@ AnimateTilesGroupE::
 ;> page = 0x76
 	ld h, $76
 ;> return AnimateTilesEvery8(page)
-	jr jr_000_1c23
+	jr AnimateTilesEvery8
 
 ;@ def UpdateLinkTiles()
 ;@ path: link/sprites
@@ -7266,7 +7267,7 @@ CheckLiftAndRead::
 	ld a, h
 	cp $d7
 ;>     return ResetLiftPull()
-	jp nz, Jump_000_207c
+	jp nz, ResetLiftPull
 
 ;> hMultiPurpose0 = mem[wRoomObjects + square]   # the object there
 	ld a, [hl]
@@ -7286,31 +7287,31 @@ CheckLiftAndRead::
 ;>@ph     if hMultiPurpose5 in (0x00, 0x50, 0x51) or not (hMultiPurpose5 == 1 or 0x11 <= hMultiPurpose5 < 0x7C or 0xD0 <= hMultiPurpose5 < 0xD4):
 	ldh a, [hMultiPurpose5]
 	cp $00
-	jp z, Jump_000_207c
+	jp z, ResetLiftPull
 
 	cp $01
 	jr z, jr_000_1ef8
 
 ;=@ph
 	cp $50
-	jp z, Jump_000_207c
+	jp z, ResetLiftPull
 
 	cp $51
-	jp z, Jump_000_207c
+	jp z, ResetLiftPull
 
 	cp $11
-	jp c, Jump_000_207c
+	jp c, ResetLiftPull
 
 ;=@ph
 	cp $d4
-	jp nc, Jump_000_207c
+	jp nc, ResetLiftPull
 
 	cp $d0
 	jr nc, jr_000_1ef8
 
 	cp $7c
 ;>         return ResetLiftPull()           # nothing to do with it
-	jp nc, Jump_000_207c
+	jp nc, ResetLiftPull
 
 jr_000_1ef8:
 ;>@rd if obj == 0x9A or (obj in (0x6F, 0x5E, 0xD4) and not wIsIndoor):   # readable: signs and tablets outdoors
@@ -7655,7 +7656,7 @@ jr_000_207b:
 	ret
 
 
-Jump_000_207c:
+ResetLiftPull:
 jr_000_207c:
 ;> # ResetLiftPull:
 ;> wLiftPullCounter = 0
@@ -9129,8 +9130,8 @@ DialogStateChoice::
 ;> set_rom_bank(0x17)
 	ld a, $17
 	ld [$2100], a
-;> Call_17_7B57()                           # draws the answer cursor (bank $17 $7B57)
-	jp $7b57
+;> return DrawDialogChoiceCursor()          # draws the answer cursor (bank $17)
+	jp DrawDialogChoiceCursor
 
 .confirm
 ;=@ok
@@ -9146,8 +9147,8 @@ DrawDialogMoreArrow::
 ;> set_rom_bank(0x17)
 	ld a, $17
 	ld [$2100], a
-;> Call_17_7B07()
-	jp $7b07
+;> return DrawDialogArrow()
+	jp DrawDialogArrow
 
 
 ;@ def RunRoomTransition()
@@ -11219,8 +11220,8 @@ LoadTileset01::
 ;> set_rom_bank(0x01)
 	ld a, $01
 	ld [$2100], a
-;> Call_01_7DC1()
-	jp $7dc1
+;> return UnusedMarkDungeonOnMap()
+	jp UnusedMarkDungeonOnMap
 
 
 ;@ def LoadRoom()
@@ -11983,7 +11984,7 @@ LoadIndoorObject::
 	cp $d3
 	jr nc, .not_CF
 
-	ld hl, $c1a5
+	ld hl, wScrollingFloorCount
 	inc [hl]
 
 .not_CF
@@ -13494,13 +13495,13 @@ GetEntityTypeByte14::
 
 ;@ def ShatterThrownObject()
 ;@ path: object/liftable
-;@ A thrown pot or rock breaks into pieces (Call_19_77C6), for code in bank 3.
+;@ A thrown pot or rock breaks into pieces (DrawShatterPieces), for code in bank 3.
 ShatterThrownObject::
 ;> SwitchBank(0x19)
 	ld a, $19
 	call SwitchBank
-;> Call_19_77C6()
-	call Call_19_77C6
+;> DrawShatterPieces()
+	call DrawShatterPieces
 ;> SwitchBank(0x03)
 	ld a, $03
 	jp SwitchBank
@@ -13586,7 +13587,7 @@ OAMStartOffsets::
 ;@ Runs all entities once per frame, slot 15 down to 0 (UpdateEntity for each used slot). Before that:
 ;@ counts down wDelayedWaveSfxTimer (sound $10 when it runs out), wLinkPoseLock (not during a dialog),
 ;@ picks the OAM start (rotating by frame inside the dungeons - maps below $0A - else 0), clears the per-frame
-;@ flags the entities set (Link in water, on a platform, carried entity, ...), and runs Call_02_63E6. Nothing
+;@ flags the entities set (Link in water, on a platform, carried entity, ...), and runs DrawSwordPowerSparkleAB. Nothing
 ;@ runs while wLinkMotionState is 7.
 UpdateEntities::
 ;> if wDelayedWaveSfxTimer:
@@ -13665,7 +13666,7 @@ UpdateEntities::
 ;> wCarriedEntityType = 0
 	ld [wCarriedEntityType], a
 ;> mem[0xD45E] = 0
-	ld [$d45e], a
+	ld [wLinkPulledByDevice], a
 ;> if not wDialogState: wCanTalkToEntity = 0
 	ld a, [wDialogState]
 	and a
@@ -13677,8 +13678,8 @@ UpdateEntities::
 ;> SwitchBank(0x02)
 	ld a, $02
 	call SwitchBank
-;> Call_02_63E6()
-	call Call_02_63E6
+;> DrawSwordPowerSparkleAB()
+	call DrawSwordPowerSparkleAB
 ;>@sl for slot in range(15, -1, -1):
 	ld b, $00
 	ld c, $0f
@@ -13735,7 +13736,7 @@ ResetEntityVariablesFrom3::
 ;@ def UpdateEntity(slot: bc)
 ;@ path: entity/engine
 ;@ Runs one entity: copies its type, state and sprite variant to the hActiveEntity bytes, moves it along with
-;@ a room scroll (Call_19_7563) and reads its position (LoadEntityPosition) - for lifted entities, and for type $6A
+;@ a room scroll (MoveEntityWithRoomScroll) and reads its position (LoadEntityPosition) - for lifted entities, and for type $6A
 ;@ while Link swims, in the other order, so they follow Link - runs the common checks of bank $14
 ;@ (Call_14_5388), then the code for its status: the type's own handler (RunEntityHandler) when active
 ;@ (status 5), else EntityStatusHandlers in bank 3.
@@ -13774,8 +13775,8 @@ UpdateEntity::
 	jr nz, .usual
 
 .follows
-;>     Call_19_7563(slot)                   # moves it with a room scroll first
-	call Call_19_7563
+;>     MoveEntityWithRoomScroll(slot)                   # moves it with a room scroll first
+	call MoveEntityWithRoomScroll
 ;>     LoadEntityPosition(slot)                      # then reads its position
 	call LoadEntityPosition
 	jr .common
@@ -13784,8 +13785,8 @@ UpdateEntity::
 ;> else:
 ;>     LoadEntityPosition(slot)
 	call LoadEntityPosition
-;>     Call_19_7563(slot)
-	call Call_19_7563
+;>     MoveEntityWithRoomScroll(slot)
+	call MoveEntityWithRoomScroll
 
 .common
 ;> SwitchBank(0x14)
@@ -13853,19 +13854,19 @@ RunEntityHandler::
 ;@ The handler of every entity type (index = type, $00-$E8; 233 entries; $0000 = no such type). Each runs in
 ;@ the bank the table at $03:$4000 gives for its type, with bc = the entity's slot.
 EntityHandlers::
-	dw Call_03_6A4B                ; $00
+	dw ArrowHandler                ; $00
 	dw BoomerangHandler            ; $01
-	dw Call_03_66BF                ; $02
+	dw BombHandler                ; $02
 	dw HookshotEntityHandler                ; $03
-	dw Call_03_69C9                ; $04
+	dw MagicRodFireballHandler                ; $04
 	dw LiftableObjectHandler       ; $05
 	dw PushedBlockHandler          ; $06
 	dw Call_07_7AE3                ; $07
 	dw MagicPowderEntityHandler                ; $08
 	dw OctorokHandler              ; $09
-	dw Call_03_6A3D                ; $0A
+	dw OctorokRockHandler                ; $0A
 	dw MoblinHandler               ; $0B
-	dw Call_03_6AE7                ; $0C
+	dw MoblinArrowHandler                ; $0C
 	dw Call_06_79CD                ; $0D
 	dw Call_04_7E82                ; $0E
 	dw Call_06_7547                ; $0F
@@ -13875,10 +13876,10 @@ EntityHandlers::
 	dw HeartContainerSprite        ; $13
 	dw Call_07_785E                ; $14
 	dw Call_06_797B                ; $15
-	dw Call_06_6641                ; $16
-	dw Call_06_6641                ; $17
+	dw SparkHandler                ; $16
+	dw SparkHandler                ; $17
 	dw Call_06_7470                ; $18
-	dw Call_06_673C                ; $19
+	dw KeeseHandler                ; $19
 	dw StalfosHandler              ; $1A
 	dw Call_06_7CFC                ; $1B
 	dw Call_06_7CD0                ; $1C
@@ -13887,15 +13888,15 @@ EntityHandlers::
 	dw Call_06_7F5F                ; $1F
 	dw HardhatBeetleHandler        ; $20
 	dw Call_06_7727                ; $21
-	dw Call_06_65FB                ; $22
+	dw WizrobeShotHandler                ; $22
 	dw Call_06_7EB5                ; $23
 	dw IronMaskHandler             ; $24
 	dw BurningFlameSprites         ; $25
 	dw BurningFlameSprites         ; $26
 	dw Call_06_760B                ; $27
-	dw Call_19_6765                ; $28
+	dw MimicHandler                ; $28
 	dw MiniMoldormHandler          ; $29
-	dw Call_04_6C34                ; $2A
+	dw Beamos                ; $2A
 	dw LaserBeamHandler            ; $2B
 	dw Call_07_76BC                ; $2C
 	dw DroppedHeartHandler         ; $2D
@@ -13934,10 +13935,10 @@ EntityHandlers::
 	dw Call_04_7634                ; $4E
 	dw Call_04_6E4F                ; $4F
 	dw Call_06_7AB3                ; $50
-	dw Call_04_697A                ; $51
-	dw Call_04_67EF                ; $52
-	dw Call_04_67EF                ; $53
-	dw Call_04_5F59                ; $54
+	dw BallTrooper                ; $51
+	dw TractorDevice                ; $52
+	dw TractorDevice                ; $53
+	dw FishermanHandler                ; $54
 	dw Call_04_7D97                ; $55
 	dw Call_04_7CA7                ; $56
 	dw PairoddHandler                ; $57
@@ -13947,7 +13948,7 @@ EntityHandlers::
 	dw SlimeEyeHandler             ; $5B
 	dw GenieHandler                ; $5C
 	dw SlimeEelEntityHandler                ; $5D
-	dw Call_05_7B05                ; $5E
+	dw GohmaEntityHandler                ; $5E
 	dw Call_07_694D                ; $5F
 	dw DodongoSnakeEntityHandler                ; $60
 	dw WarpHandler                 ; $61
@@ -13965,10 +13966,10 @@ EntityHandlers::
 	dw BowWowEntityHandler         ; $6D
 	dw Call_06_6BB4                ; $6E
 	dw DogHandler                  ; $6F
-	dw Call_06_6248                ; $70
-	dw Call_06_60C3                ; $71
-	dw Call_06_60C3                ; $72
-	dw Call_06_6248                ; $73
+	dw KidHandler                ; $70
+	dw KidCatchHandler                ; $71
+	dw KidCatchHandler                ; $72
+	dw KidHandler                ; $73
 	dw MamashaEntityHandler        ; $74
 	dw GrandmaUlriraEntityHandler  ; $75
 	dw ChristineEntityHandler      ; $76
@@ -13977,9 +13978,9 @@ EntityHandlers::
 	dw MadamMeowMeowHandler                ; $79
 	dw CrowHandler                ; $7A
 	dw CrazyTracyHandler                ; $7B
-	dw Call_06_62DE                ; $7C
-	dw Call_06_63CD                ; $7D
-	dw Call_06_642A                ; $7E
+	dw GiantGopongaHandler                ; $7C
+	dw GopongaShotHandler                ; $7D
+	dw GopongaFlowerHandler                ; $7E
 	dw TurtleRockEntityHandler                ; $7F
 	dw Call_06_6A88                ; $80
 	dw Call_06_6C58                ; $81
@@ -14003,7 +14004,7 @@ EntityHandlers::
 	dw MadBomberHandler            ; $93
 	dw Call_07_70AD                ; $94
 	dw RichardHandler              ; $95
-	dw Call_19_5AFD                ; $96
+	dw FrogHandler                ; $96
 	dw SideViewWarpTriggerHandler  ; $97
 	dw Call_07_7503                ; $98
 	dw Call_07_7444                ; $99
@@ -14012,20 +14013,20 @@ EntityHandlers::
 	dw Call_07_715E                ; $9C
 	dw LiftableStatueHandler       ; $9D
 	dw Call_07_7031                ; $9E
-	dw Call_07_63F1                ; $9F
+	dw GoombaHandler                ; $9F
 	dw Call_07_6525                ; $A0
 	dw Call_07_666D                ; $A1
-	dw Call_07_61FB                ; $A2
-	dw Call_07_60BD                ; $A3
-	dw Call_07_60BD                ; $A4
-	dw Call_07_6198                ; $A5
-	dw Call_07_5F54                ; $A6
+	dw PiranhaPlantHandler                ; $A2
+	dw MovingPlatformHandler                ; $A3
+	dw MovingPlatformHandler                ; $A4
+	dw SinkingPlatformHandler                ; $A5
+	dw SideViewWeightsHandler                ; $A6
 	dw PillarHandler                ; $A7
-	dw Call_07_5D87                ; $A8
+	dw IronBallHandler                ; $A8
 	dw BlooperHandler                ; $A9
-	dw Call_19_680A                ; $AA
-	dw Call_19_680A                ; $AB
-	dw Call_19_687E                ; $AC
+	dw CheepCheepHandler                ; $AA
+	dw CheepCheepHandler                ; $AB
+	dw JumpingCheepCheepHandler                ; $AC
 	dw KikiHandler                ; $AD
 	dw WingedOctorokHandler        ; $AE
 	dw TradeItemHandler            ; $AF
@@ -14058,15 +14059,15 @@ EntityHandlers::
 	dw MadBatterEntityHandler      ; $CA
 	dw ZoraEntityHandler           ; $CB
 	dw FishHandler                 ; $CC
-	dw Call_19_6B9B                ; $CD
+	dw BananasSchuleSaleHandler                ; $CD
 	dw MermaidStatueEntityHandler  ; $CE
-	dw Call_19_6E17                ; $CF
+	dw SeashellMansionHandler                ; $CF
 	dw AnimalD0EntityHandler       ; $D0
 	dw AnimalD1EntityHandler       ; $D1
 	dw AnimalD2EntityHandler       ; $D2
 	dw AnimalD3EntityHandler       ; $D3
-	dw Call_19_5D58                ; $D4
-	dw Call_19_5918                ; $D5
+	dw GhostHandler                ; $D4
+	dw RoosterCompanionHandler                ; $D5
 	dw SideViewPotHandler                ; $D6
 	dw ThwimpHandler                ; $D7
 	dw ThwompHandler                ; $D8
@@ -14199,52 +14200,52 @@ EntityCheckObjectCollision::
 
 ;@ def EntityCheckHits(slot: bc)
 ;@ path: entity/collision
-;@ Call_03_6E3D from any bank: contact damage to Link and hits from Link's weapons.
+;@ EntityCheckHits_03 from any bank: contact damage to Link and hits from Link's weapons.
 EntityCheckHits::
 ;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-;> Call_03_6E3D(slot)
-	call Call_03_6E3D
+;> EntityCheckHits_03(slot)
+	call EntityCheckHits_03
 ;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
 ;@ def EntityCheckContactDamage(slot: bc)
 ;@ path: entity/collision
-;@ Call_03_6C87 from any bank: the entity hurts Link when it touches him.
+;@ EntityCheckContactDamage_03 from any bank: the entity hurts Link when it touches him.
 EntityCheckContactDamage::
 ;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-;> Call_03_6C87(slot)
-	call Call_03_6C87
+;> EntityCheckContactDamage_03(slot)
+	call EntityCheckContactDamage_03
 ;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
 ;@ def EntityCheckTouchLink(slot: bc)
 ;@ path: entity/collision
-;@ Call_03_6BF9 from any bank: the entity hits Link when they touch (while Link walks on the ground).
+;@ ProjectileHitsLink from any bank: the entity hits Link when they touch (while Link walks on the ground).
 EntityCheckTouchLink::
 ;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-;> Call_03_6BF9(slot)
-	call Call_03_6BF9
+;> ProjectileHitsLink(slot)
+	call ProjectileHitsLink
 ;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
 ;@ def EntityTouchesLink(slot: bc) -> carry
 ;@ path: entity/collision
-;@ Call_03_6C93 from any bank: carry set when the entity touches Link.
+;@ EntityTouchesLink_03 from any bank: carry set when the entity touches Link.
 EntityTouchesLink::
 ;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-;> r = Call_03_6C93(slot)
-	call Call_03_6C93
+;> r = EntityTouchesLink_03(slot)
+	call EntityTouchesLink_03
 ;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 ;> return r
@@ -14252,39 +14253,39 @@ EntityTouchesLink::
 
 ;@ def EntityCheckSwordClash(slot: bc)
 ;@ path: entity/collision
-;@ Call_03_73EF from any bank: Link's sword against the entity's clash box (parrying).
+;@ EntityCheckSwordClash_03 from any bank: Link's sword against the entity's clash box (parrying).
 EntityCheckSwordClash::
 ;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-;> Call_03_73EF(slot)
-	call Call_03_73EF
+;> EntityCheckSwordClash_03(slot)
+	call EntityCheckSwordClash_03
 ;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
 ;@ def EntityCheckWeaponHits(slot: bc)
 ;@ path: entity/collision
-;@ Call_03_6E40 from any bank: hits from Link's weapons only (no contact damage).
+;@ EntityCheckWeaponHits_03 from any bank: hits from Link's weapons only (no contact damage).
 EntityCheckWeaponHits::
 ;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-;> Call_03_6E40(slot)
-	call Call_03_6E40
+;> EntityCheckWeaponHits_03(slot)
+	call EntityCheckWeaponHits_03
 ;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
 ;@ def EntityHitOtherEntities(slot: bc)
 ;@ path: entity/collision
-;@ Call_03_75A6 from any bank: the entity hits the other entities it touches.
+;@ EntityHitOtherEntities_03 from any bank: the entity hits the other entities it touches.
 EntityHitOtherEntities::
 ;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-;> Call_03_75A6(slot)
-	call Call_03_75A6
+;> EntityHitOtherEntities_03(slot)
+	call EntityHitOtherEntities_03
 ;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
@@ -14345,323 +14346,470 @@ SetEntitySpeedTowardsLink::
 
 ;@ def GetVectorTowardsLink(slot: bc, speed: a)
 ;@ path: entity/movement
-;@ Call_03_7E17 from any bank: the speed vector from the entity towards Link at `speed`: y in
+;@ GetVectorTowardsLink_03 from any bank: the speed vector from the entity towards Link at `speed`: y in
 ;@ hMultiPurpose0, x in hMultiPurpose1.
 GetVectorTowardsLink::
 ;> set_rom_bank(0x03)
 	ld hl, $2100
 	ld [hl], $03
-;> Call_03_7E17(slot, speed)
-	call Call_03_7E17
+;> GetVectorTowardsLink_03(slot, speed)
+	call GetVectorTowardsLink_03
 ;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
+;@ def DrawEntity16x16(slot: bc, sprites: de)
+;@ path: entity/draw
+;@ Draws the active entity as two 8x16 sprites side by side. `sprites` holds 4 bytes per sprite variant
+;@ (left tile, left attributes, right tile, right attributes); hActiveEntitySpriteVariant picks the
+;@ entry ($FF = draw nothing). With the x flip bit set the two halves swap places. hActiveEntityTileOffset
+;@ is added to both tiles; a half whose tile number ends in $F is hidden (x = $F0). The sprites go to
+;@ the entity area of the OAM buffer at wOAMNextIndex; then FinishEntityDraw hands out the entries and
+;@ adds the shadow. Skipped for entities outside the screen during a room transition.
+;@ test: skip calls routines in another bank
 DrawEntity16x16::
+;> if hActiveEntitySpriteVariant == 0xFF: return
 	ldh a, [hActiveEntitySpriteVariant]
 	inc a
 	ret z
 
+;> SkipDrawIfOffscreen(slot)
 	call SkipDrawIfOffscreen
+;> oam = wOAMBuffer + 0x30 + wOAMNextIndex
 	push de
 	ld a, [wOAMNextIndex]
 	ld e, a
 	ld d, b
-	ld hl, $c030
+	ld hl, wOAMBuffer + $30
 	add hl, de
+;> mem[oam] = hActiveEntityDrawY
 	push hl
 	pop de
 	ldh a, [hActiveEntityDrawY]
 	ld [de], a
 	inc de
+;>@x1 mem[oam + 1] = u8(hActiveEntityX + (hActiveEntityFlipAttribute & 0x20) // 4 - wScreenShakeX)
 	ld a, [wScreenShakeX]
 	ld c, a
 	ldh a, [hActiveEntityFlipAttribute]
 	and $20
 	rra
 	rra
+;=@x1
 	ld hl, hActiveEntityX
 	add [hl]
 	sub c
 	ld [de], a
 	inc de
+;>@v entry = sprites + hActiveEntitySpriteVariant * 4
 	ldh a, [hActiveEntitySpriteVariant]
 	ld c, a
 	ld b, $00
 	sla c
 	rl b
 	sla c
+;=@v
 	rl b
 	pop hl
 	add hl, bc
+;> tile = u8(mem[entry] + hActiveEntityTileOffset)
 	ldh a, [hActiveEntityTileOffset]
 	ld c, a
 	ld a, [hli]
 	add c
+;> mem[oam + 2] = tile
 	ld [de], a
+;> if tile & 0x0F == 0x0F:                     # an empty half: moved off the screen
 	and $0f
 	cp $0f
 	jr nz, jr_000_3c83
 
+;>     mem[oam + 1] = 0xF0
 	dec de
 	ld a, $f0
 	ld [de], a
 	inc de
 
 jr_000_3c83:
+;> mem[oam + 3] = mem[entry + 1] ^ hActiveEntityFlipAttribute
 	inc de
 	ld a, [hli]
 	push hl
 	ld hl, hActiveEntityFlipAttribute
 	xor [hl]
 	ld [de], a
+;> mem[oam + 4] = hActiveEntityDrawY
 	inc de
 	ldh a, [hActiveEntityDrawY]
 	ld [de], a
 	inc de
+;>@x2 mem[oam + 5] = u8(hActiveEntityX + ((hActiveEntityFlipAttribute & 0x20) ^ 0x20) // 4 - wScreenShakeX)
 	ld a, [wScreenShakeX]
 	ld c, a
 	ldh a, [hActiveEntityFlipAttribute]
 	and $20
 	xor $20
 	rra
+;=@x2
 	rra
 	ld hl, hActiveEntityX
 	sub c
 	add [hl]
 	ld [de], a
 	inc de
+;> tile = u8(mem[entry + 2] + hActiveEntityTileOffset)
 	pop hl
 	ldh a, [hActiveEntityTileOffset]
 	ld c, a
 	ld a, [hli]
 	add c
+;> mem[oam + 6] = tile
 	ld [de], a
+;> if tile & 0x0F == 0x0F:
 	and $0f
 	cp $0f
 	jr nz, jr_000_3cb5
 
+;>     mem[oam + 5] = 0xF0
 	dec de
 	ld a, $f0
 	ld [de], a
 	inc de
 
 jr_000_3cb5:
+;> mem[oam + 7] = mem[entry + 3] ^ hActiveEntityFlipAttribute
 	inc de
 	ld a, [hl]
 	ld hl, hActiveEntityFlipAttribute
 	xor [hl]
 	ld [de], a
+;> FinishEntityDraw()                          # falls through
 
+;@ def FinishEntityDraw()
+;@ path: entity/draw
+;@ After an entity's sprites were written: ReserveEntityOAM_15 moves the OAM position past them and
+;@ DrawEntityShadow_15 adds its shadow, ripple or grass (both in bank 15).
+;@ test: skip calls routines in another bank
 FinishEntityDraw::
+;> slot = wActiveEntitySlot
 	ld a, [wActiveEntitySlot]
 	ld c, a
 	ld b, $00
+;> set_rom_bank(0x15)
 	ld a, $15
 	ld [$2100], a
-	call $796d
+;> ReserveEntityOAM_15(slot)
+	call ReserveEntityOAM_15
 
 jr_000_3cca:
-	call $79a5
+;> DrawEntityShadow_15(slot)
+	call DrawEntityShadow_15
+;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
+;@ def DrawEntity8x16(slot: bc, sprites: de)
+;@ path: entity/draw
+;@ Draws the active entity as a single 8x16 sprite, centred on its x (x + 4). `sprites` holds 2 bytes
+;@ per sprite variant (tile, attributes); hActiveEntitySpriteVariant picks the entry ($FF = draw
+;@ nothing). In the side-view areas the sprite is raised by 4 pixels (also kept in
+;@ hActiveEntityDrawY). No tile offset is added. Ends in FinishEntityDraw.
+;@ test: skip calls routines in another bank
 DrawEntity8x16::
+;> if hActiveEntitySpriteVariant == 0xFF: return
 	ldh a, [hActiveEntitySpriteVariant]
 	inc a
 	ret z
 
+;> SkipDrawIfOffscreen(slot)
 	call SkipDrawIfOffscreen
+;> oam = wOAMBuffer + 0x30 + wOAMNextIndex
 	push de
 	ld a, [wOAMNextIndex]
 	ld l, a
 	ld h, $00
-	ld bc, $c030
+	ld bc, wOAMBuffer + $30
 	add hl, bc
+;> y = hActiveEntityDrawY
 	push hl
 	pop de
 	ld a, [wActiveEntitySlot]
 	ld c, a
 	ld b, $00
+;> if hIsSideScrolling:
 	ldh a, [hIsSideScrolling]
 	and a
 	ldh a, [hActiveEntityDrawY]
 	jr z, jr_000_3cf5
 
+;>     y = u8(y - 4)
 	sub $04
+;>     hActiveEntityDrawY = y
 	ldh [hActiveEntityDrawY], a
 
 jr_000_3cf5:
+;> mem[oam] = y
 	ld [de], a
 	inc de
+;> mem[oam + 1] = u8(hActiveEntityX + 4 - wScreenShakeX)
 	ld a, [wScreenShakeX]
 	ld h, a
 	ldh a, [hActiveEntityX]
 	add $04
 	sub h
 	ld [de], a
+;>@e entry = sprites + hActiveEntitySpriteVariant * 2
 	inc de
 	ldh a, [hActiveEntitySpriteVariant]
 	ld c, a
 	ld b, $00
 	sla c
 	rl b
+;=@e
 	pop hl
 	add hl, bc
+;> mem[oam + 2] = mem[entry]
 	ld a, [hli]
 	ld [de], a
 	inc de
+;> mem[oam + 3] = mem[entry + 1] ^ hActiveEntityFlipAttribute
 	ld a, [hli]
 	ld hl, hActiveEntityFlipAttribute
 	xor [hl]
 	ld [de], a
 	inc de
+;> return FinishEntityDraw()
 	jr FinishEntityDraw
 
+;@ def DrawEntityShadow(slot: bc)
+;@ path: entity/draw
+;@ DrawEntityShadow_15 from any bank: only the shadow, ripple or grass under the entity in `slot`.
+;@ test: skip calls routines in another bank
 DrawEntityShadow::
+;> set_rom_bank(0x15)
 	ld a, $15
 	ld [$2100], a
+;> DrawEntityShadow_15(slot)
+;> set_rom_bank(wCurrentBank)
 	jr jr_000_3cca
 
+;@ def DrawEntitySpritesAtOAMStart(count: c, sprites: hl)
+;@ path: entity/draw
+;@ Like DrawEntitySprites, but the sprites are written to the very start of the OAM buffer (before the
+;@ entity area), so they are always shown. Used for entities that must never flicker.
+;@ test: skip passes the sprite list on the stack
 DrawEntitySpritesAtOAMStart::
+;> push(sprites)
 	push hl
+;> return DrawSpriteListToOAM(wOAMBuffer, count)
 	ld hl, wOAMBuffer
 	jr DrawSpriteListToOAM
 
+;@ def DrawEntitySprites(count: c, sprites: hl)
+;@ path: entity/draw
+;@ Draws the active entity from a list of `count` sprites, 4 bytes each: y offset, x offset, tile,
+;@ attributes (offsets from the entity's draw position). Written at wOAMNextIndex in the entity area
+;@ of the OAM buffer. When hActiveEntitySpriteVariant is $FF nothing is drawn (c = the entity's slot
+;@ on return).
+;@ test: skip passes the sprite list on the stack
 DrawEntitySprites::
+;> if hActiveEntitySpriteVariant == 0xFF: return SkipEntitySprites()
 	ldh a, [hActiveEntitySpriteVariant]
 	inc a
-	jr z, jr_000_3d82
+	jr z, SkipEntitySprites
 
+;> push(sprites)
 	push hl
+;> return DrawSpriteListToOAM(wOAMBuffer + 0x30 + wOAMNextIndex, count)    # falls through
 	ld a, [wOAMNextIndex]
 	ld e, a
 	ld d, $00
-	ld hl, $c030
+	ld hl, wOAMBuffer + $30
 	add hl, de
 
+;@ def DrawSpriteListToOAM(oam: hl, count: c)
+;@ path: entity/draw
+;@ Writes `count` sprites of the active entity to the OAM buffer at `oam`. The sprite list (4 bytes per
+;@ sprite: y offset, x offset, tile, attributes) is taken from the stack, where the caller pushed it.
+;@ y = hActiveEntityDrawY + y offset, x = hActiveEntityX + x offset - wScreenShakeX, tile +
+;@ hActiveEntityTileOffset (a tile of $FF hides the sprite with x = 0), attributes ^
+;@ hActiveEntityFlipAttribute. Then ReserveEntityOAM_15 hands out the entries. Skipped for entities
+;@ outside the screen during a room transition.
+;@ test: skip takes the sprite list from the stack
 DrawSpriteListToOAM::
+;> sprites = pop()                             # pushed by the caller
 	push hl
 	pop de
 	pop hl
+;> hMultiPurpose0 = count
 	ld a, c
 	ldh [hMultiPurpose0], a
+;> SkipDrawIfOffscreen(wActiveEntitySlot)
 	ld a, [wActiveEntitySlot]
 	ld c, a
 	call SkipDrawIfOffscreen
+;> for i in range(hMultiPurpose0):
 	ldh a, [hMultiPurpose0]
 	ld c, a
 
 jr_000_3d46:
+;>     mem[oam] = u8(hActiveEntityDrawY + mem[sprites])
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ld [de], a
 	inc hl
 	inc de
+;>@sx     mem[oam + 1] = u8(hActiveEntityX + mem[sprites + 1] - wScreenShakeX)
 	push bc
 	ld a, [wScreenShakeX]
 	ld c, a
 	ldh a, [hActiveEntityX]
 	add [hl]
 	sub c
+;=@sx
 	ld [de], a
 	inc hl
 	inc de
+;>     tile = mem[sprites + 2]
 	ldh a, [hActiveEntityTileOffset]
 	ld c, a
 	ld a, [hli]
 	push af
+;>     mem[oam + 2] = u8(tile + hActiveEntityTileOffset)
 	add c
 	ld [de], a
 	pop af
+;>     if tile == 0xFF:                         # an unused sprite: moved off the screen
 	cp $ff
 	jr nz, jr_000_3d68
 
+;>         mem[oam + 1] = 0
 	dec de
 	xor a
 	ld [de], a
 	inc de
 
 jr_000_3d68:
+;>     mem[oam + 3] = hActiveEntityFlipAttribute ^ mem[sprites + 3]
 	pop bc
 	inc de
 	ldh a, [hActiveEntityFlipAttribute]
 	xor [hl]
 	inc hl
 	ld [de], a
+;>     oam += 4; sprites += 4
 	inc de
 	dec c
 	jr nz, jr_000_3d46
 
+;> set_rom_bank(0x15)
 	ld a, [wActiveEntitySlot]
 	ld c, a
 	ld a, $15
 	ld [$2100], a
-	call $796d
+;> ReserveEntityOAM_15(wActiveEntitySlot)
+	call ReserveEntityOAM_15
+;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
-jr_000_3d82:
+;@ def SkipEntitySprites() -> c
+;@ path: entity/draw
+;@ End of DrawEntitySprites when the entity is hidden (sprite variant $FF): nothing is drawn, c is
+;@ set back to the entity's slot.
+SkipEntitySprites::
+;> return wActiveEntitySlot
 	ld a, [wActiveEntitySlot]
 	ld c, a
 	ret
 
 
+;@ def SkipDrawIfOffscreen(slot: bc)
+;@ path: entity/draw
+;@ During a room transition, an entity outside the visible area (x not in 1..$C0, draw y not in
+;@ 1..$88, or a nonzero high byte of its x / y position) is not drawn: the return address is dropped,
+;@ so the drawing routine that called this returns at once. Outside a transition it does nothing.
+;@ test: skip drops its return address from the stack
 SkipDrawIfOffscreen::
+;> if wRoomTransitionState:
 	push hl
 	ld a, [wRoomTransitionState]
 	and a
 	jr z, jr_000_3dad
 
+;>     if u8(hActiveEntityX - 1) >= 0xC0:
 	ldh a, [hActiveEntityX]
 	dec a
 	cp $c0
 	jr nc, jr_000_3dac
 
+;>@off         return_from_caller()
+;>     elif u8(hActiveEntityDrawY - 1) >= 0x88:
 	ldh a, [hActiveEntityDrawY]
 	dec a
 	cp $88
 	jr nc, jr_000_3dac
 
+;>@off         return_from_caller()
+;>     elif wEntityPosXHigh[slot]:
 	ld hl, wEntityPosXHigh
 	add hl, bc
 	ld a, [hl]
 	and a
 	jr nz, jr_000_3dac
 
+;>@off         return_from_caller()
+;>     elif wEntityPosYHigh[slot]:
 	ld hl, wEntityPosYHigh
 	add hl, bc
 	ld a, [hl]
 	and a
 	jr z, jr_000_3dad
 
+;>@off         return_from_caller()
 jr_000_3dac:
+;=@off
 	pop af
 
 jr_000_3dad:
+;> return
 	pop hl
 	ret
 
 
+;@ def ClearEntitySpeed(slot: bc)
+;@ path: entity/movement
+;@ Stops the entity in `slot`: its x and y speed are set to 0 (b, the high byte of the slot, is the 0
+;@ that is stored).
 ClearEntitySpeed::
+;> wEntitySpeedX[slot] = 0
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], b
+;> wEntitySpeedY[slot] = 0
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], b
 	ret
 
 
+;@ def LoadEntityPosition(slot: bc)
+;@ path: entity/draw
+;@ Copies the position of the entity in `slot` to hActiveEntityX / hActiveEntityY; the draw y
+;@ (hActiveEntityDrawY) is y minus its height above the ground (wEntityZ).
+;@ test: slot = rand(0, 15)
 LoadEntityPosition::
+;> hActiveEntityX = wEntityX[slot]
 	ld hl, wEntityX
 	add hl, bc
 	ld a, [hl]
 	ldh [hActiveEntityX], a
+;> hActiveEntityY = wEntityY[slot]
 	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	ldh [hActiveEntityY], a
+;> hActiveEntityDrawY = u8(hActiveEntityY - wEntityZ[slot])
 	ld hl, wEntityZ
 	add hl, bc
 	sub [hl]
@@ -14669,50 +14817,57 @@ LoadEntityPosition::
 	ret
 
 
+;@ def ReserveOAMEntriesFar(count: a)
+;@ path: entity/draw
+;@ ReserveOAMEntries_15 from any bank: moves the OAM write position past `count` sprites.
+;@ test: skip calls routines in another bank
 ReserveOAMEntriesFar::
+;> set_rom_bank(0x15)
 	ld hl, $2100
 	ld [hl], $15
-	call $7974
+;> ReserveOAMEntries_15(count)
+	call ReserveOAMEntries_15
+;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
-Trampoline3DDB::
+MiniMoldormInitFar::
 	db $21, $00, $21, $36, $04, $cd, $10, $5a, $c3, $c0, $07
 
-Trampoline3DE6::
+MoldormInitFar::
 	db $21, $00, $21, $36, $04
 	db $cd, $80, $56, $c3, $c0, $07
 
-Trampoline3DF1::
+FacadeInitFar::
 	db $21, $00, $21, $36, $04, $cd, $4d, $50, $c3, $c0
 	db $07
 
-Trampoline3DFC::
+SlimeEyeInitFar::
 	db $21, $00, $21, $36, $04, $cd, $b5, $49, $c3, $c0, $07
 
-Trampoline3E07::
+GenieInitFar::
 	db $21, $00, $21, $36
 	db $04, $cd, $00, $40, $c3, $c0, $07
 
-Trampoline3E12::
+SlimeEelInitFar::
 	db $21, $00, $21, $36, $05, $cd, $2b, $6c, $c3
 	db $c0, $07
 
-Trampoline3E1D::
+DodongoSnakeInitFar::
 	db $21, $00, $21, $36, $05, $cd, $76, $67, $c3, $c0, $07
 
-Trampoline3E28::
+HideEntityWithFullHealthFar::
 	db $21, $00, $21
 	db $36, $05, $cd, $4f, $62, $c3, $c0, $07
 
-Trampoline3E33::
+EvilEagleArenaSetupFar::
 	db $21, $00, $21, $36, $05, $cd, $59, $59
 	db $c3, $c0, $07
 
-Trampoline3E3E::
+AnglerRoomHelperFar::
 	db $21, $00, $21, $36, $05, $cd, $9f, $54, $c3, $c0, $07
 
-Call_3E49::
+CheckLinkLeavesRoomFar::
 	ld a, [wCurrentBank]
 	push af
 	ld a, $02
@@ -14722,17 +14877,17 @@ Call_3E49::
 	jp SwitchBank
 
 
-Trampoline3E59::
+GhiniMoveFar::
 	db $21, $00, $21, $36, $04, $cd, $5a, $5c, $c3, $c0, $07
 
-Call_3E64::
+BreakIntoPiecesFar::
 	ld hl, $2100
 	ld [hl], $03
 	call $5464
 	jp RestoreBank
 
 
-Call_3E6F::
+DrawRupeesAndHeartsFar::
 	ld hl, $2100
 	ld [hl], $02
 	call $5fd1
@@ -14740,7 +14895,7 @@ Call_3E6F::
 	jp RestoreBank
 
 
-Call_3E7D::
+SpawnChestContentsFrom3::
 	ld a, $02
 	call SwitchBank
 	call $41ba
@@ -14748,21 +14903,21 @@ Call_3E7D::
 	jp SwitchBank
 
 
-Call_3E8A::
+DrawAButtonItemFar::
 	ld hl, $2100
 	ld [hl], $02
 	call $61e7
 	jp RestoreBank
 
 
-Call_3E95::
+GiveInventoryItemFar::
 	ld hl, $2100
 	ld [hl], $03
 	call $6497
 	jp RestoreBank
 
 
-Call_3EA0::
+DrawInstrumentWarpEffectFrom3::
 	ld a, $06
 	call SwitchBank
 	call $7940
@@ -14770,7 +14925,7 @@ Call_3EA0::
 	jp SwitchBank
 
 
-Call_3EAD::
+ClearAllEntitySlots::
 	ld e, $10
 	ld hl, wEntityStatus
 
@@ -14783,8 +14938,8 @@ jr_000_3eb2:
 	ret
 
 
-Call_3EB8::
-	ld hl, $c4a0
+AddPowerHitTrailVfx::
+	ld hl, wEntityHitByPowerUp
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -14807,7 +14962,7 @@ Call_3EB8::
 	ret
 
 
-Call_3ED9::
+EndHitImmunityAtWall::
 	ld hl, wEntityRecoilSpeedX
 	add hl, bc
 	ld a, [hl]
@@ -14851,10 +15006,10 @@ jr_000_3f08:
 	ret
 
 
-DungeonMapDialogs::
+BossIntroDialogs::
 	db $b0, $b4, $b1, $b2, $b3, $b6, $ba, $bc, $b8
 
-Call_3F12::
+StartBossMusic::
 	ld hl, wInventoryAppearing
 	ld a, [wRoomTransitionState]
 	or [hl]
@@ -14933,19 +15088,19 @@ jr_000_3f71:
 RoomEntityBitMask2::
 	db $01, $02, $04, $08, $10, $20, $40, $80
 
-Call_3F7A::
+DefeatEntityWithDrop::
 	ld a, $03
 	ld [$c113], a
 	ld [$2100], a
 	call $562f
 	call RestoreBank
 
-Call_3F88::
+DefeatEntity::
 	ld hl, wEntityLoadOrder
 	add hl, bc
 	ld a, [hl]
 	cp $ff
-	jr z, Call_3FB7
+	jr z, FreeEntitySlot
 
 	push af
 	ld a, [wDefeatedEntityCount]
@@ -14959,9 +15114,9 @@ Call_3F88::
 	ld [hl], a
 	pop af
 
-Call_3FA2::
+MarkEntityDefeated::
 	cp $08
-	jr nc, Call_3FB7
+	jr nc, FreeEntitySlot
 
 	ld e, a
 	ld d, b
@@ -14976,14 +15131,14 @@ Call_3FA2::
 	or [hl]
 	ld [hl], a
 
-Call_3FB7::
+FreeEntitySlot::
 	ld hl, wEntityStatus
 	add hl, bc
 	ld [hl], b
 	ret
 
 
-Jump_000_3fbd:
+LoadBGChangeTilesA::
 	ld a, $05
 	ld [$2100], a
 	ld hl, $5919
@@ -14991,9 +15146,9 @@ Jump_000_3fbd:
 	ld bc, $0010
 	call CopyData
 	ld hl, $5929
-	jr jr_000_3fe7
+	jr CopyBGChangeTile2
 
-Jump_000_3fd3:
+LoadBGChangeTilesB::
 	ld a, $05
 	ld [$2100], a
 	ld hl, $5939
@@ -15002,7 +15157,7 @@ Jump_000_3fd3:
 	call CopyData
 	ld hl, $5949
 
-jr_000_3fe7:
+CopyBGChangeTile2::
 	ld de, $8480
 	ld bc, $0010
 	call CopyData
@@ -15013,4 +15168,5 @@ jr_000_3fe7:
 	jp DrawLinkOAM
 
 
+Padding3FFB::
 	db $ff, $ff, $ff, $ff, $ff

@@ -593,7 +593,7 @@ jr_014_5387:
 
 Call_14_5388::
 	xor a
-	ldh [$ffbe], a
+	ldh [hWallCheckOnly], a
 	ldh [hActiveEntityTileOffset], a
 	ld a, [wGameplayType]
 	cp $07

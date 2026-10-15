@@ -62,7 +62,7 @@ jr_005_4054:
 ;>     sprites = BowWowSpritesHome
 	ld de, BowWowSpritesHome
 
-;> DrawEntity16x16(sprites)                  # draw BowWow (two 8x16 sprites)
+;> DrawEntity16x16(slot, sprites)                  # draw BowWow (two 8x16 sprites)
 jr_005_4060:
 	call DrawEntity16x16
 ;> if wRoomTransitionState:
@@ -83,7 +83,7 @@ jr_005_4060:
 ;>             return
 	jp z, Jump_005_40a7
 
-;>     DrawBowWowChain()                 # while the screen scrolls only the chain is kept up
+;>     DrawBowWowChain(slot)                 # while the screen scrolls only the chain is kept up
 ;>     return
 	jp Jump_005_40a4
 
@@ -97,7 +97,7 @@ jr_005_407e:
 	or [hl]
 	jp nz, Jump_005_40a4
 
-;>@chain     DrawBowWowChain()
+;>@chain     DrawBowWowChain(slot)
 ;>@chain     return
 ;> if wTransitionSequenceCounter != 4:  # screen still fading in
 	ld a, [wTransitionSequenceCounter]
@@ -105,23 +105,23 @@ jr_005_407e:
 ;>     return
 	ret nz
 
-;> SetBowWowSpriteFromSpeed()
+;> SetBowWowSpriteFromSpeed(slot)
 	call SetBowWowSpriteFromSpeed
-;> DecrementEntityIgnoreHitsTimer()                        # count down wEntityIgnoreHitsTimer
+;> DecrementEntityIgnoreHitsTimer(slot)                        # count down wEntityIgnoreHitsTimer
 	call DecrementEntityIgnoreHitsTimer
 ;> if wIsBowWowFollowingLink == 0:
 	ld a, [wIsBowWowFollowingLink]
 	and a
 	jr nz, jr_005_40a1
 
-;>     EntityCheckWeaponHits()                    # at home it can be hit with the sword
+;>     EntityCheckWeaponHits(slot)                    # at home it can be hit with the sword
 	call EntityCheckWeaponHits
 
 ;> BowWowDispatch(slot)
 jr_005_40a1:
 	call BowWowDispatch
 
-;> DrawBowWowChain()
+;> DrawBowWowChain(slot)
 Jump_005_40a4:
 ;=@chain
 	call DrawBowWowChain
@@ -307,7 +307,7 @@ jr_005_413a:
 	ld [hl], a
 	ld [de], a
 
-;> EntityCheckWalls()                        # walls and ground under the entity
+;> EntityCheckWalls(slot)                        # walls and ground under the entity
 jr_005_4163:
 	call EntityCheckWalls
 ;> BowWowStates[hActiveEntityState](slot)
@@ -351,7 +351,7 @@ BowWowIdleState::
 ;>@attack         return
 ;>@attack     wEntitySpeedZ[slot] = 0x20
 ;>@attack     wEntityState[slot] = 2
-;>@attack     SetEntitySpeedTowardsLink(0x20)                    # speed $20 towards Link
+;>@attack     SetEntitySpeedTowardsLink(slot, 0x20)                    # speed $20 towards Link
 ;>@attack     return
 ;> if wEntityTimer1[slot] != 0:
 	call GetEntityTimer1
@@ -472,7 +472,7 @@ BowWowLungeState::
 ;> if stop:
 	jr z, jr_005_420c
 
-;>     ClearEntitySpeed()                    # stop
+;>     ClearEntitySpeed(slot)                    # stop
 jr_005_41ff:
 	call ClearEntitySpeed
 ;>     wEntityState[slot] = 3
@@ -759,7 +759,7 @@ jr_005_42c2:
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkX], a
-;>         SetEntitySpeedTowardsLink(0x30)                # speed $30 towards it
+;>         SetEntitySpeedTowardsLink(slot, 0x30)                # speed $30 towards it
 	ld a, $30
 	call SetEntitySpeedTowardsLink
 ;>         hLinkX = link_x
@@ -803,7 +803,7 @@ Jump_005_4338:
 ;@ BowWow's bite at the end of a lunge, if the target (wBowWowTargetSlot) still exists and is within
 ;@ reach of BowWow's mouth. Type $3D is not eaten: it shows text $115 instead (at most every $80
 ;@ frames, wEntityTimer2). Type $AD takes several bites: each makes it flash for $18 frames and
-;@ counts up its wEntityPrivateCounter. Anything else is eaten (Call_3F7A kills it).
+;@ counts up its wEntityPrivateCounter. Anything else is eaten (DefeatEntityWithDrop kills it).
 BowWowBiteTarget::
 ;> other = wBowWowTargetSlot
 	ld a, [wBowWowTargetSlot]
@@ -908,12 +908,12 @@ jr_005_4389:
 	ret
 
 
-;> Call_3F7A(other)                    # eaten: the entity dies
+;> DefeatEntityWithDrop(other)                    # eaten: the entity dies
 jr_005_43a9:
 	push bc
 	push de
 	pop bc
-	call Call_3F7A
+	call DefeatEntityWithDrop
 	pop bc
 	ret
 
@@ -1316,7 +1316,7 @@ jr_005_4508:
 	bit 7, [hl]
 	jr z, jr_005_4511
 
-;>     SetEntitySpriteVariant(6)                    # wEntitySpriteVariant = 6
+;>     SetEntitySpriteVariant(slot, 6)                    # wEntitySpriteVariant = 6
 ;>     return
 	ld a, $06
 	jp SetEntitySpriteVariant
@@ -1337,7 +1337,7 @@ SetTwoFrameSpriteVariant_05::
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(base + frame)            # wEntitySpriteVariant
+;> SetEntitySpriteVariant(slot, base + frame)            # wEntitySpriteVariant
 	add e
 	jp SetEntitySpriteVariant
 
@@ -1372,7 +1372,7 @@ CuccoEntityHandler::
 	add $02
 	ldh [hActiveEntitySpriteVariant], a
 
-;> DrawEntity16x16(CuccoSprites)
+;> DrawEntity16x16(slot, CuccoSprites)
 jr_005_4542:
 	ld de, CuccoSprites
 	call DrawEntity16x16
@@ -1390,7 +1390,7 @@ jr_005_4542:
 	ld a, $13
 	ldh [hWaveSfx], a
 
-;>     SetEntitySpriteVariant((hFrameCounter >> 2) & 1)  # flap its wings
+;>     SetEntitySpriteVariant(slot, (hFrameCounter >> 2) & 1)  # flap its wings
 ;>     return
 jr_005_4558:
 	ldh a, [hFrameCounter]
@@ -1404,9 +1404,9 @@ jr_005_4558:
 jr_005_4561:
 	call ReturnIfNonInteractive_05
 ;>     return
-;> EntityCheckWeaponHits()                            # the sword can hit it
+;> EntityCheckWeaponHits(slot)                            # the sword can hit it
 	call EntityCheckWeaponHits
-;> DecrementEntityIgnoreHitsTimer()
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
 ;> if hActiveEntityState != 3:            # revenge cuccos fly level
 	ldh a, [hActiveEntityState]
@@ -1495,7 +1495,7 @@ jr_005_45c1:
 ;>     hActiveEntityState = 2
 	ldh [hActiveEntityState], a
 
-;> if EntityTouchesLink():                        # Link touches it
+;> if EntityTouchesLink(slot):                        # Link touches it
 jr_005_45c9:
 	call EntityTouchesLink
 	jr nc, jr_005_461b
@@ -1589,7 +1589,7 @@ CuccoHopSpeeds::
 ;@ State 0: stands (variant 0) until wEntityTimer runs out, then picks a random hop: x and y speed
 ;@ from CuccoHopSpeeds, facing from the x index (0-3 right, 4-7 left), 48-79 frames, state 1.
 CuccoIdleState::
-;> SetEntitySpriteVariant(0)
+;> SetEntitySpriteVariant(slot, 0)
 	xor a
 	call SetEntitySpriteVariant
 ;> if wEntityTimer[slot] != 0:
@@ -1647,7 +1647,7 @@ jr_005_466e:
 CuccoHopState::
 ;> UpdateEntityPosWithSpeed_05(slot)
 	call UpdateEntityPosWithSpeed_05
-;> EntityCheckWalls()
+;> EntityCheckWalls(slot)
 	call EntityCheckWalls
 ;> if hBGTilesRequestCopy:                 # landed this frame
 	ldh a, [hBGTilesRequestCopy]
@@ -1684,7 +1684,7 @@ jr_005_4691:
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(frame)
+;> SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 	ret
 
@@ -1718,7 +1718,7 @@ CuccoAngryState::
 	or [hl]
 	jr nz, jr_005_46df
 
-;>     GetVectorTowardsLink(0x0C)                     # vector of speed $0C towards Link
+;>     GetVectorTowardsLink(slot, 0x0C)                     # vector of speed $0C towards Link
 	ld a, $0c
 	call GetVectorTowardsLink
 ;>     wEntitySpeedY[slot] = (-hMultiPurpose0) & 0xFF     # ... reversed: away from him
@@ -1739,9 +1739,9 @@ CuccoAngryState::
 ;> UpdateEntityPosWithSpeed_05(slot)
 jr_005_46df:
 	call UpdateEntityPosWithSpeed_05
-;> EntityCheckWalls()
+;> EntityCheckWalls(slot)
 	call EntityCheckWalls
-;> SetEntitySpriteVariant((hFrameCounter >> 2) & 1)
+;> SetEntitySpriteVariant(slot, (hFrameCounter >> 2) & 1)
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -1817,7 +1817,7 @@ jr_005_46df:
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-;>             SetEntitySpeedTowardsLink(0x18)             # (for the new cucco) speed $18 towards Link
+;>             SetEntitySpeedTowardsLink(slot, 0x18)             # (for the new cucco) speed $18 towards Link
 	push de
 	pop bc
 	ld a, $18
@@ -1833,7 +1833,7 @@ jr_005_475a:
 ;@ State 3, a revenge cucco: flies straight on through walls, hurts Link when it touches him and
 ;@ disappears once it leaves the screen. Flaps every 4 frames and makes a noise.
 CuccoRevengeState::
-;> EntityCheckContactDamage()                            # hurts Link on contact
+;> EntityCheckContactDamage(slot)                            # hurts Link on contact
 	call EntityCheckContactDamage
 ;> UpdateEntityPosWithSpeed_05(slot)
 	call UpdateEntityPosWithSpeed_05
@@ -1848,7 +1848,7 @@ CuccoRevengeState::
 ;>     return
 	jp nc, ClearEntityStatus_05
 
-;> SetEntitySpriteVariant((hFrameCounter >> 2) & 1)
+;> SetEntitySpriteVariant(slot, (hFrameCounter >> 2) & 1)
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -1891,7 +1891,7 @@ WitchSprites::
 ;@ path: npc/witch
 ;@ Draws the witch: the 4 sprites of her current variant in WitchSprites.
 DrawWitch::
-;>@draw DrawEntitySprites(WitchSprites + 16 * hActiveEntitySpriteVariant, 4)
+;>@draw DrawEntitySprites(4, WitchSprites + 16 * hActiveEntitySpriteVariant)
 	ldh a, [hActiveEntitySpriteVariant]
 	rla
 	rla
@@ -1920,7 +1920,7 @@ WitchEntityHandler::
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	inc [hl]
-;>@anim SetEntitySpriteVariant((wEntityPrivateCounter[slot] >> 4) & 3)
+;>@anim SetEntitySpriteVariant(slot, (wEntityPrivateCounter[slot] >> 4) & 3)
 	ld a, [hl]
 	rra
 	rra
@@ -2216,7 +2216,7 @@ TarinEntityHandler::
 ;>         sprites = TarinEndingSprites2
 	ld hl, TarinEndingSprites2
 
-;>     DrawEntitySprites(sprites, 4)
+;>     DrawEntitySprites(4, sprites)
 jr_005_4931:
 	ld c, $04
 	call DrawEntitySprites
@@ -2253,7 +2253,7 @@ jr_005_4940:
 	and a
 	jr nz, jr_005_497c
 
-;>@sit     SetEntitySpriteVariant((hFrameCounter >> 4) & 1)
+;>@sit     SetEntitySpriteVariant(slot, (hFrameCounter >> 4) & 1)
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -2276,7 +2276,7 @@ jr_005_4940:
 	rra
 	rra
 	and $01
-;>         SetEntitySpriteVariant(frame + 2)          # alarmed
+;>         SetEntitySpriteVariant(slot, frame + 2)          # alarmed
 	add $02
 	call SetEntitySpriteVariant
 	jr jr_005_497c
@@ -2288,7 +2288,7 @@ jr_005_4977:
 	add hl, bc
 	ld [hl], b
 
-;> DrawEntity16x16(TarinSprites)
+;> DrawEntity16x16(slot, TarinSprites)
 jr_005_497c:
 	ld de, TarinSprites
 	call DrawEntity16x16
@@ -2417,7 +2417,7 @@ RaccoonSpinState::
 jr_005_49f0:
 	ld [hl], a
 
-;>@spin SetEntitySpriteVariant(RaccoonSpinFrames[wEntityPrivate5[slot]])
+;>@spin SetEntitySpriteVariant(slot, RaccoonSpinFrames[wEntityPrivate5[slot]])
 jr_005_49f1:
 	ld hl, wEntityPrivate5
 	add hl, bc
@@ -2428,7 +2428,7 @@ jr_005_49f1:
 	add hl, de
 	ld a, [hl]
 	call SetEntitySpriteVariant
-;> if GetEntityDropTimer() == 0:         # the spell breaks
+;> if GetEntityDropTimer(slot) == 0:         # the spell breaks
 	call GetEntityDropTimer
 	jr nz, jr_005_4a49
 
@@ -2458,7 +2458,7 @@ jr_005_49f1:
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $20
-;>     SetEntitySpriteVariant(9)                      # now Tarin
+;>     SetEntitySpriteVariant(slot, 9)                      # now Tarin
 	ld a, $09
 	call SetEntitySpriteVariant
 ;>     wEntitySpeedZ[slot] = 0
@@ -2503,9 +2503,9 @@ jr_005_4a49:
 ;> UpdateEntityPosWithSpeed_05(slot)
 jr_005_4a59:
 	call UpdateEntityPosWithSpeed_05
-;> EntityCheckWalls()
+;> EntityCheckWalls(slot)
 	call EntityCheckWalls
-;> t = GetEntityDropTimer()
+;> t = GetEntityDropTimer(slot)
 	call GetEntityDropTimer
 ;> if t < 6:                              # the end of the spin
 	cp $06
@@ -2610,7 +2610,7 @@ jr_005_4aac:
 	ld a, $09
 	ldh [hJingle], a
 
-;> if GetEntityDropTimer() < 0x60 and hFrameCounter & 3 == 0:
+;> if GetEntityDropTimer(slot) < 0x60 and hFrameCounter & 3 == 0:
 jr_005_4ac1:
 	call GetEntityDropTimer
 	cp $60
@@ -2692,7 +2692,7 @@ TarinFallState::
 ;>     wEntityTimer[slot] = 0x40
 	call GetEntityTimer
 	ld [hl], $40
-;>     SetEntitySpriteVariant(GetEntityDirectionToLink_05(slot) + 8)    # Tarin facing Link
+;>     SetEntitySpriteVariant(slot, GetEntityDirectionToLink_05(slot) + 8)    # Tarin facing Link
 	call GetEntityDirectionToLink_05
 	add $08
 	call SetEntitySpriteVariant
@@ -2726,7 +2726,7 @@ jr_005_4b31:
 ;@ State 3: when wEntityTimer reaches 1 Tarin speaks (text $00A); afterwards he turns to Link every
 ;@ 32 frames, blocks him (unless he landed next to him) and talking shows text $00B.
 TarinCuredState::
-;> t = GetEntityTimer()
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
 ;> if t == 1:
 	cp $01
@@ -2750,7 +2750,7 @@ jr_005_4b3f:
 	and $1f
 	jr nz, jr_005_4b50
 
-;>     SetEntitySpriteVariant(GetEntityDirectionToLink_05(slot) + 8)
+;>     SetEntitySpriteVariant(slot, GetEntityDirectionToLink_05(slot) + 8)
 	call GetEntityDirectionToLink_05
 	add $08
 	call SetEntitySpriteVariant
@@ -2799,7 +2799,7 @@ TarinIndoors::
 	and a
 	jr z, jr_005_4b98
 
-;>     DrawEntity8x16(TarinSnoreBubbleSprite)
+;>     DrawEntity8x16(slot, TarinSnoreBubbleSprite)
 	ld de, TarinSnoreBubbleSprite
 	call DrawEntity8x16
 ;>     if ReturnIfNonInteractive_05():
@@ -2807,7 +2807,7 @@ TarinIndoors::
 ;>         return
 ;>     UpdateEntityPosWithSpeed_05(slot)
 	call UpdateEntityPosWithSpeed_05
-;>     t = GetEntityTimer()
+;>     t = GetEntityTimer(slot)
 ;>     if t == 0:
 	call GetEntityTimer
 ;>         ClearEntityStatus_05(slot)
@@ -2894,7 +2894,7 @@ jr_005_4bcb:
 	ld hl, wEntityY
 	add hl, bc
 	ld [hl], $34
-;>     LoadEntityPosition()                       # copy the position to hActiveEntityX / Y
+;>     LoadEntityPosition(slot)                       # copy the position to hActiveEntityX / Y
 	call LoadEntityPosition
 ;>     sprites = TarinSleepingSprite
 	ld de, TarinSleepingSprite
@@ -2919,7 +2919,7 @@ jr_005_4bdf:
 jr_005_4bf0:
 	ld de, TarinStandingSprites
 
-;> DrawEntity16x16(sprites)
+;> DrawEntity16x16(slot, sprites)
 jr_005_4bf3:
 	call DrawEntity16x16
 ;> if ReturnIfNonInteractive_05():
@@ -3023,7 +3023,7 @@ ShieldHeldUpSprite::
 ;@ State 2: while wEntityTimer runs Link stands in his item pose ($6C) facing down with the shield
 ;@ drawn above his head. Then he gets the shield (item 4, wShieldLevel 1), text $091, state 3.
 TarinGiveShieldState::
-;> if GetEntityTimer() == 0:
+;> if GetEntityTimer(slot) == 0:
 	call GetEntityTimer
 	jr nz, jr_005_4c66
 
@@ -3057,10 +3057,10 @@ jr_005_4c66:
 ;> hActiveEntitySpriteVariant = 0
 	xor a
 	ldh [hActiveEntitySpriteVariant], a
-;> DrawEntity8x16(ShieldHeldUpSprite)          # the shield over Link's head
+;> DrawEntity8x16(slot, ShieldHeldUpSprite)          # the shield over Link's head
 	ld de, ShieldHeldUpSprite
 	call DrawEntity8x16
-;> LoadEntityPosition()                           # back to Tarin's own position
+;> LoadEntityPosition(slot)                           # back to Tarin's own position
 	call LoadEntityPosition
 ;> hLinkAnimationState = 0x6C             # Link holds it up
 	ld a, $6c
@@ -3333,9 +3333,9 @@ jr_005_4d76:
 ;> hActiveEntitySpriteVariant = 0
 	xor a
 	ldh [hActiveEntitySpriteVariant], a
-;> DrawEntity16x16(sprites)
+;> DrawEntity16x16(slot, sprites)
 	call DrawEntity16x16
-;> LoadEntityPosition()                           # back to Tarin's own position
+;> LoadEntityPosition(slot)                           # back to Tarin's own position
 	call LoadEntityPosition
 ;> hActiveEntitySpriteVariant = wEntitySpriteVariant[slot]
 	ld hl, wEntitySpriteVariant
@@ -3461,7 +3461,7 @@ jr_005_4e19:
 ;>     AnimateNpcFacing_05(slot)
 jr_005_4e3f:
 	call AnimateNpcFacing_05
-;>     sing = wMarinSinging == 1 and GetEntityTimer1() == 0
+;>     sing = wMarinSinging == 1 and GetEntityTimer1(slot) == 0
 	ld a, [wMarinSinging]
 	cp $01
 	jr nz, jr_005_4ea7
@@ -3545,7 +3545,7 @@ Jump_005_4e4e:
 jr_005_4ea7:
 	ld a, c
 	ld [wSingingMarinSlot], a
-;> DrawEntity16x16(MarinOutdoorSprites)
+;> DrawEntity16x16(slot, MarinOutdoorSprites)
 	ld de, MarinOutdoorSprites
 	call DrawEntity16x16
 ;> MakeEntitySolid_05()
@@ -4063,7 +4063,7 @@ OcarinaHeldUpSprite::
 ;@ bit 2) and selected, and Marin says text $014 (state 5) - in rooms $C0 and up text $193 and back
 ;@ to state 0.
 MarinTeachSongState::
-;> t = GetEntityTimer()
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
 ;> if t == 0:
 	jr nz, jr_005_50e5
@@ -4138,7 +4138,7 @@ jr_005_50ef:
 	ld de, OcarinaHeldUpSprite
 	xor a
 	ldh [hActiveEntitySpriteVariant], a
-;> DrawEntity8x16(OcarinaHeldUpSprite)
+;> DrawEntity8x16(slot, OcarinaHeldUpSprite)
 	call DrawEntity8x16
 	ret
 
@@ -4197,7 +4197,7 @@ MarinIndoors::
 	ld hl, wEntityX
 	add hl, bc
 	ld [hl], $7a
-;>     DrawEntity16x16(MarinLateSprite)
+;>     DrawEntity16x16(slot, MarinLateSprite)
 	ld de, MarinLateSprite
 	call DrawEntity16x16
 ;>     if ReturnIfNonInteractive_05():
@@ -4285,7 +4285,7 @@ jr_005_5189:
 ;> AnimateNpcFacing_05(slot)
 jr_005_5197:
 	call AnimateNpcFacing_05
-;> DrawEntity16x16(MarinSprites)
+;> DrawEntity16x16(slot, MarinSprites)
 	ld de, MarinSprites
 	call DrawEntity16x16
 ;> MarinHouseStates[hActiveEntityState - 1](slot)
@@ -4321,7 +4321,7 @@ LinkWakeUpFrames::
 ;@ State 1: Link wakes up in bed while wEntityDropTimer runs; then Marin speaks (text $001) and
 ;@ state 2 follows.
 MarinWatchLinkWakeState::
-;> t = GetEntityDropTimer()
+;> t = GetEntityDropTimer(slot)
 	call GetEntityDropTimer
 ;> if t == 0:
 	jr nz, jr_005_51ee
@@ -4371,10 +4371,10 @@ DrawLinkInBed::
 ;> hLinkAnimationState = 0xFF             # Link not drawn: the bed picture shows him
 	ld a, $ff
 	ldh [hLinkAnimationState], a
-;> DrawEntity16x16(LinkInBedSprites)
+;> DrawEntity16x16(slot, LinkInBedSprites)
 	ld de, LinkInBedSprites
 	call DrawEntity16x16
-;> LoadEntityPosition()                           # back to Marin's own position
+;> LoadEntityPosition(slot)                           # back to Marin's own position
 	call LoadEntityPosition
 	ret
 
@@ -4387,7 +4387,7 @@ LinkInBedState::
 ;> DrawLinkInBed(3)
 	ld a, $03
 	call DrawLinkInBed
-;> if GetEntityTimer() or wDialogState:
+;> if GetEntityTimer(slot) or wDialogState:
 	call GetEntityTimer
 	ld hl, wDialogState
 	or [hl]
@@ -4532,7 +4532,7 @@ RaftOwnerEntityHandler::
 ;> AnimateNpcFacing_05(slot)
 jr_005_52b2:
 	call AnimateNpcFacing_05
-;> DrawEntity16x16(RaftOwnerSprites)
+;> DrawEntity16x16(slot, RaftOwnerSprites)
 	ld de, RaftOwnerSprites
 	call DrawEntity16x16
 ;> if ReturnIfNonInteractive_05():
@@ -4702,7 +4702,7 @@ jr_005_5345:
 	cp $ff
 	jr nz, jr_005_532f
 
-;>     DrawEntity16x16(RaftSprites)
+;>     DrawEntity16x16(slot, RaftSprites)
 	ld de, RaftSprites
 	call DrawEntity16x16
 ;>     if ReturnIfNonInteractive_05(): return
@@ -4720,7 +4720,7 @@ jr_005_5357:
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(frame)
+;> SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
 ;> if (hLinkX - hActiveEntityX + 0x10) & 0xFF < 0x20:
 	ldh a, [hLinkX]
@@ -4756,7 +4756,7 @@ jr_005_5386:
 ;>     wEntityState[slot] = 0
 	call IncrementEntityState
 	ld [hl], b
-;>     LoadEntityPosition(); DrawEntity16x16(RaftSprites); return    # the drawing at the end of RaftBoardState
+;>     LoadEntityPosition(slot); DrawEntity16x16(slot, RaftSprites); return    # the drawing at the end of RaftBoardState
 	jr jr_005_53cd
 
 ;> RaftStates[hActiveEntityState](slot)
@@ -4790,8 +4790,8 @@ RaftWaitState::
 ;>         wEntityState[slot] += 1
 	call IncrementEntityState
 
-;> LoadEntityPosition()
-;> DrawEntity16x16(RaftSprites)
+;> LoadEntityPosition(slot)
+;> DrawEntity16x16(slot, RaftSprites)
 jr_005_53b0:
 	jr jr_005_53cd
 
@@ -4822,10 +4822,10 @@ jr_005_53c9:
 	ld a, $01
 	ldh [hLinkInWater], a
 
-;> LoadEntityPosition()
+;> LoadEntityPosition(slot)
 jr_005_53cd:
 	call LoadEntityPosition
-;> DrawEntity16x16(RaftSprites)
+;> DrawEntity16x16(slot, RaftSprites)
 	ld de, RaftSprites
 	jp DrawEntity16x16
 
@@ -4874,7 +4874,7 @@ RaftRideState::
 	ldh a, [hLinkPositionZ]
 	ld [hl], a
 
-;> hLinkInWater = 1; LoadEntityPosition(); DrawEntity16x16(RaftSprites)    # the end of RaftBoardState
+;> hLinkInWater = 1; LoadEntityPosition(slot); DrawEntity16x16(slot, RaftSprites)    # the end of RaftBoardState
 jr_005_5407:
 	jr jr_005_53c9
 
@@ -4884,7 +4884,7 @@ jr_005_5407:
 ;@ frame (and a Pegasus Boots dash ends), and a hookshot chain that reached it goes back to its
 ;@ first state.
 MakeEntitySolid_05::
-;> if not EntityTouchesLink():                    # Link does not touch it
+;> if not EntityTouchesLink(slot):                    # Link does not touch it
 	call EntityTouchesLink
 ;>     return
 	jr nc, jr_005_542b
@@ -4949,7 +4949,7 @@ AnimateNpcFacing_05::
 ;=@frame
 	pop hl
 	and $01
-;> SetEntitySpriteVariant(base | frame)
+;> SetEntitySpriteVariant(slot, base | frame)
 	or [hl]
 	jp SetEntitySpriteVariant
 
@@ -4988,7 +4988,7 @@ ShouldLinkTalkToEntity_05::
 	cp $6d
 	jr z, jr_005_5478
 
-;>     if GetEntityDirectionToLink_05() != hLinkDirection ^ 1:   # Link must face it
+;>     if GetEntityDirectionToLink_05(slot) != hLinkDirection ^ 1:   # Link must face it
 	push de
 	call GetEntityDirectionToLink_05
 	ldh a, [hLinkDirection]
@@ -5074,8 +5074,8 @@ AnglerFishParts::
 ;@ The fish itself: draws it (DrawAnglerFish). While it dies (status not 5) it flashes and explodes
 ;@ (AnglerFishDeathSteps, step in wEntityPrivate2); alive see AnglerFishAlive.
 AnglerFishBody::
-;> Call_3F12()
-	call Call_3F12
+;> StartBossMusic()
+	call StartBossMusic
 ;> DrawAnglerFish()
 	call DrawAnglerFish
 ;> if hActiveEntityStatus == 5:
@@ -5119,12 +5119,12 @@ AnglerFishDeathStart::
 ;@ Death step 1: it flashes as long as wEntityTimer runs, with explosions (BossExplosionPuffs_05) in the last
 ;@ $80 frames; at the end SpawnHeartContainer_05 spawns the next entity with an 8-frame death timer.
 AnglerFishDeathExplode::
-;> t = GetEntityTimer()
+;> t = GetEntityTimer(slot)
 ;> if t == 0:
 	call GetEntityTimer
 	jp z, Jump_005_54f2
 
-;>@end     new = SpawnHeartContainer_05()
+;>@end     new = SpawnHeartContainer_05(slot)
 ;>@end     wEntityDyingTimer[new] = 8
 ;>@end     return
 ;> wEntityFlashTimer[slot] = t
@@ -5346,7 +5346,7 @@ jr_005_5586:
 	ld [hl], $40
 	pop bc
 
-;> DecrementEntityIgnoreHitsTimer()
+;> DecrementEntityIgnoreHitsTimer(slot)
 jr_005_55e7:
 	call DecrementEntityIgnoreHitsTimer
 ;>@anim wEntitySpriteVariant[slot] = (wEntityPrivateCounter[slot] >> 4) & 1
@@ -5377,19 +5377,19 @@ jr_005_55e7:
 	ld hl, wEntityHitboxFlags
 	add hl, bc
 	ld [hl], $00
-;> LoadEntityHitbox()                            # load that hitbox
+;> LoadEntityHitbox(slot)                            # load that hitbox
 	call LoadEntityHitbox
-;> EntityCheckWeaponHits()                            # sword hits on it
+;> EntityCheckWeaponHits(slot)                            # sword hits on it
 	call EntityCheckWeaponHits
-;> LoadEntityPosition()                            # its real position again
+;> LoadEntityPosition(slot)                            # its real position again
 	call LoadEntityPosition
 ;> wEntityHitboxFlags[slot] = 0x14
 	ld hl, wEntityHitboxFlags
 	add hl, bc
 	ld [hl], $14
-;> LoadEntityHitbox()
+;> LoadEntityHitbox(slot)
 	call LoadEntityHitbox
-;> EntityCheckContactDamage()                            # hurts Link on contact
+;> EntityCheckContactDamage(slot)                            # hurts Link on contact
 	call EntityCheckContactDamage
 ;> AnglerFishStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
@@ -5418,7 +5418,7 @@ AnglerTurnY::
 ;@ State 0: swims up and down between y $18 and $60 until wEntityDropTimer runs out; then it remembers
 ;@ an x of $60-$7F to come back to (wEntityPrivate1) and charges (state 1, wEntityTimer $80).
 AnglerSwimState::
-;> if GetEntityDropTimer() == 0:
+;> if GetEntityDropTimer(slot) == 0:
 	call GetEntityDropTimer
 	jr nz, jr_005_5649
 
@@ -5484,7 +5484,7 @@ AnglerChargeState::
 	ld a, [hl]
 	inc [hl]
 	inc [hl]
-;> t = GetEntityTimer()
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
 ;> if t == 0x60:
 	cp $60
@@ -5634,7 +5634,7 @@ DrawAnglerFish::
 ;>     sprites = AnglerFishSpritesB
 	ld hl, AnglerFishSpritesB
 
-;> DrawEntitySprites(sprites + offset, 19)
+;> DrawEntitySprites(19, sprites + offset)
 jr_005_582c:
 	add hl, de
 	ld c, $13
@@ -5656,7 +5656,7 @@ AnglerBubbleSprites::
 ;@ Part 2, a bubble: it wobbles (mirrored every 8 frames) and rises in spurts (speed -8 for 48 of
 ;@ every 64 frames) until it reaches the top (drawn y < $10).
 AnglerBubble::
-;> DrawEntity8x16(AnglerBubbleSprites)
+;> DrawEntity8x16(slot, AnglerBubbleSprites)
 	ld de, AnglerBubbleSprites
 	call DrawEntity8x16
 ;> if ReturnIfNonInteractive_05(): return
@@ -5665,7 +5665,7 @@ AnglerBubble::
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	inc [hl]
-;>@wob SetEntitySpriteVariant((wEntityPrivateCounter[slot] >> 3) & 1)
+;>@wob SetEntitySpriteVariant(slot, (wEntityPrivateCounter[slot] >> 3) & 1)
 	ld a, [hl]
 	rra
 	rra
@@ -5707,12 +5707,12 @@ AnglerRockSprites::
 ;@ Part 1, a falling rock: falls at speed $0C, swaying left and right (x speed -4 / +4 for 16 frames
 ;@ each, mirrored with it), hurts Link and can be hit; gone at the bottom (drawn y >= $8B).
 AnglerFallingRock::
-;> DrawEntity16x16(AnglerRockSprites)
+;> DrawEntity16x16(slot, AnglerRockSprites)
 	ld de, AnglerRockSprites
 	call DrawEntity16x16
 ;> if ReturnIfNonInteractive_05(): return
 	call ReturnIfNonInteractive_05
-;> DecrementEntityIgnoreHitsTimer()
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
 ;> wEntityPrivateCounter[slot] += 1
 	ld hl, wEntityPrivateCounter
@@ -5721,14 +5721,14 @@ AnglerFallingRock::
 ;> n = wEntityPrivateCounter[slot]
 	ld a, [hl]
 	push af
-;> SetEntitySpriteVariant((n >> 4) & 1)
+;> SetEntitySpriteVariant(slot, (n >> 4) & 1)
 	rra
 	rra
 	rra
 	rra
 	and $01
 	call SetEntitySpriteVariant
-;> EntityCheckHits()                            # touches Link / sword hits
+;> EntityCheckHits(slot)                            # touches Link / sword hits
 	call EntityCheckHits
 ;> sx = 0xFC
 	pop af
@@ -5792,12 +5792,12 @@ AnglerFry::
 ;=@flip
 	and $20
 	ldh [hActiveEntityFlipAttribute], a
-;> DrawEntity16x16(AnglerFrySprites)
+;> DrawEntity16x16(slot, AnglerFrySprites)
 	ld de, AnglerFrySprites
 	call DrawEntity16x16
 ;> if ReturnIfNonInteractive_05(): return
 	call ReturnIfNonInteractive_05
-;> DecrementEntityIgnoreHitsTimer()
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
 ;> frame = (hFrameCounter >> 4) & 1
 	ldh a, [hFrameCounter]
@@ -5806,9 +5806,9 @@ AnglerFry::
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(frame)
+;> SetEntitySpriteVariant(slot, frame)
 	call SetEntitySpriteVariant
-;> EntityCheckHits()
+;> EntityCheckHits(slot)
 	call EntityCheckHits
 ;> if hFrameCounter & 3 == 0:
 	ldh a, [hFrameCounter]
@@ -5843,7 +5843,7 @@ AnglerFry::
 ;> UpdateEntityPosWithSpeed_05(slot)
 jr_005_5909:
 	call UpdateEntityPosWithSpeed_05
-;> if GetEntityTimer() == 0:
+;> if GetEntityTimer(slot) == 0:
 	call GetEntityTimer
 	jr nz, jr_005_5918
 
@@ -5858,14 +5858,14 @@ jr_005_5918:
 
 
 ;@ path: gfx/tiles
-;@ Two background tiles (2 bits per pixel) for a background change: the routine at Jump_000_3fbd
+;@ Two background tiles (2 bits per pixel) for a background change: the routine at LoadBGChangeTilesA
 ;@ copies the first to $8460 and the second to $8480 (BGChangeTilesB is the other form).
 ;@ asset: tiles bpp=2 length=$20
 BGChangeTilesA::
 	db $07, $00, $0f, $07, $1e, $0f, $3f, $18, $3f, $10, $3f, $14, $3f, $10, $27, $1b
 	db $e0, $00, $f0, $e0, $18, $f0, $8c, $78, $8c, $70, $3f, $c0, $ff, $3e, $ef, $f1
 ;@ path: gfx/tiles
-;@ The other form of the two tiles at $8460 / $8480, copied by Jump_000_3fd3.
+;@ The other form of the two tiles at $8460 / $8480, copied by LoadBGChangeTilesB.
 ;@ asset: tiles bpp=2 length=$20
 BGChangeTilesB::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $03, $00, $07, $03
@@ -5990,6 +5990,7 @@ GrimCreeper::
 	ldh a, [hActiveEntityState]
 	rst $00
 
+;@ def GrimCreeperStates(slot: bc)
 ;@ path: boss/evil_eagle
 ;@ The Grim Creeper's states (wEntityState): 0 arriving with his bats, 1 calling the eagle, 2 waiting,
 ;@ 3 blown off the tower (falling), 4 gone. States 3 and 4 are set by the Evil Eagle. The `ret` after
@@ -6001,6 +6002,7 @@ GrimCreeperStates::
 	dw GrimCreeperFallState
 	dw GrimCreeperGoneState
 
+;> return                                 # early exit of GrimCreeperArriveState
 jr_005_59d6:
 	ret
 
@@ -6074,7 +6076,7 @@ GrimCreeperCallEagleState::
 ;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
-;> t = GetEntityTimer()
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
 ;> if t != 0:
 	and a
@@ -6198,7 +6200,7 @@ GrimCreeperSprites::
 ;@ path: boss/evil_eagle
 ;@ Draws the Grim Creeper (GrimCreeperSprites).
 DrawGrimCreeper::
-;> DrawEntity16x16(GrimCreeperSprites)
+;> DrawEntity16x16(slot, GrimCreeperSprites)
 	ld de, GrimCreeperSprites
 	call DrawEntity16x16
 	ret
@@ -6218,7 +6220,7 @@ EvilEagleAttackByHits::
 ;@ shriek, stop, and go to the hurt state $0E; the hit count (wEntityPrivate3, up to 7) picks its next
 ;@ attack from EvilEagleAttackByHits. Otherwise the state from EvilEagleStates.
 EvilEagle::
-;> DrawEvilEagle()
+;> DrawEvilEagle(slot)
 	call DrawEvilEagle
 ;> if hActiveEntityStatus != 5:
 	ldh a, [hActiveEntityStatus]
@@ -6229,7 +6231,7 @@ EvilEagle::
 
 ;> if ReturnIfNonInteractive_05(): return
 	call ReturnIfNonInteractive_05
-;> DecrementEntityIgnoreHitsTimer()
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
 ;> if hActiveEntityState != 0x0E and wEntityFlashTimer[slot]:     # just hit
 	ldh a, [hActiveEntityState]
@@ -6247,7 +6249,7 @@ EvilEagle::
 	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld [hl], $50
-;>     ClearEntitySpeed()                       # stop
+;>     ClearEntitySpeed(slot)                       # stop
 	call ClearEntitySpeed
 ;>     wEntityState[slot] = 0x0E
 	call IncrementEntityState
@@ -6316,7 +6318,7 @@ EvilEagleStates::
 EvilEagleFlyInState::
 ;> UpdateEntityPosWithSpeed_05(slot)
 	call UpdateEntityPosWithSpeed_05
-;> if GetEntityTimer() == 0:
+;> if GetEntityTimer(slot) == 0:
 	call GetEntityTimer
 	jr nz, jr_005_5b2d
 
@@ -6325,7 +6327,7 @@ EvilEagleFlyInState::
 ;>     wEntityTimer[slot] = 0x20
 	call GetEntityTimer
 	ld [hl], $20
-;>     SetEntitySpriteVariant(0xFF)                   # not drawn
+;>     SetEntitySpriteVariant(slot, 0xFF)                   # not drawn
 	ld a, $ff
 	call SetEntitySpriteVariant
 
@@ -6339,12 +6341,12 @@ jr_005_5b2d:
 ;@ After the second pass (wEntityPrivate2 = 2) it slows down (state 2, $30 frames, noise $30);
 ;@ otherwise another pass (state 0, $80 frames) with its screech.
 EvilEagleTurnState::
-;> if GetEntityTimer() != 0:
+;> if GetEntityTimer(slot) != 0:
 	call GetEntityTimer
 ;>     return
 	jr nz, jr_005_5b66
 
-;> SetEntitySpriteVariant(0)
+;> SetEntitySpriteVariant(slot, 0)
 	xor a
 	call SetEntitySpriteVariant
 ;> wEntityY[slot] = (wEntityY[slot] + 0x14) & 0xFF
@@ -6418,7 +6420,7 @@ jr_005_5b67:
 EvilEagleSlowDownState::
 ;> UpdateEntityPosWithSpeed_05(slot)
 	call UpdateEntityPosWithSpeed_05
-;> t = GetEntityTimer()
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
 ;> if t == 1:
 	cp $01
@@ -6469,7 +6471,7 @@ EvilEagleGustState::
 ;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
-;> if GetEntityTimer() != 0:
+;> if GetEntityTimer(slot) != 0:
 	call GetEntityTimer
 ;>     EvilEagleFlap(slot)
 ;>     return
@@ -6511,7 +6513,7 @@ EvilEagleFlap::
 ;>     v = 2
 	inc a
 
-;> SetEntitySpriteVariant(v)
+;> SetEntitySpriteVariant(slot, v)
 jr_005_5bcc:
 	call SetEntitySpriteVariant
 	ret
@@ -6525,7 +6527,7 @@ EvilEagleClearTowerState::
 ;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
-;> if GetEntityTimer() == 0:
+;> if GetEntityTimer(slot) == 0:
 	call GetEntityTimer
 	jr nz, jr_005_5beb
 
@@ -6560,7 +6562,7 @@ EvilEagleHoverState::
 ;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
-;> if GetEntityTimer() == 0:
+;> if GetEntityTimer(slot) == 0:
 	call GetEntityTimer
 	jr nz, EvilEagleFlapWings
 
@@ -6591,7 +6593,7 @@ EvilEagleFlapWings::
 	ld hl, EvilEagleFlapFrames
 	add hl, de
 	ld a, [hl]
-;> SetEntitySpriteVariant(f)
+;> SetEntitySpriteVariant(slot, f)
 	call SetEntitySpriteVariant
 	ret
 
@@ -6635,7 +6637,7 @@ jr_005_5c32:
 	add hl, bc
 	dec [hl]
 
-;>     SetEntitySpriteVariant(0)
+;>     SetEntitySpriteVariant(slot, 0)
 ;>     return
 jr_005_5c3d:
 	xor a
@@ -6667,7 +6669,7 @@ EvilEagleAttackTable::
 ;@ path: boss/evil_eagle
 ;@ State 7: when the timer runs out, starts the attack in wEvilEagleAttack (EvilEagleAttacks).
 EvilEagleChooseAttack::
-;> if GetEntityTimer() != 0:
+;> if GetEntityTimer(slot) != 0:
 	call GetEntityTimer
 ;>     return
 	jr nz, jr_005_5caf
@@ -6861,7 +6863,7 @@ jr_005_5d28:
 ;@ State 8, the swoop: wings spread (variant 1), it brakes both speeds by 1 a frame towards 0; once
 ;@ the y speed is 0 it blows (state 9, $FF frames).
 EvilEagleSwoopState::
-;> SetEntitySpriteVariant(1)
+;> SetEntitySpriteVariant(slot, 1)
 	ld a, $01
 	call SetEntitySpriteVariant
 ;> UpdateEntityPosWithSpeed_05(slot)
@@ -6939,7 +6941,7 @@ EvilEagleGustTable::
 ;@ (counted in wSongShowTimer). From timer $C0 on a feather (part 3) flies out every 16 frames. When
 ;@ the timer runs out, state $0A for $50 frames.
 EvilEagleBlowState::
-;> if GetEntityTimer() == 0:
+;> if GetEntityTimer(slot) == 0:
 	call GetEntityTimer
 ;>     wEntityState[slot] += 1; wEntityTimer[slot] = 0x50; return   # code at the end of this function
 	jp z, Jump_005_5e77
@@ -7031,8 +7033,8 @@ jr_005_5dd1:
 ;>     ApplyLinkSpeedX()
 	push bc
 	call ApplyLinkSpeedX
-;>     Call_3E49()                       # his collisions
-	call Call_3E49
+;>     CheckLinkLeavesRoomFar()                       # his collisions
+	call CheckLinkLeavesRoomFar
 	pop bc
 
 ;> wSongShowTimer = (wSongShowTimer + 1) & 0xFF       # here the wind noise counter
@@ -7051,7 +7053,7 @@ jr_005_5dea:
 
 jr_005_5df7:
 	ld [wSongShowTimer], a
-;> if GetEntityTimer() < 0xC0 and hFrameCounter & 0x0F == 0:
+;> if GetEntityTimer(slot) < 0xC0 and hFrameCounter & 0x0F == 0:
 	call GetEntityTimer
 	cp $c0
 	jr nc, jr_005_5e76
@@ -7168,7 +7170,7 @@ EvilEagleLeaveSpeedX::
 EvilEagleFlyOffState::
 ;> UpdateEntityPosWithSpeed_05(slot)
 	call UpdateEntityPosWithSpeed_05
-;> if GetEntityTimer() == 0:
+;> if GetEntityTimer(slot) == 0:
 	call GetEntityTimer
 ;>     EvilEagleEndAttack(slot)
 ;>     return
@@ -7215,7 +7217,7 @@ jr_005_5ea8:
 	ret
 
 
-;> SetEntitySpriteVariant(0)
+;> SetEntitySpriteVariant(slot, 0)
 jr_005_5eb0:
 	xor a
 	call SetEntitySpriteVariant
@@ -7271,7 +7273,7 @@ jr_005_5ed8:
 EvilEagleDropState::
 ;> UpdateEntityPosWithSpeed_05(slot)
 	call UpdateEntityPosWithSpeed_05
-;> if GetEntityTimer() == 0:
+;> if GetEntityTimer(slot) == 0:
 	call GetEntityTimer
 	jr nz, jr_005_5eeb
 
@@ -7279,7 +7281,7 @@ EvilEagleDropState::
 	ld [hl], $30
 ;>     wEntityState[slot] += 1
 	call IncrementEntityState
-;>     ClearEntitySpeed()                       # stop
+;>     ClearEntitySpeed(slot)                       # stop
 	call ClearEntitySpeed
 
 ;> EvilEagleFlapWings(slot)
@@ -7302,7 +7304,7 @@ EvilEagleKnockSpeedX::
 EvilEagleDiveState::
 ;> UpdateEntityPosWithSpeed_05(slot)
 	call UpdateEntityPosWithSpeed_05
-;> t = GetEntityTimer()
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
 ;> if t == 0:
 	jr nz, jr_005_5f33
@@ -7314,7 +7316,7 @@ EvilEagleDiveState::
 ;>         return
 	jp nc, EvilEagleEndAttack
 
-;>     SetEntitySpriteVariant(1)
+;>     SetEntitySpriteVariant(slot, 1)
 	ld a, $01
 	call SetEntitySpriteVariant
 ;>     if wLinkPushedTimer == 0:
@@ -7322,7 +7324,7 @@ EvilEagleDiveState::
 	and a
 	jr nz, jr_005_5f32
 
-;>         EntityCheckHits()                   # contact with Link
+;>         EntityCheckHits(slot)                   # contact with Link
 	call EntityCheckHits
 ;>         if wLinkPushedTimer:          # it hit him
 	ld a, [wLinkPushedTimer]
@@ -7383,7 +7385,7 @@ jr_005_5f33:
 ;> EvilEagleFlapWings(slot)
 jr_005_5f51:
 	call EvilEagleFlapWings
-;> if GetEntityTimer() < 0x40:
+;> if GetEntityTimer(slot) < 0x40:
 	call GetEntityTimer
 	cp $40
 	jr nc, jr_005_5f61
@@ -7402,14 +7404,14 @@ jr_005_5f61:
 ;@ State $0D: flies straight across (variant 0), hurting Link on contact, until the timer ends the
 ;@ attack.
 EvilEagleCrossState::
-;> SetEntitySpriteVariant(0)
+;> SetEntitySpriteVariant(slot, 0)
 	xor a
 	call SetEntitySpriteVariant
 ;> UpdateEntityPosWithSpeed_05(slot)
 	call UpdateEntityPosWithSpeed_05
-;> EntityCheckHits()
+;> EntityCheckHits(slot)
 	call EntityCheckHits
-;> if GetEntityTimer() == 0:
+;> if GetEntityTimer(slot) == 0:
 	call GetEntityTimer
 ;>     EvilEagleEndAttack(slot)
 	jp z, EvilEagleEndAttack
@@ -7550,7 +7552,7 @@ DrawEvilEagle::
 ;>     sprites = EvilEagleSpritesRight
 	ld hl, EvilEagleSpritesRight
 
-;>@v48 DrawEntitySprites(sprites + 48 * v, 12)
+;>@v48 DrawEntitySprites(12, sprites + 48 * v)
 jr_005_6152:
 	ld e, a
 	ld d, b
@@ -7632,12 +7634,12 @@ GrimCreeperBat::
 ;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
-;> DrawEntity16x16(GrimCreeperBatSprites)
+;> DrawEntity16x16(slot, GrimCreeperBatSprites)
 	ld de, GrimCreeperBatSprites
 	call DrawEntity16x16
 ;> if ReturnIfNonInteractive_05(): return
 	call ReturnIfNonInteractive_05
-;> SetEntitySpriteVariant((hFrameCounter >> 3) & 1)
+;> SetEntitySpriteVariant(slot, (hFrameCounter >> 3) & 1)
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -7753,7 +7755,7 @@ EvilEagleFeatherSprites::
 ;@ Part 3, a feather from the eagle's gust: moves with its speed; state 0 flying (it hurts Link, and
 ;@ curves upwards), state 1 after bouncing off a wall. Gone at the right edge (x >= $A8).
 EvilEagleFeather::
-;> DrawEntity16x16(EvilEagleFeatherSprites)
+;> DrawEntity16x16(slot, EvilEagleFeatherSprites)
 	ld de, EvilEagleFeatherSprites
 	call DrawEntity16x16
 ;> if ReturnIfNonInteractive_05(): return
@@ -7775,7 +7777,7 @@ EvilEagleFeatherStates::
 ;@ State 0: hurts Link when it touches him; when it hits a wall it bounces up (y speed -$20, the
 ;@ upside-down picture, state 1). Its y speed falls by 1 a frame (it curves upwards).
 FeatherFlyState::
-;> EntityCheckTouchLink()                            # touches Link
+;> EntityCheckTouchLink(slot)                            # touches Link
 	call EntityCheckTouchLink
 ;> if wEntityCollisions[slot]:
 	ld hl, wEntityCollisions
@@ -7843,8 +7845,8 @@ HideEntityWithFullHealth_05::
 HotHeadEntityHandler::
 ;> ConfineLinkToArena()
 	call ConfineLinkToArena
-;> Call_3F12()                            # starts the boss music
-	call Call_3F12
+;> StartBossMusic()                            # starts the boss music
+	call StartBossMusic
 ;> part = wEntityPrivate1[slot]
 	ld hl, wEntityPrivate1
 	add hl, bc
@@ -7907,7 +7909,7 @@ HotHeadNextDeathStep:
 ;@ Death step 1: Hot Head flashes and, in the last $80 frames, gives off explosion puffs. At the end it
 ;@ is replaced by the heart container, which falls from high up (z $70) at Link's x, y $70.
 HotHeadExplodeState::
-;> t = GetEntityTimer()
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
 ;> if t != 0:
 	jp z, Jump_005_62ad
@@ -7929,7 +7931,7 @@ jr_005_62ac:
 
 
 ;> # the timer has run out
-;> new = SpawnHeartContainer_05()
+;> new = SpawnHeartContainer_05(slot)
 Jump_005_62ad:
 	call SpawnHeartContainer_05
 ;> wEntityX[new] = hLinkX
@@ -7955,7 +7957,7 @@ Jump_005_62ad:
 HotHeadAlive::
 ;> if ReturnIfNonInteractive_05(): return
 	call ReturnIfNonInteractive_05
-;> DecrementEntityIgnoreHitsTimer()
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
 ;> HotHeadStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
@@ -7996,7 +7998,7 @@ HotHeadJumpSpeedY::
 ;@ spots (HotHeadJumpX/Y, speeds HotHeadJumpSpeedX/Y, z speed $18) with a lava splash and wave
 ;@ sound $16 (state 1).
 HotHeadLavaState::
-;> if GetEntityTimer() != 0: return
+;> if GetEntityTimer(slot) != 0: return
 	call GetEntityTimer
 	jr nz, jr_005_633b
 
@@ -8169,7 +8171,7 @@ HotHeadJumpMove::
 ;>     hJingle = 0x32
 	ld a, $32
 	ldh [hJingle], a
-;>     return SetEntitySpriteVariant(0xFF)             # hidden
+;>     return SetEntitySpriteVariant(slot, 0xFF)             # hidden
 	ld a, $ff
 	jp SetEntitySpriteVariant
 
@@ -8189,7 +8191,7 @@ jr_005_63c2:
 	and a
 	jr z, jr_005_63de
 
-;> return SetEntitySpriteVariant((hFrameCounter >> 3) & 1)
+;> return SetEntitySpriteVariant(slot, (hFrameCounter >> 3) & 1)
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -8210,10 +8212,10 @@ jr_005_63de:
 ;@ (state 1 without speed). A hit there (flash timer 8) is counted; the 5th breaks the shell (state 3,
 ;@ $80 frames). Otherwise, unless just hit, it bounces off the walls and leaves a trail.
 HotHeadShellState::
-;> SetEntitySpriteVariant(2)
+;> SetEntitySpriteVariant(slot, 2)
 	ld a, $02
 	call SetEntitySpriteVariant
-;> t = GetEntityTimer()
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
 ;> if t != 0:                            # shake
 	jr z, jr_005_6400
@@ -8246,10 +8248,10 @@ jr_005_63f1:
 	ret
 
 
-;> EntityCheckHits()                            # sword hits and contact damage
+;> EntityCheckHits(slot)                            # sword hits and contact damage
 jr_005_6400:
 	call EntityCheckHits
-;> if GetEntityDropTimer() == 0 and hActiveEntityX < 0x70:
+;> if GetEntityDropTimer(slot) == 0 and hActiveEntityX < 0x70:
 	call GetEntityDropTimer
 	jr nz, jr_005_641d
 
@@ -8262,7 +8264,7 @@ jr_005_6400:
 	cp $50
 	jr nc, jr_005_641d
 
-;>         ClearEntitySpeed()                    # stop
+;>         ClearEntitySpeed(slot)                    # stop
 	call ClearEntitySpeed
 ;>         wEntityState[slot] = 1
 	call IncrementEntityState
@@ -8299,7 +8301,7 @@ jr_005_641d:
 
 ;>             wEntityState[slot] += 1
 	call IncrementEntityState
-;>             ClearEntitySpeed()
+;>             ClearEntitySpeed(slot)
 	call ClearEntitySpeed
 ;>             wEntityTimer[slot] = 0x80
 	call GetEntityTimer
@@ -8318,7 +8320,7 @@ jr_005_6448:
 
 ;> UpdateEntityPosWithSpeed_05(slot)
 	call UpdateEntityPosWithSpeed_05
-;> EntityCheckWalls()                            # background collisions
+;> EntityCheckWalls(slot)                            # background collisions
 	call EntityCheckWalls
 ;> col = wEntityCollisions[slot]
 	ld hl, wEntityCollisions
@@ -8384,7 +8386,7 @@ jr_005_6487:
 ;@ $29). Then the bare Hot Head shows (frames 3/4) until the timer runs out; it gets 8 health and
 ;@ goes back to state 1.
 HotHeadShellBreakState::
-;> t = GetEntityTimer()
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
 ;> if t >= 0x40:
 	cp $40
@@ -8437,7 +8439,7 @@ jr_005_64af:
 ;> wEntityState[slot] = 1
 	call IncrementEntityState
 	ld [hl], $01
-;> ClearEntitySpeed()
+;> ClearEntitySpeed(slot)
 	call ClearEntitySpeed
 ;> wEntityHealth[slot] = 8
 	ld hl, wEntityHealth
@@ -8458,7 +8460,7 @@ HotHeadBareFrame::
 	rra
 	and $01
 	add $03
-;> SetEntitySpriteVariant(f)
+;> SetEntitySpriteVariant(slot, f)
 	call SetEntitySpriteVariant
 	ret
 
@@ -8755,7 +8757,7 @@ DrawHotHead::
 	rla
 	rla
 	and $e0
-;> DrawEntitySprites(HotHeadSprites + e, 8)
+;> DrawEntitySprites(8, HotHeadSprites + e)
 	ld e, a
 	ld d, b
 	ld hl, HotHeadSprites
@@ -8796,11 +8798,11 @@ DrawHotHeadShadow::
 ;> hActiveEntitySpriteVariant = 0
 	xor a
 	ldh [hActiveEntitySpriteVariant], a
-;> DrawEntitySprites(HotHeadShadowSprites, 4)
+;> DrawEntitySprites(4, HotHeadShadowSprites)
 	ld hl, HotHeadShadowSprites
 	ld c, $04
 	call DrawEntitySprites
-;> LoadEntityPosition()                            # restore the active vars
+;> LoadEntityPosition(slot)                            # restore the active vars
 	call LoadEntityPosition
 
 ;> return
@@ -8829,7 +8831,7 @@ DrawHotHeadSmall::
 	rla
 	rla
 	and $f0
-;> DrawEntitySprites(HotHeadSmallSprites + e, 4)
+;> DrawEntitySprites(4, HotHeadSmallSprites + e)
 	ld e, a
 	ld d, b
 	ld hl, HotHeadSmallSprites
@@ -8845,7 +8847,7 @@ DrawHotHeadSmall::
 ;@ path: boss/hot_head
 ;@ Part 1, a lava splash: frame 6 for its first $0A frames, then frame 5; gone when its timer runs out.
 HotHeadSplash::
-;> t = GetEntityTimer()
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
 ;> if t == 0: return ClearEntityStatus_05(slot)
 	jp z, ClearEntityStatus_05
@@ -8877,12 +8879,12 @@ HotHeadFireballSprites::
 ;@ path: boss/hot_head
 ;@ Part 2, a fireball: drawn from HotHeadFireballSprites, hurts Link on contact, then runs its state.
 HotHeadFireball::
-;> DrawEntity16x16(HotHeadFireballSprites)
+;> DrawEntity16x16(slot, HotHeadFireballSprites)
 	ld de, HotHeadFireballSprites
 	call DrawEntity16x16
 ;> if ReturnIfNonInteractive_05(): return
 	call ReturnIfNonInteractive_05
-;> EntityCheckContactDamage()                            # hurts Link on contact
+;> EntityCheckContactDamage(slot)                            # hurts Link on contact
 	call EntityCheckContactDamage
 ;> HotHeadFireballStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
@@ -8929,7 +8931,7 @@ jr_005_6722:
 	rra
 	rra
 	and $01
-;> SetEntitySpriteVariant(f)
+;> SetEntitySpriteVariant(slot, f)
 	call SetEntitySpriteVariant
 	ret
 
@@ -8938,7 +8940,7 @@ jr_005_6722:
 ;@ path: boss/hot_head
 ;@ State 1: the burst, frames 2 and 3 (by timer bit 3); gone when the timer runs out.
 FireballBurstState::
-;> t = GetEntityTimer()
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
 ;> if t == 0: return ClearEntityStatus_05(slot)
 	jp z, ClearEntityStatus_05
@@ -8950,7 +8952,7 @@ FireballBurstState::
 	and $01
 	inc a
 	inc a
-;> SetEntitySpriteVariant(f)
+;> SetEntitySpriteVariant(slot, f)
 	call SetEntitySpriteVariant
 	ret
 
@@ -8967,7 +8969,7 @@ HotHeadShellSprites::
 ;@ turns into a fireball (part 2, hidden for now) that, still in state 0, at once bursts for $0F
 ;@ frames.
 HotHeadShellHalf::
-;> DrawEntity16x16(HotHeadShellSprites)
+;> DrawEntity16x16(slot, HotHeadShellSprites)
 	ld de, HotHeadShellSprites
 	call DrawEntity16x16
 ;> if ReturnIfNonInteractive_05(): return
@@ -8997,7 +8999,7 @@ HotHeadShellHalf::
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], $02
-;>     SetEntitySpriteVariant(0xFF)
+;>     SetEntitySpriteVariant(slot, 0xFF)
 	ld a, $ff
 	call SetEntitySpriteVariant
 
@@ -9111,11 +9113,11 @@ jr_005_67d7:
 	call DrawDodongoSnake
 ;> if ReturnIfNonInteractive_05(): return
 	call ReturnIfNonInteractive_05
-;> Call_3F12()                            # starts the boss music
-	call Call_3F12
-;> DecrementEntityIgnoreHitsTimer()
+;> StartBossMusic()                            # starts the boss music
+	call StartBossMusic
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
-;> EntityCheckHits()                            # sword hits and contact damage
+;> EntityCheckHits(slot)                            # sword hits and contact damage
 	call EntityCheckHits
 ;> DodongoSnakeStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
@@ -9136,7 +9138,7 @@ DodongoSnakeStates::
 ;@ from it (x and y), with timer $38 or more, is swallowed: state 2 with timer 2 at $60, flashing $0C frames,
 ;@ wEntityPrivate4 (bombs swallowed) + 1, jingle $2A.
 DodongoCrawlState::
-;> if GetEntityTimer() == 0:
+;> if GetEntityTimer(slot) == 0:
 	call GetEntityTimer
 	jr nz, jr_005_67f9
 
@@ -9211,7 +9213,7 @@ jr_005_67f9:
 	ld [hl], a
 ;> UpdateEntityPosWithSpeed_05(slot)
 	call UpdateEntityPosWithSpeed_05
-;> EntityCheckWalls()                            # background collisions
+;> EntityCheckWalls(slot)                            # background collisions
 	call EntityCheckWalls
 ;> for e in range(15, 0, -1):             # look for a bomb at its mouth
 	ld e, $0f
@@ -9307,7 +9309,7 @@ jr_005_68b1:
 ;@ turn (wEntityPrivate3 counts them) if that is a quarter turn, else a random one. It sets the
 ;@ direction's frame and speed (DodongoSpeedX/Y) and crawls on for $40-$5F frames (state 0).
 DodongoTurnState::
-;> if GetEntityTimer() != 0: return
+;> if GetEntityTimer(slot) != 0: return
 	call GetEntityTimer
 	jr nz, jr_005_68fe
 
@@ -9329,7 +9331,7 @@ DodongoTurnState::
 ;> if wEntityPrivate3[slot] == 0:
 	jr nz, jr_005_68d6
 
-;>     e = GetEntityDirectionToLink_05()
+;>     e = GetEntityDirectionToLink_05(slot)
 	call GetEntityDirectionToLink_05
 	jr jr_005_68dc
 
@@ -9521,7 +9523,7 @@ DodongoSegmentSprites::
 ;@ Draws the snake: as one sprite group (DrawDodongoWhole) while timer 1 or timer 2 runs or during a
 ;@ room transition; otherwise head and tail ball from its trail (facing up, the tail first).
 DrawDodongoSnake::
-;>@w w = GetEntityTimer1() | wRoomTransitionState | wEntityTimer2[slot]
+;>@w w = GetEntityTimer1(slot) | wRoomTransitionState | wEntityTimer2[slot]
 	call GetEntityTimer1
 	ld hl, wRoomTransitionState
 	or [hl]
@@ -9541,7 +9543,7 @@ DrawDodongoSnake::
 	call DrawDodongoTail
 ;>     DrawDodongoHead(slot)
 	call DrawDodongoHead
-;>     return LoadEntityPosition()                 # restore the active vars
+;>     return LoadEntityPosition(slot)                 # restore the active vars
 	jp LoadEntityPosition
 
 
@@ -9550,7 +9552,7 @@ jr_005_69b8:
 	call DrawDodongoHead
 ;> DrawDodongoTail(slot)
 	call DrawDodongoTail
-;> return LoadEntityPosition()
+;> return LoadEntityPosition(slot)
 	jp LoadEntityPosition
 
 
@@ -9608,7 +9610,7 @@ DrawDodongoHead::
 	add hl, de
 	ld a, [hl]
 	ldh [hActiveEntityDrawY], a
-;> DrawEntity16x16(DodongoSegmentSprites)
+;> DrawEntity16x16(slot, DodongoSegmentSprites)
 	pop bc
 	ld de, DodongoSegmentSprites
 	call DrawEntity16x16
@@ -9673,7 +9675,7 @@ DrawDodongoTail::
 	pop bc
 	ld a, $04
 	ldh [hActiveEntitySpriteVariant], a
-;> DrawEntity16x16(DodongoSegmentSprites)
+;> DrawEntity16x16(slot, DodongoSegmentSprites)
 	ld de, DodongoSegmentSprites
 	call DrawEntity16x16
 ;> hActiveEntitySpriteVariant = wEntitySpriteVariant[slot]
@@ -9769,7 +9771,7 @@ jr_005_6bf5:
 	sla e
 	add e
 	ld e, a
-;>     DrawEntitySprites(sprites + e, 10)
+;>     DrawEntitySprites(10, sprites + e)
 	add hl, de
 	ld c, $0a
 	call DrawEntitySprites
@@ -9788,7 +9790,7 @@ jr_005_6c12:
 	rla
 	rla
 	and $f0
-;> DrawEntitySprites(DodongoShortSprites + e, 4)
+;> DrawEntitySprites(4, DodongoShortSprites + e)
 	ld e, a
 	ld d, b
 	ld hl, DodongoShortSprites
@@ -9833,9 +9835,9 @@ SlimeEelInit::
 SlimeEelEntityHandler::
 ;> ConfineLinkToArena()
 	call ConfineLinkToArena
-;> Call_3F12()                            # starts the boss music
-	call Call_3F12
-;> DecrementEntityIgnoreHitsTimer()
+;> StartBossMusic()                            # starts the boss music
+	call StartBossMusic
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
 ;> SlimeEelParts[wEntityPrivate1[slot]](slot)
 	ld hl, wEntityPrivate1
@@ -9874,7 +9876,7 @@ SlimeEelTailStates::
 ;@ State 0: when the timer runs out the room quakes (bump shake for $FF frames, axis 4, rumble noise
 ;@ $3E, also put in the sound byte $D3E8) and $80 frames follow (state 1).
 SlimeEelQuakeState::
-;> if GetEntityTimer() == 0:
+;> if GetEntityTimer(slot) == 0:
 	call GetEntityTimer
 	jr nz, jr_005_6c80
 
@@ -9943,7 +9945,7 @@ SlimeEelRiseState::
 	ld hl, wEntityY
 	add hl, bc
 	ld [hl], a
-;> t = GetEntityTimer()
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
 ;> if t != 0: return SlimeEelCrackFloor(t)
 	jp nz, SlimeEelCrackFloor
@@ -9973,8 +9975,8 @@ SlimeEelRiseState::
 ;> wEntityDropTimer[slot] = 0xB0          # frames until the first head
 	call GetEntityDropTimer
 	ld [hl], $b0
-;> Call_3E64()                            # rubble flies (BreakIntoPieces, bank 3)
-	call Call_3E64
+;> BreakIntoPiecesFar()                            # rubble flies (BreakIntoPieces, bank 3)
+	call BreakIntoPiecesFar
 ;> wEntityStatus[slot] = 5                # stays active
 	ld hl, wEntityStatus
 	add hl, bc
@@ -9985,14 +9987,14 @@ SlimeEelRiseState::
 	ld a, [hl]
 	add $10
 	ld [hl], a
-;> Call_3E64()
-	call Call_3E64
+;> BreakIntoPiecesFar()
+	call BreakIntoPiecesFar
 ;> wEntityStatus[slot] = 5
 	ld hl, wEntityStatus
 	add hl, bc
 	ld [hl], $05
-;> Call_3E64()
-	call Call_3E64
+;> BreakIntoPiecesFar()
+	call BreakIntoPiecesFar
 ;> PlayClinkNoise()
 	call PlayClinkNoise
 ;> wEntityStatus[slot] = 5
@@ -10171,9 +10173,9 @@ SlimeEelOpenHolesState::
 	ld hl, wEntityX
 	add hl, bc
 	ld [hl], a
-;> LoadEntityPosition()                            # active vars from the entity
+;> LoadEntityPosition(slot)                            # active vars from the entity
 	call LoadEntityPosition
-;> t = GetEntityTimer()
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
 ;> if t == 0:
 	jr nz, jr_005_6dbc
@@ -10366,8 +10368,8 @@ jr_005_6e97:
 	ld hl, wEntityDirection
 	add hl, de
 	ld [hl], a
-;> Call_3E64()                            # rubble
-	call Call_3E64
+;> BreakIntoPiecesFar()                            # rubble
+	call BreakIntoPiecesFar
 ;> wEntityStatus[slot] = 5
 	ld hl, wEntityStatus
 	add hl, bc
@@ -10485,7 +10487,7 @@ SlimeEelHeadSpawnWall::
 ;@ wEntityPrivate3, each further one a ring further in (stopping below ring 0), whipping with
 ;@ SlimeEelWobble1-4 (the step advances every 4 frames, frozen while a head is out).
 SlimeEelSpinTail::
-;> GetEntityDropTimer()
+;> GetEntityDropTimer(slot)
 	call GetEntityDropTimer
 ;> if wEntityWorkRAM3[0] != 0:            # a head is out
 	ld a, [wEntityWorkRAM3]
@@ -10566,7 +10568,7 @@ jr_005_7016:
 	ld [hl], a
 	pop bc
 
-;> t1 = GetEntityTimer1()
+;> t1 = GetEntityTimer1(slot)
 jr_005_7071:
 	call GetEntityTimer1
 ;> if t1 != 0:
@@ -10875,7 +10877,7 @@ DrawSlimeEelSegment::
 
 ;> BounceLinkBack()
 	call BounceLinkBack
-;> GetVectorTowardsLink(0x18)            # from the tail
+;> GetVectorTowardsLink(slot, 0x18)            # from the tail
 	ld a, $18
 	call GetVectorTowardsLink
 ;> hLinkSpeedY = hMultiPurpose0
@@ -10912,7 +10914,7 @@ SlimeEelSegmentSprites::
 ;@ path: boss/slime_eel
 ;@ Draws a SlimeEelSegmentSprites frame at the active position.
 DrawSlimeEelSegmentSprite::
-;> DrawEntity16x16(SlimeEelSegmentSprites)
+;> DrawEntity16x16(slot, SlimeEelSegmentSprites)
 	ld de, SlimeEelSegmentSprites
 	call DrawEntity16x16
 	ret
@@ -10956,7 +10958,7 @@ SlimeEelPeekFramesBottom::
 ;@ State 0 (the heads of the opening holes): shows SlimeEelPeekFrames by its timer (wave sound $16 at
 ;@ $18) and goes when the timer runs out.
 SlimeEelPeekState::
-;> t = GetEntityTimer()
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
 ;> if t == 0: return RemoveSlimeEelHead(slot)
 	jp z, RemoveSlimeEelHead
@@ -10993,7 +10995,7 @@ jr_005_7235:
 ;>     frames = SlimeEelPeekFramesBottom
 	ld hl, SlimeEelPeekFramesBottom
 
-;> SetEntitySpriteVariant(frames[step])
+;> SetEntitySpriteVariant(slot, frames[step])
 jr_005_724b:
 	add hl, de
 	ld a, [hl]
@@ -11032,7 +11034,7 @@ SlimeEelPullHeading::
 ;@ other way. From the 4th hook on, at random one time in two, it is pulled right out instead and
 ;@ becomes part 2 (SlimeEelLoose), moving away from the wall.
 SlimeEelLungeState::
-;> t = GetEntityTimer()
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
 ;> if t == 0: return RemoveSlimeEelHead(slot)
 	jp z, RemoveSlimeEelHead
@@ -11071,7 +11073,7 @@ jr_005_7294:
 jr_005_72a9:
 	add hl, de
 	ld a, [hl]
-;> SetEntitySpriteVariant(f)
+;> SetEntitySpriteVariant(slot, f)
 	call SetEntitySpriteVariant
 ;> if f != 0x0B and f != 0x0E: return     # not fully out
 	cp $0b
@@ -11277,7 +11279,7 @@ jr_005_738c:
 ;>             f = 1
 	ld a, $01
 
-;>         SetEntitySpriteVariant(f)
+;>         SetEntitySpriteVariant(slot, f)
 jr_005_7398:
 	call SetEntitySpriteVariant
 ;>         return
@@ -11331,7 +11333,7 @@ SlimeEelRetractState::
 ;>     f = 0x0F
 	ld a, $0f
 
-;> SetEntitySpriteVariant(f)
+;> SetEntitySpriteVariant(slot, f)
 jr_005_73e9:
 	call SetEntitySpriteVariant
 ;> link_x = hLinkX
@@ -11350,7 +11352,7 @@ jr_005_73e9:
 	add hl, bc
 	ld a, [hl]
 	ldh [hLinkY], a
-;>@s s = SlimeEelRetractSpeed[(GetEntityTimer() >> 2) & 0x3F]
+;>@s s = SlimeEelRetractSpeed[(GetEntityTimer(slot) >> 2) & 0x3F]
 	call GetEntityTimer
 	rra
 	rra
@@ -11361,7 +11363,7 @@ jr_005_73e9:
 	ld hl, SlimeEelRetractSpeed
 	add hl, de
 	ld a, [hl]
-;> GetVectorTowardsLink(s)
+;> GetVectorTowardsLink(slot, s)
 	call GetVectorTowardsLink
 ;> wEntitySpeedX[slot] = hMultiPurpose1
 	ldh a, [hMultiPurpose1]
@@ -11393,7 +11395,7 @@ jr_005_7431:
 ;> hLinkX = link_x
 	pop af
 	ldh [hLinkX], a
-;>@m m = SlimeEelRegrowMasks[(GetEntityTimer() >> 2) & 0x3F]
+;>@m m = SlimeEelRegrowMasks[(GetEntityTimer(slot) >> 2) & 0x3F]
 	call GetEntityTimer
 	rra
 	rra
@@ -11446,9 +11448,9 @@ RemoveSlimeEelHead::
 SlimeEelDefeatedState::
 ;> DrawSlimeEelBody(slot)
 	call DrawSlimeEelBody
-;> t = GetEntityTimer()
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
-;> if t == 0: return SpawnHeartContainer_05()
+;> if t == 0: return SpawnHeartContainer_05(slot)
 	jp z, SpawnHeartContainer_05
 
 ;> wEntityFlashTimer[slot] = t
@@ -11613,14 +11615,14 @@ SlimeEelHeadingFrames::
 SlimeEelLoose::
 ;> DrawSlimeEelLoose(slot)
 	call DrawSlimeEelLoose
-;> LoadEntityPosition()                            # active vars from the entity
+;> LoadEntityPosition(slot)                            # active vars from the entity
 	call LoadEntityPosition
 ;> if ReturnIfNonInteractive_05(): return
 	call ReturnIfNonInteractive_05
 ;> wEntityWorkRAM3[0] = 1
 	ld a, $01
 	ld [wEntityWorkRAM3], a
-;> d = GetEntityDropTimer()
+;> d = GetEntityDropTimer(slot)
 	call GetEntityDropTimer
 ;> if d < 0x10:
 	cp $10
@@ -11743,7 +11745,7 @@ jr_005_7586:
 	ld hl, SlimeEelHeadingFrames
 	add hl, de
 	ld a, [hl]
-;> SetEntitySpriteVariant(f)
+;> SetEntitySpriteVariant(slot, f)
 	call SetEntitySpriteVariant
 	ret
 
@@ -11762,7 +11764,7 @@ DrawSlimeEelLoose::
 	rla
 	rla
 	and $e0
-;> DrawEntitySprites(SlimeEelHeadSprites + e, 8)
+;> DrawEntitySprites(8, SlimeEelHeadSprites + e)
 	ld e, a
 	ld d, b
 	ld hl, SlimeEelHeadSprites
@@ -11796,7 +11798,7 @@ DrawSlimeEelLoose::
 ;> hActiveEntitySpriteVariant = 0
 	ld a, $00
 	ldh [hActiveEntitySpriteVariant], a
-;> DrawEntity16x16(SlimeEelSegmentSprites)
+;> DrawEntity16x16(slot, SlimeEelSegmentSprites)
 	ld de, SlimeEelSegmentSprites
 	call DrawEntity16x16
 ;> i = (n - 0x18) & 0x7F
@@ -11818,7 +11820,7 @@ DrawSlimeEelLoose::
 ;> hActiveEntitySpriteVariant = 0
 	ld a, $00
 	ldh [hActiveEntitySpriteVariant], a
-;> DrawEntity16x16(SlimeEelSegmentSprites)
+;> DrawEntity16x16(slot, SlimeEelSegmentSprites)
 	ld de, SlimeEelSegmentSprites
 	call DrawEntity16x16
 ;> i = (n - 0x24) & 0x7F
@@ -11840,7 +11842,7 @@ DrawSlimeEelLoose::
 ;> hActiveEntitySpriteVariant = 2
 	ld a, $02
 	ldh [hActiveEntitySpriteVariant], a
-;> DrawEntity16x16(SlimeEelSegmentSprites)
+;> DrawEntity16x16(slot, SlimeEelSegmentSprites)
 	ld de, SlimeEelSegmentSprites
 	call DrawEntity16x16
 	ret
@@ -11861,9 +11863,9 @@ SlimeEelSpeeds::
 SlimeEelWander::
 ;> UpdateEntityPosWithSpeed_05(slot)
 	call UpdateEntityPosWithSpeed_05
-;> EntityCheckContactDamage()
+;> EntityCheckContactDamage(slot)
 	call EntityCheckContactDamage
-;> EntityCheckWalls()
+;> EntityCheckWalls(slot)
 	call EntityCheckWalls
 ;> if wEntityCollisions[slot] != 0:
 	ld hl, wEntityCollisions
@@ -11897,7 +11899,7 @@ jr_005_764b:
 	call GetEntityTimer
 	ld [hl], $10
 
-;> if GetEntityTimer1() == 0:
+;> if GetEntityTimer1(slot) == 0:
 jr_005_765a:
 	call GetEntityTimer1
 	jr nz, jr_005_7688
@@ -11934,7 +11936,7 @@ jr_005_765a:
 	add hl, bc
 	ld [hl], a
 
-;> if GetEntityTimer() == 0:
+;> if GetEntityTimer(slot) == 0:
 jr_005_7688:
 	call GetEntityTimer
 	jr nz, jr_005_76a0
@@ -12036,7 +12038,7 @@ DrawSlimeEelHead::
 	rl d
 	and $e0
 	ld e, a
-;> DrawEntitySprites(SlimeEelHeadSprites + e, 8)
+;> DrawEntitySprites(8, SlimeEelHeadSprites + e)
 	ld hl, SlimeEelHeadSprites
 	add hl, de
 	ld c, $08
@@ -12098,7 +12100,7 @@ jr_005_78de:
 	cp $7c
 	jr nc, jr_005_794a
 
-;>     DrawEntity16x16(SlimeEelSegmentSprites)
+;>     DrawEntity16x16(slot, SlimeEelSegmentSprites)
 	ld de, SlimeEelSegmentSprites
 	call DrawEntity16x16
 ;>     if hActiveEntityState < 4:
@@ -12114,7 +12116,7 @@ jr_005_78de:
 ;>             hActiveEntitySpriteVariant = 0
 	xor a
 	ldh [hActiveEntitySpriteVariant], a
-;>             EntityCheckWeaponHits()
+;>             EntityCheckWeaponHits(slot)
 	call EntityCheckWeaponHits
 ;>             if wEntityFlashTimer[slot] == 0x16:    # just hit
 	ld hl, wEntityFlashTimer
@@ -12157,7 +12159,7 @@ jr_005_78de:
 	ld a, $b5
 	call OpenDialog
 
-;>         EntityCheckContactDamage()
+;>         EntityCheckContactDamage(slot)
 jr_005_7945:
 	call EntityCheckContactDamage
 
@@ -12165,7 +12167,7 @@ jr_005_7945:
 jr_005_7948:
 	jr jr_005_78de
 
-;> LoadEntityPosition()                            # active vars from the entity
+;> LoadEntityPosition(slot)                            # active vars from the entity
 jr_005_794a:
 	call LoadEntityPosition
 ;> if wEntityFlashTimer[slot] == 0:
@@ -12179,7 +12181,7 @@ jr_005_794a:
 	ld hl, wEntityOptions1
 	add hl, bc
 	ld [hl], $c0
-;>     EntityCheckWeaponHits()
+;>     EntityCheckWeaponHits(slot)
 	call EntityCheckWeaponHits
 ;>     wEntityOptions1[slot] = 0x80
 	ld hl, wEntityOptions1
@@ -12191,146 +12193,289 @@ jr_005_7964:
 	ret
 
 
+;@ def ReturnIfNonInteractive_05()
+;@ path: entity/helpers
+;@ Called at the start of an entity's update: unless the entity is active (status 5) and the game is
+;@ running normally (see ReturnIfPaused_05), it drops its caller's return address, so the handler
+;@ ends for this frame.
+;@ test: skip returns from its caller (pops the return address)
 ReturnIfNonInteractive_05::
+;> if hActiveEntityStatus != 5:
 	ldh a, [hActiveEntityStatus]
 	cp $05
-	jr nz, jr_005_7985
+;>     return_from_caller()               # pops the caller's return address
+	jr nz, ReturnIfPaused_05.exitCaller
+;> ReturnIfPaused_05()                    # runs on into it
 
+;@ def ReturnIfPaused_05()
+;@ path: entity/helpers
+;@ Ends the calling handler for this frame (drops its return address) while the map screen is up
+;@ (game mode 7), a dialogue box is open, Link shows an item, the inventory is sliding in or out,
+;@ or the room is scrolling to the next one.
+;@ test: skip returns from its caller (pops the return address)
 ReturnIfPaused_05::
+;> if wGameplayType == 7:
 	ld a, [wGameplayType]
 	cp $07
-	jr z, jr_005_7985
-
+;>@exit     return_from_caller()
+	jr z, .exitCaller
+;> if wDialogState or wLinkShowItemPoseActive or wInventoryAppearing:
 	ld hl, wLinkShowItemPoseActive
 	ld a, [wDialogState]
 	or [hl]
 	ld hl, wInventoryAppearing
 	or [hl]
-	jr nz, jr_005_7985
-
+;>     return_from_caller()
+	jr nz, .exitCaller
+;> if wRoomTransitionState:
 	ld a, [wRoomTransitionState]
 	and a
-	jr z, jr_005_7986
+;>     return_from_caller()
+	jr z, .done
 
-jr_005_7985:
+.exitCaller
+;=@exit
 	pop af
 
-jr_005_7986:
+.done
+;> return
 	ret
 
 
+;@ def ApplyRecoilIfNeeded_05(slot: bc)
+;@ path: entity/helpers
+;@ While the entity's ignore-hits timer runs after a hit, moves it one step with its knockback speed
+;@ instead of its own speed (stopping at walls unless option bit 5 is set) and ends the calling
+;@ handler for this frame. Not called from this bank.
+;@ test: skip returns from its caller (pops the return address)
 ApplyRecoilIfNeeded_05::
-	db $21, $10, $c4, $09, $7e, $a7, $28, $41, $3d, $77, $cd, $b8, $3e, $21, $40, $c2
-	db $09, $7e, $f5, $21, $50, $c2, $09, $7e, $f5, $21, $f0, $c3, $09, $7e, $21, $40
-	db $c2, $09, $77, $21, $00, $c4, $09, $7e, $21, $50, $c2, $09, $77, $cd, $d1, $79
-	db $21, $30, $c4, $09, $7e, $e6, $20, $20, $03, $cd, $9e, $3b, $21, $50, $c2, $09
-	db $f1, $77, $21, $40, $c2, $09, $f1, $77, $f1, $c9
+;> if wEntityIgnoreHitsTimer[slot] == 0:
+	ld hl, wEntityIgnoreHitsTimer
+	add hl, bc
+	ld a, [hl]
+	and a
+;>     return
+	jr z, .done
+;> wEntityIgnoreHitsTimer[slot] -= 1
+	dec a
+	ld [hl], a
+;> AddPowerHitTrailVfx()
+	call AddPowerHitTrailVfx
+;> speed_x = wEntitySpeedX[slot]
+	ld hl, wEntitySpeedX
+	add hl, bc
+	ld a, [hl]
+	push af
+;> speed_y = wEntitySpeedY[slot]
+	ld hl, wEntitySpeedY
+	add hl, bc
+	ld a, [hl]
+	push af
+;> wEntitySpeedX[slot] = wEntityRecoilSpeedX[slot]
+	ld hl, wEntityRecoilSpeedX
+	add hl, bc
+	ld a, [hl]
+	ld hl, wEntitySpeedX
+	add hl, bc
+	ld [hl], a
+;> wEntitySpeedY[slot] = wEntityRecoilSpeedY[slot]
+	ld hl, wEntityRecoilSpeedY
+	add hl, bc
+	ld a, [hl]
+	ld hl, wEntitySpeedY
+	add hl, bc
+	ld [hl], a
+;> UpdateEntityPosWithSpeed_05(slot)
+	call UpdateEntityPosWithSpeed_05
+;> if not wEntityOptions1[slot] & 0x20:
+	ld hl, wEntityOptions1
+	add hl, bc
+	ld a, [hl]
+	and $20
+	jr nz, .restore
+;>     EntityCheckWalls(slot)                 # stop at walls
+	call EntityCheckWalls
+.restore
+;> wEntitySpeedY[slot] = speed_y
+	ld hl, wEntitySpeedY
+	add hl, bc
+	pop af
+	ld [hl], a
+;> wEntitySpeedX[slot] = speed_x
+	ld hl, wEntitySpeedX
+	add hl, bc
+	pop af
+	ld [hl], a
+;> return_from_caller()                   # pops the caller's return address
+	pop af
+.done
+	ret
 
+;@ def UpdateEntityPosWithSpeed_05(slot: bc)
+;@ path: entity/helpers
+;@ Moves the entity by its x and y speeds (AddEntitySpeedToPosX_05, then AddEntitySpeedToPosY_05).
 UpdateEntityPosWithSpeed_05::
+;> AddEntitySpeedToPosX_05(slot)
 	call AddEntitySpeedToPosX_05
+;> AddEntitySpeedToPosY_05(slot)         # runs on into it
 
+;@ def AddEntitySpeedToPosY_05(slot: bc)
+;@ path: entity/helpers
+;@ Moves the entity by its y speed: the y arrays lie $10 bytes after the x arrays, so this runs
+;@ AddEntitySpeedToPosX_05 with slot + $10.
 AddEntitySpeedToPosY_05::
+;> AddEntitySpeedToPosX_05(slot, slot + 0x10)
 	push bc
 	ld a, c
 	add $10
 	ld c, a
 	call AddEntitySpeedToPosX_05
 	pop bc
+;> return
 	ret
 
 
+;@ def AddEntitySpeedToPosX_05(slot: bc)
+;@ path: entity/helpers
+;@ Moves the entity by its x speed, a signed value in 1/16 pixel: the low 4 bits go into the fraction
+;@ (wEntitySpeedXAcc, high nibble), the high 4 bits (sign-extended) plus the fraction's carry into
+;@ wEntityX.
 AddEntitySpeedToPosX_05::
+;> speed = wEntitySpeedX[slot]
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
+;> if speed == 0: return
 	and a
-	jr z, jr_005_7a09
+	jr z, .done
 
+;> acc = wEntitySpeedXAcc[slot] + ((speed << 4) & 0xF0)
 	push af
 	swap a
 	and $f0
 	ld hl, wEntitySpeedXAcc
 	add hl, bc
 	add [hl]
+;> wEntitySpeedXAcc[slot] = acc & 0xFF
 	ld [hl], a
 	rl d
 	ld hl, wEntityX
 
-jr_005_79f6:
+.addWhole
+;>@w whole = (speed >> 4) | (0xF0 if speed & 0x80 else 0)
 	add hl, bc
 	pop af
 	ld e, $00
 	bit 7, a
-	jr z, jr_005_7a00
+	jr z, .positive
 
 	ld e, $f0
 
-jr_005_7a00:
+.positive
+;=@w
 	swap a
 	and $0f
 	or e
+;> wEntityX[slot] = (wEntityX[slot] + whole + (acc >> 8)) & 0xFF
 	rr d
 	adc [hl]
 	ld [hl], a
 
-jr_005_7a09:
+.done
+;> return
 	ret
 
 
+;@ def AddEntityZSpeedToPos_05(slot: bc)
+;@ path: entity/helpers
+;@ Moves the entity's height by its z speed, the same way AddEntitySpeedToPosX_05 does for x (it
+;@ ends in that routine's code).
+;@ test: skip shares its second half with AddEntitySpeedToPosX_05
 AddEntityZSpeedToPos_05::
+;> speed = wEntitySpeedZ[slot]
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld a, [hl]
+;> if speed == 0: return
 	and a
-	jr z, jr_005_7a09
+	jr z, AddEntitySpeedToPosX_05.done
 
+;> acc = wEntitySpeedZAcc[slot] + ((speed << 4) & 0xF0)
 	push af
 	swap a
 	and $f0
 	ld hl, wEntitySpeedZAcc
 	add hl, bc
 	add [hl]
+;> wEntitySpeedZAcc[slot] = acc & 0xFF
 	ld [hl], a
 	rl d
+;> whole = (speed >> 4) | (0xF0 if speed & 0x80 else 0)     # (in AddEntitySpeedToPosX_05's code)
+;> wEntityZ[slot] = (wEntityZ[slot] + whole + (acc >> 8)) & 0xFF
 	ld hl, wEntityZ
-	jr jr_005_79f6
+	jr AddEntitySpeedToPosX_05.addWhole
 
+;@ def EntityLinkDiffX_05(slot: bc) -> (d, e)
+;@ path: entity/helpers
+;@ d = Link's x minus the entity's x (signed); e = the direction towards Link along x (0 right,
+;@ 1 left).
 EntityLinkDiffX_05::
+;> e = 0
 	ld e, $00
+;> d = (hLinkX - wEntityX[slot]) & 0xFF
 	ldh a, [hLinkX]
 	ld hl, wEntityX
 	add hl, bc
 	sub [hl]
+;> if d & 0x80:
 	bit 7, a
 	jr z, jr_005_7a32
 
+;>     e = 1
 	inc e
 
+;> return d, e
 jr_005_7a32:
 	ld d, a
 	ret
 
 
+;@ def EntityLinkDiffY_05(slot: bc) -> (d, e)
+;@ path: entity/helpers
+;@ d = Link's y minus the entity's y (signed); e = the direction towards Link along y (2 up,
+;@ 3 down).
 EntityLinkDiffY_05::
+;> e = 2
 	ld e, $02
+;> d = (hLinkY - wEntityY[slot]) & 0xFF
 	ldh a, [hLinkY]
 	ld hl, wEntityY
 	add hl, bc
 	sub [hl]
+;> if d & 0x80 == 0:
 	bit 7, a
 	jr nz, jr_005_7a42
 
+;>     e = 3
 	inc e
 
+;> return d, e
 jr_005_7a42:
 	ld d, a
 	ret
 
 
+;@ def GetEntityDirectionToLink_05(slot: bc) -> e
+;@ path: entity/helpers
+;@ The direction from the entity towards Link along the axis where he is farther away (0 right,
+;@ 1 left, 2 up, 3 down; y when the distances are equal). Also returned in a.
 GetEntityDirectionToLink_05::
+;> dx, ex = EntityLinkDiffX_05(slot)
 	call EntityLinkDiffX_05
+;> hMultiPurpose0 = ex
 	ld a, e
 	ldh [hMultiPurpose0], a
+;> adx = abs(dx)
 	ld a, d
 	bit 7, a
 	jr z, jr_005_7a51
@@ -12339,10 +12484,13 @@ GetEntityDirectionToLink_05::
 	inc a
 
 jr_005_7a51:
+;> dy, ey = EntityLinkDiffY_05(slot)
 	push af
 	call EntityLinkDiffY_05
+;> hMultiPurpose1 = ey
 	ld a, e
 	ldh [hMultiPurpose1], a
+;> ady = abs(dy)
 	ld a, d
 	bit 7, a
 	jr z, jr_005_7a5f
@@ -12350,35 +12498,54 @@ jr_005_7a51:
 	cpl
 	inc a
 
+;> if ady < adx:
 jr_005_7a5f:
 	pop de
 	cp d
 	jr nc, jr_005_7a67
 
+;>     e = hMultiPurpose0
 	ldh a, [hMultiPurpose0]
 	jr jr_005_7a69
 
+;> else:
+;>     e = hMultiPurpose1
 jr_005_7a67:
 	ldh a, [hMultiPurpose1]
 
+;> return e
 jr_005_7a69:
 	ld e, a
 	ret
 
 
+;@ def ClearEntityStatus_05(slot: bc)
+;@ path: entity/helpers
+;@ Frees the entity's slot (status 0).
 ClearEntityStatus_05::
+;> wEntityStatus[slot] = 0
 	ld hl, wEntityStatus
 	add hl, bc
 	ld [hl], b
+;> return
 	ret
 
 
+;@ path: boss/gohma
+;@ Gohma's walking x speed by wEntityPrivate1: 0 right +$10, 1 left -$10.
 GohmaWalkSpeedX::
 	db $10, $f0
 
+;@ path: boss/gohma
+;@ Gohma's dash speed by the side Link is on (EntityLinkDiffX_05): 0 right +$18, 1 left -$18.
 GohmaDashSpeedX::
 	db $18, $e8
 
+;@ path: boss/gohma
+;@ Gohma, 48x16: 6 Call_3D26 lists of 6 sprites (dy, dx, tile, attr; dx -$10 to +$18): a claw on
+;@ each side and the eye in the middle. Frames 0-2 walk with the eye shut (tile $60), 3-5 the same
+;@ claw poses with the eye open ($62). Claws: frame 0/3 $64, $66 (right claw $6A, $68 mirrored),
+;@ 1/4 $6C, $6E (mirrored), 2/5 $68, $6A (right $66, $64 mirrored).
 GohmaSprites::
 	db $00, $f0, $64, $00, $00, $f8, $66, $00, $00, $00, $60, $00
 	db $00, $08, $60, $20, $00, $10, $6a, $20, $00, $18, $68, $20, $00, $f0, $6c, $00
@@ -12391,17 +12558,28 @@ GohmaSprites::
 	db $00, $f8, $6a, $00, $00, $00, $62, $00, $00, $08, $62, $20, $00, $10, $66, $20
 	db $00, $18, $64, $20
 
-Call_05_7B05::
+;@ def GohmaEntityHandler(slot: bc)
+;@ path: boss/gohma
+;@ Entity $5E, Gohma: a one-eyed crab, 48 pixels wide, that walks from side to side, dashes along
+;@ the row towards Link, lunges down at him, or stops and opens its eye to shoot (entity $7D). Its
+;@ hitbox flags are 0 while the eye is open and $80 after it shuts. While the ocarina's song state
+;@ is 1 it is made to open its eye.
+;@ Once beaten (status no longer 5) it runs the shared defeat steps (BossDefeatedHandler_05).
+GohmaEntityHandler::
+;> if wOcarinaSongState == 1:
 	ld a, [wOcarinaSongState]
 	cp $01
 	jr nz, jr_005_7b16
 
-	call Call_05_7BF5
+;>     GohmaOpenEye(slot)
+	call GohmaOpenEye
+;>     hActiveEntityState = wEntityState[slot]
 	ld hl, wEntityState
 	add hl, bc
 	ld a, [hl]
 	ldh [hActiveEntityState], a
 
+;>@o e = 24 * hActiveEntitySpriteVariant
 jr_005_7b16:
 	ldh a, [hActiveEntitySpriteVariant]
 	rla
@@ -12409,175 +12587,250 @@ jr_005_7b16:
 	rla
 	and $f8
 	ld c, a
+;=@o
 	rla
 	and $f0
 	add c
 	ld e, a
 	ld d, b
-	ld hl, $7a75
+;> DrawEntitySprites(6, GohmaSprites + e)
+	ld hl, GohmaSprites
 	add hl, de
 	ld c, $06
 	call DrawEntitySprites
+;> ReserveOAMEntriesFar(6)
 	ld a, $06
 	call ReserveOAMEntriesFar
+;> if hActiveEntityStatus != 5: return BossDefeatedHandler_05(slot)
 	ldh a, [hActiveEntityStatus]
 	cp $05
 	jp nz, BossDefeatedHandler_05
 
+;> if ReturnIfNonInteractive_05(): return
 	call ReturnIfNonInteractive_05
-	call Call_3F12
+;> StartBossMusic()                            # starts the boss music
+	call StartBossMusic
+;> EntityCheckHits(slot)
 	call EntityCheckHits
+;> UpdateEntityPosWithSpeed_05(slot)
 	call UpdateEntityPosWithSpeed_05
+;> EntityCheckWalls(slot)
 	call EntityCheckWalls
+;> DecrementEntityIgnoreHitsTimer(slot)
 	call DecrementEntityIgnoreHitsTimer
+;> GohmaStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_05_7B4E::
-	dw Jump_05_7B56
-	dw Jump_05_7B72
-	dw Jump_05_7C83
-	dw Jump_05_7D2B
+;@ path: boss/gohma
+;@ Gohma's states, by wEntityState.
+GohmaStates::
+	dw GohmaStartState
+	dw GohmaWalkState
+	dw GohmaLungeState
+	dw GohmaEyeState
 
-Jump_05_7B56::
+;@ def GohmaStartState(slot: bc)
+;@ path: boss/gohma
+;@ State 0: starts walking to a random side (state 1).
+GohmaStartState::
+;> wEntityPrivate1[slot] = GetRandomByte() & 1
 	call GetRandomByte
 	and $01
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], a
+;>@gs wEntitySpeedX[slot] = GohmaWalkSpeedX[wEntityPrivate1[slot]]
 	ld e, a
 	ld d, b
-	ld hl, $7a71
+	ld hl, GohmaWalkSpeedX
 	add hl, de
 	ld a, [hl]
+;=@gs
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
+;> wEntityState[slot] = 1
 	call IncrementEntityState
 	ld [hl], $01
+;> return
 	ret
 
 
-Jump_05_7B72::
+;@ def GohmaWalkState(slot: bc)
+;@ path: boss/gohma
+;@ State 1: waits while timer 2 runs (after an attack). While dashing (timer 1) it goes on with
+;@ GohmaWalkOn. Its timer counts a shuffle (x speed +8 or -8 every 4 frames); at 1 it dashes along
+;@ the row towards Link (speed $18 for $60-$9F frames). At 0, if Link is more than 8 and less than
+;@ $28 pixels below, and its attack cooldown (wEntityDyingTimer, set to $40-$BF) is over, it attacks:
+;@ one time in 4 a lunge (GohmaStartLunge), one in 4 the eye (GohmaOpenEye); otherwise it shuffles
+;@ for $60 more frames.
+GohmaWalkState::
+;> if wEntityTimer2[slot] != 0: return
 	ld hl, wEntityTimer2
 	add hl, bc
 	ld a, [hl]
 	and a
 	ret nz
 
+;> if GetEntityTimer1(slot) != 0: return GohmaWalkOn(slot)      # dashing
 	call GetEntityTimer1
-	jp nz, Jump_005_7c09
+	jp nz, GohmaWalkOn
 
+;> t = GetEntityTimer(slot)
+;>@z if t == 0:
+;>@z     if (wEntityY[slot] + 8) & 0xFF < hLinkY: return GohmaChooseAttack(slot)
+;>@z     wEntityTimer[slot] = 0x60
 	call GetEntityTimer
 	jr z, jr_005_7ba9
 
+;> elif t == 1:
 	cp $01
 	jr nz, jr_005_7bbc
 
+;>     dx, side = EntityLinkDiffX_05(slot)
 	call EntityLinkDiffX_05
 	ld d, b
-	ld hl, $7a73
+;>     wEntitySpeedX[slot] = GohmaDashSpeedX[side]
+	ld hl, GohmaDashSpeedX
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
+;>     wEntitySpeedY[slot] = 0
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], b
+;>     wEntityTimer1[slot] = 0x60 + (GetRandomByte() & 0x3F)
 	call GetEntityTimer1
 	call GetRandomByte
 	and $3f
 	add $60
 	ld [hl], a
-	jp Jump_005_7c09
+;>     return GohmaWalkOn(slot)
+	jp GohmaWalkOn
 
 
 jr_005_7ba9:
+;=@z
 	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	add $08
 	ld hl, hLinkY
 	cp [hl]
-	jp c, Jump_005_7bd3
+;=@z
+	jp c, GohmaChooseAttack
 
 	call GetEntityTimer
 	ld [hl], $60
 
+;> wEntitySpeedY[slot] = 0                # shuffle (t is 0 here or above 1)
 jr_005_7bbc:
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], b
+;> if t & 4 == 0:
 	ld hl, wEntitySpeedX
 	add hl, bc
 	and $04
 	jr nz, jr_005_7bce
 
+;>     wEntitySpeedX[slot] = 8
 	ld [hl], $08
-	jp Jump_005_7c61
+;>     return GohmaAnimateFast(slot)
+	jp GohmaAnimateFast
 
 
+;> wEntitySpeedX[slot] = 0xF8
 jr_005_7bce:
 	ld [hl], $f8
-	jp Jump_005_7c61
+;> return GohmaAnimateFast(slot)
+	jp GohmaAnimateFast
 
 
-Jump_005_7bd3:
+GohmaChooseAttack:
+;> # Link is below it
+;> if (hLinkY - wEntityY[slot]) & 0xFF >= 0x28: return GohmaWalkOn(slot)
 	ld hl, wEntityY
 	add hl, bc
 	ldh a, [hLinkY]
 	sub [hl]
 	cp $28
-	jr nc, jr_005_7c09
+	jr nc, GohmaWalkOn
 
+;> if wEntityDyingTimer[slot] != 0: return GohmaWalkOn(slot)      # attack cooldown
 	ld hl, wEntityDyingTimer
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr nz, jr_005_7c09
+	jr nz, GohmaWalkOn
 
+;> wEntityDyingTimer[slot] = 0x40 + (GetRandomByte() & 0x7F)
 	call GetRandomByte
 	and $7f
 	add $40
 	ld [hl], a
+;> r = wEntityDyingTimer[slot] & 3
 	and $03
-	jr z, jr_005_7c42
+;> if r == 0: return GohmaStartLunge(slot)
+	jr z, GohmaStartLunge
 
+;> if r != 1: return GohmaWalkOn(slot)
 	dec a
-	jr nz, jr_005_7c09
+	jr nz, GohmaWalkOn
 
-Call_05_7BF5::
+;> GohmaOpenEye(slot)                     # runs on into it
+
+;@ def GohmaOpenEye(slot: bc)
+;@ path: boss/gohma
+;@ Gohma stops and opens its eye: state 3, frame 1, $40 frames before it shoots.
+GohmaOpenEye::
+;> wEntityState[slot] = 3
 	call IncrementEntityState
 	ld [hl], $03
+;> ClearEntitySpeed(slot)
 	call ClearEntitySpeed
+;> wEntityTimer2[slot] = 0x40
 	ld hl, wEntityTimer2
 	add hl, bc
 	ld [hl], $40
+;> GohmaShowFrame(1)
 	ld a, $01
-	call Call_05_7C80
+	call GohmaShowFrame
+;> return
 	ret
 
 
-Jump_005_7c09:
-jr_005_7c09:
+;@ def GohmaWalkOn(slot: bc)
+;@ path: boss/gohma
+;@ Walking and dashing: at a side wall a dash bounces back (x speed ^ $F0) and a walk turns round;
+;@ when not dashing the walking speed is set (GohmaWalkSpeedX). The claws move every 16 frames
+;@ (every 8 while dashing or shuffling): frames 0, 1, 2.
+GohmaWalkOn::
+;> if wEntityCollisions[slot] & 3:        # a side wall
 	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and $03
 	jr z, jr_005_7c2a
 
+;>     if GetEntityTimer1(slot) != 0:         # dashing: bounce back
 	call GetEntityTimer1
 	jr z, jr_005_7c22
 
+;>         wEntitySpeedX[slot] ^= 0xF0
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	xor $f0
 	ld [hl], a
-	jp Jump_005_7c61
+;>         return GohmaAnimateFast(slot)
+	jp GohmaAnimateFast
 
 
+;>     wEntityPrivate1[slot] ^= 1         # walk the other way
 jr_005_7c22:
 	ld hl, wEntityPrivate1
 	add hl, bc
@@ -12585,107 +12838,156 @@ jr_005_7c22:
 	xor $01
 	ld [hl], a
 
+;> if GetEntityTimer1(slot) != 0: return GohmaAnimateFast(slot)
 jr_005_7c2a:
 	call GetEntityTimer1
-	jr nz, jr_005_7c61
+	jr nz, GohmaAnimateFast
 
+;>@sx wEntitySpeedX[slot] = GohmaWalkSpeedX[wEntityPrivate1[slot]]
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	ld e, a
 	ld d, b
-	ld hl, $7a71
+;=@sx
+	ld hl, GohmaWalkSpeedX
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
-	jr jr_005_7c69
+;> return GohmaAnimateSlow(slot)
+	jr GohmaAnimateSlow
 
-jr_005_7c42:
+GohmaStartLunge:
+;> # the lunge (GohmaChooseAttack)
+;> wEntityTimer[slot] = 0x60
 	call GetEntityTimer
 	ld [hl], $60
+;> wEntityTimer1[slot] = 0
 	call GetEntityTimer1
 	ld [hl], b
+;> wEntityState[slot] = 2
 	call IncrementEntityState
 	ld [hl], $02
+;> wEntityPrivate1[slot] = 0              # going down
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], b
+;> wEntityPrivate3[slot] = wEntityY[slot]  # its row, to come back to
 	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntityPrivate3
 	add hl, bc
 	ld [hl], a
-	jr jr_005_7c69
+;> return GohmaAnimateSlow(slot)
+	jr GohmaAnimateSlow
 
-Jump_005_7c61:
-jr_005_7c61:
+GohmaAnimateFast:
+;> if hFrameCounter & 7 == 0: return GohmaAnimateStep(slot)
 	ldh a, [hFrameCounter]
 	and $07
-	jr z, jr_005_7c6f
+	jr z, GohmaAnimateStep
 
-	jr jr_005_7c7b
+;> return GohmaShowStep(slot)
+	jr GohmaShowStep
 
-jr_005_7c69:
+GohmaAnimateSlow:
+;> if hFrameCounter & 0x0F != 0: return GohmaShowStep(slot)
 	ldh a, [hFrameCounter]
 	and $0f
-	jr nz, jr_005_7c7b
+	jr nz, GohmaShowStep
 
-jr_005_7c6f:
+GohmaAnimateStep:
+;> wEntityPrivateCounter[slot] += 1
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	inc [hl]
+;> if wEntityPrivateCounter[slot] == 3:
 	ld a, [hl]
 	cp $03
-	jr nz, jr_005_7c7b
+	jr nz, GohmaShowStep
 
+;>     wEntityPrivateCounter[slot] = 0
 	ld [hl], $00
 
-jr_005_7c7b:
+GohmaShowStep:
+;> GohmaShowFrame(wEntityPrivateCounter[slot])      # runs on into it
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 
-Call_05_7C80::
+;@ def GohmaShowFrame(f: a)
+;@ path: boss/gohma
+;@ Sets Gohma's frame.
+GohmaShowFrame::
+;> return SetEntitySpriteVariant(slot, f)
 	jp SetEntitySpriteVariant
 
 
-Jump_05_7C83::
+;@ def GohmaLungeState(slot: bc)
+;@ path: boss/gohma
+;@ State 2, the lunge: it shuffles while the timer is above 1; at 1 it aims at Link's row (straight
+;@ down or towards Link at speed $10, at random) and stops (state 1) if it is not above Link; at 0
+;@ it goes on until 8 pixels above that row, then turns back up (y speed -$10, wave sound $16) to
+;@ its own row (wEntityPrivate3) and walks on (state 1). The claws move every 16 frames.
+GohmaLungeState::
+;> if wEntityPrivate1[slot] != 0:         # coming back up
+;>@b     if wEntityPrivate3[slot] < wEntityY[slot]: return GohmaAnimateLunge(slot)
+;>@b     return GohmaEndLunge(slot)
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	and a
 	jp nz, Jump_005_7cfd
 
+;> t = GetEntityTimer(slot)
+;> if t >= 2:
+;>@s     wEntitySpeedX[slot] = 8 if t & 4 == 0 else 0xF8     # shuffle
+;>@s     return GohmaAnimateLunge(slot)
 	call GetEntityTimer
 	cp $02
 	jr nc, jr_005_7ced
 
+;> elif t == 0:
+;>@d     if (wEntityPrivate5[slot] - 8) & 0xFF >= wEntityY[slot]: return GohmaAnimateLunge(slot)
+;>@d     wEntityPrivate1[slot] += 1         # back up
+;>@d     ClearEntitySpeed(slot)
+;>@d     wEntitySpeedY[slot] = 0xF0
+;>@d     hWaveSfx = 0x16
+;>@d     return GohmaAnimateLunge(slot)
 	cp $00
 	jr z, jr_005_7cc9
 
+;> else:                                   # t == 1
+;>     wEntityPrivate5[slot] = hLinkY       # the row to reach
 	ld hl, hLinkY
 	ld a, [hl]
 	ld hl, wEntityPrivate5
 	add hl, bc
 	ld [hl], a
+;>     if GetRandomByte() & 2:
 	call GetRandomByte
 	and $02
 	jr z, jr_005_7cb3
 
+;>         ClearEntitySpeed(slot)
 	call ClearEntitySpeed
+;>         wEntitySpeedY[slot] = 0x10     # straight down
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], $10
 	jp Jump_005_7cb8
 
 
+;>     else:
+;>         SetEntitySpeedTowardsLink(slot, 0x10)
 jr_005_7cb3:
 	ld a, $10
 	call SetEntitySpeedTowardsLink
 
+;>     if (wEntityY[slot] + 8) & 0xFF >= hLinkY: return GohmaEndLunge(slot)
 Jump_005_7cb8:
 	ld hl, wEntityY
 	add hl, bc
@@ -12693,75 +12995,98 @@ Jump_005_7cb8:
 	add $08
 	ld hl, hLinkY
 	cp [hl]
-	jp nc, Jump_005_7d09
+;>     # (continued)
+	jp nc, GohmaEndLunge
 
-	jp Jump_005_7d11
+;>     return GohmaAnimateLunge(slot)
+	jp GohmaAnimateLunge
 
 
 jr_005_7cc9:
+;=@d
 	ld hl, wEntityPrivate5
 	add hl, bc
 	ld a, [hl]
 	sub $08
 	ld hl, wEntityY
 	add hl, bc
+;=@d
 	cp [hl]
-	jp nc, Jump_005_7d11
+	jp nc, GohmaAnimateLunge
 
 	ld hl, wEntityPrivate1
 	add hl, bc
 	inc [hl]
+;=@d
 	call ClearEntitySpeed
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], $f0
+;=@d
 	ld a, $16
 	ldh [hWaveSfx], a
-	jp Jump_005_7d11
+	jp GohmaAnimateLunge
 
 
 jr_005_7ced:
+;=@s
 	ld hl, wEntitySpeedX
 	add hl, bc
 	and $04
 	jr nz, jr_005_7cf9
 
 	ld [hl], $08
-	jr jr_005_7d11
+	jr GohmaAnimateLunge
 
 jr_005_7cf9:
+;=@s
 	ld [hl], $f8
-	jr jr_005_7d11
+	jr GohmaAnimateLunge
 
 Jump_005_7cfd:
+;=@b
 	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntityY
 	add hl, bc
+;=@b
 	cp [hl]
-	jr c, jr_005_7d11
+	jr c, GohmaAnimateLunge
 
-Jump_005_7d09:
+;@ def GohmaEndLunge(slot: bc)
+;@ path: boss/gohma
+;@ End of the lunge: stops and walks on (state 1), then GohmaAnimateLunge.
+GohmaEndLunge::
+;> ClearEntitySpeed(slot)
 	call ClearEntitySpeed
+;> wEntityState[slot] = 1
 	call IncrementEntityState
 	ld [hl], $01
+;> GohmaAnimateLunge(slot)                # runs on into it
 
-Jump_005_7d11:
-jr_005_7d11:
+;@ def GohmaAnimateLunge(slot: bc)
+;@ path: boss/gohma
+;@ Moves the claws every 16 frames (frames 0, 1, 2) and shows the frame.
+GohmaAnimateLunge::
+;> if hFrameCounter & 0x0F == 0:
 	ldh a, [hFrameCounter]
 	and $0f
 	jr nz, jr_005_7d23
 
+;>     wEntityPrivateCounter[slot] += 1
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	inc [hl]
+;>     if wEntityPrivateCounter[slot] == 3:
 	ld a, [hl]
 	cp $03
 	jr nz, jr_005_7d23
 
+;>         wEntityPrivateCounter[slot] = 0
 	ld [hl], $00
 
+;> return SetEntitySpriteVariant(slot, wEntityPrivateCounter[slot])
 jr_005_7d23:
 	ld hl, wEntityPrivateCounter
 	add hl, bc
@@ -12769,7 +13094,14 @@ jr_005_7d23:
 	jp SetEntitySpriteVariant
 
 
-Jump_05_7D2B::
+;@ def GohmaEyeState(slot: bc)
+;@ path: boss/gohma
+;@ State 3: after timer 2 ($40 frames, eye opening) the eye stays open for $30 frames (timer 1;
+;@ frame 4, hitbox flags 0) and at $18 it shoots: entity $7D from Gohma's position
+;@ towards Link at speed $18. At the end the eye shuts (hitbox flags $80, frame 1) and it walks on
+;@ after $40 frames (state 1).
+GohmaEyeState::
+;> if wEntityTimer2[slot] != 0: return
 	ld hl, wEntityTimer2
 	add hl, bc
 	ld a, [hl]
@@ -12779,50 +13111,66 @@ Jump_05_7D2B::
 	ret
 
 
+;> t1 = GetEntityTimer1(slot)
 jr_005_7d34:
 	call GetEntityTimer1
+;> if t1 < 2:
 	cp $02
 	jr nc, jr_005_7d5b
 
+;>     if t1 != 0:                        # the eye shuts
 	cp $00
 	jr z, jr_005_7d56
 
+;>         wEntityHitboxFlags[slot] = 0x80
 	ld hl, wEntityHitboxFlags
 	add hl, bc
 	ld [hl], $80
+;>         SetEntitySpriteVariant(slot, 1)
 	ld a, $01
 	call SetEntitySpriteVariant
+;>         wEntityState[slot] = 1
 	call IncrementEntityState
 	ld [hl], $01
+;>         wEntityTimer2[slot] = 0x40
 	ld hl, wEntityTimer2
 	add hl, bc
 	ld [hl], $40
+;>         return
 	ret
 
 
+;>     wEntityTimer1[slot] = 0x30         # the eye opens; t1 stays 0
 jr_005_7d56:
 	call GetEntityTimer1
 	ld [hl], $30
 
+;> if t1 == 0x18:
 jr_005_7d5b:
 	cp $18
 	jr nz, jr_005_7d82
 
+;>     new = SpawnEntity(0x7D)            # its shot, at Gohma (hMultiPurpose0/1)
 	ld a, $7d
 	call SpawnEntity
+;>     if new is not None:
 	jr c, jr_005_7d82
 
+;>         wEntityX[new] = hMultiPurpose0
 	ldh a, [hMultiPurpose0]
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
+;>         wEntityY[new] = hMultiPurpose1
 	ldh a, [hMultiPurpose1]
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
+;>         wEntityPrivate1[new] += 1
 	ld hl, wEntityPrivate1
 	add hl, de
 	inc [hl]
+;>         SetEntitySpeedTowardsLink(slot, 0x18)  # for the shot's slot
 	push bc
 	push de
 	pop bc
@@ -12830,68 +13178,115 @@ jr_005_7d5b:
 	call SetEntitySpeedTowardsLink
 	pop bc
 
+;> wEntityHitboxFlags[slot] = 0           # the open eye can be hit
 jr_005_7d82:
 	ld hl, wEntityHitboxFlags
 	add hl, bc
 	ld [hl], $00
+;> return SetEntitySpriteVariant(slot, 4)
 	ld a, $04
 	jp SetEntitySpriteVariant
 
 
+;@ def BossDefeatedHandler_05(slot: bc)
+;@ path: boss/common
+;@ The defeat of a boss of this bank that is no longer active, in steps by wEntityPrivate2
+;@ (BossDefeatedStates_05): it flashes for $A0 frames, then $C0 more frames with explosion puffs,
+;@ then EndBossFight_05.
 BossDefeatedHandler_05::
+;> BossDefeatedStates_05[wEntityPrivate2[slot]](slot)
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
 	rst $00
 
+;@ path: boss/common
+;@ The defeat steps, by wEntityPrivate2.
 BossDefeatedStates_05::
 	dw BossDefeated_Start_05
 	dw BossDefeated_Flash_05
 	dw BossDefeated_Explode_05
 
+;@ def BossDefeated_Start_05(slot: bc)
+;@ path: boss/common
+;@ Step 0: $A0 frames of flashing.
 BossDefeated_Start_05::
+;> wEntityTimer[slot] = 0xA0
 	call GetEntityTimer
 	ld [hl], $a0
+;> wEntityFlashTimer[slot] = 0xFF
 	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld [hl], $ff
+;> IncrementEntityPrivate2_05(slot)       # runs on into it
 
+;@ def IncrementEntityPrivate2_05(slot: bc)
+;@ path: entity/helpers
+;@ wEntityPrivate2 + 1 (the next step).
 IncrementEntityPrivate2_05::
+;> wEntityPrivate2[slot] += 1
 	ld hl, wEntityPrivate2
 	add hl, bc
 	inc [hl]
+;> return
 	ret
 
 
+;@ def BossDefeated_Flash_05(slot: bc)
+;@ path: boss/common
+;@ Step 1: when the timer runs out, $C0 more frames (flashing) follow (step 2).
 BossDefeated_Flash_05::
+;> if GetEntityTimer(slot) == 0:
 	call GetEntityTimer
 	jr nz, jr_005_7dba
 
+;>     wEntityTimer[slot] = 0xC0
 	ld [hl], $c0
+;>     wEntityFlashTimer[slot] = 0xFF
 	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld [hl], $ff
+;>     IncrementEntityPrivate2_05(slot)
 	call IncrementEntityPrivate2_05
 
+;> return
 jr_005_7dba:
 	ret
 
 
+;@ def BossDefeated_Explode_05(slot: bc)
+;@ path: boss/common
+;@ Step 2: explosion puffs while the timer runs (BossExplosionPuffs_05), then EndBossFight_05.
 BossDefeated_Explode_05::
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
-	jr nz, jr_005_7df8
+;> if t != 0: return BossDefeated_Puffs_05(t)
+	jr nz, BossDefeated_Puffs_05
 
+;> EndBossFight_05(slot)                  # runs on into it
+
+;@ def EndBossFight_05(slot: bc)
+;@ path: boss/common
+;@ A boss of this bank is beaten (noise $1A). The Evil Eagle leaves its heart container at a fixed
+;@ place (SpawnEvilEagleHeartContainer_05); the others die with their drop (DefeatEntityWithDrop). Then, if a
+;@ slot still holds an entity with option bit 7 (a boss), the room is marked (bit 5 of its
+;@ wRoomStatus entry) in dungeon maps from 5 on; if none is left, the area music comes back.
 EndBossFight_05::
+;> hNoiseSfx = 0x1A
 	ld a, $1a
 	ldh [hNoiseSfx], a
+;> if hActiveEntityType == 0x63: return SpawnEvilEagleHeartContainer_05(slot)
 	ldh a, [hActiveEntityType]
 	cp $63
 	jp z, SpawnEvilEagleHeartContainer_05
 
-	call Call_3F7A
+;> DefeatEntityWithDrop()                            # dies with its drop
+	call DefeatEntityWithDrop
+;> for e in range(15, -1, -1):
 	ld e, $0f
 	ld d, b
 
+;>     if wEntityStatus[e] == 0: continue
 jr_005_7dd1:
 	ld hl, wEntityStatus
 	add hl, de
@@ -12899,41 +13294,63 @@ jr_005_7dd1:
 	and a
 	jr z, jr_005_7de2
 
+;>     opts = wEntityOptions1[e]
+;>@m     if opts & 0x80:                    # a boss
+;>@m         if hMapId < 5: return
+;>@m         return MarkBossRoomBeaten_05()
 	ld hl, wEntityOptions1
 	add hl, de
 	ld a, [hl]
 	and $80
 	jr nz, jr_005_7df0
 
+;>     # next slot
 jr_005_7de2:
 	dec e
 	ld a, e
 	cp $ff
 	jr nz, jr_005_7dd1
 
+;> wRestoreMusicAfterTransition = 0
 	xor a
 	ld [wRestoreMusicAfterTransition], a
+;> SelectAreaMusicFar()
 	call SelectAreaMusicFar
+;> return
 	ret
 
 
 jr_005_7df0:
+;=@m
 	ldh a, [hMapId]
 	cp $05
 	ret nc
 
-	jp Jump_005_7dfc
+;=@m
+	jp MarkBossRoomBeaten_05
 
 
-jr_005_7df8:
+;@ def BossDefeated_Puffs_05(t: a)
+;@ path: boss/common
+;@ Explosion puffs during the last defeat step (BossExplosionPuffs_05).
+BossDefeated_Puffs_05::
+;> BossExplosionPuffs_05(t)
 	call BossExplosionPuffs_05
+;> return
 	ret
 
 
-Jump_005_7dfc:
+;@ def MarkBossRoomBeaten_05()
+;@ path: boss/common
+;@ Sets bit 5 of the current room's wRoomStatus entry: $D900 + room for dungeon maps below 6 and from
+;@ $1A on, $DA00 + room for maps 6-$19.
+MarkBossRoomBeaten_05::
+;> e = hMapRoom
 	ldh a, [hMapRoom]
 	ld e, a
+;> d = 0
 	ld d, b
+;> if 6 <= hMapId < 0x1A:
 	ldh a, [hMapId]
 	cp $1a
 	jr nc, jr_005_7e0b
@@ -12941,15 +13358,20 @@ Jump_005_7dfc:
 	cp $06
 	jr c, jr_005_7e0b
 
+;>     d = 1
 	inc d
 
+;> wRoomStatus[0x100 + 0x100 * d + e] |= 0x20
 jr_005_7e0b:
-	ld hl, $d900
+	ld hl, wRoomStatus + $100
 	add hl, de
 	set 5, [hl]
+;> return
 	ret
 
 
+;@ path: unused/padding
+;@ The unused end of bank 5 ($7E12-$7FFF): 494 bytes of $FF.
 Bank05Padding::
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff

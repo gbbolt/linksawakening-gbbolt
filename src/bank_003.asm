@@ -161,7 +161,7 @@ EntityHealthTable::
 	db $08, $08, $0c, $00, $00, $04, $06, $08, $0a, $04, $14, $0a, $18, $04, $02, $08
 	db $08, $02, $04, $ff, $00, $02, $04, $02, $03, $01, $01, $08, $06, $02
 
-EntityGroupTable484E::
+EntityContactDamageTable::
 	db $04, $04
 	db $08, $08, $18, $08, $04, $08, $10, $08, $10, $08, $08, $04, $08, $08, $08, $08
 	db $08, $08, $08, $0c, $00, $00, $08, $08, $08, $0c, $0c, $14, $10, $20, $08, $08
@@ -261,8 +261,8 @@ CancelMiniBossAndDespawn::
 ;> wRoomEventDone = 1
 	ld a, $01
 	ld [wRoomEventDone], a
-;> return Call_3FB7(slot)  # frees the slot
-	jp Call_3FB7
+;> return FreeEntitySlot(slot)  # frees the slot
+	jp FreeEntitySlot
 
 
 ;@ def EntityStatusInitHandler(slot: c)
@@ -284,8 +284,8 @@ EntityStatusInitHandler::
 	and $30
 	jr z, .notBeaten
 
-;>         return Call_3FB7(slot)  # frees the slot
-	jp Call_3FB7
+;>         return FreeEntitySlot(slot)  # frees the slot
+	jp FreeEntitySlot
 
 
 .notBeaten
@@ -479,8 +479,8 @@ EntityInit_MarinAtShore::
 	ld hl, wIsMarinInAnimalVillage
 	ld a, [wIsMarinFollowingLink]
 	or [hl]
-;>     return Call_3FB7(slot)  # frees the slot
-	jp nz, Call_3FB7
+;>     return FreeEntitySlot(slot)  # frees the slot
+	jp nz, FreeEntitySlot
 	ret
 
 ;@ def EntityInit_Bomber(slot: c)
@@ -682,8 +682,8 @@ EntityInit_FloatingItem::
 	jr nz, SetEntityZ13
 	ld a, [wHasToadstool]
 	and a
-;>     return Call_3FB7(slot)  # frees the slot
-	jp nz, Call_3FB7
+;>     return FreeEntitySlot(slot)  # frees the slot
+	jp nz, FreeEntitySlot
 ;> SetEntityZ13(slot)
 
 ;@ def SetEntityZ13(slot: c)
@@ -741,10 +741,10 @@ EntityInit_BigFairy::
 	ld hl, wEntityZ
 	add hl, bc
 	ld [hl], $10
-;> if mem[0xC5A9]: return Call_3FB7(slot)  # frees the slot
+;> if mem[0xC5A9]: return FreeEntitySlot(slot)  # frees the slot
 	ld a, [wHealthIsFull]
 	and a
-	jp nz, Call_3FB7
+	jp nz, FreeEntitySlot
 ;> PlayMusicAndCenterX(slot, 0x0C)
 	ld a, $0c
 ;@ def PlayMusicAndCenterX(slot: c, track: a)
@@ -767,16 +767,16 @@ EntityInit_BowWow::
 	ldh a, [hMapRoom]
 	cp $e2
 	jr nz, .home
-;>     if wIsBowWowFollowingLink != 0x80: return Call_3FB7(slot)  # frees the slot
+;>     if wIsBowWowFollowingLink != 0x80: return FreeEntitySlot(slot)  # frees the slot
 	ld a, [wIsBowWowFollowingLink]
 	cp $80
 	jr z, .done
-	jp Call_3FB7
+	jp FreeEntitySlot
 .home
-;> elif wIsBowWowFollowingLink: return Call_3FB7(slot)
+;> elif wIsBowWowFollowingLink: return FreeEntitySlot(slot)
 	ld a, [wIsBowWowFollowingLink]
 	and a
-	jp nz, Call_3FB7
+	jp nz, FreeEntitySlot
 .done
 	ret
 
@@ -800,9 +800,9 @@ EntityInit_Sword::
 ;@ Frees the slot when bit 4 of `flags` is set (callers pass the room status, shifted to test other
 ;@ bits).
 DespawnIfRoomFlag::
-;> if flags & 0x10: return Call_3FB7(slot)  # frees the slot
+;> if flags & 0x10: return FreeEntitySlot(slot)  # frees the slot
 	and $10
-	jp nz, Call_3FB7
+	jp nz, FreeEntitySlot
 	ret
 
 ;@ def EntityInit_Marin(slot: c)
@@ -817,15 +817,15 @@ EntityInit_Marin::
 	cp $c0
 	jr c, .debugCheck
 
-;>     if not wIsMarinInAnimalVillage: return Call_3FB7(slot)  # frees the slot
+;>     if not wIsMarinInAnimalVillage: return FreeEntitySlot(slot)  # frees the slot
 	ld a, [wIsMarinInAnimalVillage]
 	and a
-	jp z, Call_3FB7
+	jp z, FreeEntitySlot
 
-;>     if wIsMarinFollowingLink: return Call_3FB7(slot)
+;>     if wIsMarinFollowingLink: return FreeEntitySlot(slot)
 	ld a, [wIsMarinFollowingLink]
 	and a
-	jp nz, Call_3FB7
+	jp nz, FreeEntitySlot
 
 ;>     mem[0xC3C8] = 1
 	inc a
@@ -1138,8 +1138,8 @@ EntityStatus2Handler::
 	ld a, $27
 	ld [$db71], a
 .free
-;>     return Call_3FB7(slot)  # frees the slot
-	jp Call_3FB7
+;>     return FreeEntitySlot(slot)  # frees the slot
+	jp FreeEntitySlot
 .falling
 ;> if t >= 0x40:
 	cp $40
@@ -1313,8 +1313,8 @@ EntityStatus8Handler::
 ;>     wProjectileWeaponType = 0x0B  # a thrown object
 	ld a, $0b
 	ld [wProjectileWeaponType], a
-;>     Call_03_75A6(slot)  # hits the other entities
-	call Call_03_75A6
+;>     EntityHitOtherEntities_03(slot)  # hits the other entities
+	call EntityHitOtherEntities_03
 ;>     moving = wEntitySpeedX[slot] | wEntitySpeedY[slot]
 	ld hl, wEntitySpeedX
 	add hl, bc
@@ -1369,8 +1369,8 @@ EntityStatus6Handler::
 	call UpdatePickupPhysics
 ;> ClearEntitySpeed()  # stops the entity (x and y speed 0)
 	call ClearEntitySpeed
-;> Call_03_6E40(slot)
-	call Call_03_6E40
+;> EntityCheckWeaponHits_03(slot)
+	call EntityCheckWeaponHits_03
 ;> if wItemB == 3:  # Power Bracelet on B
 	ld a, [wItemB]
 	cp $03
@@ -1411,8 +1411,8 @@ TryLiftStunnedEntity::
 ;> wEntityPhysicsFlags[slot] = flags | 0x80  # for the touch test only
 	or $80
 	ld [hl], a
-;> touching = Call_03_6C8E(slot)  # carry: Link touches the entity
-	call Call_03_6C8E
+;> touching = EntityTouchesLinkOnGround_03(slot)  # carry: Link touches the entity
+	call EntityTouchesLinkOnGround_03
 	rl e
 ;> wEntityPhysicsFlags[slot] = flags
 	pop af
@@ -1682,13 +1682,13 @@ EntityInit_KeyDropPoint::
 	ldh a, [hMapRoom]
 	cp $f8
 	jr nz, .room7A
-;>     if hRoomStatus & 0x10: return Call_3FB7(slot)  # frees the slot
+;>     if hRoomStatus & 0x10: return FreeEntitySlot(slot)  # frees the slot
 	ldh a, [hRoomStatus]
 	bit 4, a
-	jp nz, Call_3FB7
-;>     if not hRoomStatus & 0x20: return Call_3FB7(slot)
+	jp nz, FreeEntitySlot
+;>     if not hRoomStatus & 0x20: return FreeEntitySlot(slot)
 	bit 5, a
-	jp z, Call_3FB7
+	jp z, FreeEntitySlot
 ;>     return SetEntitySpriteVariant(slot, 2)  # sets wEntitySpriteVariant
 	ld a, $02
 	jp SetEntitySpriteVariant
@@ -1696,10 +1696,10 @@ EntityInit_KeyDropPoint::
 ;> if hMapRoom == 0x7A:
 	cp $7a
 	jr nz, .room7C
-;>     if hRoomStatus & 0x10: return Call_3FB7(slot)
+;>     if hRoomStatus & 0x10: return FreeEntitySlot(slot)
 	ldh a, [hRoomStatus]
 	and $10
-	jp nz, Call_3FB7
+	jp nz, FreeEntitySlot
 ;>     return SetEntitySpriteVariant(slot, 4)
 	ld a, $04
 	jp SetEntitySpriteVariant
@@ -1707,14 +1707,14 @@ EntityInit_KeyDropPoint::
 ;> if hMapRoom == 0x7C:
 	cp $7c
 	jr nz, .done
-;>     if not wRoomStatus[0x169] & 0x10: return Call_3FB7(slot)
+;>     if not wRoomStatus[0x169] & 0x10: return FreeEntitySlot(slot)
 	ld a, [wRoomStatus + $169]
 	and $10
-	jp z, Call_3FB7
-;>     if hRoomStatus & 0x10: return Call_3FB7(slot)
+	jp z, FreeEntitySlot
+;>     if hRoomStatus & 0x10: return FreeEntitySlot(slot)
 	ldh a, [hRoomStatus]
 	and $10
-	jp nz, Call_3FB7
+	jp nz, FreeEntitySlot
 .done
 	ret
 
@@ -1892,8 +1892,8 @@ IronMaskHandler::
 	call ReturnIfNonInteractive_03
 ;> ApplyRecoilIfNeeded_03(slot)
 	call ApplyRecoilIfNeeded_03
-;> Call_03_6E3D(slot)
-	call Call_03_6E3D
+;> EntityCheckHits_03(slot)
+	call EntityCheckHits_03
 ;> UpdateEntityPosWithSpeed_03(slot)
 	call UpdateEntityPosWithSpeed_03
 ;> Call_03_7892(slot)
@@ -2227,14 +2227,14 @@ EntityInit_PushedBlock::
 	call PushedBlockHandler
 ;> Call_03_7892(slot)  # background collision
 	call Call_03_7892
-;> if wEntityCollisions[slot]: return Call_3FB7(slot)  # frees the slot
+;> if wEntityCollisions[slot]: return FreeEntitySlot(slot)  # frees the slot
 	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and a
 	jr z, .moves
 
-	jp Call_3FB7
+	jp FreeEntitySlot
 
 
 .moves
@@ -2388,8 +2388,8 @@ PushedBlockHandler::
 	call UpdateEntityPosWithSpeed_03
 ;> Call_03_5343(slot)  # pushes the entities it touches
 	call Call_03_5343
-;> if Call_03_6C93(slot):  # carry: the block touches Link
-	call Call_03_6C93
+;> if EntityTouchesLink_03(slot):  # carry: the block touches Link
+	call EntityTouchesLink_03
 	jr nc, .moving
 
 ;>     RestoreLinkPosition()
@@ -2441,8 +2441,8 @@ PushedBlockHandler::
 	cp $02
 	jr z, .done
 
-;> Call_3FB7(slot)  # frees the slot
-	call Call_3FB7
+;> FreeEntitySlot(slot)  # frees the slot
+	call FreeEntitySlot
 ;> tiles, obj = FloorTiles5205, 0xC4
 	ld de, FloorTiles5205
 	ld b, $c4
@@ -2489,7 +2489,7 @@ PushedBlockHandler::
 ;@ def Call_03_5343(slot: c)
 ;@ path: object/block
 ;@ The pushed block hits every entity (slots 15-0) it overlaps: active ones (status 5 and up) without
-;@ physics bits 6 and 5, closer than 12 pixels in x and in drawn y, get Call_03_6FE1 with weapon 8.
+;@ physics bits 6 and 5, closer than 12 pixels in x and in drawn y, get SetEntityRecoil with weapon 8.
 Call_03_5343::
 ;>@loop for other in range(15, -1, -1):
 	ld e, $0f
@@ -2547,9 +2547,9 @@ Call_03_5343::
 	push de
 	pop bc
 	push de
-;>     Call_03_6FE1(target, 8)
+;>     SetEntityRecoil(target, 8)
 	ld a, $08
-	call Call_03_6FE1
+	call SetEntityRecoil
 	pop de
 	pop bc
 
@@ -2658,8 +2658,8 @@ LiftableObjectHandler::
 ;>                 OpenDialog(0x28)
 	ld a, $28
 	call OpenDialog
-;>                 return Call_3FB7(slot)  # frees the slot
-	jp Call_3FB7
+;>                 return FreeEntitySlot(slot)  # frees the slot
+	jp FreeEntitySlot
 
 
 .usual
@@ -2668,8 +2668,8 @@ LiftableObjectHandler::
 	call OpenDialogTable1
 
 .free
-;> return Call_3FB7(slot)
-	jp Call_3FB7
+;> return FreeEntitySlot(slot)
+	jp FreeEntitySlot
 
 
 .pieces
@@ -2697,8 +2697,8 @@ UpdateThrownObject::
 ;> wProjectileWeaponType = 0x0B  # a thrown object
 	ld a, $0b
 	ld [wProjectileWeaponType], a
-;> Call_03_75A6(slot)  # hits the other entities
-	call Call_03_75A6
+;> EntityHitOtherEntities_03(slot)  # hits the other entities
+	call EntityHitOtherEntities_03
 ;> UpdatePickupPhysics(slot)
 	call UpdatePickupPhysics
 ;> if wEntityStatus[slot] == 2: return  # falls into a pit
@@ -2804,8 +2804,8 @@ BreakIntoPieces::
 ;> hNoiseSfx = 9
 	ld a, $09
 	ldh [hNoiseSfx], a
-;> Call_3FB7(slot)  # frees the old slot
-	call Call_3FB7
+;> FreeEntitySlot(slot)  # frees the old slot
+	call FreeEntitySlot
 
 .done
 	ret
@@ -2850,8 +2850,8 @@ CheckThrownObjectRoomEvents::
 ;>     hMultiPurpose8 = 0x19
 	ld a, $19
 	ldh [hMultiPurpose8], a
-;>     Call_3E7D()  # changes that square
-	call Call_3E7D
+;>     SpawnChestContentsFrom3()  # changes that square
+	call SpawnChestContentsFrom3
 ;>     return TriggerRoomEvent()
 	jp TriggerRoomEvent
 
@@ -2891,7 +2891,10 @@ CheckThrownObjectRoomEvents::
 ;@ 8 bytes no code refers to: two sprite pairs (tile, attribute) of tiles $32 and $30, the right one
 ;@ flipped both ways.
 UnusedSprites54E6::
-	db $32, $00, $32, $60, $30, $00, $30, $60
+	db $32, $00, $32, $60
+
+BombSmokeSprite::
+	db $30, $00, $30, $60
 
 ;@ path: entity/status
 ;@ The puff of smoke of a dying entity: 4 stages of 4 OAM entries (y offset, x offset, tile,
@@ -2911,7 +2914,7 @@ DeathPoofLargeSprites::
 ;@ path: entity/status
 ;@ Status 1: the entity dies. Bosses (option bit 7) run their own death code in their handler. Others
 ;@ flash for a moment ($20 and more on wEntityDyingTimer, handler still running), then vanish in a puff
-;@ of smoke; at 0 Call_3F7A drops an item and frees the slot.
+;@ of smoke; at 0 DefeatEntityWithDrop drops an item and frees the slot.
 EntityStatus1Handler::
 ;> if wEntityOptions1[slot] & 0x80: return RunEntityHandler()  # a boss: its own handler
 	ld hl, wEntityOptions1
@@ -2925,12 +2928,12 @@ EntityStatus1Handler::
 	ld hl, wEntityDyingTimer
 	add hl, bc
 	ld a, [hl]
-;> if t == 0: return Call_3F7A()  # drops the item, frees the slot
+;> if t == 0: return DefeatEntityWithDrop()  # drops the item, frees the slot
 	and a
-	jp z, Call_3F7A
+	jp z, DefeatEntityWithDrop
 ;> large = mem[0xC4A0 + slot]
 	push af
-	ld hl, $c4a0
+	ld hl, wEntityHitByPowerUp
 	add hl, bc
 	ld a, [hl]
 ;> sprites = DeathPoofLargeSprites if large else DeathPoofSprites
@@ -2961,7 +2964,7 @@ EntityStatus1Handler::
 	cp $30
 	jr nz, .four
 	push hl
-	ld hl, $c4a0
+	ld hl, wEntityHitByPowerUp
 	add hl, bc
 	ld a, [hl]
 ;> if big:  # the large puff's first stage has 8 sprites
@@ -3084,16 +3087,16 @@ DropDefeatedEntityItem::
 	jp nz, SpawnDrop
 
 ;> mem[0xD471] += 1  # kill counter for the acorn
-	ld a, [$d471]
+	ld a, [wKillsWithoutHit]
 	inc a
-	ld [$d471], a
+	ld [wKillsWithoutHit], a
 ;> if mem[0xD471] >= 12:
 	cp $0c
 	jr c, .byClass
 
 ;>     mem[0xD471] = 0
 	xor a
-	ld [$d471], a
+	ld [wKillsWithoutHit], a
 ;>     if not (wBossInRoom | wActivePowerUp | hIsSideScrolling):
 	ld a, [wBossInRoom]
 	ld hl, wActivePowerUp
@@ -3343,7 +3346,7 @@ LiftOffsetsZ::
 ;@ def EntityStatus7Handler(slot: c)
 ;@ path: entity/status
 ;@ Status 7: Link lifts or carries the entity. Each lift step (4 of them) lasts LiftStepFrames frames;
-;@ the entity is kept at Link's hands or over his head. A bomb keeps ticking (Call_03_673D) instead of
+;@ the entity is kept at Link's hands or over his head. A bomb keeps ticking (DrawBomb) instead of
 ;@ running its handler.
 EntityStatus7Handler::
 ;> wCarriedEntityType = hActiveEntityType
@@ -3357,8 +3360,8 @@ EntityStatus7Handler::
 	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld [hl], b
-;>     Call_03_673D(slot)
-	call Call_03_673D
+;>     DrawBomb(slot)
+	call DrawBomb
 	jr .step
 
 .handler
@@ -3569,10 +3572,10 @@ MoblinHandler::
 	cp $15
 	jr nz, .here
 
-;>     if wIsBowWowFollowingLink != 0x80: return Call_3FB7(slot)  # frees the slot
+;>     if wIsBowWowFollowingLink != 0x80: return FreeEntitySlot(slot)  # frees the slot
 	ld a, [wIsBowWowFollowingLink]
 	cp $80
-	jp nz, Call_3FB7
+	jp nz, FreeEntitySlot
 
 .here
 ;> mem[0xD153] = slot
@@ -3614,8 +3617,8 @@ WalkingEnemyHandler::
 .noHit
 ;> ApplyRecoilIfNeeded_03(slot)
 	call ApplyRecoilIfNeeded_03
-;> Call_03_6E3D(slot)
-	call Call_03_6E3D
+;> EntityCheckHits_03(slot)
+	call EntityCheckHits_03
 ;> if hActiveEntityState == 0:  # walking
 ;>@w1     hitWall = wEntityCollisions[slot] & 0x0F
 ;>@w2     if hitWall or not GetEntityTimer(slot):  # time to stop
@@ -4025,8 +4028,8 @@ HeartContainerHandler::
 	ld [hl], a
 ;> hRoomStatus = mem[p]
 	ldh [hRoomStatus], a
-;> return Call_3FB7(slot)  # frees the slot
-	jp Call_3FB7
+;> return FreeEntitySlot(slot)  # frees the slot
+	jp FreeEntitySlot
 
 
 ;@ def HoldItemAboveLink(slot: c)
@@ -4086,10 +4089,10 @@ HeartPieceSprite::
 ;@ (HeartPieceStates): wait for Link, hold it up, load the counter tiles, show the message with the
 ;@ heart counter filling up, and with the fourth piece add a heart container.
 HeartPieceHandler::
-;> if hRoomStatus & 0x10: return Call_3FB7(slot)  # frees the slot
+;> if hRoomStatus & 0x10: return FreeEntitySlot(slot)  # frees the slot
 	ldh a, [hRoomStatus]
 	and $10
-	jp nz, Call_3FB7
+	jp nz, FreeEntitySlot
 
 ;> return HeartPieceStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
@@ -4277,8 +4280,8 @@ HeartPiece_Done::
 ;> hNeedsUpdatingBGTiles = 6
 	ld a, $06
 	ldh [hNeedsUpdatingBGTiles], a
-;> Call_3FB7(slot)  # frees the slot
-	call Call_3FB7
+;> FreeEntitySlot(slot)  # frees the slot
+	call FreeEntitySlot
 ;> hBGChangeRequest = 0x0D
 	ld a, $0d
 	ldh [hBGChangeRequest], a
@@ -4419,10 +4422,10 @@ SwordHandler::
 	and a
 	jr nz, .draw
 
-;>     if hRoomStatus & 0x10: return Call_3FB7(slot)  # frees the slot
+;>     if hRoomStatus & 0x10: return FreeEntitySlot(slot)  # frees the slot
 	ldh a, [hRoomStatus]
 	and $10
-	jp nz, Call_3FB7
+	jp nz, FreeEntitySlot
 
 ;>     sprite = BeachSwordSprite
 	ld de, BeachSwordSprite
@@ -4541,7 +4544,7 @@ Sword_Show::
 ;@ def Sword_Give(slot: c)
 ;@ path: item/sword
 ;@ State 3: Link holds the sword up in pose $6B (sword 4 pixels to the left); halfway a sparkle
-;@ appears (Call_03_6C51) with jingle 7; at the end Link owns the sword.
+;@ appears (SpawnSparkleAtEntity) with jingle 7; at the end Link owns the sword.
 Sword_Give::
 ;> HoldItemAboveLink(slot)
 	call HoldItemAboveLink
@@ -4569,8 +4572,8 @@ Sword_Give::
 	ld [wSwordLevel], a
 ;>     MarkRoomChestOpened()
 	call MarkRoomChestOpened
-;>     return Call_3FB7(slot)  # frees the slot
-	jp Call_3FB7
+;>     return FreeEntitySlot(slot)  # frees the slot
+	jp FreeEntitySlot
 
 
 .sparkle
@@ -4578,10 +4581,10 @@ Sword_Give::
 	cp $1a
 	jr nz, .done
 
-;>     Call_03_6C51(slot, hActiveEntityY - 0x0C)
+;>     SpawnSparkleAtEntity(slot, hActiveEntityY - 0x0C)
 	ldh a, [hActiveEntityY]
 	sub $0c
-	call Call_03_6C51
+	call SpawnSparkleAtEntity
 ;>     hJingle = 7
 	ld a, $07
 	ldh [hJingle], a
@@ -4600,10 +4603,10 @@ ItemSprite8A::
 ;@ Type $30 in room $80: an item (gone once taken). Collected like the other pickups; while held up
 ;@ message $93 opens; at the end Link gets inventory item 6 (the hookshot).
 KeyDropPoint_Room80::
-;> if hRoomStatus & 0x10: return Call_3FB7(slot)  # frees the slot
+;> if hRoomStatus & 0x10: return FreeEntitySlot(slot)  # frees the slot
 	ldh a, [hRoomStatus]
 	and $10
-	jp nz, Call_3FB7
+	jp nz, FreeEntitySlot
 
 ;> DrawEntity8x16(ItemSprite8A)
 	ld de, ItemSprite8A
@@ -4635,8 +4638,8 @@ KeyDropPoint_Room80::
 	call GiveInventoryItem
 ;> MarkRoomChestOpened()
 	call MarkRoomChestOpened
-;> return Call_3FB7(slot)
-	jp Call_3FB7
+;> return FreeEntitySlot(slot)
+	jp FreeEntitySlot
 
 
 .hold
@@ -4721,11 +4724,11 @@ KeyDropPointHandler::
 	xor a
 
 .last
-;> if t == 1: return Call_3FB7(slot)  # frees the slot
+;> if t == 1: return FreeEntitySlot(slot)  # frees the slot
 	dec a
 	jr nz, .hold
 
-	jp Call_3FB7
+	jp FreeEntitySlot
 
 
 .hold
@@ -4858,11 +4861,11 @@ ToadstoolSprites::
 ;@ has magic powder. Collected like a pickup; message $0F while held up; then Link has it (inventory
 ;@ item $0C) and the background change $0A runs.
 ToadstoolHandler::
-;> if wMagicPowderCount | wHasToadstool: return Call_3FB7(slot)  # frees the slot
+;> if wMagicPowderCount | wHasToadstool: return FreeEntitySlot(slot)  # frees the slot
 	ld hl, wHasToadstool
 	ld a, [wMagicPowderCount]
 	or [hl]
-	jp nz, Call_3FB7
+	jp nz, FreeEntitySlot
 
 ;> DrawEntity16x16(ToadstoolSprites)
 	ld de, ToadstoolSprites
@@ -4898,8 +4901,8 @@ ToadstoolHandler::
 ;> wHasToadstool = 1
 	ld a, $01
 	ld [wHasToadstool], a
-;> return Call_3FB7(slot)
-	jp Call_3FB7
+;> return FreeEntitySlot(slot)
+	jp FreeEntitySlot
 
 
 .hold
@@ -4908,51 +4911,81 @@ ToadstoolHandler::
 
 
 ;@ path: item/instrument
-;@ Sprites of the eight Instruments of the Sirens (type $39), by sprite variant 0-7: one 8x16 sprite
-;@ each (tile, attribute): tiles $70, $72, ... $7E.
+;@ Sprite of an Instrument of the Sirens (type $39) by sprite variant 0-3 (hMapId & 3; each dungeon
+;@ loads its own instrument tiles): two 8x16 sprites (tile, attribute) per variant: $70/$72,
+;@ $74/$76, $78/$7A, $7C/$7E.
 InstrumentSprites_03::
 	db $70, $00, $72, $00, $74, $00, $76, $00, $78, $00, $7a, $00, $7c, $00, $7e, $00
 
+;@ def InstrumentHandler(slot: c)
+;@ path: item/instrument
+;@ Handler of type $39. The instrument and its effects share the type; wEntityPrivate1 selects the
+;@ role (InstrumentModes): 0 the instrument, 1 a music note flying off it, 2 the screen flash that
+;@ ends the dungeon.
 InstrumentHandler::
+;> return InstrumentModes[wEntityPrivate1[slot]](slot)
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	rst $00
 
+;@ path: item/instrument
+;@ Roles of type $39 by wEntityPrivate1 (0-2).
 InstrumentModes::
 	dw InstrumentItemHandler
 	dw MusicNoteHandler
 	dw InstrumentWarpOut
 
+;@ path: item/instrument
+;@ Background palettes (BGP) of the flash after the instrument's song, 29 bytes, read at index
+;@ wEntityPrivate2 + (frame & 3): white-out from $E4 down to $00, then $1C, $08, $04, $00.
 InstrumentFadeBGPalettes::
 	db $e4, $e4, $e4, $e4, $90, $90, $90, $90, $40, $40, $40, $40, $00, $00, $00, $00
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
+;@ path: item/instrument
+;@ Object palette 0 (OBP0) for the same flash, 29 bytes, same index as InstrumentFadeBGPalettes.
 InstrumentFadeOBJPalettes::
 	db $1c, $1c, $1c
 	db $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $08, $08, $08
 	db $08, $04, $04, $04, $04, $00, $00, $00, $00, $00
 
+;@ def InstrumentWarpOut(slot: c)
+;@ path: item/instrument
+;@ Role 2, spawned when the instrument's song ends: Link is frozen while the screen flashes white
+;@ (InstrumentFlashPalettes); when wEntityDropTimer runs out the slot is freed, the instrument goes to
+;@ its last state, the screen fades out and the dungeon's after-effect runs (InstrumentDoneEffects).
 InstrumentWarpOut::
-	call Call_3EA0
+;> DrawInstrumentWarpEffectFrom3()  # bank 6 $7940
+	call DrawInstrumentWarpEffectFrom3
+;> wLinkFrozen = 1
 	ld a, $01
 	ld [wLinkFrozen], a
+;> t = GetEntityDropTimer(slot)
 	call GetEntityDropTimer
+;> if t: return InstrumentFlashPalettes(slot, t)
 	jr nz, InstrumentFlashPalettes
 
-	call Call_3FB7
+;> FreeEntitySlot(slot)  # frees the slot
+	call FreeEntitySlot
+;> hLinkAnimationState = 0
 	xor a
 	ldh [hLinkAnimationState], a
+;> wEntityState[wSmasherBallSlot] += 1  # $D201 holds the instrument's slot here
 	ld a, [wSmasherBallSlot]
 	ld e, a
 	ld d, b
 	ld hl, wEntityState
 	add hl, de
 	inc [hl]
+;> StartScreenFadeOut()
 	call StartScreenFadeOut
+;> return InstrumentDoneEffects[hMapId]()
 	ldh a, [hMapId]
 	rst $00
 
+;@ path: item/instrument
+;@ What changes in the world after each dungeon's instrument (index = hMapId 0-7).
 InstrumentDoneEffects::
 	dw InstrumentDone_Map0
 	dw InstrumentDone_Map1
@@ -4963,130 +4996,199 @@ InstrumentDoneEffects::
 	dw InstrumentDone_Map6
 	dw InstrumentDone_Map4
 
+;@ def InstrumentDone_Map0()
+;@ path: item/instrument
+;@ After dungeon 0: wIsBowWowFollowingLink = $80.
 InstrumentDone_Map0::
+;> wIsBowWowFollowingLink = 0x80
 	ld a, $80
 	ld [wIsBowWowFollowingLink], a
 	ret
 
 
+;@ def InstrumentDone_Map1()
+;@ path: item/instrument
+;@ After dungeon 1: wTarinState = 2.
 InstrumentDone_Map1::
+;> wTarinState = 2
 	ld a, $02
 	ld [wTarinState], a
 	ret
 
 
+;@ def InstrumentDone_Map2()
+;@ path: item/instrument
+;@ After dungeon 2: nothing.
 InstrumentDone_Map2::
+;> return
 	ret
 
 
+;@ def InstrumentDone_Map3()
+;@ path: item/instrument
+;@ After dungeon 3: wIsGhostFollowingLink = 2.
 InstrumentDone_Map3::
+;> wIsGhostFollowingLink = 2
 	ld a, $02
 	ld [wIsGhostFollowingLink], a
 
+;@ def InstrumentDone_Map4()
+;@ path: item/instrument
+;@ After dungeons 4 and 7: nothing.
 InstrumentDone_Map4::
+;> return
 	ret
 
 
+;@ def InstrumentDone_Map5()
+;@ path: item/instrument
+;@ After dungeon 5: Marin leaves Animal Village (wIsMarinInAnimalVillage = 0).
 InstrumentDone_Map5::
+;> wIsMarinInAnimalVillage = 0
 	xor a
 	ld [wIsMarinInAnimalVillage], a
 	ret
 
 
+;@ def InstrumentDone_Map6()
+;@ path: item/instrument
+;@ After dungeon 6: the rooster stops following Link.
 InstrumentDone_Map6::
+;> wIsRoosterFollowingLink = 0
 	xor a
 	ld [wIsRoosterFollowingLink], a
 	ret
 
 
+;@ def InstrumentFlashPalettes(slot: c, t: a)
+;@ path: item/instrument
+;@ The flash while wEntityDropTimer t is below $50: every 8 frames wEntityPrivate2 counts up to $19
+;@ (noise $2C at the start); at $18 entity type $9F is spawned (role 1, timer $60). The palettes
+;@ come from InstrumentFadeBGPalettes / InstrumentFadeOBJPalettes at wEntityPrivate2 + (frame & 3).
 InstrumentFlashPalettes::
+;> if t >= 0x50: return
 	cp $50
-	jr nc, jr_003_5ec1
+	jr nc, .done
 
+;> if wEntityPrivate2[slot] >= 0x19: return
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
 	cp $19
-	jr nc, jr_003_5ec1
+	jr nc, .done
 
+;> if hFrameCounter & 7 == 0:
 	ldh a, [hFrameCounter]
 	and $07
-	jr nz, jr_003_5ea2
+	jr nz, .palettes
 
+;>     step = wEntityPrivate2[slot]
 	ld a, [hl]
 	and a
-	jr nz, jr_003_5e8c
+	jr nz, .count
 
+;>     if step == 0: hNoiseSfx = 0x2C
 	ld a, $2c
 	ldh [hNoiseSfx], a
 	xor a
 
-jr_003_5e8c:
+.count
+;>     wEntityPrivate2[slot] += 1
 	inc [hl]
+;>     if step == 0x18:
 	cp $18
-	jr nz, jr_003_5ea2
+	jr nz, .palettes
 
+;>         n = SpawnEntity_03(0x9F)
 	ld a, $9f
 	call SpawnEntity_03
+;>         wEntityPrivate1[n] = 1
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $01
+;>         wEntityTimer[n] = 0x60
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $60
 
-jr_003_5ea2:
+.palettes
+;> i = (hFrameCounter & 3) + wEntityPrivate2[slot]
 	ldh a, [hFrameCounter]
 	and $03
 	ld hl, wEntityPrivate2
 	add hl, bc
 	add [hl]
 	ld e, a
+;> wBGPalette = InstrumentFadeBGPalettes[i]
 	ld d, b
-	ld hl, $5de6
+	ld hl, InstrumentFadeBGPalettes
 	add hl, de
 	ld a, [hl]
 	ld [wBGPalette], a
-	ld hl, $5e03
+;> wOBJ0Palette = InstrumentFadeOBJPalettes[i]
+	ld hl, InstrumentFadeOBJPalettes
 	add hl, de
 	ld a, [hl]
 	ld [wOBJ0Palette], a
+;> wOBJ1Palette = 0
 	xor a
 	ld [wOBJ1Palette], a
 
-jr_003_5ec1:
+.done
 	ret
 
 
+;@ path: item/instrument
+;@ Music note sprites (role 1 of type $39), 2 variants of two 8x16 sprites (tile, attribute):
+;@ 0 = tile $6C and nothing ($FF), 1 = tiles $6C and $6E.
 MusicNoteSprites::
 	db $6c, $00, $ff, $ff, $6c, $00, $6e, $00
 
+;@ def MusicNoteHandler(slot: c)
+;@ path: item/instrument
+;@ Role 1: a music note that flies off while the instrument plays, until its timer runs out.
 MusicNoteHandler::
-	ld de, $5ec2
+;> DrawEntity16x16(MusicNoteSprites)
+	ld de, MusicNoteSprites
 	call DrawEntity16x16
+;> UpdateEntityPosWithSpeed_03(slot)
 	call UpdateEntityPosWithSpeed_03
+;> if GetEntityTimer(slot) == 0: return FreeEntitySlot(slot)  # frees the slot
 	call GetEntityTimer
-	jp z, Call_3FB7
+	jp z, FreeEntitySlot
 
 	ret
 
 
+;@ def InstrumentItemHandler(slot: c)
+;@ path: item/instrument
+;@ Role 0, the instrument after a dungeon's boss (gone once taken, room status bit 4). Its slot goes
+;@ to $D201 (wSmasherBallSlot); Link is kept in the arena; drawn with the variant hMapId & 3, then
+;@ the state machine InstrumentStates.
 InstrumentItemHandler::
+;> wSmasherBallSlot = slot
 	ld a, c
 	ld [wSmasherBallSlot], a
+;> if hRoomStatus & 0x10: return FreeEntitySlot(slot)  # frees the slot
 	ldh a, [hRoomStatus]
 	and $10
-	jp nz, Call_3FB7
+	jp nz, FreeEntitySlot
 
+;> hActiveEntitySpriteVariant = hMapId & 3
 	ldh a, [hMapId]
 	and $03
 	ldh [hActiveEntitySpriteVariant], a
+;> ConfineLinkToArena()
 	call ConfineLinkToArena
-	ld de, $5dca
+;> DrawEntity16x16(InstrumentSprites_03)
+	ld de, InstrumentSprites_03
 	call DrawEntity16x16
+;> return InstrumentStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
+;@ path: item/instrument
+;@ States of the instrument (wEntityState 0-4).
 InstrumentStates::
 	dw Instrument_Collect
 	dw Instrument_StartMusic
@@ -5094,146 +5196,203 @@ InstrumentStates::
 	dw Instrument_Hold
 	dw Instrument_Done
 
+;@ def Instrument_Collect(slot: c)
+;@ path: item/instrument
+;@ State 0: waits for Link; when he holds it up the dungeon's message opens (dialog table 1, entry
+;@ hMapId), the dungeon remembers the instrument (wDungeonFlags bit 1) and the room status gets bit 4.
 Instrument_Collect::
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
+;> if t == 0: return CollectPickupIfTouched(slot)
 	jp z, CollectPickupIfTouched
 
+;> if t == 0x10:
 	cp $10
-	jr nz, jr_003_5f2a
+	jr nz, .hold
 
+;>     wEntityTimer[slot] -= 1
 	dec [hl]
+;>     IncrementEntityState(slot)
 	call IncrementEntityState
+;>     OpenDialogTable1(hMapId)
 	ldh a, [hMapId]
 	add $00
 	call OpenDialogTable1
+;>     i = hMapId
 	ldh a, [hMapId]
 	ld e, a
 	ld d, b
+;>     wDungeonFlags[i] |= 2
 	ld hl, wDungeonFlags
 	add hl, de
 	ld a, [hl]
 	or $02
 	ld [hl], a
+;>     mem[GetRoomStatusAddress_03()] |= 0x10
 	call GetRoomStatusAddress_03
 	ld a, [hl]
 	or $10
 	ld [hl], a
 	xor a
 
-jr_003_5f2a:
+.hold
+;> return HoldItemAboveLink(slot)
 	dec a
-	jr nz, jr_003_5f2d
+	jr nz, .jump
 
-jr_003_5f2d:
+.jump
 	jp HoldItemAboveLink
 
 
+;@ path: item/instrument
+;@ Song of each dungeon's instrument (index hMapId 0-7): $20, $28, $29, ... $2E.
 InstrumentMusicTracks::
 	db $20, $28, $29, $2a, $2b, $2c, $2d, $2e
 
+;@ def Instrument_StartMusic(slot: c)
+;@ path: item/instrument
+;@ State 1: once the music is silent and the message closed, the instrument's song starts
+;@ (InstrumentMusicTracks) and the timer is set to $FF.
 Instrument_StartMusic::
+;> if wActiveMusicTrack or wDialogState: return HoldItemAboveLink(slot)
 	ld a, [wActiveMusicTrack]
 	and a
-	jr nz, jr_003_5f58
+	jr nz, .hold
 
 	ld a, [wDialogState]
 	and a
-	jr nz, jr_003_5f58
+	jr nz, .hold
 
+;> i = hMapId
 	ldh a, [hMapId]
 	ld e, a
 	ld d, b
-	ld hl, $5f30
+;> wMusicTrackToPlay = InstrumentMusicTracks[i]
+	ld hl, InstrumentMusicTracks
 	add hl, de
 	ld a, [hl]
 	ld [wMusicTrackToPlay], a
+;> IncrementEntityState(slot)
 	call IncrementEntityState
+;> wEntityTimer[slot] = 0xFF
 	call GetEntityTimer
 	ld [hl], $ff
 
-jr_003_5f58:
+.hold
+;> return HoldItemAboveLink(slot)
 	jp HoldItemAboveLink
 
 
+;@ path: item/instrument
+;@ X offset of a new music note from the instrument, by side 0/1: +$0A, -6.
 InstrumentNoteOffsetX::
 	db $0a, $fa
 
+;@ path: item/instrument
+;@ X speed of a new music note by side 0/1: +4, -4.
 InstrumentNoteSpeedX::
 	db $04, $fc
 
+;@ def Instrument_PlayNotes(slot: c)
+;@ path: item/instrument
+;@ State 2, while the song plays: every $18 frames a music note (type $39, role 1) rises from the
+;@ instrument, alternately to the right and the left, with a random sprite variant. When the timer runs
+;@ out: jingle $2B and the flash (type $39, role 2, drop timer $80) is spawned.
 Instrument_PlayNotes::
+;> if GetEntityTimer(slot) == 0:
 	call GetEntityTimer
-	jr nz, jr_003_5f8b
+	jr nz, .notes
 
+;>     hJingle = 0x2B
 	ld a, $2b
 	ldh [hJingle], a
+;>     n = SpawnEntity_03(0x39)
 	ld a, $39
 	call SpawnEntity_03
+;>     wEntityX[n] = hMultiPurpose0 - 1
 	ldh a, [hMultiPurpose0]
 	dec a
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
+;>     wEntityY[n] = hMultiPurpose1
 	ldh a, [hMultiPurpose1]
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
+;>     wEntityPrivate1[n] = 2  # the flash
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $02
+;>     wEntityDropTimer[n] = 0x80
 	ld hl, wEntityDropTimer
 	add hl, de
 	ld [hl], $80
+;>     return IncrementEntityState(slot)
 	jp IncrementEntityState
 
 
-jr_003_5f8b:
+.notes
+;> wEntityPrivate3[slot] -= 1
 	ld hl, wEntityPrivate3
 	add hl, bc
 	dec [hl]
+;> if wEntityPrivate3[slot] != 0xFF: return HoldItemAboveLink(slot)
 	ld a, [hl]
 	cp $ff
-	jr nz, jr_003_5fe5
+	jr nz, .hold
 
+;> wEntityPrivate3[slot] = 0x17
 	ld [hl], $17
+;> wEntityPrivate4[slot] += 1
 	ld hl, wEntityPrivate4
 	add hl, bc
 	inc [hl]
+;> side = wEntityPrivate4[slot] & 1  # kept in hBGTilesRequestCopy
 	ld a, [hl]
 	and $01
 	ldh [hBGTilesRequestCopy], a
+;> n = SpawnEntity_03(0x39)
 	ld a, $39
 	call SpawnEntity_03
 	push bc
+;> wEntityPrivate1[n] += 1  # role 1, a note
 	ld hl, wEntityPrivate1
 	add hl, de
 	inc [hl]
+;> x = hMultiPurpose0 + InstrumentNoteOffsetX[side]  # c = side from here on
 	ldh a, [hBGTilesRequestCopy]
 	ld c, a
-	ld hl, $5f5b
+	ld hl, InstrumentNoteOffsetX
 	add hl, bc
 	ldh a, [hMultiPurpose0]
 	add [hl]
+;> wEntityX[n] = x
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ld hl, $5f5d
+;> wEntitySpeedX[n] = InstrumentNoteSpeedX[side]
+	ld hl, InstrumentNoteSpeedX
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntitySpeedX
 	add hl, de
 	ld [hl], a
+;> wEntityY[n] = hMultiPurpose1 - 8
 	ldh a, [hMultiPurpose1]
 	ld hl, wEntityY
 	add hl, de
 	add $f8
 	ld [hl], a
+;> wEntitySpeedY[n] = -3
 	ld hl, wEntitySpeedY
 	add hl, de
 	ld [hl], $fd
+;> wEntityTimer[n] = 0x38
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $38
+;> wEntitySpriteVariant[n] = GetRandomByte() & 1
 	call GetRandomByte
 	and $01
 	ld hl, wEntitySpriteVariant
@@ -5241,398 +5400,569 @@ jr_003_5f8b:
 	ld [hl], a
 	pop bc
 
-jr_003_5fe5:
+.hold
+;> return HoldItemAboveLink(slot)
 	jp HoldItemAboveLink
 
 
+;@ def Instrument_Hold(slot: c)
+;@ path: item/instrument
+;@ State 3: Link holds the instrument up during the flash.
 Instrument_Hold::
+;> return HoldItemAboveLink(slot)
 	jp HoldItemAboveLink
 
 
+;@ def Instrument_Done(slot: c)
+;@ path: item/instrument
+;@ State 4 (set by the flash when it ends): nothing more.
 Instrument_Done::
+;> return
 	ret
 
 
+;@ path: item/pickup
+;@ Sprite of dropped bombs (type $38): one 8x16 sprite, tile $80, palette 1 (tile, attribute).
 DroppedBombsSprite::
 	db $80, $10
 
+;@ def DroppedBombsHandler(slot: c)
+;@ path: item/pickup
+;@ Handler of type $38, bombs dropped by an enemy or hidden in the room.
 DroppedBombsHandler::
+;> CheckHiddenPickup(slot)
 	call CheckHiddenPickup
+;> UpdatePickupLifetime(slot)
 	call UpdatePickupLifetime
-	ld de, $5fec
+;> DrawEntity8x16(DroppedBombsSprite)
+	ld de, DroppedBombsSprite
 	call DrawEntity8x16
+;> return CollectPickupIfTouched(slot)
 	jp CollectPickupIfTouched
 
 
+;@ path: item/pickup
+;@ Sprite of a secret seashell (type $3D): one 8x16 sprite, tile $9E, palette 1.
 SeashellSprite::
 	db $9e, $10
 
+;@ def SecretSeashellHandler(slot: c)
+;@ path: item/pickup
+;@ Handler of type $3D, a secret seashell lying in the room (gone once taken, room status bit 4).
+;@ Not there any more once Link's sword is level 2; in overworld room $E3 only after the room status
+;@ bit 6 is set.
 SecretSeashellHandler::
+;> if wSwordLevel >= 2: return FreeEntitySlot(slot)  # frees the slot
 	ld a, [wSwordLevel]
 	cp $02
-	jp nc, Call_3FB7
+	jp nc, FreeEntitySlot
 
+;> if hRoomStatus & 0x10: return FreeEntitySlot(slot)
 	ldh a, [hRoomStatus]
 	and $10
-	jp nz, Call_3FB7
+	jp nz, FreeEntitySlot
 
+;> if hMapRoom == 0xE3 and not (hRoomStatus & 0x40): return FreeEntitySlot(slot)
 	ldh a, [hMapRoom]
 	cp $e3
-	jr nz, jr_003_601b
+	jr nz, .show
 
 	ldh a, [hRoomStatus]
 	and $40
-	jp z, Call_3FB7
+	jp z, FreeEntitySlot
 
-jr_003_601b:
+.show
+;> CheckHiddenPickup(slot)
 	call CheckHiddenPickup
-	ld de, $5ffd
+;> DrawEntity8x16(SeashellSprite)
+	ld de, SeashellSprite
 	call DrawEntity8x16
+;> return CollectPickupIfTouched(slot)
 	jp CollectPickupIfTouched
 
 
+;@ path: item/pickup
+;@ Sprite of a golden leaf (type $3C): one 8x16 sprite, tile $CA, palette 1.
 GoldenLeafSprite::
 	db $ca, $10
 
+;@ def GoldenLeafHandler(slot: c)
+;@ path: item/pickup
+;@ Handler of type $3C, a golden leaf for Richard (gone once taken). When Link holds it up the leaf
+;@ count goes up (in overworld room $C6 it becomes 6 straight away) and a message tells how many
+;@ he has: $E8 normally, $E9 at 5 leaves, $A2 when all are found.
 GoldenLeafHandler::
+;> if hRoomStatus & 0x10: return FreeEntitySlot(slot)  # frees the slot
 	ldh a, [hRoomStatus]
 	and $10
-	jp nz, Call_3FB7
+	jp nz, FreeEntitySlot
 
+;> CheckHiddenPickup(slot)
 	call CheckHiddenPickup
-	ld de, $6027
+;> DrawEntity8x16(GoldenLeafSprite)
+	ld de, GoldenLeafSprite
 	call DrawEntity8x16
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
+;> if t == 0: return CollectPickupIfTouched(slot)
 	jp z, CollectPickupIfTouched
 
+;> if t == 0x10:
 	cp $10
-	jr nz, jr_003_6078
+	jr nz, .last
 
+;>     wEntityTimer[slot] -= 1
 	dec [hl]
+;>     if not wIsIndoor:
 	ld a, [wIsIndoor]
 	and a
-	jr nz, jr_003_6055
+	jr nz, .count
 
+;>         if hMapRoom == 0xC6: wGoldenLeaves = 5
 	ldh a, [hMapRoom]
 	cp $c6
-	jr nz, jr_003_6055
+	jr nz, .count
 
 	ld a, $05
 	ld [wGoldenLeaves], a
 
-jr_003_6055:
+.count
+;>     IncrementBCD99(wGoldenLeaves)  # adds 1 to the BCD count
 	ld hl, wGoldenLeaves
 	call IncrementBCD99
+;>     MarkRoomChestOpened()
 	call MarkRoomChestOpened
+;>     hRoomStatus &= ~0x10
 	ld hl, hRoomStatus
 	res 4, [hl]
+;>     msg = 0xA2
 	ld e, $a2
+;>     if wGoldenLeaves != 6:
 	ld a, [wGoldenLeaves]
 	cp $06
-	jr z, jr_003_6073
+	jr z, .open
 
+;>         msg = 0xE9 if wGoldenLeaves == 5 else 0xE8
 	ld e, $e8
 	cp $05
-	jr nz, jr_003_6073
+	jr nz, .open
 
 	inc e
 
-jr_003_6073:
+.open
+;>     OpenDialog(msg)
 	ld a, e
 	call OpenDialog
+;>     t = 0
 	xor a
 
-jr_003_6078:
+.last
+;> if t == 1: return FreeEntitySlot(slot)
 	dec a
-	jr nz, jr_003_607e
+	jr nz, .hold
 
-	jp Call_3FB7
+	jp FreeEntitySlot
 
 
-jr_003_607e:
+.hold
+;> return HoldItemAboveLink(slot)
 	jp HoldItemAboveLink
 
 
+;@ path: item/pickup
+;@ Sprite of magic powder (type $3B): one 8x16 sprite, tile $8E, palette 1.
 MagicPowderSprite::
 	db $8e, $10
 
+;@ def MagicPowderHandler(slot: c)
+;@ path: item/pickup
+;@ Handler of type $3B, magic powder (only once Link has had the toadstool turned into powder:
+;@ gone while wHasToadstool is set).
 MagicPowderHandler::
+;> if wHasToadstool: return FreeEntitySlot(slot)  # frees the slot
 	ld a, [wHasToadstool]
 	and a
-	jp nz, Call_3FB7
+	jp nz, FreeEntitySlot
 
+;> CheckHiddenPickup(slot)
 	call CheckHiddenPickup
+;> UpdatePickupLifetime(slot)
 	call UpdatePickupLifetime
-	ld de, $6081
+;> DrawEntity8x16(MagicPowderSprite)
+	ld de, MagicPowderSprite
 	call DrawEntity8x16
+;> return CollectPickupIfTouched(slot)
 	jp CollectPickupIfTouched
 
 
+;@ path: item/pickup
+;@ Sprite of dropped arrows (type $37): two 8x16 sprites (tile, attribute): tile $2A with palette 0
+;@ and attribute $40 (y-flipped), then the same x-flipped too ($60).
 DroppedArrowsSprites::
 	db $2a, $40, $2a, $60
 
+;@ def DroppedArrowsHandler(slot: c)
+;@ path: item/pickup
+;@ Handler of type $37, arrows dropped by an enemy.
 DroppedArrowsHandler::
+;> CheckHiddenPickup(slot)
 	call CheckHiddenPickup
+;> UpdatePickupLifetime(slot)
 	call UpdatePickupLifetime
-	ld de, $6099
+;> DrawEntity16x16(DroppedArrowsSprites)
+	ld de, DroppedArrowsSprites
 	call DrawEntity16x16
+;> return CollectPickupIfTouched(slot)
 	jp CollectPickupIfTouched
 
 
+;@ def UpdatePickupLifetime(slot: c)
+;@ path: item/pickup
+;@ Dropped pickups live as long as wEntityDropTimer runs (0 = forever is not possible: at 0 the slot is
+;@ freed). In the last $1C frames they blink: sprite variant $FF (hidden) on even frames.
 UpdatePickupLifetime::
+;> t = GetEntityDropTimer(slot)
 	call GetEntityDropTimer
+;> if t >= 0x1C: return
 	cp $1c
-	jr nc, jr_003_60bd
+	jr nc, .done
 
+;> if t == 0: return FreeEntitySlot(slot)  # frees the slot
 	and a
-	jp z, Call_3FB7
+	jp z, FreeEntitySlot
 
+;> SetEntitySpriteVariant(slot, (t & 1) - 1)
 	and $01
 	dec a
 	call SetEntitySpriteVariant
 
-jr_003_60bd:
+.done
 	ret
 
 
+;@ path: item/pickup
+;@ Sprite of a dropped rupee (type $2E): one 8x16 sprite, tile $A6, palette 1.
 RupeeSprite::
 	db $a6, $10
 
+;@ def RupeeHandler(slot: c)
+;@ path: item/pickup
+;@ Handler of type $2E, a rupee dropped by an enemy. Ends in CollectPickupIfTouched, the common
+;@ pickup update: carried by a weapon, the collect test, movement with bouncing.
 RupeeHandler::
+;> CheckHiddenPickup(slot)
 	call CheckHiddenPickup
+;> UpdatePickupLifetime(slot)
 	call UpdatePickupLifetime
-	ld de, $60be
+;> DrawEntity8x16(RupeeSprite)
+	ld de, RupeeSprite
 	call DrawEntity8x16
 
 CollectPickupIfTouched:
+;> ReturnIfNonInteractive_03()
 	call ReturnIfNonInteractive_03
+;> FollowCarryingWeapon(slot)  # while carried, returns from here
 	call FollowCarryingWeapon
+;> CheckPickupCollected(slot)
 	call CheckPickupCollected
 
+;@ def UpdatePickupPhysics(slot: c)
+;@ path: item/pickup
+;@ Moves a pickup and lets it bounce: with each landing the vertical speed is halved and turned (top
+;@ view: z speed; side view: y speed when the floor below is hit). A key bounce plays noise $17, a
+;@ bomb (type 2) jingle 9; horizontal speeds are halved too.
 UpdatePickupPhysics::
+;> UpdateEntityPosWithSpeed_03(slot)
 	call UpdateEntityPosWithSpeed_03
-	call Call_03_6B96
+;> UpdateEntityGravity(slot)
+	call UpdateEntityGravity
+;> Call_03_7892(slot)  # background collision
 	call Call_03_7892
+;> if hIsSideScrolling:
 	ldh a, [hIsSideScrolling]
 	and a
-	jr z, jr_003_6105
+	jr z, .topView
 
+;>     if not (wEntityCollisions[slot] & 8): return  # not on the floor
 	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and $08
-	jp z, Jump_003_6178
+	jp z, .done
 
+;>     wEntityY[slot] = (wEntityY[slot] & 0xF0) + 5
 	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	and $f0
 	add $05
 	ld [hl], a
+;>     speed = wEntitySpeedY + slot  # an address
 	ld hl, wEntitySpeedY
 	add hl, bc
+;>     v = ~mem[speed] >> 1  # signed shift
 	ld a, [hl]
 	cpl
 	sra a
+;>     stopped = v >= 0xF8
 	cp $f8
-	jr c, jr_003_6134
+	jr c, .bounce
 
-	jr jr_003_6125
+	jr .stop
 
-jr_003_6105:
+.topView
+;> else:
+;>     if not (wEntityZ[slot] & 0x80): return  # still in the air
 	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and $80
-	jr z, jr_003_6178
+	jr z, .done
 
+;>     wEntityZ[slot] = 0
 	xor a
 	ld [hl], a
+;>     g = wEntityGroundStatus[slot]
 	ld hl, wEntityGroundStatus
 	add hl, bc
 	ld a, [hl]
+;>     speed = wEntitySpeedZ + slot  # an address
 	ld hl, wEntitySpeedZ
 	add hl, bc
+;>     if g != 2:  # 2: in deep water or a hole
 	cp $02
-	jr z, jr_003_6125
+	jr z, .stop
 
+;>         v = ~(mem[speed] >> 1)  # signed shift
 	ld a, [hl]
 	sra a
 	cpl
+;>     stopped = g == 2 or v < 7
 	cp $07
-	jr nc, jr_003_6134
+	jr nc, .bounce
 
-jr_003_6125:
+.stop
+;> if stopped:
+;>     v = 0; wEntitySpeedX[slot] = 0
 	xor a
 	push hl
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
+;>     wEntitySpeedY[slot] = 0
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
 	pop hl
-	jr jr_003_6158
+	jr .store
 
-jr_003_6134:
+.bounce
+;> else:
 	push af
 	push hl
+;>     if hActiveEntityType == 0x30: hNoiseSfx = 0x17  # a key
 	ldh a, [hActiveEntityType]
 	cp $30
-	jr nz, jr_003_6142
+	jr nz, .bomb
 
 	ld a, $17
 	ldh [hNoiseSfx], a
-	jr jr_003_6156
+	jr .sfxDone
 
-jr_003_6142:
+.bomb
+;>     elif hActiveEntityType == 2:  # a bomb
 	cp $02
-	jr nz, jr_003_6156
+	jr nz, .sfxDone
 
+;>         s = wEntityStatus[slot]
 	ld hl, wEntityStatus
 	add hl, bc
 	ld a, [hl]
+;>         if s not in (0, 2): hJingle = 9
 	and a
-	jr z, jr_003_6156
+	jr z, .sfxDone
 
 	cp $02
-	jr z, jr_003_6156
+	jr z, .sfxDone
 
 	ld a, $09
 	ldh [hJingle], a
 
-jr_003_6156:
+;> mem[speed] = v
+.sfxDone
 	pop hl
 	pop af
 
-jr_003_6158:
+.store
 	ld [hl], a
+;> s = wEntitySpeedX[slot] >> 1  # signed
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	sra a
+;> wEntitySpeedX[slot] = 0 if s == -1 else s
 	cp $ff
-	jr nz, jr_003_6165
+	jr nz, .storeX
 
 	xor a
 
-jr_003_6165:
+.storeX
 	ld [hl], a
+;> if hIsSideScrolling: return
 	ldh a, [hIsSideScrolling]
 	and a
-	jr nz, jr_003_6178
+	jr nz, .done
 
+;> s = wEntitySpeedY[slot] >> 1  # signed
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 	sra a
+;> wEntitySpeedY[slot] = 0 if s == -1 else s
 	cp $ff
-	jr nz, jr_003_6177
+	jr nz, .storeY
 
 	xor a
 
-jr_003_6177:
+.storeY
 	ld [hl], a
 
-Jump_003_6178:
-jr_003_6178:
+.done
 	ret
 
 
+;@ path: item/pickup
+;@ Sprite of a fairy (type $2F) by sprite variant: one 8x16 sprite each (tile, attribute): 0 = tile
+;@ $20 x-flipped, 1 = tile $20.
 FairySprites::
 	db $20, $20, $20, $00
 
+;@ def FairyHandler(slot: c)
+;@ path: item/pickup
+;@ Handler of type $2F, a fairy. It faces its x direction, flies at a height of $10, and while Link is
+;@ within $20 pixels it changes its course at random every $30 frames; farther away it flies towards
+;@ him (Call_03_7E99 with speed 9).
 FairyHandler::
+;> CheckHiddenPickup(slot)
 	call CheckHiddenPickup
+;> UpdatePickupLifetime(slot)
 	call UpdatePickupLifetime
-	ld de, $6179
+;> DrawEntity8x16(FairySprites)
+	ld de, FairySprites
 	call DrawEntity8x16
+;> ReturnIfNonInteractive_03()
 	call ReturnIfNonInteractive_03
+;> FollowCarryingWeapon(slot)
 	call FollowCarryingWeapon
+;> CheckPickupCollected(slot)
 	call CheckPickupCollected
+;> SetEntitySpriteVariant(slot, wEntitySpeedX[slot] >> 7)
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	rlca
 	and $01
 	call SetEntitySpriteVariant
+;> UpdateEntityPosWithSpeed_03(slot)
 	call UpdateEntityPosWithSpeed_03
+;> UpdateFairyHeight(slot)
 	call UpdateFairyHeight
+;> Call_03_7892(slot)  # background collision
 	call Call_03_7892
+;> dx = GetEntityXDistanceToLink_03(slot)  # the sign test that follows has no effect
 	call GetEntityXDistanceToLink_03
 	ld a, d
 	bit 7, a
-	jr z, jr_003_61ae
+	jr z, .xDone
 
-jr_003_61ae:
+.xDone
+;> near = dx < 0x20
 	cp $20
-	jr c, jr_003_61be
+	jr c, .wander
 
+;> if not near:
+;>     dy = GetEntityYDistanceToLink_03(slot)
 	call GetEntityYDistanceToLink_03
 	ld a, d
 	bit 7, a
-	jr z, jr_003_61ba
+	jr z, .yDone
 
-jr_003_61ba:
+.yDone
+;>@toLink     if dy >= 0x20: return Call_03_7E99(slot, 9)  # flies towards Link
 	cp $20
-	jr nc, jr_003_61df
+	jr nc, .toLink
 
-jr_003_61be:
+.wander
+;> if GetEntityTimer(slot): return  # near Link: a new random course every $30 frames
 	call GetEntityTimer
-	jr nz, jr_003_61e4
+	jr nz, .done
 
+;> wEntityTimer[slot] = 0x30
 	ld [hl], $30
+;> wEntitySpeedX[slot] = (GetRandomByte() & 0x0F) - 8
 	call GetRandomByte
 	and $0f
 	sub $08
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
+;> wEntitySpeedY[slot] = (GetRandomByte() & 0x0F) - 8
 	call GetRandomByte
 	and $0f
 	sub $08
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
-	jr jr_003_61e4
+;> return
+	jr .done
 
-jr_003_61df:
+.toLink
+;=@toLink
 	ld a, $09
 	call Call_03_7E99
 
-jr_003_61e4:
+.done
 	ret
 
 
+;@ def UpdateFairyHeight(slot: c)
+;@ path: item/pickup
+;@ Every 4 frames moves the fairy's height one pixel towards $10.
 UpdateFairyHeight::
+;> if hFrameCounter & 3: return
 	ldh a, [hFrameCounter]
 	and $03
-	jr nz, jr_003_6202
+	jr nz, .done
 
+;> z = wEntityZ[slot]
 	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
+;> if z == 0x10: return
 	cp $10
-	jr z, jr_003_6202
+	jr z, .done
 
+;> if z < 0 (signed): wEntityZ[slot] += 1; return
 	bit 7, a
-	jr z, jr_003_61fb
+	jr z, .positive
 
 	inc [hl]
-	jr jr_003_6202
+	jr .done
 
-jr_003_61fb:
+.positive
+;> if z < 0x10: wEntityZ[slot] += 1; return
 	cp $10
-	jr nc, jr_003_6201
+	jr nc, .down
 
 	inc [hl]
 	ret
 
 
-jr_003_6201:
+.down
+;> wEntityZ[slot] -= 1
 	dec [hl]
 
-jr_003_6202:
+.done
 	ret
 
 
@@ -5745,7 +6075,7 @@ jr_003_6290:
 	call GetEntityTimer1
 	ld [hl], $18
 	ld a, $0c
-	call Call_03_7E17
+	call GetVectorTowardsLink_03
 	ldh a, [hMultiPurpose1]
 	cpl
 	inc a
@@ -5844,13 +6174,13 @@ CheckPickupCollected::
 	push af
 	push hl
 	ld [hl], b
-	call Call_03_6E40
+	call EntityCheckWeaponHits_03
 	pop hl
 	pop af
 	ld [hl], a
 
 jr_003_6331:
-	call Call_03_6C87
+	call EntityCheckContactDamage_03
 	jr nc, jr_003_630f
 
 CollectPickup::
@@ -5858,7 +6188,7 @@ jr_003_6336:
 	ld hl, wEntityLoadOrder
 	add hl, bc
 	ld a, [hl]
-	call Call_3FA2
+	call MarkEntityDefeated
 	ldh a, [hActiveEntityType]
 	sub $2d
 	cp $02
@@ -6029,7 +6359,7 @@ StartPowerUp:
 	ld [wLinkShowItemTimer], a
 	ld [wLinkPoseLock], a
 	xor a
-	ld [$d47a], a
+	ld [wPowerUpHits], a
 	ld a, $27
 	ld [wMusicTrackToPlay], a
 	ld a, $49
@@ -6262,7 +6592,11 @@ InitSpawnedEntityProperties::
 	ret
 
 
-	db $80, $10, $f8, $f8, $32, $00, $f8, $00, $32, $20, $f8, $08, $32, $00, $f8, $10
+BombSprite::
+	db $80, $10
+
+BombExplosionSprites::
+	db $f8, $f8, $32, $00, $f8, $00, $32, $20, $f8, $08, $32, $00, $f8, $10
 	db $32, $20, $08, $f8, $32, $00, $08, $00, $32, $20, $08, $08, $32, $00, $08, $10
 	db $32, $20, $f8, $f8, $10, $00, $f8, $00, $12, $00, $f8, $08, $12, $20, $f8, $10
 	db $10, $20, $08, $f8, $10, $40, $08, $00, $12, $40, $08, $08, $12, $60, $08, $10
@@ -6272,7 +6606,7 @@ InitSpawnedEntityProperties::
 	db $30, $20, $04, $fc, $30, $00, $04, $04, $30, $20, $04, $04, $30, $00, $04, $0c
 	db $30, $20
 
-Call_03_65DE::
+DrawBombExplosion::
 	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
@@ -6290,17 +6624,18 @@ Call_03_65DE::
 	ret
 
 
+BombExplosionStages::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $01, $01, $01, $01, $01, $01, $01, $01
 	db $02, $02, $02, $02, $03, $03, $03, $03
 
-Jump_003_6611:
-	call Call_03_667F
+BombExploding::
+	call UpdateBombExplosion
 	call ReturnIfNonInteractive_03
 	call GetEntityTimer
 	and a
 	jp nz, Jump_003_6621
 
-	jp Call_3FB7
+	jp FreeEntitySlot
 
 
 Jump_003_6621:
@@ -6323,9 +6658,9 @@ Jump_003_6621:
 	ld e, a
 	ld d, b
 	push de
-	call Call_03_691C
+	call BombDestroyObject
 	pop de
-	call Call_03_678D
+	call BombBlastBackground
 	pop af
 
 jr_003_6643:
@@ -6338,7 +6673,7 @@ jr_003_6643:
 	and a
 	jr nz, jr_003_6654
 
-	call Call_03_77D8
+	call BombHitsEntities
 	jr jr_003_6679
 
 jr_003_6654:
@@ -6356,7 +6691,7 @@ jr_003_6654:
 	cp $30
 	jr nc, jr_003_6679
 
-	call Call_03_6CF1
+	call HurtLink
 	ld hl, hLinkSpeedX
 	sla [hl]
 	ld hl, hLinkSpeedY
@@ -6371,7 +6706,7 @@ jr_003_667e:
 	ret
 
 
-Call_03_667F::
+UpdateBombExplosion::
 	call GetEntityTimer
 	ld e, a
 	ld d, b
@@ -6385,7 +6720,7 @@ Call_03_667F::
 	and $f0
 	or $08
 	ld [hl], a
-	call Call_03_65DE
+	call DrawBombExplosion
 	ld a, [wIsIndoor]
 	and a
 	jr z, jr_003_66b4
@@ -6409,22 +6744,22 @@ jr_003_66b4:
 	ret
 
 
-jr_003_66b5:
+DrawBombSmoke::
 	ld de, $54ea
 	call DrawEntity16x16
 	call ReturnIfNonInteractive_03
 	ret
 
 
-Call_03_66BF::
+BombHandler::
 	ldh a, [hActiveEntityDrawY]
 	add $10
 	cp $a0
-	jp nc, Call_3FB7
+	jp nc, FreeEntitySlot
 
 	call GetEntityTimer
 	cp $18
-	jp c, Jump_003_6611
+	jp c, BombExploding
 
 	jr nz, jr_003_66d6
 
@@ -6435,7 +6770,7 @@ jr_003_66d6:
 	ld hl, wBombsOnScreen
 	inc [hl]
 	cp $22
-	jr c, jr_003_66b5
+	jr c, DrawBombSmoke
 
 	cp $48
 	jr nz, jr_003_66e8
@@ -6445,7 +6780,7 @@ jr_003_66d6:
 	ld [hl], $30
 
 jr_003_66e8:
-	call Call_03_673D
+	call DrawBomb
 	call CheckKeyFallsInPit
 	call ReturnIfNonInteractive_03
 	call UpdatePickupPhysics
@@ -6487,7 +6822,7 @@ jr_003_6723:
 	and $03
 	jr z, jr_003_672f
 
-	call Call_03_6B4F
+	call ReverseSpeedXEighth
 
 jr_003_672f:
 	ldh a, [hIsSideScrolling]
@@ -6498,13 +6833,13 @@ jr_003_672f:
 	and $0c
 	jr z, jr_003_673c
 
-	call Call_03_6B5E
+	call ReverseSpeedYEighth
 
 jr_003_673c:
 	ret
 
 
-Call_03_673D::
+DrawBomb::
 	ld hl, hActiveEntityDrawY
 	inc [hl]
 	inc [hl]
@@ -6513,13 +6848,47 @@ Call_03_673D::
 	jp LoadEntityPosition
 
 
-	db $f8, $08, $18, $f8, $08, $18, $f8, $08, $18, $f8, $f8, $f8, $08, $08, $08, $18
-	db $18, $18, $48, $48, $00, $90, $00, $70, $38, $38, $3d, $3d, $3e, $3e, $72, $72
-	db $73, $73, $69, $79, $69, $79, $64, $66, $65, $67, $04, $08, $02, $01, $08, $04
-	db $01, $02, $f8, $08, $ff, $01, $72, $73, $73, $72, $00, $10, $f0, $10, $00, $00
+BombBlastOffsetsX::
+	db $f8, $08, $18, $f8, $08, $18, $f8, $08, $18
+
+BombBlastOffsetsY::
+	db $f8, $f8, $f8, $08, $08, $08, $18
+	db $18, $18
+
+Unused675D::
+	db $48, $48, $00, $90, $00, $70, $38, $38
+
+BombedWallObjects::
+	db $3d, $3d, $3e, $3e
+
+BombedWallTiles::
+	db $72, $72
+	db $73, $73, $69, $79, $69, $79
+
+BombedEntranceTiles::
+	db $64, $66, $65, $67
+
+BombedWallRoomBits::
+	db $04, $08, $02, $01
+
+BombedWallNeighbourBits::
+	db $08, $04
+	db $01, $02
+
+NeighbourRoomOffsets::
+	db $f8, $08, $ff, $01
+
+BombedRockTiles::
+	db $72, $73, $73, $72
+
+BombedRockStepX::
+	db $00, $10, $f0, $10
+
+BombedRockStepY::
+	db $00, $00
 	db $10, $00
 
-Call_03_678D::
+BombBlastBackground::
 	ldh a, [hIsSideScrolling]
 	and a
 	jp nz, Jump_003_68c5
@@ -6558,14 +6927,14 @@ Call_03_678D::
 	ldh [hRoomObjectType], a
 	ld e, a
 	cp $bb
-	jr c, jr_003_6828
+	jr c, BombBlastObject
 
 	cp $bf
-	jr nc, jr_003_6828
+	jr nc, BombBlastObject
 
 	ld a, [wIsIndoor]
 	and a
-	jr nz, jr_003_6828
+	jr nz, BombBlastObject
 
 	ld a, $02
 	ldh [hJingle], a
@@ -6575,7 +6944,7 @@ Call_03_678D::
 	ldh a, [hBGPosX]
 	and $e0
 	ldh [hBGPosX], a
-	call Call_03_68CE
+	call SpawnRockDebris
 	ld a, c
 	and $ee
 	ld c, a
@@ -6594,7 +6963,7 @@ Call_03_678D::
 	ld b, $00
 
 jr_003_6802:
-	call Call_03_6822
+	call DrawBombedRockTiles
 	ld hl, $6785
 	add hl, bc
 	ld a, [hl]
@@ -6615,12 +6984,12 @@ jr_003_6802:
 	jp Jump_003_68c4
 
 
-Call_03_6822::
+DrawBombedRockTiles::
 	ld de, $6781
-	jp Jump_003_6852
+	jp MarkRoomBombedAndDraw
 
 
-jr_003_6828:
+BombBlastObject::
 	ld a, [wIsIndoor]
 	ld d, a
 	call GetObjectPhysics
@@ -6635,7 +7004,7 @@ jr_003_6828:
 	ldh [hJingle], a
 	ld a, [wIsIndoor]
 	and a
-	jr nz, jr_003_6865
+	jr nz, BombBlastIndoorWall
 
 	pop bc
 	ldh a, [hMultiPurposeH]
@@ -6646,7 +7015,7 @@ jr_003_6828:
 	ld [hl], $e1
 	ld de, $6771
 
-Jump_003_6852:
+MarkRoomBombedAndDraw::
 	push de
 	ld hl, wRoomStatus
 	ldh a, [hMapRoom]
@@ -6660,7 +7029,7 @@ Jump_003_6852:
 	jp DrawRoomObjectTiles
 
 
-jr_003_6865:
+BombBlastIndoorWall::
 	ld hl, $d900
 	ldh a, [hMapRoom]
 	ld e, a
@@ -6733,9 +7102,13 @@ Jump_003_68c5:
 	ret
 
 
-	db $08, $18, $08, $18, $10, $10, $20, $20
+RockDebrisOffsetsX::
+	db $08, $18, $08, $18
 
-Call_03_68CE::
+RockDebrisOffsetsY::
+	db $10, $10, $20, $20
+
+SpawnRockDebris::
 	push bc
 	ld c, $03
 	ld b, $00
@@ -6778,10 +7151,14 @@ jr_003_6902:
 	ret
 
 
-	db $f8, $08, $18, $f8, $08, $18, $f8, $08, $18, $f8, $f8, $f8, $08, $08, $08, $18
+BombObjectOffsetsX::
+	db $f8, $08, $18, $f8, $08, $18, $f8, $08, $18
+
+BombObjectOffsetsY::
+	db $f8, $f8, $f8, $08, $08, $08, $18
 	db $18, $18
 
-Call_03_691C::
+BombDestroyObject::
 	push bc
 	ld hl, $690a
 	add hl, de
@@ -6893,14 +7270,18 @@ jr_003_69bb:
 	ret
 
 
-	db $6c, $74, $6d, $75, $36, $00, $36, $20, $36, $10, $36, $30
+LitTorchTiles_03::
+	db $6c, $74, $6d, $75
 
-Call_03_69C9::
+FireballSprites::
+	db $36, $00, $36, $20, $36, $10, $36, $30
+
+MagicRodFireballHandler::
 	ld hl, wActiveProjectileCount
 	inc [hl]
 	ld a, $0a
 	ld [wProjectileWeaponType], a
-	call Call_03_75A6
+	call EntityHitOtherEntities_03
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -6913,7 +7294,7 @@ Call_03_69C9::
 	jr z, jr_003_69f0
 
 	dec a
-	jp z, Call_3FB7
+	jp z, FreeEntitySlot
 
 	ld de, BurningFlameSprites
 	jp DrawEntity16x16
@@ -6921,7 +7302,7 @@ Call_03_69C9::
 
 jr_003_69f0:
 	ld de, $69c1
-	call Call_03_6AF2
+	call DrawAndUpdateProjectile
 	call ReturnIfNonInteractive_03
 	ld a, [wIsIndoor]
 	and a
@@ -6965,33 +7346,34 @@ jr_003_6a34:
 	ret
 
 
+OctorokRockSprites::
 	db $6c, $00, $6c, $20, $5c, $00, $5c, $20
 
-Call_03_6A3D::
+OctorokRockHandler::
 	call GetEntityTimer
 	jr nz, jr_003_6a45
 
-	call Call_03_6BF9
+	call ProjectileHitsLink
 
 jr_003_6a45:
 	ld de, $6a35
-	jp Call_03_6AF2
+	jp DrawAndUpdateProjectile
 
 
-Call_03_6A4B::
+ArrowHandler::
 	ld hl, wActiveProjectileCount
 	inc [hl]
 	ldh a, [hActiveEntityState]
 	and a
-	jr nz, jr_003_6a8b
+	jr nz, BombArrowHandler
 
 	call GetEntityTimer
-	jp nz, Call_03_6AEF
+	jp nz, DrawArrowAndUpdate
 
 	ld a, $05
 	ld [wProjectileWeaponType], a
-	call Call_03_75A6
-	call Call_03_6AEF
+	call EntityHitOtherEntities_03
+	call DrawArrowAndUpdate
 	ldh a, [hActiveEntitySpriteVariant]
 	cp $02
 	jr nz, jr_003_6a80
@@ -7006,15 +7388,22 @@ Call_03_6A4B::
 	jr nz, jr_003_6a80
 
 	call TriggerRoomEvent
-	call Call_3FB7
+	call FreeEntitySlot
 
 jr_003_6a80:
 	ret
 
 
-	db $80, $10, $04, $fc, $00, $00, $fe, $fe, $fa, $04
+ArrowBombSprite::
+	db $80, $10
 
-jr_003_6a8b:
+ArrowBombOffsetsX::
+	db $04, $fc, $00, $00
+
+ArrowBombOffsetsY::
+	db $fe, $fe, $fa, $04
+
+BombArrowHandler::
 	call GetEntityTimer
 	jr z, jr_003_6ab1
 
@@ -7036,7 +7425,7 @@ jr_003_6a8b:
 	call PlayClinkNoise
 
 jr_003_6aae:
-	jp Call_3FB7
+	jp FreeEntitySlot
 
 
 jr_003_6ab1:
@@ -7065,25 +7454,25 @@ jr_003_6ab1:
 	call DrawEntity16x16
 	ld a, $0c
 	ld [wProjectileWeaponType], a
-	call Call_03_75A6
-	jr jr_003_6af5
+	call EntityHitOtherEntities_03
+	jr UpdateProjectile
 
-Call_03_6AE7::
+MoblinArrowHandler::
 	call GetEntityTimer
-	jr nz, Call_03_6AEF
+	jr nz, DrawArrowAndUpdate
 
-	call Call_03_6BF9
+	call ProjectileHitsLink
 
-Call_03_6AEF::
+DrawArrowAndUpdate::
 	ld de, $6be1
 
-Call_03_6AF2::
+DrawAndUpdateProjectile::
 	call DrawEntity16x16
 
-jr_003_6af5:
+UpdateProjectile:
 	call ReturnIfNonInteractive_03
 	call GetEntityTimer
-	jr nz, jr_003_6b67
+	jr nz, ProjectileFalling
 
 	call UpdateEntityPosWithSpeed_03
 	call Call_03_7CAA
@@ -7121,12 +7510,12 @@ jr_003_6b2e:
 	call StartClinkTimer
 	ldh a, [hActiveEntityType]
 	cp $00
-	jr nz, jr_003_6b4c
+	jr nz, ReverseBothSpeedsEighth
 
-	call Call_03_6B47
+	call ReverseSpeedYQuarter
 	ld hl, wEntitySpeedX
 
-jr_003_6b3d:
+ReverseSpeedQuarter:
 	add hl, bc
 	ld a, [hl]
 	cpl
@@ -7137,17 +7526,17 @@ jr_003_6b3d:
 	ret
 
 
-Call_03_6B47::
+ReverseSpeedYQuarter::
 	ld hl, wEntitySpeedY
-	jr jr_003_6b3d
+	jr ReverseSpeedQuarter
 
-jr_003_6b4c:
-	call Call_03_6B5E
+ReverseBothSpeedsEighth:
+	call ReverseSpeedYEighth
 
-Call_03_6B4F::
+ReverseSpeedXEighth::
 	ld hl, wEntitySpeedX
 
-jr_003_6b52:
+ReverseSpeedEighth:
 	add hl, bc
 	ld a, [hl]
 	cpl
@@ -7161,17 +7550,18 @@ jr_003_6b5d:
 	ret
 
 
-Call_03_6B5E::
+ReverseSpeedYEighth::
 	ld hl, wEntitySpeedY
-	jr jr_003_6b52
+	jr ReverseSpeedEighth
 
+ArrowSpinVariants::
 	db $00, $03, $01, $02
 
-jr_003_6b67:
+ProjectileFalling::
 	cp $01
 	jr nz, jr_003_6b6e
 
-	jp Call_3FB7
+	jp FreeEntitySlot
 
 
 jr_003_6b6e:
@@ -7193,11 +7583,15 @@ jr_003_6b6e:
 
 jr_003_6b89:
 	call UpdateEntityPosWithSpeed_03
-	jr Call_03_6B96
+	jr UpdateEntityGravity
 
-	db $02, $01, $02, $02, $40, $08, $40, $40
+SideViewGravity::
+	db $02, $01, $02, $02
 
-Call_03_6B96::
+SideViewMaxFallSpeed::
+	db $40, $08, $40, $40
+
+UpdateEntityGravity::
 	ldh a, [hIsSideScrolling]
 	and a
 	jr nz, jr_003_6ba7
@@ -7262,10 +7656,15 @@ jr_003_6be0:
 	ret
 
 
+ArrowSprites::
 	db $2e, $20, $2c, $20, $2c, $00, $2e, $00, $2a, $40, $2a, $60, $2a, $00, $2a, $20
-	db $01, $00, $03, $02, $02, $0a, $0e, $06
+OppositeDirections::
+	db $01, $00, $03, $02
 
-Call_03_6BF9::
+ShieldFacingAngles::
+	db $02, $0a, $0e, $06
+
+ProjectileHitsLink::
 	ld a, [wLinkMotionState]
 	cp $02
 	jr nc, jr_003_6c76
@@ -7321,7 +7720,7 @@ Call_03_6BF9::
 	ldh [hJingle], a
 	ldh a, [hActiveEntityY]
 
-Call_03_6C51::
+SpawnSparkleAtEntity::
 	ldh [hMultiPurpose1], a
 	ldh a, [hActiveEntityX]
 	ldh [hMultiPurpose0], a
@@ -7355,7 +7754,7 @@ jr_003_6c76:
 
 
 jr_003_6c77:
-	call Call_03_6CDC
+	call EntityHitsLink
 	ldh a, [hActiveEntityType]
 	cp $2b
 	jr z, jr_003_6c84
@@ -7364,21 +7763,21 @@ jr_003_6c77:
 	jr nz, jr_003_6c70
 
 jr_003_6c84:
-	jp Call_3FB7
+	jp FreeEntitySlot
 
 
-Call_03_6C87::
+EntityCheckContactDamage_03::
 	ldh a, [hFrameCounter]
 	xor c
 	rra
 	jp nc, Jump_003_6ce7
 
-Call_03_6C8E::
+EntityTouchesLinkOnGround_03::
 	ldh a, [hLinkPositionZ]
 	and a
 	jr nz, jr_003_6c76
 
-Call_03_6C93::
+EntityTouchesLink_03::
 	ld a, [wLinkMotionState]
 	cp $02
 	jr nc, jr_003_6c76
@@ -7436,7 +7835,7 @@ jr_003_6cd1:
 	cp e
 	jr nc, jr_003_6ce7
 
-Call_03_6CDC::
+EntityHitsLink::
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld a, [hl]
@@ -7460,7 +7859,7 @@ jr_003_6ce9:
 	cp $02
 	jr c, jr_003_6ce5
 
-Call_03_6CF1::
+HurtLink::
 	ldh a, [hActiveEntityType]
 	cp $ac
 	jr nz, jr_003_6d15
@@ -7613,22 +8012,22 @@ jr_003_6dc0:
 	ld a, $50
 	ld [wInvincibilityCounter], a
 	xor a
-	ld [$d471], a
+	ld [wKillsWithoutHit], a
 	ld a, [wActivePowerUp]
 	and a
-	jr z, Call_03_6DF4
+	jr z, KnockLinkBack
 
-	ld hl, $d47a
+	ld hl, wPowerUpHits
 	inc [hl]
 	ld a, [hl]
 	cp $03
-	jr c, Call_03_6DF4
+	jr c, KnockLinkBack
 
 	xor a
 	ld [wActivePowerUp], a
 	ld a, [wBossInRoom]
 	and a
-	jr nz, Call_03_6DF4
+	jr nz, KnockLinkBack
 
 	ldh a, [hDefaultMusicTrack]
 	cp $22
@@ -7639,7 +8038,7 @@ jr_003_6dc0:
 jr_003_6df2:
 	ldh [hLastMusicTrack], a
 
-Call_03_6DF4::
+KnockLinkBack::
 	call ResetPegasusBoots
 	ld a, $10
 	ld [wLinkPushedTimer], a
@@ -7663,10 +8062,10 @@ jr_003_6e0f:
 	ld a, $18
 
 jr_003_6e17:
-	call Call_03_7569
+	call PushLinkAway
 	ldh a, [hIsSideScrolling]
 	and a
-	jr nz, jr_003_6e23
+	jr nz, SideViewKnockback
 
 Jump_003_6e1f:
 jr_003_6e1f:
@@ -7674,9 +8073,10 @@ jr_003_6e1f:
 	ret
 
 
+SideKnockbackSpeedsX::
 	db $0c, $f4
 
-jr_003_6e23:
+SideViewKnockback::
 	ldh a, [hLinkMotionStep]
 	cp $02
 	jr z, jr_003_6e1f
@@ -7695,10 +8095,10 @@ jr_003_6e23:
 	ret
 
 
-Call_03_6E3D::
-	call Call_03_6C87
+EntityCheckHits_03::
+	call EntityCheckContactDamage_03
 
-Call_03_6E40::
+EntityCheckWeaponHits_03::
 	ld a, [wSwordHitboxX]
 	cp $00
 	jp z, Jump_003_73ea
@@ -7791,7 +8191,7 @@ jr_003_6ea3:
 
 	ld a, [wSwordCollisionEnabled]
 	and a
-	jp nz, Jump_003_6ffe
+	jp nz, SwordHitsEntityAttack
 
 	ld a, [wIsUsingPegasusBoots]
 	ldh [hMultiPurposeH], a
@@ -7821,7 +8221,7 @@ jr_003_6ee6:
 
 	ldh a, [hActiveEntityState]
 	cp $02
-	jp nz, Call_03_6FA8
+	jp nz, SwordClink
 
 	ld hl, wEntitySpeedX
 	add hl, bc
@@ -7849,7 +8249,7 @@ jr_003_6f0c:
 	ld hl, wEntityOptions1
 	add hl, bc
 	and $40
-	jp z, Call_03_6FA8
+	jp z, SwordClink
 
 Jump_003_6f19:
 	ld hl, wEntityPrivate1
@@ -7858,7 +8258,7 @@ Jump_003_6f19:
 	cpl
 	inc a
 	ld [hl], a
-	call Call_03_6F71
+	call SwordBounceOff
 	call GetEntityTimer1
 	ld [hl], $0c
 	ld a, $01
@@ -7873,19 +8273,19 @@ jr_003_6f35:
 	jr nz, jr_003_6f3f
 
 Jump_003_6f39:
-	call Call_03_6FA8
+	call SwordClink
 	jp Jump_003_6c70
 
 
 jr_003_6f3f:
 	cp $2c
-	jr nz, jr_003_6f82
+	jr nz, SwordHitOtherTypes
 
 	ld hl, wEntityState
 	add hl, bc
 	ld a, [hl]
 	cp $03
-	jr z, Call_03_6F71
+	jr z, SwordBounceOff
 
 	ld [hl], $03
 	ld hl, wEntitySpeedZ
@@ -7909,17 +8309,21 @@ jr_003_6f3f:
 	add hl, bc
 	ld [hl], a
 
-Call_03_6F71::
-	call Call_03_6FA8
+SwordBounceOff::
+	call SwordClink
 	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
 	ld [hl], b
 	ret
 
 
-	db $10, $f0, $00, $00, $00, $00, $f0, $10
+SwordPushSpeedsX::
+	db $10, $f0, $00, $00
 
-jr_003_6f82:
+SwordPushSpeedsY::
+	db $00, $00, $f0, $10
+
+SwordHitOtherTypes::
 	cp $9c
 	jr z, jr_003_6f8a
 
@@ -7944,7 +8348,7 @@ jr_003_6f9a:
 	cpl
 	inc a
 	ld [hl], a
-	call Call_03_6FA8
+	call SwordClink
 	ld [hl], b
 	ret
 
@@ -7953,7 +8357,7 @@ jr_003_6fa3:
 	cp $5a
 	jp z, Jump_003_6f39
 
-Call_03_6FA8::
+SwordClink::
 	ld a, $09
 	ldh [hJingle], a
 	call ResetPegasusBoots
@@ -7986,18 +8390,18 @@ jr_003_6fc8:
 
 jr_003_6fce:
 	ld a, $12
-	call Call_03_7569
+	call PushLinkAway
 	ld hl, hMultiPurposeH
 	ldh a, [hJoypadHeld]
 	and $0f
 	ld a, $08
 	or [hl]
-	jr z, Call_03_6FE1
+	jr z, SetEntityRecoil
 
 	ld a, $20
 
-Call_03_6FE1::
-	call Call_03_7E17
+SetEntityRecoil::
+	call GetVectorTowardsLink_03
 	ldh a, [hMultiPurpose0]
 	cpl
 	inc a
@@ -8010,13 +8414,14 @@ Call_03_6FE1::
 	ld hl, wEntityRecoilSpeedX
 	add hl, bc
 	ld [hl], a
-	call Call_03_73DF
+	call StartHitPause
 	ret
 
 
+LinkFacingDirections::
 	db $00, $01, $02, $03
 
-Jump_003_6ffe:
+SwordHitsEntityAttack::
 	ldh a, [hActiveEntityType]
 	cp $e2
 	ret z
@@ -8027,21 +8432,21 @@ Jump_003_6ffe:
 	ld a, [wFinalNightmareForm]
 	rst $00
 
-JumpTable_03_700B::
+FinalNightmareSwordReactions::
 	dw EntityInit_None
-	dw Jump_03_7017
-	dw Jump_03_701D
-	dw Jump_03_702D
-	dw Jump_03_702D
-	dw Jump_03_7059
+	dw FinalNightmareSword_Form1
+	dw FinalNightmareSword_Form2
+	dw FinalNightmareSword_Form3
+	dw FinalNightmareSword_Form3
+	dw SwordHitsEntityNormal
 
-Jump_03_7017::
+FinalNightmareSword_Form1::
 	call IncrementEntityState
 	ld [hl], $06
 	ret
 
 
-Jump_03_701D::
+FinalNightmareSword_Form2::
 	ld a, [wSpinAttackTimer]
 	and a
 	jr nz, jr_003_7029
@@ -8055,16 +8460,16 @@ jr_003_7029:
 	ret
 
 
-Jump_03_702D::
+FinalNightmareSword_Form3::
 	ldh a, [hActiveEntityType]
 
 jr_003_702f:
 	cp $b9
-	jr nz, Jump_03_7059
+	jr nz, SwordHitsEntityNormal
 
 	ldh a, [hActiveEntityStatus]
 	cp $05
-	jr nz, Jump_03_7059
+	jr nz, SwordHitsEntityNormal
 
 	call IncrementEntityState
 	ld [hl], $01
@@ -8078,16 +8483,16 @@ jr_003_702f:
 	ld [wSpinAttackTimer], a
 	ld a, $1c
 	ldh [hNoiseSfx], a
-	jp Call_03_6CF1
+	jp HurtLink
 
 
-Jump_03_7059::
+SwordHitsEntityNormal::
 	ldh a, [hActiveEntityType]
 	cp $55
 	jr nz, jr_003_7086
 
 	ld a, $30
-	call Call_03_7E17
+	call GetVectorTowardsLink_03
 	ldh a, [hMultiPurpose0]
 	cpl
 	inc a
@@ -8113,7 +8518,7 @@ jr_003_7086:
 	cp $65
 	jr nz, jr_003_7094
 
-	call Call_03_6DF4
+	call KnockLinkBack
 	ld a, $08
 	ld [wLinkPushedTimer], a
 	jr jr_003_70d1
@@ -8147,12 +8552,12 @@ Jump_003_70b4:
 	and a
 	jr z, jr_003_70c4
 
-	call Call_03_6DF4
+	call KnockLinkBack
 	jp Jump_003_7113
 
 
 jr_003_70c0:
-	call Call_03_6DF4
+	call KnockLinkBack
 	ret
 
 
@@ -8160,7 +8565,7 @@ jr_003_70c4:
 	ld a, $04
 	ld [wLinkPushedTimer], a
 	ld a, $10
-	call Call_03_7569
+	call PushLinkAway
 	jp Jump_003_7113
 
 
@@ -8186,7 +8591,7 @@ jr_003_70d1:
 	ld a, $30
 
 jr_003_70f0:
-	call Call_03_6FE1
+	call SetEntityRecoil
 	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld [hl], b
@@ -8205,7 +8610,7 @@ jr_003_70f8:
 	ld hl, wEntityRecoilSpeedY
 	add hl, bc
 	ld [hl], b
-	jp Call_03_6DF4
+	jp KnockLinkBack
 
 
 Jump_003_7113:
@@ -8242,9 +8647,9 @@ jr_003_711e:
 	ld a, $10
 	ld [wLinkPushedTimer], a
 	ld a, $10
-	call Call_03_7569
+	call PushLinkAway
 	ld a, $10
-	call Call_03_6FE1
+	call SetEntityRecoil
 
 Jump_003_714c:
 	ldh a, [hActiveEntityX]
@@ -8274,18 +8679,18 @@ jr_003_7170:
 	xor a
 	ld [wSwordCharge], a
 	ld a, $30
-	call Call_03_6FE1
+	call SetEntityRecoil
 	ld hl, hJingle
 	ld [hl], $09
 	ld a, [wActivePowerUp]
 	cp $01
-	jr nz, Call_03_71A8
+	jr nz, SwordDamageEntity
 
-	call Call_03_71A8
+	call SwordDamageEntity
 	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
 	ld [hl], $20
-	ld hl, $c4a0
+	ld hl, wEntityHitByPowerUp
 	add hl, bc
 	ld [hl], $01
 	ld a, $11
@@ -8304,7 +8709,7 @@ jr_003_71a7:
 	ret
 
 
-Call_03_71A8::
+SwordDamageEntity::
 	ld a, c
 	inc a
 	ld [wSwordDirectionLocked], a
@@ -8323,7 +8728,7 @@ jr_003_71c0:
 	dec a
 	ld [wProjectileWeaponType], a
 
-Call_03_71C4::
+ApplyWeaponHit::
 	ld hl, wEntityHealthGroup
 	add hl, bc
 	ld e, [hl]
@@ -8369,7 +8774,7 @@ Call_03_71C4::
 
 	ld a, [wIsUsingPegasusBoots]
 	push af
-	call Call_03_6DF4
+	call KnockLinkBack
 	pop af
 	and a
 	jr nz, jr_003_7219
@@ -8414,7 +8819,7 @@ jr_003_7239:
 
 	ld hl, hNoiseSfx
 	ld [hl], $12
-	call Call_03_73DF
+	call StartHitPause
 	ld hl, wEntityStatus
 	add hl, bc
 	ld [hl], $03
@@ -8436,7 +8841,7 @@ jr_003_7264:
 	cp $ff
 	jr nz, jr_003_727d
 
-	call Call_03_73DF
+	call StartHitPause
 StunEntity::
 	ld hl, wEntityStatus
 	add hl, bc
@@ -8710,8 +9115,8 @@ jr_003_73d4:
 jr_003_73dd:
 	ld [hl], $18
 
-Call_03_73DF::
-	ld hl, $c4a0
+StartHitPause::
+	ld hl, wEntityHitByPowerUp
 	add hl, bc
 	ld [hl], b
 	ld hl, wEntityIgnoreHitsTimer
@@ -8722,13 +9127,14 @@ Jump_003_73ea:
 	ret
 
 
+GhiniDropTypes::
 	db $2d, $2e, $38, $37
 
-Call_03_73EF::
+EntityCheckSwordClash_03::
 	ld hl, wSwordDirectionLocked
 	ld a, [wLinkPushedTimer]
 	or [hl]
-	ld hl, $ffb6
+	ld hl, hSwordClashCooldown
 	or [hl]
 	ld hl, wSpinAttackTimer
 	or [hl]
@@ -8796,9 +9202,9 @@ jr_003_7444:
 	ld a, $08
 	ld [wLinkPushedTimer], a
 	ld a, $12
-	call Call_03_7569
+	call PushLinkAway
 	ld a, $18
-	call Call_03_7E17
+	call GetVectorTowardsLink_03
 	ldh a, [hMultiPurpose0]
 	cpl
 	inc a
@@ -8811,7 +9217,7 @@ jr_003_7444:
 	ld hl, wEntityRecoilSpeedX
 	add hl, bc
 	ld [hl], a
-	call Call_03_73DF
+	call StartHitPause
 	ld [hl], $08
 	xor a
 	ld [wSwordCharge], a
@@ -8842,19 +9248,19 @@ jr_003_748f:
 	jr z, jr_003_74b9
 
 	cp $03
-	jp z, Jump_003_7575
+	jp z, EvilEagleThrowsLink
 
 	ld a, $20
 	ld [wLinkPushedTimer], a
 	ld a, $20
-	call Call_03_7569
+	call PushLinkAway
 	jr jr_003_74e0
 
 jr_003_74b9:
 	ld a, $10
 	ld [wLinkPushedTimer], a
 	ld a, $20
-	call Call_03_7569
+	call PushLinkAway
 
 jr_003_74c3:
 	jr jr_003_74e0
@@ -8877,17 +9283,21 @@ jr_003_74c5:
 
 jr_003_74e0:
 	ld a, $0c
-	ldh [$ffb6], a
+	ldh [hSwordClashCooldown], a
 	ret
 
 
 Jump_003_74e5:
-	jp Jump_003_74f0
+	jp ClashBoxHitsLink
 
 
-	db $00, $f0, $f8, $fc, $fc, $fc, $f0, $00
+ClashSparkOffsetsX::
+	db $00, $f0, $f8, $fc
 
-Jump_003_74f0:
+ClashSparkOffsetsY::
+	db $fc, $fc, $f0, $00
+
+ClashBoxHitsLink::
 	ldh a, [hFrameCounter]
 	xor c
 	rra
@@ -8951,7 +9361,7 @@ jr_003_7531:
 	and a
 	jr nz, jr_003_7574
 
-	call Call_03_6CF1
+	call HurtLink
 	ldh a, [hActiveEntityType]
 	cp $be
 	jr nz, jr_003_7574
@@ -8975,8 +9385,8 @@ jr_003_7531:
 	ld [wLinkPushedTimer], a
 	ld a, $30
 
-Call_03_7569::
-	call Call_03_7E17
+PushLinkAway::
+	call GetVectorTowardsLink_03
 	ldh a, [hMultiPurpose0]
 	ldh [hLinkSpeedY], a
 	ldh a, [hMultiPurpose1]
@@ -8986,7 +9396,7 @@ jr_003_7574:
 	ret
 
 
-Jump_003_7575:
+EvilEagleThrowsLink::
 jr_003_7575:
 	ld hl, wEntityPrivateCounter
 	add hl, bc
@@ -9016,9 +9426,10 @@ jr_003_758f:
 	ret
 
 
+Unused759D::
 	db $3e, $20, $ea, $3e, $c1, $3e, $20, $18, $c3
 
-Call_03_75A6::
+EntityHitOtherEntities_03::
 	ld e, $0f
 	ld d, $00
 
@@ -9262,7 +9673,7 @@ jr_003_7711:
 	jr jr_003_773b
 
 jr_003_7714:
-	call Call_03_77A5
+	call ProjectileHitsEntity
 	jr jr_003_773b
 
 Jump_003_7719:
@@ -9361,7 +9772,7 @@ jr_003_7780:
 	jr nz, jr_003_7796
 
 jr_003_7793:
-	call Call_3FB7
+	call FreeEntitySlot
 
 jr_003_7796:
 	jr jr_003_779d
@@ -9381,7 +9792,7 @@ jr_003_779d:
 	ret
 
 
-Call_03_77A5::
+ProjectileHitsEntity::
 	ldh a, [hActiveEntityType]
 	cp $00
 	jr nz, jr_003_77b6
@@ -9412,18 +9823,18 @@ jr_003_77b6:
 	push de
 	pop bc
 	push de
-	call Call_03_77D4
+	call ApplyWeaponHitTo
 	pop de
 	pop bc
 	ret
 
 
-Call_03_77D4::
-	call Call_03_71C4
+ApplyWeaponHitTo::
+	call ApplyWeaponHit
 	ret
 
 
-Call_03_77D8::
+BombHitsEntities::
 	ld e, $0f
 	ld d, $00
 
@@ -9468,9 +9879,9 @@ jr_003_77dc:
 
 	ld a, $07
 	ld [wProjectileWeaponType], a
-	call Call_03_77A5
+	call ProjectileHitsEntity
 	ld a, $30
-	call Call_03_783A
+	call GetVectorTowardsEntity
 	ld hl, wEntityRecoilSpeedY
 	add hl, de
 	ldh a, [hMultiPurpose0]
@@ -9489,7 +9900,7 @@ jr_003_7833:
 	ret
 
 
-Call_03_783A::
+GetVectorTowardsEntity::
 	ldh [hMultiPurpose0], a
 	ldh a, [hLinkX]
 	push af
@@ -9505,7 +9916,7 @@ Call_03_783A::
 	ldh [hLinkY], a
 	push de
 	ldh a, [hMultiPurpose0]
-	call Call_03_7E17
+	call GetVectorTowardsLink_03
 	pop de
 	pop af
 	ldh [hLinkY], a
@@ -9569,7 +9980,7 @@ jr_003_78c4:
 	cp $c1
 	jr z, jr_003_7906
 
-	call Call_3FB7
+	call FreeEntitySlot
 	jp Jump_003_795b
 
 
@@ -9829,7 +10240,7 @@ jr_003_7a46:
 
 	ldh a, [hRoomObjectType]
 	ld [$c503], a
-	ldh a, [$ffbe]
+	ldh a, [hWallCheckOnly]
 	and a
 	jr nz, jr_003_7a5c
 
@@ -9857,7 +10268,7 @@ jr_003_7a6d:
 
 	ldh a, [hRoomObjectType]
 	ld [$c50d], a
-	ldh a, [$ffbe]
+	ldh a, [hWallCheckOnly]
 	and a
 	jr nz, jr_003_7a83
 
@@ -10197,7 +10608,7 @@ Jump_003_7c7a:
 	cp $26
 	jr c, jr_003_7c8a
 
-	call Call_3FB7
+	call FreeEntitySlot
 
 jr_003_7c8a:
 	ld hl, wEntityState
@@ -10451,7 +10862,7 @@ Jump_003_7dd7:
 	cp $01
 	jr z, jr_003_7db5
 
-	jp Call_3FB7
+	jp FreeEntitySlot
 
 
 Call_03_7DE0::
@@ -10490,7 +10901,7 @@ Call_03_7DE0::
 	ret
 
 
-Call_03_7E17::
+GetVectorTowardsLink_03::
 	ldh [hMultiPurpose1], a
 	and a
 	jp z, Jump_003_7e95
@@ -10603,7 +11014,7 @@ Jump_003_7e95:
 
 
 Call_03_7E99::
-	call Call_03_7E17
+	call GetVectorTowardsLink_03
 	ldh a, [hMultiPurpose0]
 	ld hl, wEntitySpeedY
 	add hl, bc
@@ -10793,7 +11204,7 @@ ApplyRecoilIfNeeded_03::
 
 	dec a
 	ld [hl], a
-	call Call_3EB8
+	call AddPowerHitTrailVfx
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
@@ -10833,7 +11244,7 @@ jr_003_7fa8:
 	pop af
 	ld [hl], a
 	pop af
-	call Call_3ED9
+	call EndHitImmunityAtWall
 
 jr_003_7fb8:
 	ret

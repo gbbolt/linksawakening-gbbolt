@@ -27,8 +27,8 @@ GenieInit::
 GenieHandler::
 ;> ConfineLinkToArena()                       # keep Link inside the boss arena
 	call ConfineLinkToArena
-;> Call_3F12()
-	call Call_3F12
+;> StartBossMusic()
+	call StartBossMusic
 ;> return GeniePartHandlers[wEntityPrivate1[slot]](slot)
 	ld hl, wEntityPrivate1
 	add hl, bc
@@ -84,8 +84,8 @@ GenieBottle::
 	ld hl, wEntityHealth
 	add hl, de
 	ld [hl], $08
-;>     Call_3E64()                        # shards of the bottle, removes it
-	call Call_3E64
+;>     BreakIntoPiecesFar()                        # shards of the bottle, removes it
+	call BreakIntoPiecesFar
 ;>     hNoiseSfx = 0x29
 	ld a, $29
 	ldh [hNoiseSfx], a
@@ -1909,8 +1909,8 @@ SlimeEyeInit::
 SlimeEyeHandler::
 ;> ConfineLinkToArena()                                  # keep Link inside the boss arena
 	call ConfineLinkToArena
-;> Call_3F12()
-	call Call_3F12
+;> StartBossMusic()
+	call StartBossMusic
 ;> SlimeEyePinLink(slot)
 	call SlimeEyePinLink
 ;> return SlimeEyeParts[wEntityPrivate5[slot]](slot)
@@ -3064,8 +3064,8 @@ Facade::
 ;> wScreenShakeX = 0
 	xor a
 	ld [wScreenShakeX], a
-;> Call_3F12()
-	call Call_3F12
+;> StartBossMusic()
+	call StartBossMusic
 ;> ConfineLinkToArena()                                  # keep Link inside the boss arena
 	call ConfineLinkToArena
 ;> DrawFacade(slot)
@@ -4010,8 +4010,8 @@ FacadeTileFly::
 ;@ The flying tile or pot breaks: shards, and the entity is removed.
 ;@ test: skip spawns an effect through bank 3
 ShatterFacadePiece::
-;> Call_3E64()                                  # shards (removes the entity)
-	call Call_3E64
+;> BreakIntoPiecesFar()                                  # shards (removes the entity)
+	call BreakIntoPiecesFar
 
 .done
 ;> return
@@ -4346,8 +4346,8 @@ MoldormHandler::
 	ld a, [wRoomTransitionState]
 	and a
 	jp nz, MoldormInit
-;> Call_3F12()
-	call Call_3F12
+;> StartBossMusic()
+	call StartBossMusic
 ;> if hActiveEntityStatus == 5:
 ;>     return MoldormActive(slot)
 	ldh a, [hActiveEntityStatus]
@@ -5833,7 +5833,7 @@ PairoddProjectileHandler::
 	jr z, jr_004_5f24
 
 	call DespawnEntity_04
-	call Call_04_6BF2
+	call PuffAtEntity_04
 
 jr_004_5f24:
 	ret
@@ -5842,9 +5842,10 @@ jr_004_5f24:
 	db $00, $f0, $78, $00, $00, $f8, $7a, $00, $00, $00, $70, $00, $00, $08, $72, $00
 	db $00, $f0, $7c, $00, $00, $f8, $7e, $00, $00, $00, $70, $00, $00, $08, $72, $00
 	db $00, $f0, $78, $00, $00, $f8, $7a, $00, $00, $00, $74, $00, $00, $08, $76, $00
+FishermanPrizeSprite::
 	db $9a, $10, $9c, $10
 
-Call_04_5F59::
+FishermanHandler::
 	ld hl, wEntityPrivate4
 	add hl, bc
 	ld a, [hl]
@@ -5883,7 +5884,7 @@ jr_004_5f8e:
 jr_004_5f93:
 	ldh a, [hIsSideScrolling]
 	and a
-	jp nz, Jump_004_607b
+	jp nz, FishingPond
 
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
@@ -5917,11 +5918,11 @@ jr_004_5fbf:
 	rst $00
 
 JumpTable_04_5FCF::
-	dw Jump_04_5FD5
-	dw Jump_04_5FE3
-	dw Jump_04_6016
+	dw FishermanWaitForTalk
+	dw FishermanOffer
+	dw FishermanGoFishing
 
-Jump_04_5FD5::
+FishermanWaitForTalk::
 	call CanTalkToEntity_04
 	jr nc, jr_004_5fe2
 
@@ -5933,7 +5934,7 @@ jr_004_5fe2:
 	ret
 
 
-Jump_04_5FE3::
+FishermanOffer::
 	ld a, [wDialogState]
 	and a
 	jr nz, jr_004_600e
@@ -5971,26 +5972,42 @@ jr_004_600f:
 	ret
 
 
-Jump_04_6016::
+FishermanGoFishing::
 	ld a, [wDialogState]
 	and a
 	jr nz, jr_004_6022
 
-	call Call_3EAD
-	call Call_04_67C6
+	call ClearAllEntitySlots
+	call LeaveFishingGame
 
 jr_004_6022:
 	ret
 
 
+FishingRodSprites::
 	db $58, $00, $5a, $00, $56, $20, $ff, $00, $5c, $00, $5e, $00, $58, $00, $5a, $00
 	db $58, $00, $5a, $00, $5c, $00, $5e, $00, $5c, $00, $5e, $00, $56, $00, $ff, $00
-	db $5e, $20, $5c, $20, $58, $00, $5a, $00, $06, $16, $10, $10, $38, $38, $39, $39
-	db $16, $38, $f6, $00, $f1, $f0, $f0, $f0, $f0, $fe, $04, $f2, $00, $f0, $fa, $00
-	db $00, $f8, $f8, $f8, $f2, $fe, $e8, $00, $e0, $e8, $00, $00, $00, $00, $14, $10
+	db $5e, $20, $5c, $20, $58, $00, $5a, $00
+
+FishingLinkPoses::
+	db $06, $16, $10, $10, $38, $38, $39, $39
+	db $16, $38
+
+FishingRodOffsetX::
+	db $f6, $00, $f1, $f0, $f0, $f0, $f0, $fe, $04, $f2
+
+FishingRodOffsetY::
+	db $00, $f0, $fa, $00
+	db $00, $f8, $f8, $f8, $f2, $fe
+
+FishingLureOffsetX::
+	db $e8, $00, $e0, $e8, $00, $00, $00, $00, $14
+
+FishingLureOffsetY::
+	db $10
 	db $e0, $f8, $10, $00, $00, $00, $00, $f0
 
-Jump_004_607b:
+FishingPond::
 	ld a, $01
 	ld [wLinkFrozen], a
 	ld hl, wEntityPrivate1
@@ -5998,17 +6015,17 @@ Jump_004_607b:
 	ld a, [hl]
 	rst $00
 
-JumpTable_04_6086::
-	dw Jump_04_60A7
-	dw Jump_04_6246
-	dw Jump_04_6401
-	dw Jump_04_66EC
+FishingPondParts::
+	dw FishingRod
+	dw FishingLure
+	dw SmallFish
+	dw BigFish
 
 	db $18, $58
 	db $60, $18, $88, $40, $4c, $34, $68, $50, $01, $00, $00, $01, $00, $02, $02, $02
 	db $03, $03, $00, $3e, $1e, $10, $30
 
-Jump_04_60A7::
+FishingRod::
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
 	ld hl, wEntityPrivate2
@@ -6086,16 +6103,16 @@ jr_004_60f7:
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_04_611D::
-	dw Jump_04_612B
-	dw Jump_04_6153
-	dw Jump_04_61BC
-	dw Jump_04_61BD
-	dw Jump_04_6207
-	dw Jump_04_6214
-	dw Jump_04_6231
+FishingRodStates::
+	dw FishingRodWait
+	dw FishingRodCast
+	dw FishingRodIdle
+	dw FishingRodAfterCatch
+	dw FishingRodLeave
+	dw FishingRodNoMoreFish
+	dw FishingRodDone
 
-Jump_04_612B::
+FishingRodWait::
 	ld a, [wDialogState]
 	and a
 	jr nz, jr_004_6143
@@ -6112,13 +6129,14 @@ Jump_04_612B::
 
 jr_004_6143:
 	ld a, $09
-	call Call_04_6192
+	call DrawFishingLureOnRod
 	ret
 
 
+FishingCastFrames::
 	db $01, $08, $08, $08, $08, $08, $01, $02, $03, $00
 
-Jump_04_6153::
+FishingRodCast::
 	call GetEntityTimer
 	jr nz, jr_004_618e
 
@@ -6155,7 +6173,7 @@ jr_004_618e:
 	rra
 	and $1f
 
-Call_04_6192::
+DrawFishingLureOnRod::
 	ld e, a
 	ld d, b
 	ld hl, $6149
@@ -6181,11 +6199,11 @@ Call_04_6192::
 	jp LoadEntityPosition
 
 
-Jump_04_61BC::
+FishingRodIdle::
 	ret
 
 
-Jump_04_61BD::
+FishingRodAfterCatch::
 	ld a, [wDialogState]
 	and a
 	jr nz, jr_004_61fe
@@ -6236,19 +6254,19 @@ jr_004_61ff:
 	jp IncrementEntityState
 
 
-Jump_04_6207::
+FishingRodLeave::
 	ld a, [wDialogState]
 	and a
 	jr nz, jr_004_6213
 
-	call Call_3EAD
-	call Call_04_67C6
+	call ClearAllEntitySlots
+	call LeaveFishingGame
 
 jr_004_6213:
 	ret
 
 
-Jump_04_6214::
+FishingRodNoMoreFish::
 	ld a, [wDialogState]
 	and a
 	jr nz, jr_004_6230
@@ -6272,14 +6290,15 @@ jr_004_6230:
 	ret
 
 
-Jump_04_6231::
+FishingRodDone::
 	ret
 
 
+FishingLureSprites::
 	db $50, $00, $54, $00, $50, $00, $52, $00, $50, $40, $54, $00, $54, $40, $50, $40
 	db $54, $60, $50, $60
 
-Jump_04_6246::
+FishingLure::
 	ld a, c
 	ld [wSceneVar3], a
 	ld de, $6232
@@ -6292,11 +6311,11 @@ Jump_04_6246::
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_04_6260::
-	dw Jump_04_6264
-	dw Jump_04_62CD
+FishingLureStates::
+	dw FishingLureFly
+	dw FishingLureInWater
 
-Jump_04_6264::
+FishingLureFly::
 	call AddEntitySpeedToPosX_04
 	call AddEntitySpeedToPosY_04
 	ldh a, [hJoypadHeld]
@@ -6362,7 +6381,7 @@ jr_004_62ac:
 	call ClearEntitySpeed
 	call IncrementEntityState
 
-Jump_004_62bb:
+FishingSplash::
 	ldh a, [hActiveEntityDrawY]
 	ldh [hMultiPurpose1], a
 	ldh a, [hActiveEntityX]
@@ -6376,7 +6395,7 @@ jr_004_62cc:
 	ret
 
 
-Jump_04_62CD::
+FishingLureInWater::
 	ld hl, wEntitySpriteVariant
 	ld [hl], $00
 	call GetEntityTimer
@@ -6584,10 +6603,11 @@ jr_004_63e0:
 	ret
 
 
+SmallFishSprites::
 	db $4c, $00, $4a, $00, $4c, $00, $4e, $00, $48, $00, $4a, $00, $48, $00, $4e, $00
 	db $4a, $20, $4c, $20, $4e, $20, $4c, $20, $4a, $20, $48, $20, $4e, $20, $48, $20
 
-Jump_04_6401::
+SmallFish::
 	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
@@ -6602,27 +6622,27 @@ jr_004_640f:
 	ld de, $63e1
 	call DrawEntity16x16
 
-Jump_004_6415:
+FishCommon::
 	call ReturnIfNonInteractive_04
 	call UpdateEntityPosWithSpeed_04
 	ldh a, [hActiveEntityState]
 	rst $00
 
 JumpTable_04_641E::
-	dw Jump_04_642A
+	dw FishIdle
 	dw Jump_04_6462
-	dw Jump_04_64B9
-	dw Jump_04_64F4
-	dw Jump_04_6541
-	dw Jump_04_6652
+	dw FishBite
+	dw FishTakeLure
+	dw FishHooked
+	dw FishCaught
 
-Jump_04_642A::
-	call Call_04_6766
+FishIdle::
+	call FishCheckLure
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	cp $03
-	jp z, Jump_004_6703
+	jp z, BigFishIdle
 
 	call GetEntityTimer
 	jr nz, jr_004_6449
@@ -6658,15 +6678,16 @@ jr_004_645d:
 jr_004_645e:
 	jr jr_004_64a7
 
+SmallFishSwimSpeed::
 	db $10, $f0
 
 Jump_04_6462::
-	call Call_04_6766
+	call FishCheckLure
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	cp $03
-	jp z, Jump_004_672d
+	jp z, BigFishSwim
 
 	call GetEntityTimer
 	jr nz, jr_004_647a
@@ -6726,9 +6747,10 @@ jr_004_64b6:
 	ret
 
 
+FishBiteOffsetX::
 	db $f2, $14
 
-Jump_04_64B9::
+FishBite::
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -6765,7 +6787,7 @@ jr_004_64cb:
 	jp UpdateEntityPosWithSpeed_04
 
 
-Jump_04_64F4::
+FishTakeLure::
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -6808,9 +6830,13 @@ jr_004_653c:
 	ret
 
 
-	db $54, $00, $08, $f8
+HookedLureSprite::
+	db $54, $00
 
-Jump_04_6541::
+HookedLureOffsetX::
+	db $08, $f8
+
+FishHooked::
 	ld hl, wEntityDirection
 	add hl, bc
 	ld e, [hl]
@@ -6980,7 +7006,7 @@ jr_004_6620:
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], $f0
-	jp Jump_004_62bb
+	jp FishingSplash
 
 
 jr_004_663e:
@@ -6999,7 +7025,7 @@ jr_004_6651:
 	ret
 
 
-Jump_04_6652::
+FishCaught::
 	ld hl, wEntitySpriteVariant
 	ld [hl], $01
 	call UpdateEntityPosWithSpeed_04
@@ -7080,10 +7106,11 @@ jr_004_66cb:
 	ret
 
 
+BigFishSprites::
 	db $44, $00, $42, $00, $44, $00, $46, $00, $40, $00, $42, $00, $40, $00, $46, $00
 	db $42, $20, $44, $20, $46, $20, $44, $20, $42, $20, $40, $20, $46, $20, $40, $20
 
-Jump_04_66EC::
+BigFish::
 	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
@@ -7097,10 +7124,10 @@ Jump_04_66EC::
 jr_004_66fa:
 	ld de, $66cc
 	call DrawEntity16x16
-	jp Jump_004_6415
+	jp FishCommon
 
 
-Jump_004_6703:
+BigFishIdle::
 	call GetEntityTimer
 	jr nz, jr_004_6715
 
@@ -7136,9 +7163,10 @@ jr_004_672a:
 	ret
 
 
+BigFishSwimSpeed::
 	db $08, $f8
 
-Jump_004_672d:
+BigFishSwim::
 	call GetEntityTimer
 	jr nz, jr_004_6738
 
@@ -7185,7 +7213,7 @@ jr_004_6765:
 	ret
 
 
-Call_04_6766::
+FishCheckLure::
 	ld a, [wSceneVar2]
 	and a
 	jr nz, jr_004_67c5
@@ -7246,7 +7274,7 @@ jr_004_67c5:
 	ret
 
 
-Call_04_67C6::
+LeaveFishingGame::
 	call StartWarpFadeOutMusic
 	ldh a, [hLinkX]
 	swap a
@@ -7262,10 +7290,14 @@ Call_04_67C6::
 	ret
 
 
-	db $4c, $00, $4c, $20, $4e, $00, $4e, $20, $7c, $00, $7c, $20, $7e, $00, $7e, $20
+TractorDeviceSprites::
+	db $4c, $00, $4c, $20, $4e, $00, $4e, $20
 
-Call_04_67EF::
-	ld hl, $d45e
+TractorDeviceSpritesAlt::
+	db $7c, $00, $7c, $20, $7e, $00, $7e, $20
+
+TractorDevice::
+	ld hl, wLinkPulledByDevice
 	inc [hl]
 	ld de, $67df
 	ldh a, [hMapId]
@@ -7281,13 +7313,14 @@ jr_004_67ff:
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_04_680B::
-	dw Jump_04_6813
-	dw Jump_04_68C9
+TractorDeviceStates::
+	dw TractorDeviceWork
+	dw TractorDeviceRest
 
+TractorSpinDirections::
 	db $00, $03, $01, $02
 
-Jump_04_6813::
+TractorDeviceWork::
 	call GetEntityDropTimer
 	jr nz, jr_004_681e
 
@@ -7299,7 +7332,7 @@ Jump_04_6813::
 jr_004_681e:
 	ld a, [wLinkMotionState]
 	cp $00
-	jp nz, Jump_004_68b0
+	jp nz, TractorDeviceRun
 
 	ldh a, [hLinkSpeedX]
 	push af
@@ -7338,7 +7371,7 @@ jr_004_6850:
 	ldh [hLinkSpeedX], a
 	push bc
 	call ApplyLinkSpeed
-	call Call_3E49
+	call CheckLinkLeavesRoomFar
 	pop bc
 	pop af
 	ldh [hLinkSpeedY], a
@@ -7348,7 +7381,7 @@ jr_004_6850:
 	ld [wLinkPushingTimer], a
 	ldh a, [hActiveEntityType]
 	cp $52
-	jp nz, Jump_004_68b0
+	jp nz, TractorDeviceRun
 
 	ld a, [wIsLinkInTheAir]
 	and a
@@ -7392,8 +7425,8 @@ jr_004_68a0:
 	ld a, [hl]
 	ldh [hLinkDirection], a
 
-Jump_004_68b0:
-	call Call_04_68D9
+TractorDeviceRun::
+	call TractorDeviceMoveEntities
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -7412,7 +7445,7 @@ jr_004_68c8:
 	ret
 
 
-Jump_04_68C9::
+TractorDeviceRest::
 	call GetEntityDropTimer
 	jr nz, jr_004_68d4
 
@@ -7425,7 +7458,7 @@ jr_004_68d4:
 	jp SetEntitySpriteVariant
 
 
-Call_04_68D9::
+TractorDeviceMoveEntities::
 	ld e, $0f
 	ld d, b
 
@@ -7544,7 +7577,7 @@ Jump_004_6971:
 	ret
 
 
-Call_04_697A::
+BallTrooper::
 	ldh a, [hMapId]
 	cp $14
 	jr c, jr_004_6995
@@ -7571,7 +7604,7 @@ jr_004_6995:
 	jp nz, DespawnEntity_04
 
 jr_004_69a1:
-	call Call_04_6A94
+	call DrawBallTrooper
 	call LoadEntityPosition
 	call ReturnIfNonInteractive_04
 	call ApplyRecoilIfNeeded_04
@@ -7582,12 +7615,12 @@ jr_004_69a1:
 	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_04_69B9::
-	dw Jump_04_69BF
-	dw Jump_04_6A0A
-	dw Jump_04_6A37
+BallTrooperStates::
+	dw BallTrooperApproach
+	dw BallTrooperAim
+	dw BallTrooperThrow
 
-Jump_04_69BF::
+BallTrooperApproach::
 	call GetEntityTimer
 	jr nz, jr_004_69f1
 
@@ -7625,7 +7658,7 @@ jr_004_69f1:
 	and $01
 	jr nz, jr_004_69f0
 
-Jump_004_69f7:
+BallTrooperSwingBall::
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	inc [hl]
@@ -7638,9 +7671,10 @@ Jump_004_69f7:
 	ret
 
 
+BallTrooperThrowAngles::
 	db $04, $0c, $00, $08
 
-Jump_04_6A0A::
+BallTrooperAim::
 	call GetEntityTimer
 	jr nz, jr_004_6a34
 
@@ -7667,10 +7701,10 @@ Jump_04_6A0A::
 	call IncrementEntityState
 
 jr_004_6a34:
-	jp Jump_004_69f7
+	jp BallTrooperSwingBall
 
 
-Jump_04_6A37::
+BallTrooperThrow::
 	call AddPrivate1SpeedToPrivate3_04
 	ld hl, wEntityPrivate1
 	add hl, bc
@@ -7716,10 +7750,14 @@ jr_004_6a73:
 	ret
 
 
-	db $70, $00, $72, $00, $74, $00, $76, $00, $78, $00, $78, $20, $0a, $06, $03, $01
+BallTrooperSprites::
+	db $70, $00, $72, $00, $74, $00, $76, $00, $78, $00, $78, $20
+
+BallTrooperBallCircle::
+	db $0a, $06, $03, $01
 	db $00, $01, $03, $06, $0a, $0e, $11, $13, $14, $13, $11, $0e, $0a, $06, $03, $01
 
-Call_04_6A94::
+DrawBallTrooper::
 	ld de, $6a74
 	call DrawEntity16x16
 	ld hl, wEntityPrivate3
@@ -7843,7 +7881,7 @@ jr_004_6b1e:
 	add hl, bc
 	ld [hl], $40
 	call EntityCheckHits
-	call Call_04_6BB1
+	call BallTrooperBallBounce
 
 jr_004_6b4b:
 	ldh a, [hActiveEntityX]
@@ -7910,7 +7948,7 @@ Jump_004_6bb0:
 	ret
 
 
-Call_04_6BB1::
+BallTrooperBallBounce::
 	ldh a, [hActiveEntityX]
 	ldh [hMultiPurpose4], a
 	swap a
@@ -7951,7 +7989,7 @@ Call_04_6BB1::
 	ld a, $07
 	ldh [hJingle], a
 
-Call_04_6BF2::
+PuffAtEntity_04::
 	ldh a, [hActiveEntityX]
 	ldh [hMultiPurpose0], a
 	ldh a, [hActiveEntityDrawY]
@@ -7963,15 +8001,17 @@ jr_004_6bff:
 	ret
 
 
+BeamosSprites::
 	db $70, $00, $70, $20, $78, $00, $7a, $00, $74, $00, $76, $00, $7c, $00, $7e, $00
 	db $72, $00, $72, $20, $7e, $20, $7c, $20, $76, $20, $74, $20, $7a, $20, $78, $20
+BeamosProbeSpeeds::
 	db $10, $0e, $0c, $06, $00, $fa, $f4, $f2, $f0, $f2, $f4, $fa, $00, $06, $0c, $0e
 	db $10, $0e, $0c, $06
 
-Call_04_6C34::
+Beamos::
 	ldh a, [hActiveEntityState]
 	and a
-	jp nz, Jump_004_6ce2
+	jp nz, BeamosProbe
 
 	ld de, $6c00
 	call DrawEntity16x16
@@ -8080,7 +8120,7 @@ jr_004_6ce1:
 	ret
 
 
-Jump_004_6ce2:
+BeamosProbe::
 	call EntityCheckObjectCollision
 	ld hl, wEntityCollisions
 	add hl, bc
@@ -8167,7 +8207,7 @@ ApplyRecoilIfNeeded_04::
 
 	dec a
 	ld [hl], a
-	call Call_3EB8
+	call AddPowerHitTrailVfx
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
@@ -9655,7 +9695,7 @@ jr_004_75bc:
 jr_004_75cf:
 	ld [wMagicPowderCount], a
 	ld d, $0c
-	call Call_3E95
+	call GiveInventoryItemFar
 	ld a, $0b
 	ldh [hBGChangeRequest], a
 	ret
@@ -9666,7 +9706,7 @@ jr_004_75dc:
 	jr nz, jr_004_75e5
 
 	ld d, $04
-	call Call_3E95
+	call GiveInventoryItemFar
 	ret
 
 
@@ -10305,7 +10345,7 @@ JumpTable_04_79FC::
 
 Jump_04_7A0E::
 	ld d, $05
-	call Call_3E95
+	call GiveInventoryItemFar
 	ld a, $20
 	ld [wArrowCount], a
 	ret
@@ -10326,7 +10366,7 @@ jr_004_7a23:
 
 Jump_04_7A27::
 	ld d, $09
-	call Call_3E95
+	call GiveInventoryItemFar
 	ret
 
 
@@ -10353,7 +10393,7 @@ Jump_04_7A3B::
 
 Jump_04_7A45::
 	ld d, $0b
-	call Call_3E95
+	call GiveInventoryItemFar
 	ret
 
 
@@ -10368,7 +10408,7 @@ Jump_04_7A4B::
 jr_004_7a55:
 	ld [wBombCount], a
 	ld d, $02
-	call Call_3E95
+	call GiveInventoryItemFar
 	ret
 
 
@@ -10383,7 +10423,7 @@ Jump_04_7A71::
 
 Jump_04_7A77::
 	ld d, $04
-	call Call_3E95
+	call GiveInventoryItemFar
 	ret
 
 
