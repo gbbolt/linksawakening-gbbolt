@@ -1,0 +1,54 @@
+{
+  "_doc": "How tools/audio.py drives the sound engine. RAM names come from ram.inc. The game requests music with wMusicTrackToPlay (PlayMusic) and sound effects through hJingle / hWaveSfx / hNoiseSfx, which the main loop copies into wJingleToPlay / wWaveSfxToPlay / wNoiseSfxToPlay; here the requests go straight into those bytes. UpdateSound runs once a frame from the VBlank handler: the effect engine of bank $1F, then the music engines of banks $1B (tracks $01-$10, $31-$40) and $1E (tracks $11-$30, $41-$60). Both music banks share the channel records wMusicChannel1-4 at $D310.",
+  "init": "InitSoundEngine",
+  "update": "UpdateSound",
+  "power_on": [["rNR52", 128], ["rNR51", 255], ["rNR50", 119]],
+  "stack": "0xDFF0",
+  "kinds": {
+    "music": {
+      "label": "Music",
+      "request": "wMusicTrackToPlay",
+      "_playing": "the song number inside its bank's table; 0 when a song without a loop ends",
+      "playing": "wActiveMusicTrack",
+      "ids": [1, 96],
+      "loops": true,
+      "max_seconds": 240
+    },
+    "jingle": {
+      "label": "Sound effects (square channels)",
+      "request": "wJingleToPlay",
+      "playing": "wActiveJingle",
+      "ids": [1, 65],
+      "max_seconds": 12
+    },
+    "wave": {
+      "label": "Sound effects (wave channel)",
+      "request": "wWaveSfxToPlay",
+      "playing": "wActiveWaveSfx",
+      "ids": [1, 35],
+      "max_seconds": 12
+    },
+    "noise": {
+      "label": "Sound effects (noise channel)",
+      "request": "wNoiseSfxToPlay",
+      "playing": "wActiveNoiseSfx",
+      "ids": [1, 63],
+      "max_seconds": 12
+    }
+  },
+  "music_channels": {
+    "_doc": "per channel: its RAM record, the offset of the pattern pointer (the note just played is the byte before it), the pattern list pointer, and the flag byte/bit set while a sound effect owns the channel",
+    "structs": ["wMusicChannel1", "wMusicChannel2", "wMusicChannel3", "wMusicChannel4"],
+    "pattern_ptr": 4,
+    "list_ptr": 0,
+    "effect_flag": [15, 128]
+  },
+  "effect_channels": {"jingle": [0, 1], "wave": [2], "noise": [3]},
+  "pokes": {
+    "_doc": "the item fanfares $0F, $10 and $25 start hLastMusicTrack again when they end; $FF stops the music instead",
+    "music 15": {"hLastMusicTrack": 255},
+    "music 16": {"hLastMusicTrack": 255},
+    "music 37": {"hLastMusicTrack": 255}
+  },
+  "names": {}
+}

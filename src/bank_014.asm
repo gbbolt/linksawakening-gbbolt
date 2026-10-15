@@ -285,74 +285,74 @@ JumpTable_14_5001::
 
 Jump_14_5021::
 	push bc
-	ld hl, $d711
+	ld hl, wRoomObjects
 	ld bc, $5097
 	ld de, $50b8
-	jp Jump_000_33a7
+	jp PlaceObjectShape
 
 
 Jump_14_502E::
 	push bc
-	ld hl, $d711
+	ld hl, wRoomObjects
 	ld bc, $50d8
 	ld de, $50f1
-	jp Jump_000_33a7
+	jp PlaceObjectShape
 
 
 Jump_14_503B::
 	push bc
-	ld hl, $d711
+	ld hl, wRoomObjects
 	ld bc, $5109
 	ld de, $5124
-	jp Jump_000_33a7
+	jp PlaceObjectShape
 
 
 Jump_14_5048::
 	push bc
-	ld hl, $d711
+	ld hl, wRoomObjects
 	ld bc, $513e
 	ld de, $5157
-	jp Jump_000_33a7
+	jp PlaceObjectShape
 
 
 Jump_14_5055::
 	push bc
-	ld hl, $d711
+	ld hl, wRoomObjects
 	ld bc, $516f
 	ld de, $518a
-	jp Jump_000_33a7
+	jp PlaceObjectShape
 
 
 Jump_14_5062::
 	push bc
-	ld hl, $d711
+	ld hl, wRoomObjects
 	ld bc, $51a4
 	ld de, $51b6
-	jp Jump_000_33a7
+	jp PlaceObjectShape
 
 
 Jump_14_506F::
 	push bc
-	ld hl, $d711
+	ld hl, wRoomObjects
 	ld bc, $51c7
 	ld de, $51d9
-	jp Jump_000_33a7
+	jp PlaceObjectShape
 
 
 Jump_14_507C::
 	push bc
-	ld hl, $d711
+	ld hl, wRoomObjects
 	ld bc, $51ea
 	ld de, $51fc
-	jp Jump_000_33a7
+	jp PlaceObjectShape
 
 
 Jump_14_5089::
 	push bc
-	ld hl, $d711
+	ld hl, wRoomObjects
 	ld bc, $520d
 	ld de, $521f
-	jp Jump_000_33a7
+	jp PlaceObjectShape
 
 
 Jump_14_5096::
@@ -387,70 +387,70 @@ Jump_14_5096::
 	db $21, $21, $23, $23, $23, $23, $23, $23, $23, $18, $20, $28, $30, $38, $40, $48
 	db $50, $58, $60, $68, $70
 
-	ld a, [$d462]
+	ld a, [wCompassChimeDelay]
 	and a
 	jr z, jr_014_524c
 
 	dec a
-	ld [$d462], a
+	ld [wCompassChimeDelay], a
 	jr nz, jr_014_524c
 
 	ld a, $1b
-	ldh [$fff3], a
+	ldh [hWaveSfx], a
 
 jr_014_524c:
-	ld a, [$c502]
+	ld a, [wClinkTimer]
 	and a
 	jr z, jr_014_5256
 
 	dec a
-	ld [$c502], a
+	ld [wClinkTimer], a
 
 jr_014_5256:
-	ld a, [$c5af]
+	ld a, [wRestartMusicTimer]
 	and a
 	jr z, jr_014_5267
 
 	dec a
-	ld [$c5af], a
+	ld [wRestartMusicTimer], a
 	jr nz, jr_014_5267
 
-	ldh a, [$ffbf]
-	ld [$d368], a
+	ldh a, [hLastMusicTrack]
+	ld [wMusicTrackToPlay], a
 
 jr_014_5267:
-	ld a, [$dba5]
+	ld a, [wIsIndoor]
 	and a
 	jr nz, jr_014_528c
 
-	ldh a, [$fff6]
+	ldh a, [hMapRoom]
 	ld [$db54], a
-	ldh a, [$fff6]
+	ldh a, [hMapRoom]
 	cp $f0
 	jr c, jr_014_528c
 
 	cp $f6
 	jr nc, jr_014_528c
 
-	ld a, [$c114]
+	ld a, [wSeaWavesSoundTimer]
 	inc a
 	cp $a0
 	jr nz, jr_014_5289
 
 	ld a, $0f
-	ldh [$fff4], a
+	ldh [hNoiseSfx], a
 	xor a
 
 jr_014_5289:
-	ld [$c114], a
+	ld [wSeaWavesSoundTimer], a
 
 jr_014_528c:
-	ld a, [$db5b]
+	ld a, [wMaxHearts]
 	ld e, a
 	ld d, b
 	ld hl, $522d
 	add hl, de
-	ld a, [$db5a]
+	ld a, [wHealth]
 	cp [hl]
 	ld a, $00
 	jr nz, jr_014_529e
@@ -459,7 +459,7 @@ jr_014_528c:
 
 jr_014_529e:
 	ld [$c5a9], a
-	ld a, [$c5ac]
+	ld a, [wNoiseSfxCycle]
 	inc a
 	cp $1a
 	jr nz, jr_014_52aa
@@ -467,8 +467,8 @@ jr_014_529e:
 	xor a
 
 jr_014_52aa:
-	ld [$c5ac], a
-	ldh a, [$ffe7]
+	ld [wNoiseSfxCycle], a
+	ldh a, [hFrameCounter]
 	and $3f
 	jr nz, jr_014_52be
 
@@ -485,16 +485,16 @@ jr_014_52be:
 	ret z
 
 	ld a, $e4
-	ld [$db97], a
-	ld [$db99], a
+	ld [wBGPalette], a
+	ld [wOBJ1Palette], a
 	ld a, $1c
-	ld [$db98], a
+	ld [wOBJ0Palette], a
 	ld hl, $d464
 	dec [hl]
 	ret z
 
 	ld a, [hl]
-	ld hl, $c155
+	ld hl, wScreenShakeX
 	ld [hl], b
 	cp $20
 	jr c, jr_014_52fa
@@ -505,14 +505,14 @@ jr_014_52be:
 	nop
 	and $04
 	sub $02
-	ld [$c155], a
+	ld [wScreenShakeX], a
 	ld a, $cc
-	ld [$db97], a
-	ld [$db99], a
+	ld [wBGPalette], a
+	ld [wOBJ1Palette], a
 	ld a, $0c
-	ld [$db98], a
+	ld [wOBJ0Palette], a
 	ld a, $02
-	ldh [$ffa1], a
+	ldh [hLinkInteractiveMotionBlocked], a
 
 jr_014_52fa:
 	ret
@@ -522,11 +522,11 @@ jr_014_52fa:
 	db $e4, $e4, $e4, $e4, $94, $94, $94, $94, $40, $40, $40, $40, $00, $00, $00, $00
 	db $00, $00, $00, $01, $01, $00, $00, $00, $00, $00, $00
 
-	ld a, [$db96]
+	ld a, [wGameplaySubtype]
 	cp $07
 	ret nz
 
-	ld a, [$c16b]
+	ld a, [wTransitionSequenceCounter]
 	cp $04
 	ret nz
 
@@ -535,9 +535,9 @@ jr_014_52fa:
 	jr z, jr_014_5387
 
 	xor a
-	ldh [$ffd7], a
+	ldh [hMultiPurpose0], a
 	ld d, a
-	ld a, [$c11c]
+	ld a, [wLinkMotionState]
 	ld e, a
 	ld hl, $531b
 	add hl, de
@@ -545,35 +545,35 @@ jr_014_52fa:
 	and a
 	jr nz, jr_014_5387
 
-	ld a, [$db9a]
+	ld a, [wWindowY]
 	cp $00
 	jr z, jr_014_535d
 
-	ld hl, $c17f
-	ld a, [$c19f]
+	ld hl, wTransitionGfx
+	ld a, [wDialogState]
 	or [hl]
 	jr nz, jr_014_535d
 
 	ld a, [$c3cd]
-	ldh [$ffd7], a
+	ldh [hMultiPurpose0], a
 
 jr_014_535d:
 	ld a, [$c3cc]
 	ld e, a
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $03
 	add e
 	ld e, a
 	ld hl, $52fb
 	add hl, de
 	ld a, [hl]
-	ld [$db97], a
+	ld [wBGPalette], a
 	ld [$c5ad], a
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $01
 	jr nz, jr_014_5387
 
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	ld hl, $c3cc
 	sub [hl]
 	jr z, jr_014_5387
@@ -595,32 +595,32 @@ Call_14_5388::
 	xor a
 	ldh [$ffbe], a
 	ldh [$fff5], a
-	ld a, [$db95]
+	ld a, [wGameplayType]
 	cp $07
 	jr z, jr_014_53e1
 
-	ld a, [$c124]
-	ld hl, $c14f
+	ld a, [wRoomTransitionState]
+	ld hl, wInventoryAppearing
 	or [hl]
-	ld hl, $c19f
+	ld hl, wDialogState
 	or [hl]
-	ld hl, $c166
+	ld hl, wOcarinaSongState
 	or [hl]
 	jr nz, jr_014_53e1
 
-	call Call_0891
+	call GetEntityTimer
 	jr z, jr_014_53ab
 
 	dec [hl]
 
 jr_014_53ab:
-	call Call_088C
+	call GetEntityTimer1
 	jr z, jr_014_53b1
 
 	dec [hl]
 
 jr_014_53b1:
-	ld hl, $c300
+	ld hl, wEntityTimer2
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -629,7 +629,7 @@ jr_014_53b1:
 	dec [hl]
 
 jr_014_53ba:
-	ld hl, $c480
+	ld hl, wEntityDyingTimer
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -638,17 +638,17 @@ jr_014_53ba:
 	dec [hl]
 
 jr_014_53c3:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $03
 	jr nz, jr_014_53cf
 
-	call Call_0887
+	call GetEntityDropTimer
 	jr z, jr_014_53cf
 
 	dec [hl]
 
 jr_014_53cf:
-	ld hl, $c420
+	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -660,13 +660,13 @@ jr_014_53d8:
 	sla a
 	sla a
 	and $10
-	ldh [$ffed], a
+	ldh [hActiveEntityFlipAttribute], a
 	ret
 
 
 jr_014_53e1:
 	xor a
-	ldh [$ffed], a
+	ldh [hActiveEntityFlipAttribute], a
 	ret
 
 
@@ -679,12 +679,12 @@ Call_14_541B::
 	ld a, $01
 	ld [$d474], a
 	ld a, $03
-	ld [$c11c], a
-	ld a, [$dba5]
+	ld [wLinkMotionState], a
+	ld a, [wIsIndoor]
 	and a
 	jr z, jr_014_544a
 
-	ldh a, [$fff7]
+	ldh a, [hMapId]
 	cp $0a
 	jr nc, jr_014_544a
 
@@ -697,7 +697,7 @@ Call_14_541B::
 	ld hl, $53e5
 	add hl, de
 	ld e, $05
-	ld bc, $d401
+	ld bc, wWarpType
 
 jr_014_5443:
 	ld a, [hli]
@@ -711,18 +711,18 @@ jr_014_5443:
 
 jr_014_544a:
 	xor a
-	ld [$d401], a
-	ld [$d402], a
+	ld [wWarpType], a
+	ld [wWarpMap], a
 	ld a, $45
-	ld [$d403], a
+	ld [wWarpRoom], a
 	ld a, $38
-	ld [$d404], a
-	ldh [$ff98], a
+	ld [wWarpDestX], a
+	ldh [hLinkX], a
 	ld a, $60
-	ld [$d405], a
-	ldh [$ff99], a
+	ld [wWarpDestY], a
+	ldh [hLinkY], a
 	ld a, $53
-	ld [$d416], a
+	ld [wWarpDestPosition], a
 	ret
 
 
@@ -752,49 +752,49 @@ Call_14_55AA::
 	ld d, $00
 
 jr_014_55ae:
-	ld hl, $c280
+	ld hl, wEntityStatus
 	add hl, de
 	ld a, [hl]
 	cp $05
 	jr nz, jr_014_55f8
 
-	ld hl, $c340
+	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld a, [hl]
 	and $20
 	jr z, jr_014_55f8
 
-	ld hl, $c2d0
+	ld hl, wEntityPrivate3
 	add hl, de
 	ld a, [hl]
 	cp $02
 	jr nz, jr_014_55f8
 
-	ld hl, $c200
+	ld hl, wEntityX
 	add hl, de
-	ldh a, [$ffce]
+	ldh a, [hBGPosX]
 	add $08
 	sub [hl]
 	add $08
 	cp $10
 	jr nc, jr_014_55f8
 
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, de
-	ldh a, [$ffcd]
+	ldh a, [hBGPosY]
 	add $10
 	sub [hl]
 	add $08
 	cp $10
 	jr nc, jr_014_55f8
 
-	ld hl, $c450
+	ld hl, wEntityDropTimer
 	add hl, de
 	ld [hl], $80
-	ld hl, $c2d0
+	ld hl, wEntityPrivate3
 	add hl, de
 	ld [hl], d
-	ld hl, $c2f0
+	ld hl, wEntityTimer1
 	add hl, de
 	ld [hl], $18
 
@@ -844,16 +844,16 @@ jr_014_55f8:
 	db $06, $00, $04
 
 Call_14_5822::
-	ld a, [$c124]
+	ld a, [wRoomTransitionState]
 	and a
 	jr nz, jr_014_582f
 
-	ld a, [$c11c]
+	ld a, [wLinkMotionState]
 	cp $06
 	jr nz, jr_014_583b
 
 jr_014_582f:
-	ldh a, [$ffeb]
+	ldh a, [hActiveEntityType]
 	cp $a8
 	jr z, jr_014_583b
 
@@ -872,12 +872,12 @@ jr_014_583b:
 
 
 jr_014_5846:
-	ld a, [$c15c]
+	ld a, [wIsCarryingLiftedObject]
 	cp $01
 	jp nz, Jump_014_591e
 
 	ld d, $03
-	ldh a, [$ffeb]
+	ldh a, [hActiveEntityType]
 	cp $02
 	jr nz, jr_014_5858
 
@@ -885,7 +885,7 @@ jr_014_5846:
 
 jr_014_5858:
 	ld e, $10
-	ld a, [$db00]
+	ld a, [wItemB]
 	cp d
 	jr nz, jr_014_5864
 
@@ -893,38 +893,38 @@ jr_014_5858:
 	jr jr_014_586c
 
 jr_014_5864:
-	ld a, [$db01]
+	ld a, [wItemA]
 	cp d
 	jr z, jr_014_586c
 
 	ld e, $30
 
 jr_014_586c:
-	ldh a, [$ffcc]
+	ldh a, [hJoypadPressed]
 	and e
 	jp z, Jump_014_591e
 
-	ldh a, [$ff9e]
+	ldh a, [hLinkDirection]
 	ld hl, $c5d0
 	add hl, bc
 	ld [hl], a
-	ld hl, $fff2
+	ld hl, hJingle
 	ld [hl], $08
 
 Call_14_587E::
-	ld hl, $c280
+	ld hl, wEntityStatus
 	add hl, bc
 	ld [hl], $05
-	ldh a, [$ffeb]
+	ldh a, [hActiveEntityType]
 	cp $02
 	jr nz, jr_014_5891
 
-	call Call_0891
+	call GetEntityTimer
 	ld [hl], $a0
 	jr jr_014_58e4
 
 jr_014_5891:
-	ld hl, $c280
+	ld hl, wEntityStatus
 	add hl, bc
 	cp $d6
 	jr z, jr_014_58c8
@@ -945,17 +945,17 @@ jr_014_5891:
 	jr nz, jr_014_58d1
 
 	push hl
-	ldh a, [$ff9e]
+	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, b
 	ld hl, $581e
 	add hl, de
 	ld a, [hl]
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, bc
 	ld [hl], a
-	call Call_0891
-	call Call_27ED
+	call GetEntityTimer
+	call GetRandomByte
 	and $1f
 	add $30
 	ld [hl], a
@@ -984,14 +984,14 @@ jr_014_58de:
 
 jr_014_58e4:
 	ld e, b
-	ldh a, [$fff9]
+	ldh a, [hIsSideScrolling]
 	and a
 	jr z, jr_014_58ec
 
 	ld e, $08
 
 jr_014_58ec:
-	ldh a, [$ffeb]
+	ldh a, [hActiveEntityType]
 	cp $02
 	jr nz, jr_014_58f6
 
@@ -1000,30 +1000,30 @@ jr_014_58ec:
 	ld e, a
 
 jr_014_58f6:
-	ldh a, [$ff9e]
+	ldh a, [hLinkDirection]
 	add e
 	ld e, a
 	ld d, b
 	ld hl, $57ee
 	add hl, de
 	ld a, [hl]
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
 	ld hl, $57fe
 	add hl, de
 	ld a, [hl]
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
 	ld hl, $580e
 	add hl, de
 	ld a, [hl]
-	ld hl, $c320
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], a
 	ld a, $0c
-	ld [$c19b], a
+	ld [wItemUsePoseTimer], a
 
 Jump_014_591e:
 	ret
@@ -1031,7 +1031,7 @@ Jump_014_591e:
 
 jr_014_591f:
 	xor a
-	ld [$c19f], a
+	ld [wDialogState], a
 	ret
 
 
@@ -1039,7 +1039,7 @@ jr_014_591f:
 	and a
 	jr nz, jr_014_5935
 
-	ld a, [$c11c]
+	ld a, [wLinkMotionState]
 	cp $03
 	jr z, jr_014_591f
 
@@ -1047,7 +1047,7 @@ jr_014_591f:
 	jr z, jr_014_591f
 
 jr_014_5935:
-	ld a, [$db95]
+	ld a, [wGameplayType]
 	cp $01
 	jr z, jr_014_595a
 
@@ -1055,69 +1055,69 @@ jr_014_5935:
 	and a
 	jr nz, jr_014_595a
 
-	ldh a, [$ff9d]
+	ldh a, [hLinkAnimationState]
 	cp $6c
 	jr z, jr_014_595a
 
 	ld a, $04
-	ld [$c16b], a
+	ld [wTransitionSequenceCounter], a
 	ld a, $e4
-	ld [$db97], a
-	ld [$db99], a
+	ld [wBGPalette], a
+	ld [wOBJ1Palette], a
 	ld a, $1c
-	ld [$db98], a
+	ld [wOBJ0Palette], a
 
 jr_014_595a:
-	ld a, [$d601]
+	ld a, [wDrawCommand]
 	and a
 	ret nz
 
-	ld hl, $c19f
+	ld hl, wDialogState
 	inc [hl]
 	ret
 
 
 Call_14_5964::
-	ld hl, $c17b
-	ld a, [$c124]
+	ld hl, wDebugToggle
+	ld a, [wRoomTransitionState]
 	or [hl]
 	jr nz, jr_014_599f
 
-	ldh a, [$ff98]
+	ldh a, [hLinkX]
 	sub $11
 	cp $7e
 	jr c, jr_014_5989
 
-	ldh a, [$ff98]
+	ldh a, [hLinkX]
 	cp $50
 	jr nc, jr_014_5982
 
-	ldh a, [$ff98]
+	ldh a, [hLinkX]
 	inc a
-	ldh [$ff98], a
+	ldh [hLinkX], a
 	jr jr_014_5996
 
 jr_014_5982:
-	ldh a, [$ff98]
+	ldh a, [hLinkX]
 	dec a
-	ldh [$ff98], a
+	ldh [hLinkX], a
 	jr jr_014_5996
 
 jr_014_5989:
-	ldh a, [$ff99]
+	ldh a, [hLinkY]
 	sub $16
 	cp $5e
 	jr c, jr_014_599f
 
-	ldh a, [$ff99]
+	ldh a, [hLinkY]
 	dec a
-	ldh [$ff99], a
+	ldh [hLinkY], a
 
 jr_014_5996:
 	ld a, $01
-	ldh [$ffa1], a
+	ldh [hLinkInteractiveMotionBlocked], a
 	ld a, $02
-	ld [$c111], a
+	ld [wLinkPoseLock], a
 
 jr_014_599f:
 	ret
@@ -1134,49 +1134,49 @@ Call_14_59B0::
 	ld [$c178], a
 
 jr_014_59ba:
-	ld a, [$c157]
+	ld a, [wBumpShakeTimer]
 	and a
 	jr z, jr_014_59dd
 
 	dec a
-	ld [$c157], a
+	ld [wBumpShakeTimer], a
 	and $03
-	ld hl, $c158
+	ld hl, wBumpShakeAxis
 	add [hl]
 	ld e, a
 	ld d, $00
 	ld hl, $59a0
 	add hl, de
 	ld a, [hl]
-	ld [$c155], a
+	ld [wScreenShakeX], a
 	ld hl, $59a8
 	add hl, de
 	ld a, [hl]
-	ld [$c156], a
+	ld [wScreenShakeY], a
 
 jr_014_59dd:
 	ret
 
 
 Call_14_59DE::
-	ld hl, $d711
+	ld hl, wRoomObjects
 	add hl, de
-	ldh a, [$ffaf]
+	ldh a, [hRoomObjectType]
 	cp $8e
 	jr nz, jr_014_5a1d
 
 	ld [hl], $aa
-	call Call_2839
-	ld hl, $d601
-	ld a, [$d600]
+	call GetBGAddress
+	ld hl, wDrawCommand
+	ld a, [wDrawCommandsSize]
 	ld e, a
 	add $0a
-	ld [$d600], a
+	ld [wDrawCommandsSize], a
 	ld d, $00
 	add hl, de
-	ldh a, [$ffcf]
+	ldh a, [hBGAddrHigh]
 	ld [hli], a
-	ldh a, [$ffd0]
+	ldh a, [hBGAddrLow]
 	ld [hli], a
 	ld a, $81
 	ld [hli], a
@@ -1184,9 +1184,9 @@ Call_14_59DE::
 	ld [hli], a
 	ld a, $16
 	ld [hli], a
-	ldh a, [$ffcf]
+	ldh a, [hBGAddrHigh]
 	ld [hli], a
-	ldh a, [$ffd0]
+	ldh a, [hBGAddrLow]
 	inc a
 	ld [hli], a
 	ld a, $81
@@ -1205,30 +1205,30 @@ jr_014_5a1d:
 
 
 jr_014_5a24:
-	ld a, [$dba5]
+	ld a, [wIsIndoor]
 	and a
 	jp z, Jump_014_5a9f
 
-	ldh a, [$fff9]
+	ldh a, [hIsSideScrolling]
 	and a
 	jr z, jr_014_5a6b
 
-	ldh a, [$ffaf]
+	ldh a, [hRoomObjectType]
 	cp $8a
 	jr nz, jr_014_5a6b
 
 	ld [hl], $04
-	call Call_2839
-	ld hl, $d601
-	ld a, [$d600]
+	call GetBGAddress
+	ld hl, wDrawCommand
+	ld a, [wDrawCommandsSize]
 	ld e, a
 	add $0a
-	ld [$d600], a
+	ld [wDrawCommandsSize], a
 	ld d, $00
 	add hl, de
-	ldh a, [$ffcf]
+	ldh a, [hBGAddrHigh]
 	ld [hli], a
-	ldh a, [$ffd0]
+	ldh a, [hBGAddrLow]
 	ld [hli], a
 	ld a, $81
 	ld [hli], a
@@ -1236,9 +1236,9 @@ jr_014_5a24:
 	ld [hli], a
 	ld a, $7e
 	ld [hli], a
-	ldh a, [$ffcf]
+	ldh a, [hBGAddrHigh]
 	ld [hli], a
-	ldh a, [$ffd0]
+	ldh a, [hBGAddrLow]
 	inc a
 	ld [hli], a
 	ld a, $81
@@ -1251,17 +1251,17 @@ jr_014_5a24:
 
 jr_014_5a6b:
 	ld [hl], $0d
-	call Call_2839
-	ld hl, $d601
-	ld a, [$d600]
+	call GetBGAddress
+	ld hl, wDrawCommand
+	ld a, [wDrawCommandsSize]
 	ld e, a
 	add $0a
-	ld [$d600], a
+	ld [wDrawCommandsSize], a
 	ld d, $00
 	add hl, de
-	ldh a, [$ffcf]
+	ldh a, [hBGAddrHigh]
 	ld [hli], a
-	ldh a, [$ffd0]
+	ldh a, [hBGAddrLow]
 	ld [hli], a
 	ld a, $81
 	ld [hli], a
@@ -1269,9 +1269,9 @@ jr_014_5a6b:
 	ld [hli], a
 	ld a, $12
 	ld [hli], a
-	ldh a, [$ffcf]
+	ldh a, [hBGAddrHigh]
 	ld [hli], a
-	ldh a, [$ffd0]
+	ldh a, [hBGAddrLow]
 	inc a
 	ld [hli], a
 	ld a, $81
@@ -1282,11 +1282,11 @@ jr_014_5a6b:
 	jr jr_014_5ae4
 
 Jump_014_5a9f:
-	ldh a, [$ffaf]
+	ldh a, [hRoomObjectType]
 	cp $20
 	jr nz, jr_014_5ab2
 
-	ldh a, [$fff6]
+	ldh a, [hMapRoom]
 	cp $52
 	jr z, jr_014_5aaf
 
@@ -1299,17 +1299,17 @@ jr_014_5aaf:
 
 jr_014_5ab2:
 	ld [hl], $04
-	call Call_2839
-	ld hl, $d601
-	ld a, [$d600]
+	call GetBGAddress
+	ld hl, wDrawCommand
+	ld a, [wDrawCommandsSize]
 	ld e, a
 	add $0a
-	ld [$d600], a
+	ld [wDrawCommandsSize], a
 	ld d, $00
 	add hl, de
-	ldh a, [$ffcf]
+	ldh a, [hBGAddrHigh]
 	ld [hli], a
-	ldh a, [$ffd0]
+	ldh a, [hBGAddrLow]
 	ld [hli], a
 	ld a, $81
 	ld [hli], a
@@ -1317,9 +1317,9 @@ jr_014_5ab2:
 	ld [hli], a
 	ld a, $7f
 	ld [hli], a
-	ldh a, [$ffcf]
+	ldh a, [hBGAddrHigh]
 	ld [hli], a
-	ldh a, [$ffd0]
+	ldh a, [hBGAddrLow]
 	inc a
 	ld [hli], a
 	ld a, $81
@@ -1337,7 +1337,7 @@ jr_014_5ae4:
 
 
 Jump_014_5ae9:
-	ldh a, [$fff6]
+	ldh a, [hMapRoom]
 	cp $75
 	jr z, jr_014_5afb
 
@@ -1351,30 +1351,30 @@ Jump_014_5ae9:
 	jr nz, jr_014_5b69
 
 jr_014_5afb:
-	ld hl, $d711
+	ld hl, wRoomObjects
 	add hl, de
 	push hl
-	ldh a, [$fff6]
+	ldh a, [hMapRoom]
 	ld e, a
 	ld d, $00
-	ld hl, $d800
+	ld hl, wRoomStatus
 	add hl, de
 	set 4, [hl]
 	pop hl
 
 Jump_014_5b0c:
 	ld [hl], $c6
-	call Call_2839
-	ld hl, $d601
-	ld a, [$d600]
+	call GetBGAddress
+	ld hl, wDrawCommand
+	ld a, [wDrawCommandsSize]
 	ld e, a
 	add $0a
-	ld [$d600], a
+	ld [wDrawCommandsSize], a
 	ld d, $00
 	add hl, de
-	ldh a, [$ffcf]
+	ldh a, [hBGAddrHigh]
 	ld [hli], a
-	ldh a, [$ffd0]
+	ldh a, [hBGAddrLow]
 	ld [hli], a
 	ld a, $81
 	ld [hli], a
@@ -1382,9 +1382,9 @@ Jump_014_5b0c:
 	ld [hli], a
 	ld a, $77
 	ld [hli], a
-	ldh a, [$ffcf]
+	ldh a, [hBGAddrHigh]
 	ld [hli], a
-	ldh a, [$ffd0]
+	ldh a, [hBGAddrLow]
 	inc a
 	ld [hli], a
 	ld a, $81
@@ -1395,43 +1395,43 @@ Jump_014_5b0c:
 	ld [hli], a
 	ld [hl], $00
 	ld a, $01
-	ldh [$ffac], a
-	ldh a, [$ffcd]
+	ldh [hStairsState], a
+	ldh a, [hBGPosY]
 	and $f0
 	add $10
-	ldh [$ffae], a
-	ldh a, [$ffce]
+	ldh [hStairsY], a
+	ldh a, [hBGPosX]
 	and $f0
 	add $08
-	ldh [$ffad], a
-	ldh a, [$ffce]
+	ldh [hStairsX], a
+	ldh a, [hBGPosX]
 	swap a
 	and $0f
 	ld e, a
-	ldh a, [$ffcd]
+	ldh a, [hBGPosY]
 	and $f0
 	or e
-	ld [$d416], a
+	ld [wWarpDestPosition], a
 	ld a, $02
-	ldh [$fff2], a
+	ldh [hJingle], a
 	ret
 
 
 jr_014_5b69:
-	ld hl, $d711
+	ld hl, wRoomObjects
 	add hl, de
 	ld [hl], $e8
-	call Call_2839
-	ld hl, $d601
-	ld a, [$d600]
+	call GetBGAddress
+	ld hl, wDrawCommand
+	ld a, [wDrawCommandsSize]
 	ld e, a
 	add $0a
-	ld [$d600], a
+	ld [wDrawCommandsSize], a
 	ld d, $00
 	add hl, de
-	ldh a, [$ffcf]
+	ldh a, [hBGAddrHigh]
 	ld [hli], a
-	ldh a, [$ffd0]
+	ldh a, [hBGAddrLow]
 	ld [hli], a
 	ld a, $81
 	ld [hli], a
@@ -1439,9 +1439,9 @@ jr_014_5b69:
 	ld [hli], a
 	ld a, $78
 	ld [hli], a
-	ldh a, [$ffcf]
+	ldh a, [hBGAddrHigh]
 	ld [hli], a
-	ldh a, [$ffd0]
+	ldh a, [hBGAddrLow]
 	inc a
 	ld [hli], a
 	ld a, $81

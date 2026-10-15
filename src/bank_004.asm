@@ -5,1023 +5,1423 @@
 
 SECTION "ROM Bank $004", ROMX[$4000], BANK[$4]
 
-	db $21, $00, $c2, $09, $7e, $c6, $08, $77, $c9
+;@ def GenieInit(slot: c)
+;@ path: boss/genie
+;@ Set-up of a new Genie (entity $5C, from the entity init table in bank 3, through a bank-switch stub
+;@ in bank 0): moves it 8 pixels to the right, so the bottle stands in the middle of its two tiles.
+GenieInit::
+;> wEntityX[slot] += 8
+	ld hl, wEntityX
+	add hl, bc
+	ld a, [hl]
+	add $08
+	ld [hl], a
+	ret
 
-Call_04_4009::
+;@ def GenieHandler(slot: c)
+;@ path: boss/genie
+;@ Entity $5C: the Genie, boss of Bottle Grotto (level 2), and the pieces of its fight. wEntityPrivate1
+;@ says which piece this entity is: 0 the bottle, 1 the Genie, 2 the cloud of smoke it comes out of / goes
+;@ back into, 3 a flame that hops from its hand, 4 a fireball thrown at Link.
+;@ test: skip dispatches through a jump table into the whole boss
+GenieHandler::
+;> Call_380E()                       # keep Link inside the boss arena
 	call Call_380E
+;> Call_3F12()
 	call Call_3F12
-	ld hl, $c2b0
+;> return GeniePartHandlers[wEntityPrivate1[slot]](slot)
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	rst $00
 
-JumpTable_04_4015::
-	dw Jump_04_401F
-	dw Jump_04_42D2
-	dw Jump_04_4833
-	dw Jump_04_48D0
-	dw Jump_04_4936
+;@ path: boss/genie
+;@ Handler of each piece of the Genie fight, indexed by wEntityPrivate1.
+GeniePartHandlers::
+	dw GenieBottle
+	dw Genie
+	dw GenieSmoke
+	dw GenieHandFlame
+	dw GenieFireball
 
-Jump_04_401F::
-	ld hl, $c440
+;@ def GenieBottle(slot: c)
+;@ path: boss/genie
+;@ The Genie's bottle. It waits until Link walks up, hops to the middle of the room and lets the Genie
+;@ out; after the Genie goes back in it hops after Link and can be lifted with the Power Bracelet and
+;@ thrown. Once it has been smashed three times (wEntityPrivate4, counted by the throw code) it breaks and
+;@ the Genie comes out for good. wEntityWorkRAM[2] keeps the bottle's slot for the other pieces.
+;@ test: skip spawns entities and dispatches through a jump table
+GenieBottle::
+;> if wEntityPrivate4[slot] >= 3:        # smashed three times: the bottle breaks
+	ld hl, wEntityPrivate4
 	add hl, bc
 	ld a, [hl]
 	cp $03
-	jr c, jr_004_4057
-
+	jr c, .whole
+;>     new = Call_3C01(0x5C)              # spawn a smoke cloud (no check for a full entity table)
 	ld a, $5c
 	call Call_3C01
-	ldh a, [$ffd7]
-	ld hl, $c200
+;>     wEntityX[new] = hMultiPurpose0
+	ldh a, [hMultiPurpose0]
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ldh a, [$ffd8]
-	ld hl, $c210
+;>     wEntityY[new] = hMultiPurpose1 - 0x18
+	ldh a, [hMultiPurpose1]
+	ld hl, wEntityY
 	add hl, de
 	sub $18
 	ld [hl], a
-	ld hl, $c2b0
+;>     wEntityPrivate1[new] = 2           # smoke that lets the Genie out
+	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $02
-	ld hl, $c2e0
+;>     wEntityTimer[new] = 0x27
+	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $27
-	ld hl, $c360
+;>     wEntityHealth[new] = 8
+	ld hl, wEntityHealth
 	add hl, de
 	ld [hl], $08
+;>     Call_3E64()                        # shards of the bottle, removes it
 	call Call_3E64
+;>     hNoiseSfx = 0x29
 	ld a, $29
-	ldh [$fff4], a
+	ldh [hNoiseSfx], a
+;>     return
 	ret
 
 
-jr_004_4057:
-	ld hl, $c360
+.whole
+;> wEntityHealth[slot] = 0x20                # cannot be destroyed by hits
+	ld hl, wEntityHealth
 	add hl, bc
 	ld [hl], $20
+;> wEntityWorkRAM[2] = slot
 	ld a, c
-	ld [$d002], a
-	call Call_04_429C
-	call Call_04_7F36
-	ld hl, $c340
+	ld [wEntityWorkRAM + 2], a
+;> DrawGenieBottle(slot)
+	call DrawGenieBottle
+;> if ReturnIfNonInteractive_04(): return
+	call ReturnIfNonInteractive_04
+;> wEntityPhysicsFlags[slot] = 0x81
+	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $81
-	ld hl, $c350
+;> wEntityHitboxFlags[slot] = 0x80
+	ld hl, wEntityHitboxFlags
 	add hl, bc
 	ld [hl], $80
-	call Call_04_6DD6
-	ld hl, $c320
+;> AddEntityZSpeedToPos_04(slot)
+	call AddEntityZSpeedToPos_04
+;> wEntitySpeedZ[slot] -= 2                 # gravity
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	dec [hl]
 	dec [hl]
-	ld hl, $c310
+;> landed = wEntityZ[slot]                  # kept in $FFE8; negative = it just hit the floor
+	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
-	ldh [$ffe8], a
+	ldh [hBGTilesRequestCopy], a
+;> if landed & 0x80:
 	and $80
-	jr z, jr_004_408e
-
+	jr z, .states
+;>     wEntityZ[slot] = 0
 	xor a
 	ld [hl], a
-	ld hl, $c320
+;>     wEntitySpeedZ[slot] = 0
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], b
 
-jr_004_408e:
-	ldh a, [$fff0]
+.states
+;> return GenieBottleStates[hActiveEntityState](slot, landed)
+	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_04_4091::
-	dw Jump_04_4099
-	dw Jump_04_40AC
-	dw Jump_04_415F
-	dw Jump_04_41FD
+;@ path: boss/genie
+;@ States of the Genie's bottle.
+GenieBottleStates::
+	dw GenieBottleWaitForLink
+	dw GenieBottleReleaseGenie
+	dw GenieBottleLiftable
+	dw GenieBottleHopTowardsLink
 
-Jump_04_4099::
-	ldh a, [$ff99]
+;@ def GenieBottleWaitForLink(slot: c)
+;@ path: boss/genie
+;@ Bottle state 0: waits until Link has walked into the upper part of the room (y below $70).
+GenieBottleWaitForLink::
+;> if hLinkY < 0x70:
+	ldh a, [hLinkY]
 	cp $70
-	jr nc, jr_004_40a7
-
+	jr nc, .done
+;>     wEntityState[slot] += 1
 	call Call_3B8D
-	call Call_0891
+;>     wEntityTimer[slot] = 0xFF
+	call GetEntityTimer
 	ld [hl], $ff
 
-jr_004_40a7:
+.done
+;> return
 	ret
 
 
+;@ path: boss/genie
+;@ Sprite variant of the bottle for each 8-frame step of its wobble: 0 upright, 1 tilted left,
+;@ 2 tilted right (1 byte each, see GenieBottleSprites).
+GenieBottleWobbleFrames::
 	db $00, $01, $00, $02
 
-Jump_04_40AC::
-	call Call_08E2
+;@ def GenieBottleReleaseGenie(slot: c, landed)
+;@ path: boss/genie
+;@ Bottle state 1: hops to the middle of the room ($50, $48), bouncing Link away when he touches it,
+;@ and when its timer is down to 1 releases a smoke cloud with the Genie in it.
+;@ test: skip spawns entities and calls bank-3 collision code
+GenieBottleReleaseGenie::
+;> DecrementEntityIgnoreHitsTimer(slot)                          # count down the hit immunity
+	call DecrementEntityIgnoreHitsTimer
+;> Call_3BEB(slot)                          # hits from Link's weapons
 	call Call_3BEB
+;> if Call_3BBF(slot):                      # Link touches the bottle: bounce him away
 	call Call_3BBF
-	jr nc, jr_004_40d0
-
-	call Call_0942
+	jr nc, .noTouch
+;>     ResetPegasusBoots()                          # stop the Pegasus Boots run
+	call ResetPegasusBoots
+;>     hJingle = 0x09
 	ld a, $09
-	ldh [$fff2], a
+	ldh [hJingle], a
+;>     wLinkPushedTimer = 0x10
 	ld a, $10
-	ld [$c13e], a
+	ld [wLinkPushedTimer], a
+;>     Call_3C30(0x14)                      # vector of speed $14 towards Link
 	ld a, $14
 	call Call_3C30
-	ldh a, [$ffd7]
-	ldh [$ff9b], a
-	ldh a, [$ffd8]
-	ldh [$ff9a], a
+;>     hLinkSpeedY = hMultiPurpose0
+	ldh a, [hMultiPurpose0]
+	ldh [hLinkSpeedY], a
+;>     hLinkSpeedX = hMultiPurpose1
+	ldh a, [hMultiPurpose1]
+	ldh [hLinkSpeedX], a
 
-jr_004_40d0:
-	ld hl, $c2d0
+.noTouch
+;> if wEntityPrivate3[slot] == 0:           # not yet in the middle of the room
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr nz, jr_004_4121
-
-	ldh a, [$ffe8]
+	jr nz, .release
+;>     if landed & 0x80:
+	ldh a, [hBGTilesRequestCopy]
 	and $80
-	jr z, jr_004_40e8
-
-	ld hl, $c320
+	jr z, .move
+;>         wEntitySpeedZ[slot] = 0x10       # hop again
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], $10
+;>         hJingle = 0x20
 	ld a, $20
-	ldh [$fff2], a
+	ldh [hJingle], a
 
-jr_004_40e8:
-	ldh a, [$ff98]
+.move
+;>     savedX = hLinkX                      # aim at the room centre instead of at Link
+	ldh a, [hLinkX]
 	push af
+;>     hLinkX = 0x50
 	ld a, $50
-	ldh [$ff98], a
-	ldh a, [$ff99]
+	ldh [hLinkX], a
+;>     savedY = hLinkY
+	ldh a, [hLinkY]
 	push af
+;>     hLinkY = 0x48
 	ld a, $48
-	ldh [$ff99], a
+	ldh [hLinkY], a
+;>     Call_3C25(0x08)                      # speed 8 towards that point
 	ld a, $08
 	call Call_3C25
-	ldh a, [$ffee]
-	ld hl, $ff98
+;>@and     if (hActiveEntityX - hLinkX + 2) & 0xFF < 4 and (hActiveEntityY - hLinkY + 2) & 0xFF < 4:
+	ldh a, [hActiveEntityX]
+	ld hl, hLinkX
 	sub [hl]
 	add $02
 	cp $04
-	jr nc, jr_004_4118
-
-	ldh a, [$ffef]
-	ld hl, $ff99
+	jr nc, .restore
+;=@and
+	ldh a, [hActiveEntityY]
+	ld hl, hLinkY
 	sub [hl]
 	add $02
 	cp $04
-	jr nc, jr_004_4118
-
-	ld hl, $c2d0
+	jr nc, .restore
+;>         wEntityPrivate3[slot] += 1       # arrived
+	ld hl, wEntityPrivate3
 	add hl, bc
 	inc [hl]
 
-jr_004_4118:
+.restore
+;>     hLinkY = savedY
 	pop af
-	ldh [$ff99], a
+	ldh [hLinkY], a
+;>     hLinkX = savedX
 	pop af
-	ldh [$ff98], a
-	call Call_04_6D9D
+	ldh [hLinkX], a
+;>     UpdateEntityPosWithSpeed_04(slot)
+	call UpdateEntityPosWithSpeed_04
 
-jr_004_4121:
-	call Call_0891
+.release
+;> if wEntityTimer[slot] == 1:
+	call GetEntityTimer
 	cp $01
-	jr nz, jr_004_414d
-
+	jr nz, AnimateGenieBottle
+;>     new = Call_3C01(0x5C)                # the smoke cloud the Genie comes out of
 	ld a, $5c
 	call Call_3C01
-	ldh a, [$ffd7]
-	ld hl, $c200
+;>     wEntityX[new] = hMultiPurpose0
+	ldh a, [hMultiPurpose0]
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ldh a, [$ffd8]
-	ld hl, $c210
+;>     wEntityY[new] = hMultiPurpose1 - 0x26
+	ldh a, [hMultiPurpose1]
+	ld hl, wEntityY
 	add hl, de
 	sub $26
 	ld [hl], a
-	ld hl, $c2b0
+;>     wEntityPrivate1[new] = 2
+	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $02
-	ld hl, $c2e0
+;>     wEntityTimer[new] = 0x47
+	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $47
+;>     hJingle = 0x06
 	ld a, $06
-	ldh [$fff2], a
+	ldh [hJingle], a
+;> AnimateGenieBottle(slot)                 # (falls through)
 
-Jump_004_414d:
-jr_004_414d:
-	ldh a, [$ffe7]
+;@ def AnimateGenieBottle(slot: c)
+;@ path: boss/genie
+;@ Wobbles the bottle: picks its sprite variant from GenieBottleWobbleFrames, one step every 8 frames.
+AnimateGenieBottle::
+;>@v Call_3B87(GenieBottleWobbleFrames[(hFrameCounter >> 3) & 3])   # set the sprite variant
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $03
 	ld e, a
+;=@v
 	ld d, b
-	ld hl, $40a8
+	ld hl, GenieBottleWobbleFrames
 	add hl, de
 	ld a, [hl]
 	call Call_3B87
 	ret
 
 
-Jump_04_415F::
-	call Call_0891
-	jr z, jr_004_4194
-
+;@ def GenieBottleLiftable(slot: c)
+;@ path: boss/genie
+;@ Bottle state 2: the Genie is inside (or the bottle was just hit). It shakes for a while, then lies still;
+;@ Link can lift it with the Power Bracelet (in either button slot, button held while touching it). When
+;@ the timer is down to 1 the bottle starts hopping after Link (state 3).
+;@ test: skip calls bank-3 collision code
+GenieBottleLiftable::
+;> t = wEntityTimer[slot]
+	call GetEntityTimer
+;> if t != 0:
+	jr z, .lift
+;>     if t == 1:
 	dec a
-	jr nz, jr_004_416d
-
+	jr nz, .shake
+;>         wEntityState[slot] = 3
 	call Call_3B8D
 	ld [hl], $03
+;>         return
 	ret
 
 
-jr_004_416d:
-	ld hl, $c310
+.shake
+;>     moving = wEntityZ[slot] != 0         # still in the air
+	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr nz, jr_004_418e
-
+;>     if not moving:
+	jr nz, .fly
+;>         Call_3DAF(slot)                  # stop
 	call Call_3DAF
-	call Call_0891
+;>         if wEntityTimer[slot] < 0x28:    # the last $28 frames: shake
+	call GetEntityTimer
 	cp $28
-	jr nc, jr_004_4191
-
+	jr nc, .physics
+;>             moving = True
+;>             shake = 0xF8 if hFrameCounter & 4 else 0x08     # left and right every 4 frames
 	ld e, $08
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $04
-	jr z, jr_004_4189
-
+	jr z, .setShake
 	ld e, $f8
-
-jr_004_4189:
-	ld hl, $c240
+.setShake
+;>             wEntitySpeedX[slot] = shake
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], e
 
-jr_004_418e:
-	call Call_04_6D9D
+.fly
+;>     if moving:
+;>         UpdateEntityPosWithSpeed_04(slot)
+	call UpdateEntityPosWithSpeed_04
 
-jr_004_4191:
+.physics
+;>     Call_3B9E(slot)                      # walls and floor
 	call Call_3B9E
 
-jr_004_4194:
-	call Call_08E2
+.lift
+;> DecrementEntityIgnoreHitsTimer(slot)
+	call DecrementEntityIgnoreHitsTimer
+;> Call_3BEB(slot)
 	call Call_3BEB
-	call Call_04_7B6B
-	ldh a, [$ffee]
-	ld hl, $ff98
+;> BlockLinkAtEntity_04(slot)                       # Link cannot walk through it
+	call BlockLinkAtEntity_04
+;>@and2 if (hActiveEntityX - hLinkX + 0x10) & 0xFF < 0x20 and (hActiveEntityDrawY - hLinkY + 0x10) & 0xFF < 0x20:
+	ldh a, [hActiveEntityX]
+	ld hl, hLinkX
 	sub [hl]
 	add $10
 	cp $20
-	jr nc, jr_004_41f8
-
-	ldh a, [$ffec]
-	ld hl, $ff99
+	jr nc, .done
+;=@and2
+	ldh a, [hActiveEntityDrawY]
+	ld hl, hLinkY
 	sub [hl]
 	add $10
 	cp $20
-	jr nc, jr_004_41f8
-
-	call Call_0942
-	ld a, [$db00]
+	jr nc, .done
+;>     ResetPegasusBoots()
+	call ResetPegasusBoots
+;>@bracelet     if (wItemB == 3 and hJoypadHeld & 0x20) or (wItemB != 3 and wItemA == 3 and hJoypadHeld & 0x10):   # Power Bracelet button held
+	ld a, [wItemB]
 	cp $03
-	jr nz, jr_004_41c7
-
-	ldh a, [$ffcb]
+	jr nz, .tryA
+;=@bracelet
+	ldh a, [hJoypadHeld]
 	and $20
-	jr nz, jr_004_41d4
-
-	jr jr_004_41f8
-
-jr_004_41c7:
-	ld a, [$db01]
+	jr nz, .tryLift
+	jr .done
+.tryA
+;=@bracelet
+	ld a, [wItemA]
 	cp $03
-	jr nz, jr_004_41f8
-
-	ldh a, [$ffcb]
+	jr nz, .done
+;=@bracelet
+	ldh a, [hJoypadHeld]
 	and $10
-	jr z, jr_004_41f8
-
-jr_004_41d4:
-	ld a, [$c3cf]
+	jr z, .done
+.tryLift
+;>         if wLinkIsCarrying == 0:         # Link is not carrying anything yet
+	ld a, [wLinkIsCarrying]
 	and a
-	jr nz, jr_004_41f8
-
+	jr nz, .done
+;>             wLinkIsCarrying = 1
 	inc a
-	ld [$c3cf], a
-	ld hl, $c280
+	ld [wLinkIsCarrying], a
+;>             wEntityStatus[slot] = 7      # lifted
+	ld hl, wEntityStatus
 	add hl, bc
 	ld [hl], $07
-	ld hl, $c490
+;>             mem[0xC490 + slot] = 0
+	ld hl, wEntityLiftStep
 	add hl, bc
 	ld [hl], b
-	ldh a, [$ff9e]
-	ld [$c15d], a
-	ld hl, $fff3
+;>             wLiftDirection = hLinkDirection
+	ldh a, [hLinkDirection]
+	ld [wLiftDirection], a
+;>             hWaveSfx = 0x02
+	ld hl, hWaveSfx
 	ld [hl], $02
-	call Call_0891
+;>             wEntityTimer[slot] = 8
+	call GetEntityTimer
 	ld [hl], $08
 
-jr_004_41f8:
+.done
+;> Call_3B87(0)                             # upright
 	xor a
 	call Call_3B87
 	ret
 
 
-Jump_04_41FD::
-	ld hl, $c420
+;@ def GenieBottleHopTowardsLink(slot: c, landed)
+;@ path: boss/genie
+;@ Bottle state 3: hops after Link. A hit makes it jump away from Link and lie still (state 2,
+;@ timer $C0) so it can be lifted.
+;@ test: skip calls bank-3 collision code
+GenieBottleHopTowardsLink::
+;> if wEntityFlashTimer[slot] != 0:          # just hit
+	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_004_422e
-
+	jr z, .hop
+;>     wEntityFlashTimer[slot] = 0
 	ld [hl], b
+;>     wEntityState[slot] = 2
 	call Call_3B8D
 	ld [hl], $02
-	ld hl, $c320
+;>     wEntitySpeedZ[slot] = 0x20
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], $20
+;>     Call_3C30(0x08)                      # vector towards Link ...
 	ld a, $08
 	call Call_3C30
-	ldh a, [$ffd7]
+;>     wEntitySpeedY[slot] = -hMultiPurpose0  # ... and fly the other way
+	ldh a, [hMultiPurpose0]
 	cpl
 	inc a
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
-	ldh a, [$ffd8]
+;>     wEntitySpeedX[slot] = -hMultiPurpose1
+	ldh a, [hMultiPurpose1]
 	cpl
 	inc a
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
-	call Call_0891
+;>     wEntityTimer[slot] = 0xC0
+	call GetEntityTimer
 	ld [hl], $c0
+;>     return
 	ret
 
 
-jr_004_422e:
-	call Call_04_6D53
-	ld hl, $c340
+.hop
+;> ApplyRecoilIfNeeded_04(slot)
+	call ApplyRecoilIfNeeded_04
+;> wEntityPhysicsFlags[slot] = 0x01
+	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $01
-	ld hl, $c350
+;> wEntityHitboxFlags[slot] = 0x00
+	ld hl, wEntityHitboxFlags
 	add hl, bc
 	ld [hl], $00
-	ld hl, $c430
+;> wEntityOptions1[slot] = 0x00             # options cleared for the collision checks only
+	ld hl, wEntityOptions1
 	add hl, bc
 	ld [hl], $00
+;> Call_3BB4(slot)                          # Link touching it, weapon hits
 	call Call_3BB4
-	ld hl, $c430
+;> wEntityOptions1[slot] = 0xD0
+	ld hl, wEntityOptions1
 	add hl, bc
 	ld [hl], $d0
-	ldh a, [$ffe8]
+;> if landed & 0x80:
+	ldh a, [hBGTilesRequestCopy]
 	and $80
-	jr z, jr_004_4261
-
-	ld hl, $c320
+	jr z, .move
+;>     wEntitySpeedZ[slot] = 0x10
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], $10
+;>     hJingle = 0x20
 	ld a, $20
-	ldh [$fff2], a
+	ldh [hJingle], a
+;>     Call_3C25(0x0C)                      # next hop towards Link
 	ld a, $0c
 	call Call_3C25
 
-jr_004_4261:
-	call Call_04_6D9D
+.move
+;> UpdateEntityPosWithSpeed_04(slot)
+	call UpdateEntityPosWithSpeed_04
+;> Call_3B9E(slot)
 	call Call_3B9E
-	jp Jump_004_414d
+;> return AnimateGenieBottle(slot)
+	jp AnimateGenieBottle
 
 
+;@ path: boss/genie
+;@ Sprites of the bottle: 3 variants (upright, tilted left, tilted right) of 4 sprites, 16 bytes each.
+;@ Each sprite: y offset, x offset (signed, from the entity position), tile, OAM attributes
+;@ (bit 5 = x flip). Drawn by DrawGenieBottle.
+GenieBottleSprites::
 	db $f0, $00, $76, $00, $f0, $08, $76, $20, $00, $00, $78, $00, $00, $08, $78, $20
 	db $f0, $00, $7a, $00, $f0, $08, $7c, $00, $00, $00, $7e, $00, $00, $08, $7e, $20
 	db $f0, $00, $7c, $20, $f0, $08, $7a, $20, $00, $00, $7e, $00, $00, $08, $7e, $20
+;@ path: boss/genie
+;@ Shadow drawn under the bottle while it is in the air: one 8x16 sprite, tile $26, attributes 0.
+GenieBottleShadowSprite::
 	db $26, $00
 
-Call_04_429C::
-	ld hl, $c3b0
+;@ def DrawGenieBottle(slot: c)
+;@ path: boss/genie
+;@ Draws the bottle (4 sprites of GenieBottleSprites for its variant) and, while it is in the air, its
+;@ shadow on the floor 10 pixels below its position.
+;@ test: skip writes OAM through bank-0 sprite code
+DrawGenieBottle::
+;>@d Call_3D26(GenieBottleSprites + (wEntitySpriteVariant[slot] << 4), 4)   # draw a list of 4 sprites
+	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	rla
 	rla
 	rla
+;=@d
 	rla
 	and $f0
 	ld e, a
 	ld d, b
-	ld hl, $426a
+	ld hl, GenieBottleSprites
 	add hl, de
+;=@d
 	ld c, $04
 	call Call_3D26
+;> Call_3DD0(4)                             # those 4 OAM entries are used
 	ld a, $04
 	call Call_3DD0
-	ld hl, $c310
+;> if wEntityZ[slot] != 0:
+	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_004_42d1
-
-	ldh a, [$ffef]
+	jr z, .done
+;>     hActiveEntityDrawY = hActiveEntityY + 10
+	ldh a, [hActiveEntityY]
 	add $0a
-	ldh [$ffec], a
+	ldh [hActiveEntityDrawY], a
+;>     hActiveEntitySpriteVariant = 0
 	xor a
-	ldh [$fff1], a
-	ld de, $429a
+	ldh [hActiveEntitySpriteVariant], a
+;>     Call_3CD0(GenieBottleShadowSprite)   # one 8x16 sprite
+	ld de, GenieBottleShadowSprite
 	call Call_3CD0
+;>     Call_3DBA(slot)                      # reload the entity's position into hActiveEntity*
 	call Call_3DBA
 
-jr_004_42d1:
+.done
+;> return
 	ret
 
 
-Jump_04_42D2::
-	call Call_04_46EC
-	ldh a, [$ffea]
+;@ def Genie(slot: c)
+;@ path: boss/genie
+;@ The Genie itself (piece 1). It floats around throwing flames and fireballs, then flies back into its
+;@ bottle; once the bottle is broken it fights in the open (states 4 and 5). When its health runs out the
+;@ entity code changes its status, and this handler then plays the death: it flashes, explodes and leaves
+;@ a heart container.
+;@ test: skip dispatches through jump tables into the whole boss
+Genie::
+;> DrawGenie(slot)
+	call DrawGenie
+;> if hActiveEntityStatus == 5:             # alive
+;>     return GenieActive(slot)
+	ldh a, [hActiveEntityStatus]
 	cp $05
-	jr z, jr_004_4309
-
-	ld hl, $c420
+	jr z, GenieActive
+;> wEntityFlashTimer[slot] = hFrameCounter   # defeated: keeps flashing
+	ld hl, wEntityFlashTimer
 	add hl, bc
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	ld [hl], a
-	ldh a, [$fff0]
+;> return GenieDeathStates[hActiveEntityState](slot)
+	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_04_42E5::
-	dw Jump_04_42EB
-	dw Jump_04_42F4
-	dw Jump_04_42FF
+;@ path: boss/genie
+;@ States of the Genie's death.
+GenieDeathStates::
+	dw GenieDeathStart
+	dw GenieDeathWait
+	dw GenieDeathExplode
 
-Jump_04_42EB::
-	call Call_0891
+;@ def GenieDeathStart(slot: c)
+;@ path: boss/genie
+;@ Death state 0: wait $40 frames.
+GenieDeathStart::
+;> wEntityTimer[slot] = 0x40
+	call GetEntityTimer
 	ld [hl], $40
+;> wEntityState[slot] += 1
 	call Call_3B8D
 	ret
 
 
-Jump_04_42F4::
-	call Call_0891
-	jr nz, jr_004_42fe
-
+;@ def GenieDeathWait(slot: c)
+;@ path: boss/genie
+;@ Death state 1: when the wait is over, explode for $A0 frames.
+GenieDeathWait::
+;> if wEntityTimer[slot] == 0:
+	call GetEntityTimer
+	jr nz, .done
+;>     wEntityTimer[slot] = 0xA0
 	ld [hl], $a0
+;>     wEntityState[slot] += 1
 	call Call_3B8D
 
-jr_004_42fe:
+.done
+;> return
 	ret
 
 
-Jump_04_42FF::
-	call Call_0891
-	jp z, Jump_004_5746
-
-	call Call_04_50F3
+;@ def GenieDeathExplode(slot: c)
+;@ path: boss/genie
+;@ Death state 2: explosions around the Genie; at the end it turns into a heart container.
+GenieDeathExplode::
+;> if wEntityTimer[slot] == 0:
+	call GetEntityTimer
+;>     return BossDropHeartContainer_04(slot)
+	jp z, BossDropHeartContainer_04
+;> BossDeathExplosion_04(wEntityTimer[slot])    # an explosion every 8 frames
+	call BossDeathExplosion_04
 	ret
 
 
-jr_004_4309:
-	call Call_04_7F36
-	ld hl, $c240
+;@ def GenieActive(slot: c)
+;@ path: boss/genie
+;@ The living Genie: shares its speed with the hand flames, hurts Link on touch (except in state 5)
+;@ and runs its state.
+;@ test: skip dispatches through a jump table
+GenieActive::
+;> if ReturnIfNonInteractive_04(): return
+	call ReturnIfNonInteractive_04
+;> wEntityWorkRAM = wEntitySpeedX[slot]         # the hand flames ride along with the Genie
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
-	ld [$d000], a
-	ld hl, $c250
+	ld [wEntityWorkRAM], a
+;> wSceneVar1 = wEntitySpeedY[slot]             # ($D001)
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
-	ld [$d001], a
-	ldh a, [$fff0]
+	ld [wSceneVar1], a
+;> if hActiveEntityState != 5:
+	ldh a, [hActiveEntityState]
 	cp $05
-	jr z, jr_004_4325
-
+	jr z, .states
+;>     Call_3BBF(slot)                          # touching the Genie hurts Link
 	call Call_3BBF
 
-jr_004_4325:
-	ldh a, [$fff0]
+.states
+;> return GenieStates[hActiveEntityState](slot)
+	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_04_4328::
-	dw Jump_04_4334
-	dw Jump_04_4371
-	dw Jump_04_4492
-	dw Jump_04_44DC
-	dw Jump_04_450A
-	dw Jump_04_4568
+;@ path: boss/genie
+;@ States of the Genie.
+GenieStates::
+	dw GenieTaunt
+	dw GenieThrowFlames
+	dw GenieReturnToBottle
+	dw GenieEnterBottle
+	dw GenieChaseLink
+	dw GenieCircleRoom
 
-Jump_04_4334::
-	call Call_0891
-	jr nz, jr_004_4360
-
+;@ def GenieTaunt(slot: c)
+;@ path: boss/genie
+;@ State 0: when the Genie has come out of its smoke it speaks. If the bottle (its slot in wSceneVar2)
+;@ still exists it says dialogue $52 and starts throwing (state 1); if the bottle is gone it says $53 and
+;@ fights with 8 hit points (state 4).
+;@ test: skip opens a dialogue
+GenieTaunt::
+;> if wEntityTimer[slot] == 0:
+	call GetEntityTimer
+	jr nz, .done
+;>     wEntityState[slot] += 1
 	call Call_3B8D
-	call Call_088C
+;>     wEntityTimer1[slot] = 0xFF
+	call GetEntityTimer1
 	ld [hl], $ff
-	ld a, [$d002]
+;>     text = 0x52
+;>@if     if wEntityStatus[wSceneVar2] == 0:       # the bottle has broken
+	ld a, [wSceneVar2]
 	ld e, a
 	ld d, b
-	ld hl, $c280
+	ld hl, wEntityStatus
 	add hl, de
 	ld a, [hl]
+;=@if
 	and a
 	ld a, $52
-	jr nz, jr_004_435d
-
+	jr nz, .say
+;>         wEntityState[slot] = 4
 	call Call_3B8D
 	ld [hl], $04
-	ld hl, $c360
+;>         wEntityHealth[slot] = 8
+	ld hl, wEntityHealth
 	add hl, bc
 	ld [hl], $08
+;>         text = 0x53
 	ld a, $53
 
-jr_004_435d:
-	call Call_2197
+.say
+;>     OpenDialog(text)
+	call OpenDialog
 
-jr_004_4360:
+.done
+;> return
 	ret
 
 
-	db $10, $14, $18, $20, $28, $30, $38, $40, $ff, $ff, $60, $40, $01, $ff, $08, $f8
+;@ path: boss/genie
+;@ Frames between two hand flames, indexed by the number of fireballs thrown so far (0-7); the last two
+;@ bytes ($FF) are never read.
+GenieFlameDelays::
+	db $10, $14, $18, $20, $28, $30, $38, $40, $ff, $ff
 
-Jump_04_4371::
-	call Call_04_6D9D
-	ld hl, $c380
+;@ path: boss/genie
+;@ X position at which the floating Genie turns around, by its direction (0 moving right: $60, 1 moving
+;@ left: $40).
+GenieTurnX::
+	db $60, $40
+
+;@ path: boss/genie
+;@ Speed step of the floating Genie by direction (+1 / -1); also used for the vertical sway.
+GenieAcceleration::
+	db $01, $ff
+
+;@ path: boss/genie
+;@ Top speed of the floating Genie by direction (+8 / -8, 1/16 pixel per frame).
+GenieMaxSpeed::
+	db $08, $f8
+
+;@ def GenieThrowFlames(slot: c)
+;@ path: boss/genie
+;@ State 1: the Genie sways left and right between x $40 and $60 and up and down, throws a hand flame
+;@ after each delay of GenieFlameDelays and a fireball at Link every $20 frames. After 8 fireballs
+;@ it heads back to the bottle (state 2).
+;@ test: skip spawns entities
+GenieThrowFlames::
+;> UpdateEntityPosWithSpeed_04(slot)
+	call UpdateEntityPosWithSpeed_04
+;> dir = wEntityDirection[slot]
+	ld hl, wEntityDirection
 	add hl, bc
 	ld e, [hl]
 	ld d, b
-	ldh a, [$ffe7]
+;>@if1 if hFrameCounter & 7 == 0 and wEntitySpeedX[slot] != GenieMaxSpeed[dir]:
+	ldh a, [hFrameCounter]
 	and $07
-	jr nz, jr_004_4397
-
-	ld hl, $c240
+	jr nz, .turn
+;=@if1
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
-	ld hl, $436f
+;=@if1
+	ld hl, GenieMaxSpeed
 	add hl, de
 	cp [hl]
-	jr z, jr_004_4397
-
-	ld hl, $436d
+	jr z, .turn
+;>@add     wEntitySpeedX[slot] += GenieAcceleration[dir]
+	ld hl, GenieAcceleration
 	add hl, de
 	ld a, [hl]
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	add [hl]
+;=@add
 	ld [hl], a
 
-jr_004_4397:
-	ld hl, $436b
+.turn
+;> if hActiveEntityX == GenieTurnX[dir]:
+	ld hl, GenieTurnX
 	add hl, de
-	ldh a, [$ffee]
+	ldh a, [hActiveEntityX]
 	cp [hl]
-	jr nz, jr_004_43a8
-
-	ld hl, $c380
+	jr nz, .sway
+;>     wEntityDirection[slot] ^= 1
+	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
 	xor $01
 	ld [hl], a
 
-jr_004_43a8:
-	ldh a, [$ffe7]
+.sway
+;> if hFrameCounter & 1 == 0:                   # vertical sway: wEntityPrivate2 = its direction
+	ldh a, [hFrameCounter]
 	and $01
-	jr nz, jr_004_43ce
-
-	ld hl, $c2c0
+	jr nz, .anim
+;>     vdir = wEntityPrivate2[slot]
+	ld hl, wEntityPrivate2
 	add hl, bc
 	ld e, [hl]
 	ld d, b
-	ld hl, $436d
+;>@sy     wEntitySpeedY[slot] += GenieAcceleration[vdir]
+	ld hl, GenieAcceleration
 	add hl, de
 	ld a, [hl]
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	add [hl]
+;=@sy
 	ld [hl], a
-	ld hl, $436f
+;>     if wEntitySpeedY[slot] == GenieMaxSpeed[vdir]:
+	ld hl, GenieMaxSpeed
 	add hl, de
 	cp [hl]
-	jr nz, jr_004_43ce
-
-	ld hl, $c2c0
+	jr nz, .anim
+;>         wEntityPrivate2[slot] ^= 1
+	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
 	xor $01
 	ld [hl], a
 
-jr_004_43ce:
-	ldh a, [$ffe7]
+.anim
+;>@v Call_3B87((hFrameCounter >> 4) & 1)          # floating frames 0 / 1
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	rra
 	and $01
+;=@v
 	call Call_3B87
-	call Call_0891
-	jr nz, jr_004_4429
-
+;> if wEntityTimer[slot] == 0:
+	call GetEntityTimer
+	jr nz, .fireball
+;>     thrown = wEntityPrivateCounter[slot]
 	push hl
-	ld hl, $c3d0
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	ld e, a
+;>     if thrown >= 8:
 	cp $08
-	jr c, jr_004_43f0
-
+	jr c, .flame
+;>         wEntityState[slot] += 1              # back to the bottle
 	call Call_3B8D
+;>         wEntityTimer[slot] = 0x30
 	pop hl
 	ld [hl], $30
+;>         return
 	ret
 
 
-jr_004_43f0:
+.flame
+;>     wEntityTimer[slot] = GenieFlameDelays[thrown]
 	ld d, b
-	ld hl, $4361
+	ld hl, GenieFlameDelays
 	add hl, de
 	ld a, [hl]
 	pop hl
 	ld [hl], a
+;>     new = Call_3C01(0x5C)
 	ld a, $5c
 	call Call_3C01
-	jr c, jr_004_4429
-
-	ldh a, [$ffd7]
+;>     if new is not None:
+	jr c, .fireball
+;>         wEntityX[new] = hMultiPurpose0 - 0x0C
+	ldh a, [hMultiPurpose0]
 	sub $0c
-	ld hl, $c200
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ldh a, [$ffd8]
+;>         wEntityY[new] = hMultiPurpose1 - 0x14
+	ldh a, [hMultiPurpose1]
 	sub $14
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-	ld hl, $c2b0
+;>         wEntityPrivate1[new] = 3             # hand flame
+	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $03
-	ld hl, $c320
+;>         wEntitySpeedZ[new] = 0x20
+	ld hl, wEntitySpeedZ
 	add hl, de
 	ld [hl], $20
-	ld hl, $c240
+;>         wEntitySpeedX[new] = 0x0C
+	ld hl, wEntitySpeedX
 	add hl, de
 	ld [hl], $0c
-	ld hl, $c340
+;>         wEntityPhysicsFlags[new] = 0x42
+	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], $42
 
-jr_004_4429:
-	call Call_088C
-	jr nz, jr_004_4478
-
+.fireball
+;> if wEntityTimer1[slot] == 0:
+	call GetEntityTimer1
+	jr nz, .pose
+;>     wEntityTimer1[slot] = 0x20
 	ld [hl], $20
+;>     new = Call_3C01(0x5C)
 	ld a, $5c
 	call Call_3C01
-	jr c, jr_004_4478
-
+;>     if new is not None:
+	jr c, .pose
+;>@hand         hand = wEntityPrivateCounter[slot] & 1   # throws with the left and the right hand in turn
 	push bc
-	ld hl, $c3d0
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
+;>         wEntityPrivateCounter[slot] += 1
 	inc [hl]
+;=@hand
 	and $01
 	ld c, a
-	ld hl, $4490
+;>@x         wEntityX[new] = hMultiPurpose0 + GenieFireballOffsetX[hand]
+	ld hl, GenieFireballOffsetX
 	add hl, bc
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	add [hl]
-	ld hl, $c200
+	ld hl, wEntityX
+	add hl, de
+;=@x
+	ld [hl], a
+;>         wEntityY[new] = hMultiPurpose1
+	ldh a, [hMultiPurpose1]
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-	ldh a, [$ffd8]
-	ld hl, $c210
-	add hl, de
-	ld [hl], a
-	ld hl, $c320
+;>         wEntitySpeedZ[new] = 0x24
+	ld hl, wEntitySpeedZ
 	add hl, de
 	ld [hl], $24
-	ld hl, $c2b0
+;>         wEntityPrivate1[new] = 4             # fireball
+	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $04
-	ld hl, $c340
+;>         wEntityPhysicsFlags[new] = 0x12
+	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], $12
+;>         Call_3C25(0x1F, slot=new)            # aim it at Link, speed $1F
 	push de
 	pop bc
 	ld a, $1f
 	call Call_3C25
 	pop bc
-	ld hl, $c300
+;>         wEntityTimer2[slot] = 0x10           # throwing pose
+	ld hl, wEntityTimer2
 	add hl, bc
 	ld [hl], $10
+;>         hNoiseSfx = 0x28
 	ld a, $28
-	ldh [$fff4], a
+	ldh [hNoiseSfx], a
 
-jr_004_4478:
-	ld hl, $c300
+.pose
+;> if wEntityTimer2[slot] != 0:
+	ld hl, wEntityTimer2
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_004_448f
-
-	ld hl, $c3d0
+	jr z, .done
+;>@p     Call_3B87(2 if wEntityPrivateCounter[slot] & 1 == 0 else 3)   # arm raised, by hand
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	and $01
 	ld a, $02
-	jr z, jr_004_448c
-
+	jr z, .setPose
+;=@p
 	inc a
-
-jr_004_448c:
+.setPose
 	call Call_3B87
 
-jr_004_448f:
+.done
+;> return
 	ret
 
 
+;@ path: boss/genie
+;@ X offset of a new fireball from the Genie, by the hand that throws it (-12 / +12 pixels).
+GenieFireballOffsetX::
 	db $f4, $0c
 
-Jump_04_4492::
-	ld a, [$d002]
+;@ def GenieReturnToBottle(slot: c)
+;@ path: boss/genie
+;@ State 2: flies at speed $10 to the point $20 pixels above the bottle; when it is within 3 pixels
+;@ it goes on to state 3 with a timer of $10.
+;@ test: skip calls bank-3 movement code
+GenieReturnToBottle::
+;> bottle = wSceneVar2
+	ld a, [wSceneVar2]
 	ld e, a
 	ld d, b
-	ldh a, [$ff98]
+;> savedX = hLinkX                              # aim at the bottle instead of at Link
+	ldh a, [hLinkX]
 	push af
-	ld hl, $c200
+;> hLinkX = wEntityX[bottle]
+	ld hl, wEntityX
 	add hl, de
 	ld a, [hl]
-	ldh [$ff98], a
-	ldh a, [$ff99]
+	ldh [hLinkX], a
+;> savedY = hLinkY
+	ldh a, [hLinkY]
 	push af
-	ld hl, $c210
+;> hLinkY = wEntityY[bottle] - 0x20
+	ld hl, wEntityY
 	add hl, de
 	ld a, [hl]
 	sub $20
-	ldh [$ff99], a
+	ldh [hLinkY], a
+;> Call_3C25(0x10)
 	ld a, $10
 	call Call_3C25
-	call Call_04_6D9D
-	ld hl, $ff98
-	ldh a, [$ffee]
+;> UpdateEntityPosWithSpeed_04(slot)
+	call UpdateEntityPosWithSpeed_04
+;>@near if (hActiveEntityX - hLinkX + 3) & 0xFF < 6 and (hActiveEntityDrawY - hLinkY + 3) & 0xFF < 6:
+	ld hl, hLinkX
+	ldh a, [hActiveEntityX]
 	sub [hl]
 	add $03
 	cp $06
-	jr nc, jr_004_44d5
-
-	ld hl, $ff99
-	ldh a, [$ffec]
+	jr nc, .restore
+;=@near
+	ld hl, hLinkY
+	ldh a, [hActiveEntityDrawY]
 	sub [hl]
 	add $03
 	cp $06
-	jr nc, jr_004_44d5
-
-	call Call_0891
+	jr nc, .restore
+;>     wEntityTimer[slot] = 0x10
+	call GetEntityTimer
 	ld [hl], $10
+;>     wEntityState[slot] += 1
 	call Call_3B8D
 
-jr_004_44d5:
+.restore
+;> hLinkY = savedY
 	pop af
-	ldh [$ff99], a
+	ldh [hLinkY], a
+;> hLinkX = savedX
 	pop af
-	ldh [$ff98], a
+	ldh [hLinkX], a
 	ret
 
 
-Jump_04_44DC::
-	call Call_0891
-	jp z, Call_04_6D4D
-
+;@ def GenieEnterBottle(slot: c)
+;@ path: boss/genie
+;@ State 3: at timer 4 a smoke cloud that shrinks into the bottle appears at the Genie (timer $C7: bit 7
+;@ = shrinking); when the timer runs out the Genie is gone.
+;@ test: skip spawns entities
+GenieEnterBottle::
+;> t = wEntityTimer[slot]
+	call GetEntityTimer
+;> if t == 0:
+;>     return DespawnEntity_04(slot)
+	jp z, DespawnEntity_04
+;> if t == 4:
 	cp $04
-	jr nz, jr_004_4509
-
+	jr nz, .done
+;>     new = Call_3C01(0x5C)                    # (no check for a full entity table)
 	ld a, $5c
 	call Call_3C01
-	ldh a, [$ffd7]
-	ld hl, $c200
+;>     wEntityX[new] = hMultiPurpose0
+	ldh a, [hMultiPurpose0]
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ldh a, [$ffd8]
-	ld hl, $c210
+;>     wEntityY[new] = hMultiPurpose1
+	ldh a, [hMultiPurpose1]
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-	ld hl, $c2b0
+;>     wEntityPrivate1[new] = 2
+	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $02
-	ld hl, $c2e0
+;>     wEntityTimer[new] = 0xC7
+	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $c7
+;>     hJingle = 0x1F
 	ld a, $1f
-	ldh [$fff2], a
+	ldh [hJingle], a
 
-jr_004_4509:
+.done
+;> return
 	ret
 
 
-Jump_04_450A::
-	ld hl, $c350
+;@ def GenieChaseLink(slot: c)
+;@ path: boss/genie
+;@ State 4 (bottle broken): the Genie can be hit; it accelerates towards Link, one step of its speed
+;@ every 4 frames. A hit (flash timer at 2) sends it into state 5 for $80 frames.
+;@ test: skip calls bank-3 collision code
+GenieChaseLink::
+;> wEntityHitboxFlags[slot] = 0x0C
+	ld hl, wEntityHitboxFlags
 	add hl, bc
 	ld [hl], $0c
-	ld hl, $c430
+;> wEntityOptions1[slot] = 0x81
+	ld hl, wEntityOptions1
 	add hl, bc
 	ld [hl], $81
-	ld hl, $c420
+;> if wEntityFlashTimer[slot] == 2:            # just hit
+	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld a, [hl]
 	cp $02
-	jr nz, jr_004_4528
-
+	jr nz, .chase
+;>     wEntityState[slot] += 1
 	call Call_3B8D
-	call Call_0891
+;>     wEntityTimer[slot] = 0x80
+	call GetEntityTimer
 	ld [hl], $80
+;>     return
 	ret
 
 
-jr_004_4528:
-	call Call_04_6D53
+.chase
+;> ApplyRecoilIfNeeded_04(slot)
+	call ApplyRecoilIfNeeded_04
+;> Call_3BEB(slot)
 	call Call_3BEB
-	call Call_04_6D9D
+;> UpdateEntityPosWithSpeed_04(slot)
+	call UpdateEntityPosWithSpeed_04
+;> Call_3B9E(slot)
 	call Call_3B9E
-	ldh a, [$ffe7]
+;> if hFrameCounter & 3 == 0:
+	ldh a, [hFrameCounter]
 	and $03
-	jr nz, jr_004_455b
-
+	jr nz, AnimateGenieArms
+;>     Call_3C30(0x10)                          # vector towards Link
 	ld a, $10
 	call Call_3C30
-	ld hl, $c240
+;>@sx     wEntitySpeedX[slot] += -1 if (hMultiPurpose1 - wEntitySpeedX[slot]) & 0x80 else 1
+	ld hl, wEntitySpeedX
 	add hl, bc
-	ldh a, [$ffd8]
+	ldh a, [hMultiPurpose1]
 	sub [hl]
 	and $80
-	jr z, jr_004_454c
-
+	jr z, .incX
+;=@sx
 	dec [hl]
 	dec [hl]
-
-jr_004_454c:
+.incX
 	inc [hl]
-	ld hl, $c250
+;>@sy     wEntitySpeedY[slot] += -1 if (hMultiPurpose0 - wEntitySpeedY[slot]) & 0x80 else 1
+	ld hl, wEntitySpeedY
 	add hl, bc
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	sub [hl]
 	and $80
-	jr z, jr_004_455a
-
+	jr z, .incY
+;=@sy
 	dec [hl]
 	dec [hl]
-
-jr_004_455a:
+.incY
 	inc [hl]
+;> AnimateGenieArms(slot)                       # (falls through)
 
-Jump_004_455b:
-jr_004_455b:
-	ldh a, [$ffe7]
+;@ def AnimateGenieArms(slot: c)
+;@ path: boss/genie
+;@ Sprite variants 2 and 3 (arms swinging), switching every 16 frames.
+AnimateGenieArms::
+;>@r return Call_3B87(2 + ((hFrameCounter >> 4) & 1))
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	rra
 	and $01
+;=@r
 	add $02
 	jp Call_3B87
 
 
-Jump_04_4568::
-	ld hl, $c340
+;@ def GenieCircleRoom(slot: c)
+;@ path: boss/genie
+;@ State 5, after a hit: for $80 frames the Genie spirals around the middle of the room ($50, $48) and
+;@ is also drawn, every other frame, at the point mirrored through the middle (wEntityPrivate3 /
+;@ wEntityPrivate4), so two Genies seem to circle. Then it reappears at one of the two places at random,
+;@ throws a fireball at Link and chases him again (state 4).
+;@ test: skip spawns entities
+GenieCircleRoom::
+;> wEntityPhysicsFlags[slot] = 0x41
+	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $41
-	call Call_0891
-	jr nz, jr_004_45e4
-
+;> if wEntityTimer[slot] == 0:
+	call GetEntityTimer
+	jr nz, .circle
+;>     wEntityState[slot] = 4
 	call Call_3B8D
 	ld [hl], $04
-	ld hl, $c340
+;>     wEntityPhysicsFlags[slot] = 0x01
+	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $01
-	call Call_27ED
+;>     if GetRandomByte() & 1 == 0:                 # random: jump to the mirrored place
+	call GetRandomByte
 	and $01
-	jr nz, jr_004_4599
-
-	ld hl, $c2d0
+	jr nz, .stop
+;>         wEntityY[slot] = wEntityPrivate3[slot]
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, bc
 	ld [hl], a
-	ld hl, $c440
+;>         wEntityX[slot] = wEntityPrivate4[slot]
+	ld hl, wEntityPrivate4
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c200
+	ld hl, wEntityX
 	add hl, bc
 	ld [hl], a
 
-jr_004_4599:
+.stop
+;>     Call_3DAF(slot)                          # stop
 	call Call_3DAF
-	ld hl, $c410
+;>     wEntityIgnoreHitsTimer[slot] = 0
+	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
 	ld [hl], b
+;>     new = Call_3C01(0x5C)
 	ld a, $5c
 	call Call_3C01
-	jr c, jr_004_45e3
-
+;>     if new is None:
+;>         return
+	jr c, .done
+;>@hand     hand = wEntityPrivateCounter[slot] & 1
 	push bc
-	ld hl, $c3d0
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
+;>     wEntityPrivateCounter[slot] += 1
 	inc [hl]
+;=@hand
 	and $01
 	ld c, a
-	ld hl, $4490
+;>@x     wEntityX[new] = hMultiPurpose0 + GenieFireballOffsetX[hand]
+	ld hl, GenieFireballOffsetX
 	add hl, bc
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	add [hl]
-	ld hl, $c200
+	ld hl, wEntityX
+	add hl, de
+;=@x
+	ld [hl], a
+;>     wEntityY[new] = hMultiPurpose1
+	ldh a, [hMultiPurpose1]
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-	ldh a, [$ffd8]
-	ld hl, $c210
-	add hl, de
-	ld [hl], a
-	ld hl, $c320
+;>     wEntitySpeedZ[new] = 0x24
+	ld hl, wEntitySpeedZ
 	add hl, de
 	ld [hl], $24
-	ld hl, $c2b0
+;>     wEntityPrivate1[new] = 4                 # fireball
+	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $04
-	ld hl, $c340
+;>     wEntityPhysicsFlags[new] = 0x12
+	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], $12
+;>     Call_3C25(0x1F, slot=new)                # aim it at Link
 	push de
 	pop bc
 	ld a, $1f
 	call Call_3C25
 	pop bc
+;>     hNoiseSfx = 0x28
 	ld a, $28
-	ldh [$fff4], a
+	ldh [hNoiseSfx], a
 
-jr_004_45e3:
+.done
+;>     return
 	ret
 
 
-jr_004_45e4:
-	ldh a, [$ff98]
+.circle
+;> savedX = hLinkX                              # measure from the room centre
+	ldh a, [hLinkX]
 	push af
+;> hLinkX = 0x50
 	ld a, $50
-	ldh [$ff98], a
-	ldh a, [$ff99]
+	ldh [hLinkX], a
+;> savedY = hLinkY
+	ldh a, [hLinkY]
 	push af
+;> hLinkY = 0x48
 	ld a, $48
-	ldh [$ff99], a
+	ldh [hLinkY], a
+;> Call_3C30(0x20)                              # vector towards the centre, speed $20
 	ld a, $20
 	call Call_3C30
-	ldh a, [$ffd8]
+;> orbitY = -hMultiPurpose1                     # turned by 90 degrees: around the centre
+	ldh a, [hMultiPurpose1]
 	cpl
 	inc a
 	push af
-	ldh a, [$ffd7]
+;> orbitX = hMultiPurpose0
+	ldh a, [hMultiPurpose0]
 	push af
+;> Call_3C30(0x04)                              # plus a slight pull towards the centre
 	ld a, $04
 	call Call_3C30
-	ld hl, $ffd8
+;> wEntitySpeedX[slot] = orbitX + hMultiPurpose1
+	ld hl, hMultiPurpose1
 	pop af
 	add [hl]
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
-	ld hl, $ffd7
+;> wEntitySpeedY[slot] = orbitY + hMultiPurpose0
+	ld hl, hMultiPurpose0
 	pop af
 	add [hl]
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
+;> hLinkY = savedY
 	pop af
-	ldh [$ff99], a
+	ldh [hLinkY], a
+;> hLinkX = savedX
 	pop af
-	ldh [$ff98], a
-	call Call_04_6D9D
-	call Call_04_4627
-	jp Jump_004_455b
+	ldh [hLinkX], a
+;> UpdateEntityPosWithSpeed_04(slot)
+	call UpdateEntityPosWithSpeed_04
+;> GenieSetMirrorPosition(slot)
+	call GenieSetMirrorPosition
+;> return AnimateGenieArms(slot)
+	jp AnimateGenieArms
 
 
-Call_04_4627::
-	ld hl, $c210
+;@ def GenieSetMirrorPosition(slot: c)
+;@ path: boss/genie
+;@ Stores the Genie's position mirrored through the room centre ($50, $48): wEntityPrivate3 =
+;@ $90 - y, wEntityPrivate4 = $A0 - x.
+GenieSetMirrorPosition::
+;>@y wEntityPrivate3[slot] = (0x48 - (wEntityY[slot] - 0x48)) & 0xFF
+	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	sub $48
 	ld e, a
 	ld a, $48
+;=@y
 	sub e
-	ld hl, $c2d0
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld [hl], a
-	ld hl, $c200
+;>@x wEntityPrivate4[slot] = (0x50 - (wEntityX[slot] - 0x50)) & 0xFF
+	ld hl, wEntityX
 	add hl, bc
 	ld a, [hl]
 	sub $50
 	ld e, a
 	ld a, $50
+;=@x
 	sub e
-	ld hl, $c440
+	ld hl, wEntityPrivate4
 	add hl, bc
 	ld [hl], a
 	ret
 
 
+;@ path: boss/genie
+;@ Sprites of the Genie: 4 variants of 10 sprites (40 bytes each), a block 5 sprites wide and 2 high
+;@ (x offsets -12, -4, 4, 12, 20; y offsets -16 and 0). Each sprite: y offset, x offset, tile, OAM
+;@ attributes (bit 5 = x flip). Variants: 0 and 1 floating (arms down, two poses), 2 right arm raised,
+;@ 3 left arm raised. Drawn by DrawGenie.
+GenieSprites::
 	db $f0, $f4, $60, $00, $f0, $fc, $62, $00, $f0, $04, $64, $00, $f0, $0c, $62, $20
 	db $f0, $14, $60, $20, $00, $f4, $66, $00, $00, $fc, $68, $00, $00, $04, $6a, $00
 	db $00, $0c, $68, $20, $00, $14, $66, $20, $f0, $f4, $60, $00, $f0, $fc, $62, $00
@@ -1032,61 +1432,86 @@ Call_04_4627::
 	db $00, $0c, $70, $00, $00, $14, $72, $00, $f0, $f4, $6e, $20, $f0, $fc, $6c, $20
 	db $f0, $04, $64, $20, $f0, $0c, $62, $20, $f0, $14, $60, $20, $00, $f4, $72, $20
 	db $00, $fc, $70, $20, $00, $04, $6a, $20, $00, $0c, $68, $20, $00, $14, $66, $20
+;@ path: boss/genie
+;@ The wisp of smoke under the Genie: one 8x16 sprite (tile, attributes) per variant; variant 0 tile $74,
+;@ variant 1 the same tile flipped, swapped every 8 frames.
+GenieTailSprites::
 	db $74, $00, $74, $20
 
-Call_04_46EC::
-	ldh a, [$fff0]
+;@ def DrawGenie(slot: c)
+;@ path: boss/genie
+;@ Draws the Genie (10 sprites of GenieSprites) and the wisp of smoke 16 pixels below. In state 5 it is
+;@ drawn every other frame at the mirrored position, so it seems to be in two places.
+;@ test: skip writes OAM through bank-0 sprite code
+DrawGenie::
+;>@if if hActiveEntityState == 5 and hFrameCounter & 1 == 0:
+	ldh a, [hActiveEntityState]
 	cp $05
-	jr nz, jr_004_4706
-
-	ldh a, [$ffe7]
+	jr nz, .draw
+;=@if
+	ldh a, [hFrameCounter]
 	and $01
-	jr nz, jr_004_4706
-
-	ld hl, $c2d0
+	jr nz, .draw
+;>     hActiveEntityDrawY = wEntityPrivate3[slot]
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
-	ldh [$ffec], a
-	ld hl, $c440
+	ldh [hActiveEntityDrawY], a
+;>     hActiveEntityX = wEntityPrivate4[slot]
+	ld hl, wEntityPrivate4
 	add hl, bc
 	ld a, [hl]
-	ldh [$ffee], a
+	ldh [hActiveEntityX], a
 
-jr_004_4706:
-	ld hl, $c3b0
+.draw
+;>@d Call_3D26(GenieSprites + wEntitySpriteVariant[slot] * 40, 10)   # 10 sprites
+	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	ld e, a
 	ld d, b
 	sla e
+;=@d
 	sla e
 	sla e
 	ld a, e
 	sla e
 	sla e
 	add e
+;=@d
 	ld e, a
-	ld hl, $4648
+	ld hl, GenieSprites
 	add hl, de
 	ld c, $0a
 	call Call_3D26
+;> Call_3DD0(10)
 	ld a, $0a
 	call Call_3DD0
-	ldh a, [$ffec]
+;> hActiveEntityDrawY += 0x10
+	ldh a, [hActiveEntityDrawY]
 	add $10
-	ldh [$ffec], a
-	ldh a, [$ffe7]
+	ldh [hActiveEntityDrawY], a
+;>@t hActiveEntitySpriteVariant = (hFrameCounter >> 3) & 1
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
-	ldh [$fff1], a
-	ld de, $46e8
+;=@t
+	ldh [hActiveEntitySpriteVariant], a
+;> Call_3CD0(GenieTailSprites)
+	ld de, GenieTailSprites
 	call Call_3CD0
+;> Call_3DBA(slot)
 	call Call_3DBA
 	ret
 
 
+;@ path: boss/genie
+;@ Sprites of the smoke cloud: 7 variants of 8 sprites (32 bytes each); each sprite y offset, x offset,
+;@ tile, OAM attributes (bits 5/6 = x/y flip). Variant 0 is a small puff on the floor, the later ones a
+;@ column that rises and widens up to the full cloud (6). Drawn by DrawGenieSmoke.
+GenieSmokeSprites::
 	db $10, $00, $1e, $00, $10, $08, $1e, $60, $10, $00, $1e, $00, $10, $08, $1e, $60
 	db $10, $00, $1e, $00, $10, $08, $1e, $60, $10, $00, $1e, $00, $10, $08, $1e, $60
 	db $08, $00, $30, $00, $08, $08, $30, $60, $08, $00, $30, $00, $08, $08, $30, $60
@@ -1101,605 +1526,880 @@ jr_004_4706:
 	db $00, $f8, $30, $40, $00, $00, $30, $20, $00, $08, $30, $40, $00, $10, $30, $20
 	db $f0, $f8, $32, $00, $f0, $00, $32, $60, $f0, $08, $32, $00, $f0, $10, $32, $60
 	db $00, $f8, $32, $00, $00, $00, $32, $60, $00, $08, $32, $00, $00, $10, $32, $60
-	db $06, $05, $04, $05, $04, $03, $02, $01, $00, $00, $01, $02, $03, $04, $05, $04
+;@ path: boss/genie
+;@ Smoke variant for the cloud that lets the Genie out, indexed by timer / 8 (8 down to 0): it rises
+;@ from the bottle to the full cloud (1 byte per step).
+GenieSmokeOutFrames::
+	db $06, $05, $04, $05, $04, $03, $02, $01, $00
+
+;@ path: boss/genie
+;@ Smoke variant for the cloud that takes the Genie back in, indexed by (timer & $7F) / 8 (8 down to 0):
+;@ from the full cloud back to the small puff.
+GenieSmokeInFrames::
+	db $00, $01, $02, $03, $04, $05, $04
 	db $05, $06
 
-Jump_04_4833::
-	call Call_04_48AE
-	call Call_04_7F36
-	call Call_0891
+;@ def GenieSmoke(slot: c)
+;@ path: boss/genie
+;@ Piece 2, the smoke cloud. Timer with bit 7 set: it shrinks into the bottle and at the end puts the
+;@ bottle into its hopping state 3. Bit 7 clear: it grows out of the bottle; at timer 6 the Genie
+;@ appears in it (at least at y $14) with a timer of $40.
+;@ test: skip spawns entities
+GenieSmoke::
+;> DrawGenieSmoke(slot)
+	call DrawGenieSmoke
+;> if ReturnIfNonInteractive_04(): return
+	call ReturnIfNonInteractive_04
+;> t = wEntityTimer[slot]
+	call GetEntityTimer
+;> if t & 0x80:                                 # going into the bottle
 	bit 7, a
-	jr z, jr_004_4862
-
+	jr z, .out
+;>     if t & 0x7F == 0:
 	and $7f
-	jr nz, jr_004_4852
-
-	ld a, [$d002]
+	jr nz, .shrink
+;>         wEntityState[wSceneVar2] = 3         # the bottle starts hopping after Link
+	ld a, [wSceneVar2]
 	ld e, a
 	ld d, b
-	ld hl, $c290
+	ld hl, wEntityState
 	add hl, de
 	ld [hl], $03
-	jp Call_04_6D4D
+;>         return DespawnEntity_04(slot)
+	jp DespawnEntity_04
 
 
-jr_004_4852:
+.shrink
+;>@s     return Call_3B87(GenieSmokeInFrames[(t >> 3) & 0x0F])
 	rra
 	rra
 	rra
 	and $0f
 	ld e, a
 	ld d, b
-	ld hl, $482a
+;=@s
+	ld hl, GenieSmokeInFrames
 	add hl, de
 	ld a, [hl]
 	call Call_3B87
 	ret
 
 
-jr_004_4862:
+.out
+;> if t == 0:
 	and a
-	jp z, Call_04_6D4D
-
+;>     return DespawnEntity_04(slot)
+	jp z, DespawnEntity_04
+;> if t == 6:
 	cp $06
-	jr nz, jr_004_489b
-
+	jr nz, .grow
+;>     new = Call_3C01(0x5C)                    # the Genie (no check for a full entity table)
 	ld a, $5c
 	call Call_3C01
-	ldh a, [$ffd7]
-	ld hl, $c200
+;>     wEntityX[new] = hMultiPurpose0
+	ldh a, [hMultiPurpose0]
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ldh a, [$ffd8]
+;>@y     wEntityY[new] = max(hMultiPurpose1, 0x14)
+	ldh a, [hMultiPurpose1]
 	cp $14
-	jr nc, jr_004_487e
-
+	jr nc, .setY
 	ld a, $14
-
-jr_004_487e:
-	ld hl, $c210
+.setY
+;=@y
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-	ld hl, $c2b0
+;>     wEntityPrivate1[new] = 1
+	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $01
-	ld hl, $c2e0
+;>     wEntityTimer[new] = 0x40
+	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $40
-	ld hl, $c340
+;>     wEntityPhysicsFlags[new] = 0x01
+	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], $01
-	ld hl, $c350
+;>     wEntityHitboxFlags[new] = 0x8C
+	ld hl, wEntityHitboxFlags
 	add hl, de
 	ld [hl], $8c
 
-jr_004_489b:
-	call Call_0891
+.grow
+;>@g Call_3B87(GenieSmokeOutFrames[(wEntityTimer[slot] >> 3) & 0x0F])
+	call GetEntityTimer
 	rra
 	rra
 	rra
 	and $0f
 	ld e, a
+;=@g
 	ld d, b
-	ld hl, $4821
+	ld hl, GenieSmokeOutFrames
 	add hl, de
 	ld a, [hl]
 	call Call_3B87
 	ret
 
 
-Call_04_48AE::
-	ldh a, [$fff1]
+;@ def DrawGenieSmoke(slot: c)
+;@ path: boss/genie
+;@ Draws the smoke cloud: 8 sprites of GenieSmokeSprites for the current variant.
+;@ test: skip writes OAM through bank-0 sprite code
+DrawGenieSmoke::
+;>@d Call_3D26(GenieSmokeSprites + (hActiveEntitySpriteVariant << 5), 8)
+	ldh a, [hActiveEntitySpriteVariant]
 	rla
 	rla
 	rla
 	rla
 	rla
+;=@d
 	and $e0
 	ld e, a
 	ld d, b
-	ld hl, $4741
+	ld hl, GenieSmokeSprites
 	add hl, de
 	ld c, $08
+;=@d
 	call Call_3D26
+;> Call_3DD0(8)
 	ld a, $08
 	call Call_3DD0
 	ret
 
 
+;@ path: boss/genie
+;@ The flames and fireballs: a 16x16 entity of two 8x16 sprites, 4 bytes per variant (left tile and
+;@ attributes, right tile and attributes). Variant 0 tile $34 with the right half mirrored, variant 1
+;@ the same in the other palette (bit 4), so the flame flickers.
+GenieFireballSprites::
 	db $34, $00, $34, $20, $34, $10, $34, $30
 
-Jump_04_48D0::
-	ld de, $48c8
+;@ def GenieHandFlame(slot: c)
+;@ path: boss/genie
+;@ Piece 3: a flame the Genie juggles. It is thrown up from the Genie's hand and moves along with the
+;@ Genie (its speed plus the Genie's speed from wEntityWorkRAM / wSceneVar1); after it comes down
+;@ it flies off to the left for 8 frames and vanishes. It does not hurt Link.
+;@ test: skip writes OAM through bank-0 sprite code
+GenieHandFlame::
+;> Call_3C3B(GenieFireballSprites)             # draw the 16x16 flame
+	ld de, GenieFireballSprites
 	call Call_3C3B
-	call Call_04_7F36
-	ldh a, [$ffe7]
+;> if ReturnIfNonInteractive_04(): return
+	call ReturnIfNonInteractive_04
+;>@v Call_3B87((hFrameCounter >> 3) & 1)        # flicker
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
+;=@v
 	call Call_3B87
-	ld hl, $c240
+;> ownX = wEntitySpeedX[slot]
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	push af
-	ld a, [$d000]
+;> wEntitySpeedX[slot] += wEntityWorkRAM         # add the Genie's speed for this move
+	ld a, [wEntityWorkRAM]
 	add [hl]
 	ld [hl], a
-	ld hl, $c250
+;> ownY = wEntitySpeedY[slot]
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 	push af
-	ld a, [$d001]
+;> wEntitySpeedY[slot] += wSceneVar1
+	ld a, [wSceneVar1]
 	add [hl]
 	ld [hl], a
-	call Call_04_6D9D
+;> UpdateEntityPosWithSpeed_04(slot)
+	call UpdateEntityPosWithSpeed_04
+;> wEntitySpeedY[slot] = ownY
 	pop af
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
+;> wEntitySpeedX[slot] = ownX
 	pop af
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
-	ldh a, [$fff0]
+;> if hActiveEntityState == 0:                  # in the air
+	ldh a, [hActiveEntityState]
 	and a
-	jr nz, jr_004_492f
-
-	call Call_04_6DD6
-	ld hl, $c320
+	jr nz, .flyOff
+;>     AddEntityZSpeedToPos_04(slot)
+	call AddEntityZSpeedToPos_04
+;>     wEntitySpeedZ[slot] -= 2
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	dec [hl]
 	dec [hl]
-	ld hl, $c310
+;>     if wEntityZ[slot] & 0x80:                # came down
+	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and $80
-	jr z, jr_004_492e
-
+	jr z, .done
+;>         wEntityZ[slot] = 0
 	ld [hl], b
+;>         wEntityState[slot] += 1
 	call Call_3B8D
-	call Call_0891
+;>         wEntityTimer[slot] = 8
+	call GetEntityTimer
 	ld [hl], $08
-	ld hl, $c240
+;>         wEntitySpeedX[slot] = 0xE0
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], $e0
 
-jr_004_492e:
+.done
+;>     return
 	ret
 
 
-jr_004_492f:
-	call Call_0891
-	call z, Call_04_6D4D
+.flyOff
+;> if wEntityTimer[slot] == 0:
+	call GetEntityTimer
+;>     DespawnEntity_04(slot)
+	call z, DespawnEntity_04
 	ret
 
 
-Jump_04_4936::
-	ld de, $48c8
+;@ def GenieFireball(slot: c)
+;@ path: boss/genie
+;@ Piece 4: a fireball thrown at Link in an arc; it hurts Link on touch and is gone when it lands.
+;@ test: skip writes OAM through bank-0 sprite code
+GenieFireball::
+;> Call_3C3B(GenieFireballSprites)
+	ld de, GenieFireballSprites
 	call Call_3C3B
-	call Call_04_7F36
-	ldh a, [$ffe7]
+;> if ReturnIfNonInteractive_04(): return
+	call ReturnIfNonInteractive_04
+;>@v Call_3B87((hFrameCounter >> 3) & 1)
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
+;=@v
 	call Call_3B87
+;> Call_3BBF(slot)                              # hurts Link on touch
 	call Call_3BBF
-	call Call_04_6D9D
-	call Call_04_6DD6
-	ld hl, $c320
+;> UpdateEntityPosWithSpeed_04(slot)
+	call UpdateEntityPosWithSpeed_04
+;> AddEntityZSpeedToPos_04(slot)
+	call AddEntityZSpeedToPos_04
+;> wEntitySpeedZ[slot] -= 2
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	dec [hl]
 	dec [hl]
-	ld hl, $c310
+;> if wEntityZ[slot] & 0x80:                    # landed
+	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and $80
-	jp nz, Call_04_6D4D
+;>     return DespawnEntity_04(slot)
+	jp nz, DespawnEntity_04
 
 	ret
 
 
-	db $ee, $12, $f8, $08
+;@ path: boss/slime_eye
+;@ X offset of the two halves of Slime Eye from its centre when it splits (-18 / +18 pixels).
+SlimeEyeSplitOffsetX::
+	db $ee, $12
 
-Jump_004_4967:
+;@ path: boss/slime_eye
+;@ Horizontal speed of the two halves when they jump apart (-8 / +8).
+SlimeEyeSplitSpeedX::
+	db $f8, $08
+
+;@ def SlimeEyeSplit(slot: c)
+;@ path: boss/slime_eye
+;@ Slime Eye splits in two: spawns two halves (entity $5B with wEntityPrivate5 = 1, 5 hit points each)
+;@ that jump apart from its centre (hMultiPurpose0 / hMultiPurpose1), then removes the big eye.
+;@ test: skip spawns entities
+SlimeEyeSplit::
+;>@loop for half in range(2):                   # counted in $FFE8
 	xor a
-	ldh [$ffe8], a
+	ldh [hBGTilesRequestCopy], a
 
-jr_004_496a:
+.loop
+;>     new = Call_3C01(0x5B)                    # (no check for a full entity table)
 	ld a, $5b
 	call Call_3C01
-	ld hl, $c390
+;>     wEntityPrivate5[new] = 1                 # a half
+	ld hl, wEntityPrivate5
 	add hl, de
 	ld [hl], $01
+;>@x     wEntityX[new] = hMultiPurpose0 + SlimeEyeSplitOffsetX[half]
 	push bc
-	ldh a, [$ffe8]
+	ldh a, [hBGTilesRequestCopy]
 	ld c, a
-	ld hl, $4963
+	ld hl, SlimeEyeSplitOffsetX
 	add hl, bc
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
+;=@x
 	add [hl]
-	ld hl, $c200
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ld hl, $4965
+;>     wEntitySpeedX[new] = SlimeEyeSplitSpeedX[half]
+	ld hl, SlimeEyeSplitSpeedX
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, de
 	ld [hl], a
-	ld hl, $c320
+;>     wEntitySpeedZ[new] = 0x10
+	ld hl, wEntitySpeedZ
 	add hl, de
 	ld [hl], $10
-	ld hl, $c290
+;>     wEntityState[new] = 1
+	ld hl, wEntityState
 	add hl, de
 	ld [hl], $01
-	ldh a, [$ffd8]
-	ld hl, $c210
+;>     wEntityY[new] = hMultiPurpose1
+	ldh a, [hMultiPurpose1]
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-	ld hl, $c360
+;>     wEntityHealth[new] = 5
+	ld hl, wEntityHealth
 	add hl, de
 	ld [hl], $05
 	pop bc
-	ldh a, [$ffe8]
+;=@loop
+	ldh a, [hBGTilesRequestCopy]
 	inc a
-	ldh [$ffe8], a
+	ldh [hBGTilesRequestCopy], a
 	cp $02
-	jr nz, jr_004_496a
+	jr nz, .loop
+;> return DespawnEntity_04(slot)
+	jp DespawnEntity_04
 
-	jp Call_04_6D4D
 
+;@ def SlimeEyeInit(slot: c)
+;@ path: boss/slime_eye
+;@ Set-up of a new Slime Eye (entity $5B, from the entity init table in bank 3, through a bank-switch
+;@ stub in bank 0): it starts high up in the ceiling (height $7E) with a timer of $A0.
+SlimeEyeInit::
+;> wEntityZ[slot] = 0x7E
+	ld hl, wEntityZ
+	add hl, bc
+	ld [hl], $7e
+;> wEntityTimer[slot] = 0xA0
+	call GetEntityTimer
+	ld [hl], $a0
+	ret
 
-	db $21, $10, $c3, $09, $36, $7e, $cd, $91, $08, $36, $a0, $c9
-
-Call_04_49C1::
+;@ def SlimeEyeHandler(slot: c)
+;@ path: boss/slime_eye
+;@ Entity $5B: Slime Eye, boss of Key Cavern (level 3). It hangs in the ceiling while Gels drop, falls
+;@ when Link dashes into a wall with the Pegasus Boots, stretches when hit, and splits into two halves
+;@ (wEntityPrivate5 = 1) when its stretched eye is struck with a boots dash.
+;@ test: skip dispatches through a jump table into the whole boss
+SlimeEyeHandler::
+;> Call_380E()                                  # keep Link inside the boss arena
 	call Call_380E
+;> Call_3F12()
 	call Call_3F12
-	call Call_04_4E52
-	ld hl, $c390
+;> SlimeEyePinLink(slot)
+	call SlimeEyePinLink
+;> return SlimeEyeParts[wEntityPrivate5[slot]](slot)
+	ld hl, wEntityPrivate5
 	add hl, bc
 	ld a, [hl]
 	rst $00
 
-JumpTable_04_49D0::
-	dw Jump_04_49D4
-	dw Jump_04_4DF9
+;@ path: boss/slime_eye
+;@ Handler by wEntityPrivate5: 0 the whole Slime Eye, 1 one of its halves.
+SlimeEyeParts::
+	dw SlimeEye
+	dw SlimeEyeHalf
 
-Jump_04_49D4::
-	ld hl, $c360
+;@ def SlimeEye(slot: c)
+;@ path: boss/slime_eye
+;@ The whole Slime Eye: its health is kept at $50 (it cannot be killed in one piece); runs its state.
+;@ test: skip dispatches through a jump table
+SlimeEye::
+;> wEntityHealth[slot] = 0x50
+	ld hl, wEntityHealth
 	add hl, bc
 	ld [hl], $50
-	ldh a, [$fff0]
+;> return SlimeEyeStates[hActiveEntityState](slot)
+	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_04_49DD::
-	dw Jump_04_49E5
-	dw Jump_04_4A25
-	dw Jump_04_4A64
-	dw Jump_04_4A78
+;@ path: boss/slime_eye
+;@ States of the whole Slime Eye.
+SlimeEyeStates::
+	dw SlimeEyeOnCeiling
+	dw SlimeEyeFall
+	dw SlimeEyeLanded
+	dw SlimeEyeFight
 
-Jump_04_49E5::
-	ld a, [$c157]
+;@ def SlimeEyeOnCeiling(slot: c)
+;@ path: boss/slime_eye
+;@ State 0, in the ceiling (not drawn): every $50 frames a Gel drops from the ceiling at a random place
+;@ (x $40-$7F, y $30-$6F) while fewer than 2 Gels are about. When Link's dash into a wall shakes the
+;@ room, Slime Eye falls (state 1).
+;@ test: skip spawns entities
+SlimeEyeOnCeiling::
+;> if wBumpShakeTimer == 5:                     # Link dashed into a wall
+	ld a, [wBumpShakeTimer]
 	cp $05
-	jr nz, jr_004_49f3
-
+	jr nz, .gels
+;>     wEntityState[slot] += 1
 	call Call_3B8D
+;>     hJingle = 0x08
 	ld a, $08
-	ldh [$fff2], a
+	ldh [hJingle], a
 
-jr_004_49f3:
-	call Call_0891
-	jr nz, jr_004_4a24
-
+.gels
+;> if wEntityTimer[slot] == 0:
+	call GetEntityTimer
+	jr nz, .done
+;>     wEntityTimer[slot] = 0x50
 	ld [hl], $50
-	ld a, [$c1ae]
+;>     if wGelCount < 2:
+	ld a, [wGelCount]
 	cp $02
-	jr nc, jr_004_4a24
-
+	jr nc, .done
+;>         new = Call_3C01(0x1B)                # a Gel (no check for a full entity table)
 	ld a, $1b
 	call Call_3C01
-	call Call_27ED
+;>         wEntityX[new] = 0x40 + (GetRandomByte() & 0x3F)
+	call GetRandomByte
 	and $3f
 	add $40
-	ld hl, $c200
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	call Call_27ED
+;>         wEntityY[new] = 0x30 + (GetRandomByte() & 0x3F)
+	call GetRandomByte
 	and $3f
 	add $30
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-	ld hl, $c310
+;>         wEntityZ[new] = 0x70                 # falls from the ceiling
+	ld hl, wEntityZ
 	add hl, de
 	ld [hl], $70
 
-jr_004_4a24:
+.done
+;> return
 	ret
 
 
-Jump_04_4A25::
-	call Call_04_4DB1
-	call Call_04_7F36
-	call Call_04_6DD6
-	ld hl, $c320
+;@ def SlimeEyeFall(slot: c)
+;@ path: boss/slime_eye
+;@ State 1: falls (speed growing to $A0 down). On landing the room shakes for $50 frames; Link, if he
+;@ is on the ground, is pinned for $14 frames (wEntityDropTimer). Then state 2 with a timer of $40.
+;@ test: skip writes OAM through bank-0 sprite code
+SlimeEyeFall::
+;> DrawSlimeEye(slot)
+	call DrawSlimeEye
+;> if ReturnIfNonInteractive_04(): return
+	call ReturnIfNonInteractive_04
+;> AddEntityZSpeedToPos_04(slot)
+	call AddEntityZSpeedToPos_04
+;> if wEntitySpeedZ[slot] != 0xA0:              # gravity up to the top falling speed
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld a, [hl]
 	cp $a0
-	jr z, jr_004_4a39
-
+	jr z, .landed
+;>     wEntitySpeedZ[slot] -= 2
 	dec [hl]
 	dec [hl]
 
-jr_004_4a39:
-	ld hl, $c310
+.landed
+;> if wEntityZ[slot] & 0x80:                    # reached the floor
+	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and $80
-	jr z, jr_004_4a63
-
+	jr z, .done
+;>     wEntityZ[slot] = 0
 	ld [hl], b
+;>     wBumpShakeTimer = 0x50                   # the room shakes ...
 	ld a, $50
-	ld [$c157], a
+	ld [wBumpShakeTimer], a
+;>     wBumpShakeAxis = 4                       # ... up and down
 	ld a, $04
-	ld [$c158], a
-	call Call_0891
+	ld [wBumpShakeAxis], a
+;>     wEntityTimer[slot] = 0x40
+	call GetEntityTimer
 	ld [hl], $40
-	call Call_08D7
-	ld a, [$c146]
+;>     PlayClinkNoise()
+	call PlayClinkNoise
+;>     if wIsLinkInTheAir == 0:
+	ld a, [wIsLinkInTheAir]
 	and a
-	jr nz, jr_004_4a60
-
-	call Call_0887
+	jr nz, .next
+;>         wEntityDropTimer[slot] = 0x14        # Link is pinned by the impact
+	call GetEntityDropTimer
 	ld [hl], $14
 
-jr_004_4a60:
+.next
+;>     wEntityState[slot] += 1
 	call Call_3B8D
 
-jr_004_4a63:
+.done
+;> return
 	ret
 
 
-Jump_04_4A64::
-	call Call_04_4DB1
-	call Call_04_7F36
-	call Call_0891
-	jr nz, jr_004_4a72
-
+;@ def SlimeEyeLanded(slot: c)
+;@ path: boss/slime_eye
+;@ State 2: sits still until the timer runs out; its body hurts Link on touch.
+;@ test: skip calls bank-3 collision code
+SlimeEyeLanded::
+;> DrawSlimeEye(slot)
+	call DrawSlimeEye
+;> if ReturnIfNonInteractive_04(): return
+	call ReturnIfNonInteractive_04
+;> if wEntityTimer[slot] == 0:
+	call GetEntityTimer
+	jr nz, .touch
+;>     wEntityState[slot] += 1
 	call Call_3B8D
 
-jr_004_4a72:
-	call Call_04_4B28
+.touch
+;> SetSlimeEyeHitbox(slot)
+	call SetSlimeEyeHitbox
+;> return Call_3BBF(slot)                       # touching it hurts Link
 	jp Call_3BBF
 
 
-Jump_04_4A78::
-	call Call_04_4DB1
-	call Call_04_7F36
-	call Call_08E2
-	ld hl, $c300
+;@ def SlimeEyeFight(slot: c)
+;@ path: boss/slime_eye
+;@ State 3: slides about in jerks (SlimeEyeMove). Each hit stretches it one step more (wEntityPrivate1,
+;@ up to 4; it shrinks back one step every $28 frames). The eye in the middle has its own small hitbox
+;@ (checked with $FFE8 = 0) and the body the stretched one ($FFE8 = 1). When the eye of the fully
+;@ stretched Slime Eye is hit during a Pegasus Boots dash, the hit code starts wEntityTimer2 ($0C):
+;@ Link is held while it tears apart (variant 6) and at 1 it splits in two.
+;@ test: skip calls bank-3 collision code
+SlimeEyeFight::
+;> DrawSlimeEye(slot)
+	call DrawSlimeEye
+;> if ReturnIfNonInteractive_04(): return
+	call ReturnIfNonInteractive_04
+;> DecrementEntityIgnoreHitsTimer(slot)
+	call DecrementEntityIgnoreHitsTimer
+;> split = wEntityTimer2[slot]
+	ld hl, wEntityTimer2
 	add hl, bc
 	ld a, [hl]
+;> if split != 0:
 	and a
-	jr z, jr_004_4a9f
-
+	jr z, .fight
+;>     if split == 1:
 	cp $01
-	jp z, Jump_004_4967
-
-	ldh [$ffa1], a
-	ldh a, [$ffe7]
+;>         return SlimeEyeSplit(slot)
+	jp z, SlimeEyeSplit
+;>     hLinkInteractiveMotionBlocked = split    # Link cannot move meanwhile
+	ldh [hLinkInteractiveMotionBlocked], a
+;>     if hFrameCounter & 1 == 0:
+	ldh a, [hFrameCounter]
 	and $01
-	jr nz, jr_004_4a9a
-
-	ld hl, $ff99
+	jr nz, .tear
+;>         hLinkY -= 1                          # Link is pushed upwards
+	ld hl, hLinkY
 	dec [hl]
 
-jr_004_4a9a:
+.tear
+;>     return Call_3B87(6)                      # tearing apart
 	ld a, $06
 	jp Call_3B87
 
 
-jr_004_4a9f:
-	call Call_04_4B4C
-	ldh a, [$ffe7]
+.fight
+;> SlimeEyeMove(slot)
+	call SlimeEyeMove
+;>@v Call_3B87((hFrameCounter >> 4) & 1)        # wobble: variants 0 / 1
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	rra
 	and $01
+;=@v
 	call Call_3B87
-	ld hl, $c2b0
+;> if wEntityPrivate1[slot] != 0:               # stretched
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_004_4ac5
-
+	jr z, .hits
+;>     Call_3B87(wEntityPrivate1[slot] + 1)     # variants 2-5
 	inc a
 	call Call_3B87
-	call Call_088C
-	jr nz, jr_004_4ac5
-
+;>     if wEntityTimer1[slot] == 0:
+	call GetEntityTimer1
+	jr nz, .hits
+;>         wEntityTimer1[slot] = 0x28
 	ld [hl], $28
-	ld hl, $c2b0
+;>         wEntityPrivate1[slot] -= 1           # shrinks back a step
+	ld hl, wEntityPrivate1
 	add hl, bc
 	dec [hl]
 
-jr_004_4ac5:
+.hits
+;> hBGTilesRequestCopy = 0                      # ($FFE8) the eye is checked
 	xor a
-	ldh [$ffe8], a
+	ldh [hBGTilesRequestCopy], a
+;> SetSlimeEyeHitboxRecord(slot, 0x14)          # small box around the eye
 	ld a, $14
-	call Call_04_4B31
+	call SetSlimeEyeHitboxRecord
+;> Call_3BEB(slot)                              # hits from Link's weapons
 	call Call_3BEB
-	ld hl, $c420
+;>@if if wEntityFlashTimer[slot] | wEntityTimer2[slot] == 0:   # the eye was not hit
+	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c300
+	ld hl, wEntityTimer2
 	add hl, bc
 	or [hl]
-	jr nz, jr_004_4ae9
-
-	call Call_04_4B28
+;=@if
+	jr nz, .restore
+;>     SetSlimeEyeHitbox(slot)                  # the whole (stretched) body
+	call SetSlimeEyeHitbox
+;>     Call_3BBF(slot)                          # touching it hurts Link
 	call Call_3BBF
+;>     hBGTilesRequestCopy = 1                  # ($FFE8) the body is checked
 	ld a, $01
-	ldh [$ffe8], a
+	ldh [hBGTilesRequestCopy], a
+;>     Call_3BEB(slot)
 	call Call_3BEB
 
-jr_004_4ae9:
+.restore
+;> SetSlimeEyeHitboxRecord(slot, 0x14)
 	ld a, $14
-	call Call_04_4B31
-	ld hl, $c420
+	call SetSlimeEyeHitboxRecord
+;>@stretch if wEntityFlashTimer[slot] != 0 and hFrameCounter & 0x1F == 0:   # hit: stretch a step
+	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_004_4b0b
-
-	ldh a, [$ffe7]
+	jr z, .done
+;=@stretch
+	ldh a, [hFrameCounter]
 	and $1f
-	jr nz, jr_004_4b0b
-
-	call Call_088C
+	jr nz, .done
+;>     wEntityTimer1[slot] = 0x50
+	call GetEntityTimer1
 	ld [hl], $50
-	ld hl, $c2b0
+;>     if wEntityPrivate1[slot] != 4:
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	cp $04
-	jr z, jr_004_4b0b
-
+	jr z, .done
+;>         wEntityPrivate1[slot] += 1
 	inc [hl]
 
-jr_004_4b0b:
+.done
+;> return
 	ret
 
 
+;@ path: boss/slime_eye
+;@ Hitboxes of Slime Eye, copied to wEntityHitbox (4 bytes: x offset, half width, y offset, half height,
+;@ in pixels). Offsets $00-$10: the body at stretch 0-4 (half width $14-$18, half height $0C-$04);
+;@ $14: the eye ($03 x $03 around (+8, +8)); $18: one of the halves (half size $0C).
+SlimeEyeHitboxes::
 	db $08, $14, $00, $0c, $08, $15, $00, $0b, $08, $16, $00, $08, $08, $17, $00, $06
 	db $08, $18, $00, $04, $08, $03, $08, $03, $08, $0c, $02, $0c
 
-Call_04_4B28::
-	ld hl, $c2b0
+;@ def SetSlimeEyeHitbox(slot: c)
+;@ path: boss/slime_eye
+;@ Gives Slime Eye the body hitbox of its current stretch (wEntityPrivate1).
+;@ test: skip falls through into SetSlimeEyeHitboxRecord
+SetSlimeEyeHitbox::
+;> return SetSlimeEyeHitboxRecord(slot, wEntityPrivate1[slot] * 4)   # (falls through)
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	sla a
 	sla a
 
-Call_04_4B31::
+;@ def SetSlimeEyeHitboxRecord(slot: c, offset: a)
+;@ path: boss/slime_eye
+;@ Copies the 4-byte record at `offset` of SlimeEyeHitboxes into the entity's wEntityHitbox entry.
+;@ test: offset = rand(0, 6) * 4
+SetSlimeEyeHitboxRecord::
+;> src = SlimeEyeHitboxes + offset
 	ld e, a
 	ld d, b
-	ld hl, $4b0c
+	ld hl, SlimeEyeHitboxes
 	add hl, de
 	push hl
 	pop de
+;> dst = addr(wEntityHitbox) + slot * 4
 	push bc
 	sla c
 	sla c
-	ld hl, $d580
+	ld hl, wEntityHitbox
 	add hl, bc
+;> copy(dst, src, 4)
 	ld c, $04
-
-jr_004_4b44:
+.copy
 	ld a, [de]
 	inc de
 	ld [hli], a
 	dec c
-	jr nz, jr_004_4b44
+	jr nz, .copy
 
+;> return
 	pop bc
 	ret
 
 
-Call_04_4B4C::
-	ld hl, $c2d0
+;@ def SlimeEyeMove(slot: c)
+;@ path: boss/slime_eye
+;@ Slime Eye's movement, by wEntityPrivate3: 0 choose a slide, 1 slide.
+;@ test: skip dispatches through a jump table
+SlimeEyeMove::
+;> return SlimeEyeMoveSteps[wEntityPrivate3[slot]](slot)
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	rst $00
 
-JumpTable_04_4B52::
-	dw Jump_04_4B76
-	dw Jump_04_4BC1
+;@ path: boss/slime_eye
+;@ Steps of Slime Eye's movement.
+SlimeEyeMoveSteps::
+	dw SlimeEyePickSlide
+	dw SlimeEyeSlide
 
+;@ path: boss/slime_eye
+;@ Horizontal slide speed (signed, 1/16 pixel per frame) by quadrant * 4 + random 0-3. Quadrants:
+;@ 0 upper left, 1 upper right, 2 lower left, 3 lower right of the room; the speeds point back towards
+;@ the middle. 16 bytes.
+SlimeEyeSlideSpeedX::
 	db $10, $0c, $06, $02, $f0, $f4, $fa, $fe, $10, $0c, $06, $02, $f0, $f4, $fa, $fe
+;@ path: boss/slime_eye
+;@ Vertical slide speed, same index as SlimeEyeSlideSpeedX. 16 bytes.
+SlimeEyeSlideSpeedY::
 	db $02, $06, $0c, $10, $02, $06, $0c, $10, $fe, $fa, $f4, $f0, $fe, $fa, $f4, $f0
 
-Jump_04_4B76::
-	call Call_0891
+;@ def SlimeEyePickSlide(slot: c)
+;@ path: boss/slime_eye
+;@ After its pause, Slime Eye picks a slide towards the middle of the room ($50, $48) for $10-$2F
+;@ frames, at one of four angles at random.
+;@ test: skip calls bank-0 random number code
+SlimeEyePickSlide::
+;> if wEntityTimer[slot] != 0:
+;>     return
+	call GetEntityTimer
 	and a
-	jr nz, jr_004_4bc0
-
-	call Call_27ED
+	jr nz, .done
+;> wEntityTimer[slot] = 0x10 + (GetRandomByte() & 0x1F)
+	call GetRandomByte
 	and $1f
 	add $10
 	ld [hl], a
-	ld hl, $c2d0
+;> wEntityPrivate3[slot] += 1
+	ld hl, wEntityPrivate3
 	add hl, bc
 	inc [hl]
+;> quadrant = 1 if hActiveEntityX >= 0x50 else 0
 	ld e, $00
-	ldh a, [$ffee]
+	ldh a, [hActiveEntityX]
 	cp $50
-	jr c, jr_004_4b92
-
+	jr c, .left
 	inc e
-
-jr_004_4b92:
+.left
+;> if hActiveEntityDrawY >= 0x48:
 	ld d, $00
-	ldh a, [$ffec]
+	ldh a, [hActiveEntityDrawY]
 	cp $48
-	jr c, jr_004_4b9c
-
+	jr c, .top
+;>     quadrant += 2
 	inc d
 	inc d
-
-jr_004_4b9c:
+.top
+;>@i i = (quadrant << 2) | (GetRandomByte() & 3)
 	ld a, d
 	or e
 	sla a
 	sla a
 	push af
-	call Call_27ED
+	call GetRandomByte
+;=@i
 	and $03
 	pop de
 	or d
 	ld e, a
 	ld d, b
-	ld hl, $4b56
+;> wEntitySpeedX[slot] = SlimeEyeSlideSpeedX[i]
+	ld hl, SlimeEyeSlideSpeedX
 	add hl, de
 	ld a, [hl]
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
-	ld hl, $4b66
+;> wEntitySpeedY[slot] = SlimeEyeSlideSpeedY[i]
+	ld hl, SlimeEyeSlideSpeedY
 	add hl, de
 	ld a, [hl]
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
 
-jr_004_4bc0:
+.done
+;> return
 	ret
 
 
-Jump_04_4BC1::
-	call Call_0891
-	jr z, jr_004_4bd1
-
+;@ def SlimeEyeSlide(slot: c)
+;@ path: boss/slime_eye
+;@ Slides in jerks (moving only 2 frames out of 16); when the slide is over, pauses $30 frames.
+;@ test: skip calls bank-3 collision code
+SlimeEyeSlide::
+;> t = wEntityTimer[slot]
+	call GetEntityTimer
+;> if t == 0:
+	jr z, .over
+;>     if t & 0x0E == 0:
 	and $0e
-	jr nz, jr_004_4bd0
-
-	call Call_04_6D9D
+	jr nz, .done
+;>         UpdateEntityPosWithSpeed_04(slot)
+	call UpdateEntityPosWithSpeed_04
+;>         Call_3B9E(slot)
 	call Call_3B9E
 
-jr_004_4bd0:
+.done
+;>     return
 	ret
 
 
-jr_004_4bd1:
+.over
+;> wEntityTimer[slot] = 0x30
 	ld [hl], $30
-	ld hl, $c2d0
+;> wEntityPrivate3[slot] = 0
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld [hl], b
 	ret
 
 
+;@ path: boss/slime_eye
+;@ Sprites of Slime Eye: 7 variants of 16 sprites (64 bytes each; y offset, x offset, tile, OAM
+;@ attributes; tile $FF = sprite not used). 0 and 1: the slime with its eye (two wobble frames),
+;@ 2-5: more and more stretched sideways (x offsets up to -24 / +32), 6: torn apart in the middle.
+;@ Drawn by DrawSlimeEye.
+SlimeEyeSprites::
 	db $f0, $f0, $60, $00, $f0, $f8, $62, $00, $f0, $00, $70, $00, $f0, $08, $70, $20
 	db $f0, $10, $62, $20, $f0, $18, $60, $20, $00, $f0, $64, $00, $00, $f8, $6e, $00
 	db $00, $00, $72, $00, $00, $08, $72, $20, $00, $10, $6e, $20, $00, $18, $64, $20
@@ -1728,871 +2428,1274 @@ jr_004_4bd1:
 	db $f0, $0a, $78, $20, $f0, $12, $62, $00, $f0, $1a, $62, $20, $f0, $22, $60, $20
 	db $00, $e6, $64, $00, $00, $ee, $66, $00, $00, $f6, $66, $20, $00, $fe, $7c, $00
 	db $00, $0a, $7c, $20, $00, $12, $66, $00, $00, $1a, $66, $20, $00, $22, $64, $20
+;@ path: boss/slime_eye
+;@ Shadow of the falling Slime Eye: 6 sprites (y offset, x offset, tile $26, attributes) in a row 12
+;@ pixels below the drawing position.
+SlimeEyeShadowSprites::
 	db $0c, $f5, $26, $00, $0c, $fb, $26, $00, $0c, $01, $26, $00, $0c, $07, $26, $00
 	db $0c, $0d, $26, $00, $0c, $13, $26, $00
 
-Call_04_4DB1::
-	ld hl, $c3b0
+;@ def DrawSlimeEye(slot: c)
+;@ path: boss/slime_eye
+;@ Draws Slime Eye (16 sprites of SlimeEyeSprites for its variant) and, while it is in the air, its
+;@ shadow on the floor.
+;@ test: skip writes OAM through bank-0 sprite code
+DrawSlimeEye::
+;>@d Call_3D26(SlimeEyeSprites + wEntitySpriteVariant[slot] * 64, 16)
+	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	ld d, b
 	rla
 	rl d
+;=@d
 	rla
 	rl d
 	rla
 	rl d
 	rla
 	rl d
+;=@d
 	rla
 	rl d
 	rla
 	rl d
 	and $c0
 	ld e, a
-	ld hl, $4bd9
+;=@d
+	ld hl, SlimeEyeSprites
 	add hl, de
 	ld c, $10
 	call Call_3D26
+;> Call_3DD0(16)
 	ld a, $10
 	call Call_3DD0
-	ld hl, $c310
+;> if wEntityZ[slot] != 0:
+	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_004_4df8
-
-	ldh a, [$ffef]
+	jr z, .done
+;>     hActiveEntityDrawY = hActiveEntityY - 8
+	ldh a, [hActiveEntityY]
 	sub $08
-	ldh [$ffec], a
-	ld hl, $4d99
+	ldh [hActiveEntityDrawY], a
+;>     Call_3D26(SlimeEyeShadowSprites, 6)
+	ld hl, SlimeEyeShadowSprites
 	ld c, $06
 	call Call_3D26
+;>     Call_3DD0(6)
 	ld a, $06
 	call Call_3DD0
+;>     Call_3DBA(slot)
 	call Call_3DBA
 
-jr_004_4df8:
+.done
 	ret
 
 
-Jump_04_4DF9::
-	call Call_04_5000
-	ldh a, [$ffea]
+;@ def SlimeEyeHalf(slot: c)
+;@ path: boss/slime_eye
+;@ One of the two halves Slime Eye splits into (5 hit points each). It hops about and, after its first
+;@ hit, jumps out of sight and drops onto Link. When it is defeated it explodes; the last half to go
+;@ leaves the heart container.
+;@ test: skip dispatches through jump tables
+SlimeEyeHalf::
+;> DrawSlimeEyeHalf(slot)
+	call DrawSlimeEyeHalf
+;> if hActiveEntityStatus == 5:
+;>     return SlimeEyeHalfActive(slot)
+	ldh a, [hActiveEntityStatus]
 	cp $05
-	jp z, Jump_004_4e60
-
-	ld hl, $c420
+	jp z, SlimeEyeHalfActive
+;> wEntityFlashTimer[slot] = hFrameCounter      # defeated: keeps flashing
+	ld hl, wEntityFlashTimer
 	add hl, bc
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	ld [hl], a
-	ldh a, [$fff0]
+;> return SlimeEyeHalfDeathStates[hActiveEntityState](slot)
+	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_04_4E0D::
-	dw Jump_04_4E13
-	dw Jump_04_4E1B
-	dw Jump_04_4E26
+;@ path: boss/slime_eye
+;@ States of a defeated half.
+SlimeEyeHalfDeathStates::
+	dw SlimeEyeHalfDeathStart
+	dw SlimeEyeHalfDeathWait
+	dw SlimeEyeHalfDeathExplode
 
-Jump_04_4E13::
-	call Call_0891
+;@ def SlimeEyeHalfDeathStart(slot: c)
+;@ path: boss/slime_eye
+;@ Death state 0: wait $40 frames.
+SlimeEyeHalfDeathStart::
+;> wEntityTimer[slot] = 0x40
+	call GetEntityTimer
 	ld [hl], $40
+;> wEntityState[slot] += 1
 	jp Call_3B8D
 
 
-Jump_04_4E1B::
-	call Call_0891
-	jr nz, jr_004_4e25
-
+;@ def SlimeEyeHalfDeathWait(slot: c)
+;@ path: boss/slime_eye
+;@ Death state 1: then explode for $A0 frames.
+SlimeEyeHalfDeathWait::
+;> if wEntityTimer[slot] == 0:
+	call GetEntityTimer
+	jr nz, .done
+;>     wEntityTimer[slot] = 0xA0
 	ld [hl], $a0
+;>     wEntityState[slot] += 1
 	call Call_3B8D
 
-jr_004_4e25:
+.done
+;> return
 	ret
 
 
-Jump_04_4E26::
-	call Call_0891
-	jr nz, jr_004_4e4f
-
+;@ def SlimeEyeHalfDeathExplode(slot: c)
+;@ path: boss/slime_eye
+;@ Death state 2: explosions; at the end the half vanishes, or, if no other Slime Eye entity is left in
+;@ the room, turns into the heart container.
+;@ test: skip spawns entities
+SlimeEyeHalfDeathExplode::
+;> if wEntityTimer[slot] != 0:
+	call GetEntityTimer
+	jr nz, .explode
+;>@exp     return BossDeathExplosion_04(wEntityTimer[slot])
+;>@loop for other in range(15, -1, -1):
 	ld e, $0f
 	ld d, b
 
-jr_004_4e2e:
+.loop
+;>@if     if other != slot and wEntityStatus[other] != 0 and wEntityType[other] == 0x5B:
 	ld a, c
 	cp e
-	jr z, jr_004_4e43
-
-	ld hl, $c280
+	jr z, .next
+;=@if
+	ld hl, wEntityStatus
 	add hl, de
 	ld a, [hl]
 	and a
-	jr z, jr_004_4e43
-
-	ld hl, $c3a0
+	jr z, .next
+;=@if
+	ld hl, wEntityType
 	add hl, de
 	ld a, [hl]
 	cp $5b
-	jr z, jr_004_4e4c
+	jr z, .vanish
+;>@v         return DespawnEntity_04(slot)      # the other half is still there
 
-jr_004_4e43:
+.next
+;=@loop
 	dec e
 	ld a, e
 	cp $ff
-	jr nz, jr_004_4e2e
-
-	jp Jump_004_5746
-
-
-jr_004_4e4c:
-	jp Call_04_6D4D
+	jr nz, .loop
+;> return BossDropHeartContainer_04(slot)       # it was the last one
+	jp BossDropHeartContainer_04
 
 
-jr_004_4e4f:
-	jp Call_04_50F3
+.vanish
+;=@v
+	jp DespawnEntity_04
 
 
-Call_04_4E52::
-	call Call_0887
-	jr z, jr_004_4e5f
+.explode
+;=@exp
+	jp BossDeathExplosion_04
 
+
+;@ def SlimeEyePinLink(slot: c)
+;@ path: boss/slime_eye
+;@ While wEntityDropTimer runs (set when Slime Eye or a half lands hard), Link is frozen in his
+;@ squashed pose ($6A).
+SlimeEyePinLink::
+;> if wEntityDropTimer[slot] != 0:
+	call GetEntityDropTimer
+	jr z, .done
+;>     hLinkInteractiveMotionBlocked = 2
 	ld a, $02
-	ldh [$ffa1], a
+	ldh [hLinkInteractiveMotionBlocked], a
+;>     hLinkAnimationState = 0x6A               # squashed flat
 	ld a, $6a
-	ldh [$ff9d], a
+	ldh [hLinkAnimationState], a
 
-jr_004_4e5f:
+.done
+;> return
 	ret
 
 
-Jump_004_4e60:
-	call Call_04_7F36
-	ld hl, $c410
+;@ def SlimeEyeHalfActive(slot: c)
+;@ path: boss/slime_eye
+;@ A living half. Its first hit only marks it (wEntityPrivate1 = 1); every later hit makes it jump out of
+;@ sight (state 2) to come down on Link.
+;@ test: skip dispatches through a jump table
+SlimeEyeHalfActive::
+;> if ReturnIfNonInteractive_04(): return
+	call ReturnIfNonInteractive_04
+;> if wEntityIgnoreHitsTimer[slot] == 2:        # just hit
+	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
 	ld a, [hl]
 	cp $02
-	jr nz, jr_004_4e83
-
-	ld hl, $c2b0
+	jr nz, .states
+;>     if wEntityPrivate1[slot] != 0:
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_004_4e82
-
+	jr z, .firstHit
+;>         wEntityState[slot] = 2
 	call Call_3B8D
 	ld [hl], $02
+;>         hJingle = 0x24
 	ld a, $24
-	ldh [$fff2], a
+	ldh [hJingle], a
+;>         Call_3DAF(slot)                      # stop
 	call Call_3DAF
-	jr jr_004_4e83
-
-jr_004_4e82:
+	jr .states
+;>     else:
+.firstHit
+;>         wEntityPrivate1[slot] = 1
 	inc [hl]
 
-jr_004_4e83:
-	call Call_04_6D53
+.states
+;> ApplyRecoilIfNeeded_04(slot)
+	call ApplyRecoilIfNeeded_04
+;> hBGTilesRequestCopy = 0                      # ($FFE8) for the hit code
 	xor a
-	ldh [$ffe8], a
-	ldh a, [$fff0]
+	ldh [hBGTilesRequestCopy], a
+;> return SlimeEyeHalfStates[hActiveEntityState](slot)
+	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_04_4E8C::
-	dw Jump_04_4EA4
-	dw Jump_04_4EEB
-	dw Jump_04_4F65
-	dw Jump_04_4F80
+;@ path: boss/slime_eye
+;@ States of a living half.
+SlimeEyeHalfStates::
+	dw SlimeEyeHalfPickHop
+	dw SlimeEyeHalfHop
+	dw SlimeEyeHalfRise
+	dw SlimeEyeHalfDropOnLink
 
-	db $10, $0c, $00, $f4, $f0, $f4, $00, $0c, $00, $0c, $10, $0c, $00, $f4, $f0, $f4
+;@ path: boss/slime_eye
+;@ Horizontal speed of a half's hop in each of 8 directions (0 right, then anticlockwise in steps of 45
+;@ degrees, speed $10). 8 bytes.
+SlimeEyeHalfHopSpeedX::
+	db $10, $0c, $00, $f4, $f0, $f4, $00, $0c
 
-Jump_04_4EA4::
+;@ path: boss/slime_eye
+;@ Vertical speed of a half's hop, same 8 directions as SlimeEyeHalfHopSpeedX. 8 bytes.
+SlimeEyeHalfHopSpeedY::
+	db $00, $0c, $10, $0c, $00, $f4, $f0, $f4
+
+;@ def SlimeEyeHalfPickHop(slot: c)
+;@ path: boss/slime_eye
+;@ State 0, sitting: when its timer is over the half hops in a random one of 8 directions (one time in
+;@ four straight at Link, speed $18), with an upward speed of 8-23.
+;@ test: skip calls bank-3 collision code
+SlimeEyeHalfPickHop::
+;> SetSlimeEyeHitboxRecord(slot, 0x18)          # the hitbox of a half
 	ld a, $18
-	call Call_04_4B31
+	call SetSlimeEyeHitboxRecord
+;> Call_3BB4(slot)                              # touching it hurts Link; weapon hits
 	call Call_3BB4
-	call Call_0891
-	jr nz, jr_004_4ee7
-
-	call Call_27ED
+;> if wEntityTimer[slot] == 0:
+	call GetEntityTimer
+	jr nz, .pose
+;>     dir = GetRandomByte() & 7
+	call GetRandomByte
 	and $07
 	ld e, a
 	ld d, b
-	ld hl, $4e94
+;>     wEntitySpeedX[slot] = SlimeEyeHalfHopSpeedX[dir]
+	ld hl, SlimeEyeHalfHopSpeedX
 	add hl, de
 	ld a, [hl]
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
-	ld hl, $4e9c
+;>     wEntitySpeedY[slot] = SlimeEyeHalfHopSpeedY[dir]
+	ld hl, SlimeEyeHalfHopSpeedY
 	add hl, de
 	ld a, [hl]
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
-	call Call_27ED
+;>     if GetRandomByte() & 3 == 0:
+	call GetRandomByte
 	and $03
-	jr nz, jr_004_4ed8
-
+	jr nz, .jump
+;>         Call_3C25(0x18)                      # straight at Link
 	ld a, $18
 	call Call_3C25
 
-jr_004_4ed8:
-	call Call_27ED
+.jump
+;>     wEntitySpeedZ[slot] = 8 + (GetRandomByte() & 0x0F)
+	call GetRandomByte
 	and $0f
-	ld hl, $c320
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	add $08
 	ld [hl], a
+;>     wEntityState[slot] += 1
 	call Call_3B8D
 
-jr_004_4ee7:
+.pose
+;> return Call_3B87(0)
 	ld a, b
 	jp Call_3B87
 
 
-Jump_04_4EEB::
-	call Call_0891
+;@ def SlimeEyeHalfHop(slot: c)
+;@ path: boss/slime_eye
+;@ State 1, in the air (also the drop onto Link, wEntityPrivate4 = 1, during which it cannot be hit).
+;@ A hard landing (falling faster than $20) shakes the room and pins Link if he is on the ground; a
+;@ soft one just thuds. Then it sits $20 frames (state 0).
+;@ test: skip calls bank-3 collision code
+SlimeEyeHalfHop::
+;> if wEntityTimer[slot] == 0:
+	call GetEntityTimer
 	and a
-	jr nz, jr_004_4f60
-
-	call Call_04_6D9D
+	jr nz, .pose
+;>     UpdateEntityPosWithSpeed_04(slot)
+	call UpdateEntityPosWithSpeed_04
+;>     Call_3B9E(slot)
 	call Call_3B9E
-	call Call_04_6DD6
-	ld hl, $c320
+;>     AddEntityZSpeedToPos_04(slot)
+	call AddEntityZSpeedToPos_04
+;>     wEntitySpeedZ[slot] -= 2
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	dec [hl]
 	dec [hl]
+;>     SetSlimeEyeHitboxRecord(slot, 0x18)
 	ld a, $18
-	call Call_04_4B31
+	call SetSlimeEyeHitboxRecord
+;>     Call_3BBF(slot)
 	call Call_3BBF
-	ld hl, $c440
+;>     if wEntityPrivate4[slot] == 0:           # not dropping onto Link
+	ld hl, wEntityPrivate4
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr nz, jr_004_4f14
-
+	jr nz, .land
+;>         Call_3BEB(slot)                      # weapon hits
 	call Call_3BEB
 	xor a
 
-jr_004_4f14:
-	ld hl, $c310
+.land
+;>     if wEntityZ[slot] & 0x80:                # landed
+	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and $80
-	jr z, jr_004_4f60
-
+	jr z, .pose
+;>         wEntityZ[slot] = 0
 	ld [hl], b
-	ld hl, $c440
+;>         wEntityPrivate4[slot] = 0
+	ld hl, wEntityPrivate4
 	add hl, bc
 	ld [hl], b
-	ld hl, $c320
+;>         if (wEntitySpeedZ[slot] - 0xE0) & 0x80:   # hard landing
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld a, [hl]
 	sub $e0
 	and $80
-	jr z, jr_004_4f49
-
+	jr z, .soft
+;>             wBumpShakeTimer = 0x18
 	ld a, $18
-	ld [$c157], a
+	ld [wBumpShakeTimer], a
+;>             hJingle = 0x0B
 	ld a, $0b
-	ldh [$fff2], a
-	ld a, [$c146]
+	ldh [hJingle], a
+;>             if wIsLinkInTheAir == 0:
+	ld a, [wIsLinkInTheAir]
 	and a
-	jr nz, jr_004_4f49
-
-	call Call_0887
+	jr nz, .soft
+;>                 wEntityDropTimer[slot] = 0x0E    # Link is pinned
+	call GetEntityDropTimer
 	ld [hl], $0e
-	ld hl, $c320
+;>                 wEntitySpeedZ[slot] = 0
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], b
-	jr jr_004_4f57
+	jr .sit
 
-jr_004_4f49:
-	ld hl, $c320
+.soft
+;>@soft         else:
+;>             speed = wEntitySpeedZ[slot]
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld a, [hl]
+;>             wEntitySpeedZ[slot] = 0
 	ld [hl], b
+;>             if speed < 0xF2:
 	cp $f2
-	jr nc, jr_004_4f57
-
+	jr nc, .sit
+;>                 hJingle = 0x20
 	ld a, $20
-	ldh [$fff2], a
+	ldh [hJingle], a
 
-jr_004_4f57:
+.sit
+;>         wEntityState[slot] = 0
 	call Call_3B8D
 	ld [hl], b
-	call Call_0891
+;>         wEntityTimer[slot] = 0x20
+	call GetEntityTimer
 	ld [hl], $20
 
-jr_004_4f60:
+.pose
+;> return Call_3B87(1)
 	ld a, $01
 	jp Call_3B87
 
 
-Jump_04_4F65::
-	ld hl, $c320
+;@ def SlimeEyeHalfRise(slot: c)
+;@ path: boss/slime_eye
+;@ State 2, after a hit: flies straight up out of sight (speed $60) up to height $70, then waits
+;@ there (state 3, timer $30).
+SlimeEyeHalfRise::
+;> wEntitySpeedZ[slot] = 0x60
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], $60
-	call Call_04_6DD6
-	ld hl, $c310
+;> AddEntityZSpeedToPos_04(slot)
+	call AddEntityZSpeedToPos_04
+;> if wEntityZ[slot] >= 0x70:
+	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	cp $70
-	jr c, jr_004_4f7f
-
-	call Call_0891
+	jr c, .done
+;>     wEntityTimer[slot] = 0x30
+	call GetEntityTimer
 	ld [hl], $30
+;>     wEntityState[slot] += 1
 	call Call_3B8D
 
-jr_004_4f7f:
+.done
+;> return
 	ret
 
 
-Jump_04_4F80::
+;@ def SlimeEyeHalfDropOnLink(slot: c)
+;@ path: boss/slime_eye
+;@ State 3, out of sight (not drawn): when the timer is over it moves above Link and drops fast
+;@ (speed $C0 down), back in state 1 as a drop (wEntityPrivate4 = 1).
+SlimeEyeHalfDropOnLink::
+;> Call_3B87(0xFF)                              # hidden
 	ld a, $ff
 	call Call_3B87
-	call Call_0891
-	jr nz, jr_004_4faf
-
+;> if wEntityTimer[slot] == 0:
+	call GetEntityTimer
+	jr nz, .done
+;>     wEntityTimer[slot] = 0x18
 	ld [hl], $18
-	ld hl, $c440
+;>     wEntityPrivate4[slot] = 1
+	ld hl, wEntityPrivate4
 	add hl, bc
 	ld [hl], $01
+;>     wEntityState[slot] = 1
 	call Call_3B8D
 	ld [hl], $01
-	ld hl, $c320
+;>     wEntitySpeedZ[slot] = 0xC0
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], $c0
-	ldh a, [$ff98]
-	ld hl, $c200
+;>     wEntityX[slot] = hLinkX
+	ldh a, [hLinkX]
+	ld hl, wEntityX
 	add hl, bc
 	ld [hl], a
-	ldh a, [$ff99]
-	ld hl, $c210
+;>     wEntityY[slot] = hLinkY
+	ldh a, [hLinkY]
+	ld hl, wEntityY
 	add hl, bc
 	ld [hl], a
+;>     hJingle = 0x08
 	ld a, $08
-	ldh [$fff2], a
+	ldh [hJingle], a
 
-jr_004_4faf:
+.done
+;> return
 	ret
 
 
+;@ path: boss/slime_eye
+;@ Sprites of a half: 2 variants of 8 sprites (32 bytes each; y offset, x offset, tile, OAM attributes),
+;@ a 32x32 blob. 0 sitting, 1 in the air. Drawn by DrawSlimeEyeHalf.
+SlimeEyeHalfSprites::
 	db $f0, $f8, $60, $00, $f0, $00, $62, $00, $f0, $08, $62, $20, $f0, $10, $60, $20
 	db $00, $f8, $64, $00, $00, $00, $66, $00, $00, $08, $66, $20, $00, $10, $64, $20
 	db $f0, $f8, $68, $00, $f0, $00, $6a, $00, $f0, $08, $6a, $20, $f0, $10, $68, $20
 	db $00, $f8, $6c, $00, $00, $00, $66, $00, $00, $08, $66, $20, $00, $10, $6c, $20
+;@ path: boss/slime_eye
+;@ Shadow of a half in the air: 4 sprites of tile $26 in a row, 12 pixels below the drawing position.
+SlimeEyeHalfShadowSprites::
 	db $0c, $fb, $26, $00, $0c, $01, $26, $00, $0c, $07, $26, $00, $0c, $0d, $26, $00
 
-Call_04_5000::
-	ld hl, $c3b0
+;@ def DrawSlimeEyeHalf(slot: c)
+;@ path: boss/slime_eye
+;@ Draws a half (8 sprites of SlimeEyeHalfSprites) and, while it is visible and in the air, its shadow.
+;@ test: skip writes OAM through bank-0 sprite code
+DrawSlimeEyeHalf::
+;>@d Call_3D26(SlimeEyeHalfSprites + wEntitySpriteVariant[slot] * 32, 8)
+	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	ld d, b
 	rla
 	rl d
+;=@d
 	rla
 	rl d
 	rla
 	rl d
 	rla
 	rl d
+;=@d
 	rla
 	rl d
 	and $e0
 	ld e, a
-	ld hl, $4fb0
+	ld hl, SlimeEyeHalfSprites
 	add hl, de
+;=@d
 	ld c, $08
 	call Call_3D26
+;> Call_3DD0(8)
 	ld a, $08
 	call Call_3DD0
-	ld hl, $c3b0
+;>@if if wEntitySpriteVariant[slot] != 0xFF and wEntityZ[slot] != 0:
+	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	cp $ff
-	jr z, jr_004_504a
-
-	ld hl, $c310
+	jr z, .done
+;=@if
+	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_004_504a
-
-	ldh a, [$ffef]
+	jr z, .done
+;>     hActiveEntityDrawY = hActiveEntityY - 2
+	ldh a, [hActiveEntityY]
 	sub $02
-	ldh [$ffec], a
-	ld hl, $4ff0
+	ldh [hActiveEntityDrawY], a
+;>     Call_3D26(SlimeEyeHalfShadowSprites, 4)
+	ld hl, SlimeEyeHalfShadowSprites
 	ld c, $04
 	call Call_3D26
+;>     Call_3DD0(4)
 	ld a, $04
 	call Call_3DD0
 
-jr_004_504a:
+.done
+;> return Call_3DBA(slot)
 	jp Call_3DBA
 
 
-	db $cd, $91, $08, $36, $ff, $21, $10, $c4, $09, $36, $08, $21, $60, $c3, $09, $36
-	db $12, $21, $00, $c2, $09, $cd, $69, $50, $21, $10, $c2, $09, $7e, $c6, $08, $77
-	db $3e, $ff, $c3, $87, $3b
-
-Call_04_5072::
-	ld hl, $c2b0
+;@ def FacadeInit(slot: c)
+;@ path: boss/facade
+;@ Set-up of a new Facade (entity $5A, from the entity init table in bank 3, through a bank-switch
+;@ stub in bank 0): timer $FF, hit immunity for 8 frames, $12 hit points, moved 8 pixels right and down
+;@ (to the middle of its 2x2 tiles) and not drawn yet.
+FacadeInit::
+;> wEntityTimer[slot] = 0xFF
+	call GetEntityTimer
+	ld [hl], $ff
+;> wEntityIgnoreHitsTimer[slot] = 8
+	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
+	ld [hl], $08
+;> wEntityHealth[slot] = 0x12
+	ld hl, wEntityHealth
+	add hl, bc
+	ld [hl], $12
+;> AddEightAndHideEntity(slot, addr(wEntityX) + slot)
+	ld hl, wEntityX
+	add hl, bc
+	call AddEightAndHideEntity
+;> return AddEightAndHideEntity(slot, addr(wEntityY) + slot)   # (falls through)
+	ld hl, wEntityY
+	add hl, bc
+
+;@ def AddEightAndHideEntity(slot: c, ptr: hl)
+;@ path: boss/facade
+;@ Adds 8 to the byte at `ptr` (a position) and sets the entity's sprite variant to $FF (not drawn).
+;@ test: skip writes through a pointer into the entity tables
+AddEightAndHideEntity::
+;> mem[ptr] = (mem[ptr] + 8) & 0xFF
 	ld a, [hl]
-	rst $00
-
-JumpTable_04_5078::
-	dw Jump_04_5080
-	dw Jump_04_5470
-	dw Jump_04_550B
-	dw Jump_04_559C
-
-Jump_04_5080::
-	xor a
-	ld [$c155], a
-	call Call_3F12
-	call Call_380E
-	call Call_04_5438
-	ldh a, [$ffea]
-	cp $05
-	jp z, Jump_004_5115
-
-	ld hl, $c420
-	add hl, bc
-	ldh a, [$ffe7]
+	add $08
 	ld [hl], a
-	ld hl, $c440
+;> return Call_3B87(0xFF)
+	ld a, $ff
+	jp Call_3B87
+
+;@ def FacadeHandler(slot: c)
+;@ path: boss/facade
+;@ Entity $5A: Facade, boss of Face Shrine (level 6), a face in the floor, and the things it throws.
+;@ wEntityPrivate1: 0 the face, 1 a hole that opens in the floor, 2 a floor tile that flies at Link,
+;@ 3 a pot that flies at Link.
+;@ test: skip dispatches through a jump table into the whole boss
+FacadeHandler::
+;> return FacadeParts[wEntityPrivate1[slot]](slot)
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	rst $00
 
-JumpTable_04_50A1::
-	dw Jump_04_50A7
-	dw Jump_04_50E3
-	dw Jump_04_50ED
+;@ path: boss/facade
+;@ Handler of each piece, indexed by wEntityPrivate1.
+FacadeParts::
+	dw Facade
+	dw FacadeHole
+	dw FacadeFlyingTile
+	dw FacadePot
 
-Jump_04_50A7::
-	call Call_0891
+;@ def Facade(slot: c)
+;@ path: boss/facade
+;@ The face. When it is defeated, every other enemy in the room dies with it, it waits, explodes and
+;@ leaves a heart container (death steps in wEntityPrivate4).
+;@ test: skip dispatches through jump tables
+Facade::
+;> wScreenShakeX = 0
+	xor a
+	ld [wScreenShakeX], a
+;> Call_3F12()
+	call Call_3F12
+;> Call_380E()                                  # keep Link inside the boss arena
+	call Call_380E
+;> DrawFacade(slot)
+	call DrawFacade
+;> if hActiveEntityStatus == 5:
+;>     return FacadeActive(slot)
+	ldh a, [hActiveEntityStatus]
+	cp $05
+	jp z, FacadeActive
+;> wEntityFlashTimer[slot] = hFrameCounter      # defeated: keeps flashing
+	ld hl, wEntityFlashTimer
+	add hl, bc
+	ldh a, [hFrameCounter]
+	ld [hl], a
+;> return FacadeDeathStates[wEntityPrivate4[slot]](slot)
+	ld hl, wEntityPrivate4
+	add hl, bc
+	ld a, [hl]
+	rst $00
+
+;@ path: boss/facade
+;@ Steps of Facade's death, indexed by wEntityPrivate4.
+FacadeDeathStates::
+	dw FacadeDeathKillAll
+	dw FacadeDeathWait
+	dw FacadeDeathExplode
+
+;@ def FacadeDeathKillAll(slot: c)
+;@ path: boss/facade
+;@ Death step 0: every other active entity (status 5 or more) that is not flagged as indestructible
+;@ (physics flag bit 7) starts dying (status 1, $1F frames); then wait $80 frames.
+FacadeDeathKillAll::
+;> wEntityTimer[slot] = 0x80
+	call GetEntityTimer
 	ld [hl], $80
+;>@loop for other in range(15, -1, -1):
 	ld e, $0f
 	ld d, b
 
-jr_004_50af:
+.loop
+;>@if     if other != slot and not wEntityPhysicsFlags[other] & 0x80 and wEntityStatus[other] >= 5:
 	ld a, c
 	cp e
-	jr z, jr_004_50d7
-
-	ld hl, $c340
+	jr z, .next
+;=@if
+	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld a, [hl]
 	and $80
-	jr nz, jr_004_50d7
-
-	ld hl, $c280
+	jr nz, .next
+;=@if
+	ld hl, wEntityStatus
 	add hl, de
 	ld a, [hl]
 	cp $05
-	jr c, jr_004_50d7
-
+	jr c, .next
+;>         wEntityStatus[other] = 1             # dying
 	ld [hl], $01
-	ld hl, $c480
+;>         wEntityDyingTimer[other] = 0x1F
+	ld hl, wEntityDyingTimer
 	add hl, de
 	ld [hl], $1f
-	ld hl, $c340
+;>         wEntityPhysicsFlags[other] = (wEntityPhysicsFlags[other] & 0xF0) | 2   # 2 sprites
+	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld a, [hl]
 	and $f0
 	or $02
 	ld [hl], a
 
-jr_004_50d7:
+.next
+;=@loop
 	dec e
 	ld a, e
 	cp $ff
-	jr nz, jr_004_50af
+	jr nz, .loop
 
 jr_004_50dd:
-	ld hl, $c440
+;> wEntityPrivate4[slot] += 1
+	ld hl, wEntityPrivate4
 	add hl, bc
 	inc [hl]
 	ret
 
 
-Jump_04_50E3::
-	call Call_0891
-	jr nz, jr_004_50ec
-
+;@ def FacadeDeathWait(slot: c)
+;@ path: boss/facade
+;@ Death step 1: when the wait is over, explode for $FF frames.
+FacadeDeathWait::
+;> if wEntityTimer[slot] == 0:
+	call GetEntityTimer
+	jr nz, .done
+;>     wEntityTimer[slot] = 0xFF
 	ld [hl], $ff
+;>     wEntityPrivate4[slot] += 1               # (the tail of FacadeDeathKillAll)
 	jr jr_004_50dd
 
-jr_004_50ec:
+.done
+;> return
 	ret
 
 
-Jump_04_50ED::
-	call Call_0891
-	jp z, Jump_004_5746
+;@ def FacadeDeathExplode(slot: c)
+;@ path: boss/facade
+;@ Death step 2: explosions; at the end the face leaves a heart container.
+FacadeDeathExplode::
+;> if wEntityTimer[slot] == 0:
+	call GetEntityTimer
+;>     return BossDropHeartContainer_04(slot)
+	jp z, BossDropHeartContainer_04
+;> return BossDeathExplosion_04(wEntityTimer[slot])   # (falls through)
 
-Call_04_50F3::
+;@ def BossDeathExplosion_04(timer: a)
+;@ path: entity/helpers
+;@ Every 8 frames of the death timer `timer`: an explosion at a random spot within 16 pixels of the
+;@ dying boss (moves hActiveEntityX / hActiveEntityDrawY by -16..+15 for it).
+;@ test: skip spawns an explosion effect
+BossDeathExplosion_04::
+;> if timer & 7 != 0:
+;>     return
 	and $07
-	jr nz, jr_004_5114
-
-	call Call_27ED
+	jr nz, .done
+;>@x hActiveEntityX += (GetRandomByte() & 0x1F) - 0x10
+	call GetRandomByte
 	and $1f
 	sub $10
 	ld e, a
-	ld hl, $ffee
+	ld hl, hActiveEntityX
 	add [hl]
+;=@x
 	ld [hl], a
-	call Call_27ED
+;>@y hActiveEntityDrawY += (GetRandomByte() & 0x1F) - 0x10
+	call GetRandomByte
 	and $1f
 	sub $10
 	ld e, a
-	ld hl, $ffec
+	ld hl, hActiveEntityDrawY
 	add [hl]
+;=@y
 	ld [hl], a
-	call Call_04_59FB
+;> SpawnExplosionAtEntity_04()
+	call SpawnExplosionAtEntity_04
 
-jr_004_5114:
+.done
 	ret
 
 
-Jump_004_5115:
-	call Call_04_7F36
-	ld hl, $c420
+;@ def FacadeActive(slot: c)
+;@ path: boss/facade
+;@ The living face: a hit starts its hurt animation (wEntityPrivate5 = $FF); runs its state.
+;@ test: skip dispatches through a jump table
+FacadeActive::
+;> if ReturnIfNonInteractive_04(): return
+	call ReturnIfNonInteractive_04
+;> if wEntityFlashTimer[slot] != 0:            # just hit
+	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_004_5126
-
-	ld hl, $c390
+	jr z, .states
+;>     wEntityPrivate5[slot] = 0xFF
+	ld hl, wEntityPrivate5
 	add hl, bc
 	ld [hl], $ff
 
-jr_004_5126:
-	ld hl, $c340
+.states
+;> wEntityPhysicsFlags[slot] = 0x08
+	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $08
-	ldh a, [$fff0]
+;> return FacadeStates[hActiveEntityState](slot)
+	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_04_512F::
-	dw Jump_04_5135
-	dw Jump_04_5160
-	dw Jump_04_51F1
+;@ path: boss/facade
+;@ States of the living face.
+FacadeStates::
+	dw FacadeWait
+	dw FacadeAwaken
+	dw FacadeFight
 
-Jump_04_5135::
-	call Call_0891
-	jr nz, jr_004_513f
-
+;@ def FacadeWait(slot: c)
+;@ path: boss/facade
+;@ State 0: waits for its timer (set to $FF on creation), then wakes up for $FF frames.
+FacadeWait::
+;> if wEntityTimer[slot] == 0:
+	call GetEntityTimer
+	jr nz, .done
+;>     wEntityTimer[slot] = 0xFF
 	ld [hl], $ff
+;>     wEntityState[slot] += 1
 	call Call_3B8D
 
-jr_004_513f:
+.done
+;> return
 	ret
 
 
+;@ path: boss/facade
+;@ Sprite variant of the waking face, indexed by timer / 8 (31 down to 0): closed (3), opening
+;@ (2, 1, 0), blinking (1 / 0), then open (0). 32 bytes.
+FacadeAwakenFrames::
 	db $03, $03, $03, $03, $03, $02, $01, $00, $01, $00, $01, $01, $01, $01, $01, $01
 	db $01, $01, $01, $01, $01, $01, $01, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
-Jump_04_5160::
-	call Call_0891
-	jr z, jr_004_5174
-
+;@ def FacadeAwaken(slot: c)
+;@ path: boss/facade
+;@ State 1: the face opens its eyes (FacadeAwakenFrames), then speaks (dialogue $B6) and starts the
+;@ fight: first hole after $FF frames, first flying tile after $A0 frames.
+;@ test: skip opens a dialogue
+FacadeAwaken::
+;> t = wEntityTimer[slot]
+	call GetEntityTimer
+;> if t != 0:
+	jr z, .speak
+;>@v     return Call_3B87(FacadeAwakenFrames[(t >> 3) & 0x1F])
 	rra
 	rra
 	rra
 	and $1f
 	ld e, a
 	ld d, b
-	ld hl, $5140
+;=@v
+	ld hl, FacadeAwakenFrames
 	add hl, de
 	ld a, [hl]
 	jp Call_3B87
 
 
-jr_004_5174:
+.speak
+;> wEntityState[slot] += 1
 	call Call_3B8D
-	call Call_088C
+;> wEntityTimer1[slot] = 0xA0                   # first flying tile
+	call GetEntityTimer1
 	ld [hl], $a0
-	call Call_0887
+;> wEntityDropTimer[slot] = 0xFF                # first hole
+	call GetEntityDropTimer
 	ld [hl], $ff
+;> OpenDialog(0xB6)
 	ld a, $b6
-	call Call_2197
+	call OpenDialog
 	ret
 
 
-	db $03, $02, $04, $02, $28, $38, $48, $58, $68, $78, $28, $78, $28, $78, $28, $38
-	db $48, $58, $68, $78, $30, $30, $30, $30, $30, $30, $40, $40, $50, $50, $60, $60
-	db $60, $60, $60, $60, $28, $38, $48, $58, $68, $78, $18, $88, $18, $88, $18, $88
-	db $18, $88, $28, $38, $48, $58, $68, $78, $20, $20, $20, $20, $20, $20, $30, $30
-	db $40, $40, $50, $50, $60, $60, $70, $70, $70, $70, $70, $70, $00, $13, $01, $12
+;@ path: boss/facade
+;@ Sprite variant of the fighting face by timer / 8 (3 down to 0) while its timer runs ($1F frames at
+;@ random times): mouth movement 3, 2, 4, 2.
+FacadeMouthFrames::
+	db $03, $02, $04, $02
+
+;@ path: boss/facade
+;@ X position (pixels) of the 16 places where a hole can open, around the face. 16 bytes.
+FacadeHoleX::
+	db $28, $38, $48, $58, $68, $78, $28, $78, $28, $78, $28, $38
+	db $48, $58, $68, $78
+
+;@ path: boss/facade
+;@ Y position of the 16 hole places (same index as FacadeHoleX). 16 bytes.
+FacadeHoleY::
+	db $30, $30, $30, $30, $30, $30, $40, $40, $50, $50, $60, $60
+	db $60, $60, $60, $60
+
+;@ path: boss/facade
+;@ X position of the 20 floor tiles that fly at Link: the ring of floor tiles around the edge of the
+;@ room. 20 bytes.
+FacadeTileX::
+	db $28, $38, $48, $58, $68, $78, $18, $88, $18, $88, $18, $88
+	db $18, $88, $28, $38, $48, $58, $68, $78
+
+;@ path: boss/facade
+;@ Y position of the 20 flying floor tiles (same index as FacadeTileX). 20 bytes.
+FacadeTileY::
+	db $20, $20, $20, $20, $20, $20, $30, $30
+	db $40, $40, $50, $50, $60, $60, $70, $70, $70, $70, $70, $70
+
+;@ path: boss/facade
+;@ Order in which the floor tiles fly (index into FacadeTileX / FacadeTileY), from both ends of the
+;@ ring in turn. 20 bytes.
+FacadeTileOrder::
+	db $00, $13, $01, $12
 	db $02, $11, $03, $10, $04, $0f, $05, $0e, $06, $0d, $07, $0c, $08, $0b, $09, $0a
-	db $18, $88, $18, $88, $20, $70, $70, $20, $00, $ff
+;@ path: boss/facade
+;@ X position of the four pots in the room corners (thrown in this order). 4 bytes.
+FacadePotX::
+	db $18, $88, $18, $88
 
-Jump_04_51F1::
-	ldh a, [$ffe7]
+;@ path: boss/facade
+;@ Y position of the four corner pots. 4 bytes.
+FacadePotY::
+	db $20, $70, $70, $20
+
+;@ path: boss/facade
+;@ X offset of the screen while the face rumbles (wScreenShakeX), switching every 8 frames: 0 / -1.
+FacadeRumbleOffsets::
+	db $00, $ff
+
+;@ def FacadeFight(slot: c)
+;@ path: boss/facade
+;@ State 2, the fight. The face rumbles and moves its mouth at random. Every $40 frames one of the 20
+;@ floor tiles flies at Link (FacadeTileOrder); once 18 have flown, the four corner pots follow, one
+;@ every $40 frames; once all 20 tiles and the 4 pots are done, holes open in the floor every $18-$27
+;@ frames, never twice in a row at the same place. A hit plays the hurt animation (FacadeHurtFrames).
+;@ wEntityPrivateCounter = tiles thrown, wEntityPrivate3 = pots thrown, wEntityPrivate2 = last hole.
+;@ test: skip spawns entities
+FacadeFight::
+;>@if if hFrameCounter & 0x3F == 0 and GetRandomByte() & 1 == 0:
+	ldh a, [hFrameCounter]
 	and $3f
-	jr nz, jr_004_5203
-
-	call Call_27ED
+	jr nz, .rumble
+;=@if
+	call GetRandomByte
 	and $01
-	jr nz, jr_004_5203
-
-	call Call_0891
+	jr nz, .rumble
+;>     wEntityTimer[slot] = 0x1F                # mouth movement
+	call GetEntityTimer
 	ld [hl], $1f
 
-jr_004_5203:
-	ldh a, [$ffe7]
+.rumble
+;>@sh wScreenShakeX = FacadeRumbleOffsets[(hFrameCounter >> 3) & 1]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
 	ld e, a
+;=@sh
 	ld d, b
-	ld hl, $51ef
+	ld hl, FacadeRumbleOffsets
 	add hl, de
 	ld a, [hl]
-	ld [$c155], a
-	call Call_0887
-	jr nz, jr_004_527c
-
-	call Call_27ED
+	ld [wScreenShakeX], a
+;> if wEntityDropTimer[slot] == 0:              # time for a hole
+	call GetEntityDropTimer
+	jr nz, .tile
+;>     wEntityDropTimer[slot] = 0x18 + (GetRandomByte() & 0x0F)
+	call GetRandomByte
 	and $0f
 	add $18
 	ld [hl], a
-	ld hl, $c3d0
+;>@if2     if wEntityPrivateCounter[slot] >= 0x14 and wEntityPrivate3[slot] >= 4:   # tiles and pots used up
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	cp $14
-	jr c, jr_004_527c
-
-	ld hl, $c2d0
+	jr c, .tile
+;=@if2
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	cp $04
-	jr c, jr_004_527c
-
+	jr c, .tile
+;>         new = Call_3C01(0x5A)
 	ld a, $5a
 	call Call_3C01
-	jr c, jr_004_527c
-
-	ld hl, $c2b0
+;>         if new is not None:
+	jr c, .tile
+;>             wEntityPrivate1[new] = 1         # a hole
+	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $01
 
-jr_004_5240:
-	call Call_27ED
+.pickHole
+;>             while True:
+;>                 spot = GetRandomByte() & 0x0F
+	call GetRandomByte
 	and $0f
-	ld hl, $c2c0
+;>                 if spot != wEntityPrivate2[slot]:   # not where the last one was
+;>                     break
+	ld hl, wEntityPrivate2
 	add hl, bc
 	cp [hl]
-	jr z, jr_004_5240
-
+	jr z, .pickHole
+;>             wEntityPrivate2[slot] = spot
 	ld [hl], a
+;>@hx             wEntityX[new] = FacadeHoleX[spot]
 	push bc
 	ld c, a
-	ld hl, $518b
+	ld hl, FacadeHoleX
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c200
+	ld hl, wEntityX
+;=@hx
 	add hl, de
 	ld [hl], a
-	ld hl, $519b
+;>             wEntityY[new] = FacadeHoleY[spot]
+	ld hl, FacadeHoleY
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-	ld hl, $c2e0
+;>             wEntityTimer[new] = 0x7F
+	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $7f
-	ld hl, $c340
+;>             wEntityPhysicsFlags[new] = 0xC2
+	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], $c2
-	ld hl, $c350
+;>             wEntityHitboxFlags[new] = 0
+	ld hl, wEntityHitboxFlags
 	add hl, de
 	ld [hl], $00
-	ld hl, $c430
+;>             wEntityOptions1[new] = 0
+	ld hl, wEntityOptions1
 	add hl, de
 	ld [hl], $00
 	pop bc
 
-jr_004_527c:
-	call Call_088C
-	jr nz, jr_004_52d2
-
+.tile
+;> if wEntityTimer1[slot] == 0:                 # time for a flying tile
+	call GetEntityTimer1
+	jr nz, .pot
+;>     wEntityTimer1[slot] = 0x40
 	ld [hl], $40
-	ld hl, $c3d0
+;>     if wEntityPrivateCounter[slot] < 0x14:
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	cp $14
-	jr nc, jr_004_52d2
-
+	jr nc, .pot
+;>         new = Call_3C01(0x5A)
 	ld a, $5a
 	call Call_3C01
-	jr c, jr_004_52d2
-
-	ld hl, $c2b0
+;>         if new is not None:
+	jr c, .pot
+;>             wEntityPrivate1[new] = 2         # a flying floor tile
+	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $02
+;>             n = wEntityPrivateCounter[slot]
 	push bc
-	ld hl, $c3d0
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld c, [hl]
+;>             wEntityPrivateCounter[slot] += 1
 	inc [hl]
-	ld hl, $51d3
+;>             i = FacadeTileOrder[n]
+	ld hl, FacadeTileOrder
 	add hl, bc
 	ld c, [hl]
-	ld hl, $51ab
+;>             wEntityX[new] = FacadeTileX[i]
+	ld hl, FacadeTileX
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c200
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ld hl, $51bf
+;>             wEntityY[new] = FacadeTileY[i]
+	ld hl, FacadeTileY
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-	ld hl, $c340
+;>             wEntityPhysicsFlags[new] = 0x12
+	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], $12
-	ld hl, $c350
+;>             wEntityHitboxFlags[new] = 0
+	ld hl, wEntityHitboxFlags
 	add hl, de
 	ld [hl], $00
-	ld hl, $c430
+;>             wEntityOptions1[new] = 0
+	ld hl, wEntityOptions1
 	add hl, de
 	ld [hl], $00
-	ld hl, $c4d0
+;>             wEntityHealthGroup[new] = 2
+	ld hl, wEntityHealthGroup
 	add hl, de
 	ld [hl], $02
 	pop bc
 
-jr_004_52d2:
-	ld hl, $c300
+.pot
+;> if wEntityTimer2[slot] == 0:                 # time for a pot
+	ld hl, wEntityTimer2
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr nz, jr_004_5349
-
+	jr nz, .anim
+;>     wEntityTimer2[slot] = 0x40
 	ld [hl], $40
-	ld hl, $c2d0
+;>@if3     if wEntityPrivate3[slot] < 4 and wEntityPrivateCounter[slot] >= 0x12:
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	cp $04
-	jr nc, jr_004_5349
-
-	ld hl, $c3d0
+	jr nc, .anim
+;=@if3
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	cp $12
-	jr c, jr_004_5349
-
+	jr c, .anim
+;>         new = Call_3C01(0x5A)
 	ld a, $5a
 	call Call_3C01
-	jr c, jr_004_5349
-
-	ld hl, $c2b0
+;>         if new is not None:
+	jr c, .anim
+;>             wEntityPrivate1[new] = 3         # a pot
+	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $03
+;>             n = wEntityPrivate3[slot]
 	push bc
-	ld hl, $c2d0
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld c, [hl]
+;>             wEntityPrivate3[slot] += 1
 	inc [hl]
-	ld hl, $51e7
+;>             wEntityX[new] = FacadePotX[n]
+	ld hl, FacadePotX
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c200
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ldh [$ffee], a
-	ld hl, $51eb
+;>             hActiveEntityX = FacadePotX[n]
+	ldh [hActiveEntityX], a
+;>             wEntityY[new] = FacadePotY[n]
+	ld hl, FacadePotY
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-	ldh [$ffef], a
-	ld hl, $c340
+;>             hActiveEntityY = FacadePotY[n]
+	ldh [hActiveEntityY], a
+;>             wEntityPhysicsFlags[new] = 0x12
+	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], $12
-	ld hl, $c350
+;>             wEntityHitboxFlags[new] = 0
+	ld hl, wEntityHitboxFlags
 	add hl, de
 	ld [hl], $00
-	ld hl, $c430
+;>             wEntityOptions1[new] = 0
+	ld hl, wEntityOptions1
 	add hl, de
 	ld [hl], $00
-	ld hl, $c4d0
+;>             wEntityHealthGroup[new] = 0x1B
+	ld hl, wEntityHealthGroup
 	add hl, de
 	ld [hl], $1b
+;>             wEntitySpeedX[new] = 1                # probe the corner for the pot object
 	push de
 	pop bc
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], $01
+;>             Call_3B9E(new)
 	call Call_3B9E
-	ld hl, $c2a0
+;>             if wEntityCollisions[new] == 0:  # the pot in that corner is already gone
+	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr nz, jr_004_5348
+	jr nz, .potDone
+;>                 DespawnEntity_04(new)
+	call DespawnEntity_04
 
-	call Call_04_6D4D
-
-jr_004_5348:
+.potDone
 	pop bc
 
-jr_004_5349:
-	call Call_0891
+.anim
+;>@m Call_3B87(FacadeMouthFrames[(wEntityTimer[slot] >> 3) & 3])
+	call GetEntityTimer
 	rra
 	rra
 	rra
 	and $03
 	ld e, a
+;=@m
 	ld d, b
-	ld hl, $5187
+	ld hl, FacadeMouthFrames
 	add hl, de
 	ld a, [hl]
 	call Call_3B87
-	ld hl, $c420
+;> if wEntityFlashTimer[slot] != 0:
+	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_004_5368
-
+	jr z, .hurt
+;>     Call_3B87(2)
 	ld a, $02
 	call Call_3B87
 
-jr_004_5368:
-	ld hl, $c390
+.hurt
+;> if wEntityPrivate5[slot] != 0:               # hurt animation running
+	ld hl, wEntityPrivate5
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_004_5387
-
+	jr z, .done
+;>     wEntityPrivate5[slot] -= 1
 	dec [hl]
+;>@hv     Call_3B87(FacadeHurtFrames[(wEntityPrivate5[slot] >> 4) & 0x0F])
 	rra
 	rra
 	rra
 	rra
 	and $0f
 	ld e, a
+;=@hv
 	ld d, b
-	ld hl, $5388
+	ld hl, FacadeHurtFrames
 	add hl, de
 	ld a, [hl]
 	call Call_3B87
-	ld hl, $c340
+;>     wEntityPhysicsFlags[slot] = 0x48
+	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $48
 
-jr_004_5387:
+.done
+;> return
 	ret
 
 
+;@ path: boss/facade
+;@ Sprite variant during Facade's hurt animation, indexed by wEntityPrivate5 / 16 (15 down to 0): the
+;@ face closes (2, 1, 0 ... read from the end), vanishes ($FF = not drawn) and comes back. 16 bytes.
+FacadeHurtFrames::
 	db $02, $01, $00, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $00, $01, $02
+;@ path: boss/facade
+;@ Sprites of the face: 5 variants of 8 sprites (32 bytes each; y offset, x offset, tile, OAM
+;@ attributes): two rows of four 8x16 sprites (eyes on top, mouth below). Variants: 0 eyes open,
+;@ 1 half open, 2 hurt, 3 eyes closed, 4 mouth open. Drawn by DrawFacade.
+FacadeSprites::
 	db $f8, $f0, $70, $00, $f8, $f8, $72, $00, $f8, $10, $72, $20, $f8, $18, $70, $20
 	db $08, $f8, $7c, $00, $08, $00, $7e, $00, $08, $08, $7e, $20, $08, $10, $7c, $20
 	db $f8, $f0, $74, $00, $f8, $f8, $76, $00, $f8, $10, $76, $20, $f8, $18, $74, $20
@@ -2604,392 +3707,612 @@ jr_004_5387:
 	db $f8, $f0, $70, $00, $f8, $f8, $72, $00, $f8, $10, $72, $20, $f8, $18, $70, $20
 	db $08, $f8, $60, $00, $08, $00, $62, $00, $08, $08, $62, $20, $08, $10, $60, $20
 
-Call_04_5438::
-	ld hl, $c3b0
+;@ def DrawFacade(slot: c)
+;@ path: boss/facade
+;@ Draws the face: 8 sprites of FacadeSprites for its variant.
+;@ test: skip writes OAM through bank-0 sprite code
+DrawFacade::
+;>@d Call_3D26(FacadeSprites + (wEntitySpriteVariant[slot] << 5), 8)
+	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	rla
 	rla
 	rla
+;=@d
 	rla
 	rla
 	and $e0
 	ld e, a
 	ld d, b
-	ld hl, $5398
+	ld hl, FacadeSprites
+;=@d
 	add hl, de
 	ld c, $08
 	call Call_3D26
 	ret
 
 
+;@ path: boss/facade
+;@ Sprites of a hole: 4 variants of a 16x16 entity (left tile, attributes, right tile, attributes; the
+;@ right half mirrored), from a small dent (0) to the open hole (3).
+FacadeHoleSprites::
 	db $68, $00, $68, $20, $6a, $00, $6a, $20, $6c, $00, $6c, $20, $6e, $00, $6e, $20
+;@ path: boss/facade
+;@ Variant of a hole by timer / 8 (15 down to 0, timer starts at $7F): opens, stays open (3), closes.
+;@ 16 bytes.
+FacadeHoleFrames::
 	db $00, $01, $02, $03, $03, $03, $03, $03, $03, $02, $01, $00, $00, $00, $00, $00
 
-Jump_04_5470::
-	ld de, $5450
+;@ def FacadeHole(slot: c)
+;@ path: boss/facade
+;@ Piece 1, a hole in the floor. While it is fully open it pulls Link in when he is within 8 pixels and
+;@ on the ground; within 3 pixels he falls in (Link motion 6, as into a pit of sinking sand).
+;@ test: skip moves Link through bank-0 code
+FacadeHole::
+;> Call_3C3B(FacadeHoleSprites)
+	ld de, FacadeHoleSprites
 	call Call_3C3B
-	call Call_04_7F36
-	call Call_0891
-	jp z, Call_04_6D4D
-
+;> if ReturnIfNonInteractive_04(): return
+	call ReturnIfNonInteractive_04
+;> t = wEntityTimer[slot]
+	call GetEntityTimer
+;> if t == 0:
+;>     return DespawnEntity_04(slot)
+	jp z, DespawnEntity_04
+;> if t == 0x50:
 	cp $50
-	jr nz, jr_004_5488
-
-	ld hl, $fff2
+	jr nz, .anim
+;>     hJingle = 0x40
+	ld hl, hJingle
 	ld [hl], $40
 
-jr_004_5488:
+.anim
+;>@v open = FacadeHoleFrames[(t >> 3) & 0x0F]
 	rra
 	rra
 	rra
 	and $0f
 	ld e, a
 	ld d, b
-	ld hl, $5460
+;=@v
+	ld hl, FacadeHoleFrames
 	add hl, de
 	ld a, [hl]
+;> Call_3B87(open)
 	call Call_3B87
+;>@if if open == 3 and wLinkMotionState != 6 and hLinkPositionZ == 0:   # open, Link not falling, on the ground
 	cp $03
-	jr nz, jr_004_54fa
-
-	ld a, [$c11c]
+	jr nz, .done
+;=@if
+	ld a, [wLinkMotionState]
 	cp $06
-	jr z, jr_004_54fa
-
-	ldh a, [$ffa2]
+	jr z, .done
+;=@if
+	ldh a, [hLinkPositionZ]
 	and a
-	jr nz, jr_004_54fa
-
-	call Call_04_6E08
+	jr nz, .done
+;>@near     if (GetEntityXDistanceToLink_04() + 8) & 0xFF < 0x10 and (GetEntityYDistanceToLink_04() + 8) & 0xFF < 0x10:
+	call GetEntityXDistanceToLink_04
 	add $08
 	cp $10
-	jr nc, jr_004_54fa
-
-	call Call_04_6E18
+	jr nc, .done
+;=@near
+	call GetEntityYDistanceToLink_04
 	add $08
 	cp $10
-	jr nc, jr_004_54fa
-
+	jr nc, .done
+;>         Call_3C30(0x0C)                      # vector towards Link ...
 	ld a, $0c
 	call Call_3C30
-	ldh a, [$ffd7]
+;>         hLinkSpeedY = -hMultiPurpose0        # ... reversed: pull Link to the hole
+	ldh a, [hMultiPurpose0]
 	cpl
 	inc a
-	ldh [$ff9b], a
-	ldh a, [$ffd8]
+	ldh [hLinkSpeedY], a
+;>         hLinkSpeedX = -hMultiPurpose1
+	ldh a, [hMultiPurpose1]
 	cpl
 	inc a
-	ldh [$ff9a], a
+	ldh [hLinkSpeedX], a
+;>         ApplyLinkSpeed()
 	push bc
-	call Call_20D6
+	call ApplyLinkSpeed
 	pop bc
-	call Call_04_6E08
+;>@in         if (GetEntityXDistanceToLink_04() + 3) & 0xFF < 6 and (GetEntityYDistanceToLink_04() + 3) & 0xFF < 6:
+	call GetEntityXDistanceToLink_04
 	add $03
 	cp $06
-	jr nc, jr_004_54fa
-
-	call Call_04_6E18
+	jr nc, .done
+;=@in
+	call GetEntityYDistanceToLink_04
 	add $03
 	cp $06
-	jr nc, jr_004_54fa
-
-	ldh a, [$ffee]
-	ldh [$ff98], a
+	jr nc, .done
+;>             hLinkX = hActiveEntityX
+	ldh a, [hActiveEntityX]
+	ldh [hLinkX], a
+;>             wLinkMotionState = 6             # falling into a hole
 	ld a, $06
-	ld [$c11c], a
-	call Call_093B
-	ld [$c198], a
-	call Call_0891
+	ld [wLinkMotionState], a
+;>             ResetSpinAttackAndDash()
+	call ResetSpinAttackAndDash
+;>             wLinkMotionCounter = 0
+	ld [wLinkMotionCounter], a
+;>             wEntityTimer[slot] = 0x40
+	call GetEntityTimer
 	ld [hl], $40
+;>             wHoleCollisionType = 0x50
 	ld a, $50
-	ld [$dbcb], a
+	ld [wHoleCollisionType], a
 
-jr_004_54fa:
+.done
+;> return
 	ret
 
 
-	db $40, $00, $40, $20, $42, $00, $42, $20, $70, $00, $70, $20, $72, $00, $72, $20
+;@ path: boss/facade
+;@ Sprites of a flying floor tile: 2 variants of a 16x16 entity (left tile, attributes, right tile,
+;@ attributes; right half mirrored): tiles $40 / $42, swapped every 8 frames.
+FacadeTileSprites::
+	db $40, $00, $40, $20, $42, $00, $42, $20
 
-Jump_04_550B::
-	ld de, $54fb
-	ldh a, [$fff7]
+;@ path: boss/facade
+;@ The same flying tile in map 1, which has the floor graphics at tiles $70 / $72.
+FacadeTileSpritesMap1::
+	db $70, $00, $70, $20, $72, $00, $72, $20
+
+;@ def FacadeFlyingTile(slot: c)
+;@ path: boss/facade
+;@ Piece 2: a floor tile that lifts off, hovers buzzing and then flies straight at Link; it shatters
+;@ when it hits a wall or is hit. Lifting off leaves floor where it was.
+;@ test: skip dispatches through a jump table
+FacadeFlyingTile::
+;>@d Call_3C3B(FacadeTileSpritesMap1 if hMapId == 1 else FacadeTileSprites)
+	ld de, FacadeTileSprites
+	ldh a, [hMapId]
 	cp $01
-	jr nz, jr_004_5517
-
-	ld de, $5503
-
-jr_004_5517:
+	jr nz, .draw
+	ld de, FacadeTileSpritesMap1
+.draw
+;=@d
 	call Call_3C3B
-	call Call_08E2
-	ld hl, $c420
+;> DecrementEntityIgnoreHitsTimer(slot)
+	call DecrementEntityIgnoreHitsTimer
+;> if wEntityFlashTimer[slot] != 0:             # hit
+;>     return ShatterFacadePiece(slot)
+	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr nz, jr_004_5594
-
-	call Call_04_7F36
-	ldh a, [$ffe7]
+	jr nz, ShatterFacadePiece
+;> if ReturnIfNonInteractive_04(): return
+	call ReturnIfNonInteractive_04
+;>@v Call_3B87((hFrameCounter >> 3) & 1)
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
+;=@v
 	call Call_3B87
-	ldh a, [$ffe7]
+;> if hFrameCounter & 7 == 0:
+	ldh a, [hFrameCounter]
 	and $07
-	jr nz, jr_004_553c
-
+	jr nz, .states
+;>     hJingle = 0x3F                           # buzzing
 	ld a, $3f
-	ldh [$fff2], a
+	ldh [hJingle], a
 
-jr_004_553c:
-	ldh a, [$fff0]
+.states
+;> return FacadeFlyingTileStates[hActiveEntityState](slot)
+	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_04_553F::
-	dw Jump_04_5545
-	dw Jump_04_5564
-	dw Jump_04_5583
+;@ path: boss/facade
+;@ States of a flying floor tile.
+FacadeFlyingTileStates::
+	dw FacadeTileLiftOff
+	dw FacadeTileRise
+	dw FacadeTileFly
 
-Jump_04_5545::
-	call Call_0891
+;@ def FacadeTileLiftOff(slot: c)
+;@ path: boss/facade
+;@ State 0: hover for $60 frames; put a room object where the tile was, chosen by wEntityPrivate4: 1
+;@ object $AA, $10 object $1D, $20 object $AE, anything else (the Facade's tiles) the floor object $0D.
+;@ test: skip queues background drawing
+FacadeTileLiftOff::
+;> wEntityTimer[slot] = 0x60
+	call GetEntityTimer
 	ld [hl], $60
+;> wEntityState[slot] += 1
 	call Call_3B8D
-	ld hl, $c440
+;> kind = wEntityPrivate4[slot]
+	ld hl, wEntityPrivate4
 	add hl, bc
 	ld a, [hl]
+;> if kind == 0x01:
+;>     return PlaceObjectAAUnderEntity()
 	cp $01
-	jp z, Jump_004_5608
-
+	jp z, PlaceObjectAAUnderEntity
+;> if kind == 0x10:
+;>     return PlaceObject1DUnderEntity()
 	cp $10
-	jp z, Jump_004_5616
-
+	jp z, PlaceObject1DUnderEntity
+;> if kind == 0x20:
+;>     return PlaceObjectAEUnderEntity()
 	cp $20
-	jp z, Jump_004_560f
+	jp z, PlaceObjectAEUnderEntity
+;> return PlaceFloorUnderEntity()
+	jp PlaceFloorUnderEntity
 
-	jp Jump_004_5624
 
-
-Jump_04_5564::
+;@ def FacadeTileRise(slot: c)
+;@ path: boss/facade
+;@ State 1: during the first $30 frames the piece rises one pixel every 4 frames, then hovers; when the
+;@ timer runs out it flies straight at Link at speed $18. Also used by the pots (FacadePotRise).
+;@ test: skip calls bank-3 collision code
+FacadeTileRise::
+;> Call_3BEB(slot)                              # weapon hits
 	call Call_3BEB
-	call Call_0891
-	jr z, jr_004_557a
-
+;> t = wEntityTimer[slot]
+	call GetEntityTimer
+;> if t == 0:
+	jr z, .launch
+;>@a     if t >= 0x30 and t & 3 == 0:
 	cp $30
-	jr c, jr_004_5582
-
+	jr c, .done
 	and $03
-	jr nz, jr_004_5579
-
-	ld hl, $c310
+	jr nz, .rise
+;>         wEntityZ[slot] += 1
+	ld hl, wEntityZ
 	add hl, bc
 	inc [hl]
 
-jr_004_5579:
+.rise
+;>     return
 	ret
 
 
-jr_004_557a:
+.launch
+;> wEntityState[slot] += 1
 	call Call_3B8D
+;> Call_3C25(0x18)                              # straight at Link
 	ld a, $18
 	call Call_3C25
 
-jr_004_5582:
+.done
+;> return
 	ret
 
 
-Jump_04_5583::
-	call Call_04_6D9D
+;@ def FacadeTileFly(slot: c)
+;@ path: boss/facade
+;@ State 2: flies on; hurts Link on touch and shatters against a wall.
+;@ test: skip calls bank-3 collision code
+FacadeTileFly::
+;> UpdateEntityPosWithSpeed_04(slot)
+	call UpdateEntityPosWithSpeed_04
+;> Call_3B9E(slot)                              # walls
 	call Call_3B9E
+;> Call_3BB4(slot)                              # touching Link, weapon hits
 	call Call_3BB4
-	ld hl, $c2a0
+;> if wEntityCollisions[slot] != 0:
+;>     ShatterFacadePiece(slot)                 # (falls through)
+	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_004_5597
+	jr z, ShatterFacadePiece.done
 
-Jump_004_5594:
-jr_004_5594:
+;@ def ShatterFacadePiece(slot: c)
+;@ path: boss/facade
+;@ The flying tile or pot breaks: shards, and the entity is removed.
+;@ test: skip spawns an effect through bank 3
+ShatterFacadePiece::
+;> Call_3E64()                                  # shards (removes the entity)
 	call Call_3E64
 
-jr_004_5597:
+.done
+;> return
 	ret
 
 
+;@ path: boss/facade
+;@ Sprite of a pot: one 16x16 variant (tile $F0 for both halves, the right half mirrored; palette
+;@ bit 4 set).
+FacadePotSprites::
 	db $f0, $10, $f0, $30
 
-Jump_04_559C::
-	ld de, $5598
+;@ def FacadePot(slot: c)
+;@ path: boss/facade
+;@ Piece 3: one of the four corner pots. It lifts off like the floor tiles, flies at Link and shatters.
+;@ test: skip dispatches through a jump table
+FacadePot::
+;> Call_3C3B(FacadePotSprites)
+	ld de, FacadePotSprites
 	call Call_3C3B
-	ld hl, $c420
+;> if wEntityFlashTimer[slot] != 0:
+;>     return ShatterFacadePiece(slot)
+	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr nz, jr_004_5594
-
-	call Call_04_7F36
-	ldh a, [$fff0]
+	jr nz, ShatterFacadePiece
+;> if ReturnIfNonInteractive_04(): return
+	call ReturnIfNonInteractive_04
+;> return FacadePotStates[hActiveEntityState](slot)
+	ldh a, [hActiveEntityState]
 	rst $00
 
-JumpTable_04_55B0::
-	dw Jump_04_55B6
-	dw Jump_04_55C2
-	dw Jump_04_55E1
+;@ path: boss/facade
+;@ States of a flying pot.
+FacadePotStates::
+	dw FacadePotLiftOff
+	dw FacadePotRise
+	dw FacadePotFly
 
-Jump_04_55B6::
-	call Call_04_561D
+;@ def FacadePotLiftOff(slot: c)
+;@ path: boss/facade
+;@ State 0: the pot object in the corner becomes floor; hover for $60 frames.
+;@ test: skip queues background drawing
+FacadePotLiftOff::
+;> PlaceFloorUnderPot()
+	call PlaceFloorUnderPot
+;> wEntityState[slot] += 1
 	call Call_3B8D
-	call Call_0891
+;> wEntityTimer[slot] = 0x60
+	call GetEntityTimer
 	ld [hl], $60
 	ret
 
 
-Jump_04_55C2::
+;@ def FacadePotRise(slot: c)
+;@ path: boss/facade
+;@ State 1 of a pot: the same as FacadeTileRise (rises, hovers, launches at Link at speed $18).
+;@ test: skip calls bank-3 collision code
+FacadePotRise::
+;> Call_3BEB(slot)
 	call Call_3BEB
-	call Call_0891
-	jr z, jr_004_55d8
-
+;> t = wEntityTimer[slot]
+	call GetEntityTimer
+;> if t == 0:
+	jr z, .launch
+;>@a     if t >= 0x30 and t & 3 == 0:
 	cp $30
-	jr c, jr_004_55e0
-
+	jr c, .done
 	and $03
-	jr nz, jr_004_55d7
-
-	ld hl, $c310
+	jr nz, .rise
+;>         wEntityZ[slot] += 1
+	ld hl, wEntityZ
 	add hl, bc
 	inc [hl]
 
-jr_004_55d7:
+.rise
+;>     return
 	ret
 
 
-jr_004_55d8:
+.launch
+;> wEntityState[slot] += 1
 	call Call_3B8D
+;> Call_3C25(0x18)
 	ld a, $18
 	call Call_3C25
 
-jr_004_55e0:
+.done
+;> return
 	ret
 
 
-Jump_04_55E1::
-	call Call_04_6D9D
+;@ def FacadePotFly(slot: c)
+;@ path: boss/facade
+;@ State 2 of a pot: flies on, hurts Link on touch, shatters against a wall.
+;@ test: skip calls bank-3 collision code
+FacadePotFly::
+;> UpdateEntityPosWithSpeed_04(slot)
+	call UpdateEntityPosWithSpeed_04
+;> Call_3B9E(slot)
 	call Call_3B9E
+;> Call_3BB4(slot)
 	call Call_3BB4
-	ld hl, $c2a0
+;> if wEntityCollisions[slot] != 0:
+;>     return ShatterFacadePiece(slot)
+	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and a
-	jp nz, Jump_004_5594
+	jp nz, ShatterFacadePiece
 
 	ret
 
 
-	db $10, $12, $11, $13, $10, $12, $11, $13, $14, $16, $15, $17, $76, $77, $76, $77
+;@ path: world/room_objects
+;@ Background tiles of the floor object $0D (top left, bottom left, top right, bottom right), put where a
+;@ flying floor tile lifted off. 4 bytes.
+FloorObjectTiles::
+	db $10, $12, $11, $13
+
+;@ path: world/room_objects
+;@ The same floor tiles, put where a pot lifted off. 4 bytes.
+PotFloorObjectTiles::
+	db $10, $12, $11, $13
+
+;@ path: world/room_objects
+;@ Background tiles of room object $AA (top left, bottom left, top right, bottom right). 4 bytes.
+ObjectAATiles::
+	db $14, $16, $15, $17
+
+;@ path: world/room_objects
+;@ Background tiles of room object $AE. 4 bytes.
+ObjectAETiles::
+	db $76, $77, $76, $77
+;@ path: world/room_objects
+;@ Background tiles of room object $1D. 4 bytes.
+Object1DTiles::
 	db $76, $49, $76, $49
 
-Jump_004_5608:
-	ld de, $55fc
+;@ def PlaceObjectAAUnderEntity()
+;@ path: world/room_objects
+;@ Puts room object $AA (tiles ObjectAATiles) on the square under the entity.
+;@ test: skip queues background drawing
+PlaceObjectAAUnderEntity::
+;> return PlaceRoomObjectUnderEntity(0xAA, ObjectAATiles)
+	ld de, ObjectAATiles
 	ld a, $aa
-	jr jr_004_5629
+	jr PlaceRoomObjectUnderEntity
 
-Jump_004_560f:
-	ld de, $5600
+;@ def PlaceObjectAEUnderEntity()
+;@ path: world/room_objects
+;@ Puts room object $AE on the square under the entity.
+;@ test: skip queues background drawing
+PlaceObjectAEUnderEntity::
+;> return PlaceRoomObjectUnderEntity(0xAE, ObjectAETiles)
+	ld de, ObjectAETiles
 	ld a, $ae
-	jr jr_004_5629
+	jr PlaceRoomObjectUnderEntity
 
-Jump_004_5616:
-	ld de, $5604
+;@ def PlaceObject1DUnderEntity()
+;@ path: world/room_objects
+;@ Puts room object $1D on the square under the entity.
+;@ test: skip queues background drawing
+PlaceObject1DUnderEntity::
+;> return PlaceRoomObjectUnderEntity(0x1D, Object1DTiles)
+	ld de, Object1DTiles
 	ld a, $1d
-	jr jr_004_5629
+	jr PlaceRoomObjectUnderEntity
 
-Call_04_561D::
-	ld de, $55f8
+;@ def PlaceFloorUnderPot()
+;@ path: world/room_objects
+;@ Puts the floor object $0D where a pot stood.
+;@ test: skip queues background drawing
+PlaceFloorUnderPot::
+;> return PlaceRoomObjectUnderEntity(0x0D, PotFloorObjectTiles)
+	ld de, PotFloorObjectTiles
 	ld a, $0d
-	jr jr_004_5629
+	jr PlaceRoomObjectUnderEntity
 
-Jump_004_5624:
-	ld de, $55f4
+;@ def PlaceFloorUnderEntity()
+;@ path: world/room_objects
+;@ Puts the floor object $0D on the square under the entity.
+;@ test: skip queues background drawing
+PlaceFloorUnderEntity::
+;> return PlaceRoomObjectUnderEntity(0x0D, FloorObjectTiles)   # (falls through)
+	ld de, FloorObjectTiles
 	ld a, $0d
 
-jr_004_5629:
-	ldh [$ffd7], a
+;@ def PlaceRoomObjectUnderEntity(object: a, tiles: de)
+;@ path: world/room_objects
+;@ Replaces the room object on the 16x16 square under the active entity (its position minus (7, 15)) by
+;@ `object` in wRoomObjects and queues the drawing of its 4 tiles (`tiles`: top left, bottom left, top
+;@ right, bottom right) as two vertical 2-tile draw commands for the next VBlank.
+;@ test: skip queues background drawing through bank-0 code
+PlaceRoomObjectUnderEntity::
+;> hMultiPurpose0 = object
+	ldh [hMultiPurpose0], a
 	push de
-	ldh a, [$ffef]
+;> hBGPosY = hActiveEntityY - 0x0F
+	ldh a, [hActiveEntityY]
 	sub $0f
-	ldh [$ffcd], a
-	ldh a, [$ffee]
+	ldh [hBGPosY], a
+;> hBGPosX = hActiveEntityX - 7
+	ldh a, [hActiveEntityX]
 	sub $07
-	ldh [$ffce], a
+	ldh [hBGPosX], a
+;>@sq square = (hBGPosY & 0xF0) | (hBGPosX >> 4)  # row * 16 + column
 	swap a
 	and $0f
 	ld e, a
-	ldh a, [$ffcd]
+	ldh a, [hBGPosY]
 	and $f0
 	or e
+;=@sq
 	ld e, a
 	ld d, $00
-	ld hl, $d711
+;> wRoomObjects[square] = object
+	ld hl, wRoomObjects
 	add hl, de
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	ld [hl], a
-	call Call_2839
-	ld a, [$d600]
+;> GetBGAddress()                               # -> hBGAddrHigh / hBGAddrLow
+	call GetBGAddress
+;> cmd = addr(wDrawCommand) + wDrawCommandsSize
+	ld a, [wDrawCommandsSize]
 	ld e, a
 	ld d, $00
-	ld hl, $d601
+	ld hl, wDrawCommand
 	add hl, de
+;> wDrawCommandsSize += 10
 	add $0a
-	ld [$d600], a
+	ld [wDrawCommandsSize], a
 	pop de
-	ldh a, [$ffcf]
+;> mem[cmd] = hBGAddrHigh                       # left column: 2 tiles downwards
+	ldh a, [hBGAddrHigh]
 	ld [hli], a
-	ldh a, [$ffd0]
+;> mem[cmd + 1] = hBGAddrLow
+	ldh a, [hBGAddrLow]
 	ld [hli], a
+;> mem[cmd + 2] = 0x81
 	ld a, $81
 	ld [hli], a
+;> mem[cmd + 3] = mem[tiles]
 	ld a, [de]
 	inc de
 	ld [hli], a
+;> mem[cmd + 4] = mem[tiles + 1]
 	ld a, [de]
 	inc de
 	ld [hli], a
-	ldh a, [$ffcf]
+;> mem[cmd + 5] = hBGAddrHigh                   # right column
+	ldh a, [hBGAddrHigh]
 	ld [hli], a
-	ldh a, [$ffd0]
+;> mem[cmd + 6] = (hBGAddrLow + 1) & 0xFF
+	ldh a, [hBGAddrLow]
 	inc a
 	ld [hli], a
+;> mem[cmd + 7] = 0x81
 	ld a, $81
 	ld [hli], a
+;> mem[cmd + 8] = mem[tiles + 2]
 	ld a, [de]
 	inc de
 	ld [hli], a
+;> mem[cmd + 9] = mem[tiles + 3]
 	ld a, [de]
 	ld [hli], a
+;> mem[cmd + 10] = 0                            # end of the queue
 	xor a
 	ld [hl], a
 	ret
 
 
-Jump_004_5680:
+;@ def MoldormInit(slot: c)
+;@ path: boss/moldorm
+;@ Set-up of a new Moldorm (entity $59, from the entity init table in bank 3, through a bank-switch stub
+;@ in bank 0): clears the trail index ($D201) and the first $80 bytes of wEntityWorkRAM2 (its trail of
+;@ y positions).
+MoldormInit::
+;> wSmasherBallSlot = 0                         # ($D201)
 	xor a
-	ld [$d201], a
+	ld [wSmasherBallSlot], a
+;> fill(addr(wEntityWorkRAM2), 0, 0x80)
 	ld e, $80
-	ld hl, $d100
-
-jr_004_5689:
+	ld hl, wEntityWorkRAM2
+.clear
 	xor a
 	ld [hli], a
 	dec e
-	jr nz, jr_004_5689
+	jr nz, .clear
 
+;> return
 	ret
 
 
+MoldormDirectionTable::
 	db $06, $07, $00, $01, $02, $03, $04, $05
 
 Call_04_5697::
-	call Call_04_7F36
+	call ReturnIfNonInteractive_04
 	jp Call_3BB4
 
 
@@ -2997,17 +4320,17 @@ Call_04_569D::
 	call Call_380E
 	call Call_04_5697
 	call Call_04_58F8
-	call Call_08E2
-	ld a, [$c124]
+	call DecrementEntityIgnoreHitsTimer
+	ld a, [wRoomTransitionState]
 	and a
-	jp nz, Jump_004_5680
+	jp nz, MoldormInit
 
 	call Call_3F12
-	ldh a, [$ffea]
+	ldh a, [hActiveEntityStatus]
 	cp $05
 	jp z, Jump_004_5786
 
-	ldh a, [$fff0]
+	ldh a, [hActiveEntityState]
 	rst $00
 
 JumpTable_04_56BD::
@@ -3017,9 +4340,9 @@ JumpTable_04_56BD::
 	dw Jump_04_5712
 
 Jump_04_56C5::
-	call Call_0891
+	call GetEntityTimer
 	ld [hl], $60
-	ld hl, $c420
+	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld [hl], $ff
 	call Call_3B8D
@@ -3027,11 +4350,11 @@ Jump_04_56C5::
 
 
 Jump_04_56D4::
-	call Call_0891
+	call GetEntityTimer
 	jr nz, jr_004_56e4
 
 	ld [hl], $ff
-	ld hl, $c420
+	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld [hl], $ff
 	call Call_3B8D
@@ -3041,25 +4364,25 @@ jr_004_56e4:
 
 
 Jump_04_56E5::
-	call Call_0891
+	call GetEntityTimer
 	and $1f
 	jr nz, jr_004_56f9
 
-	ld hl, $c2d0
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	cp $04
 	jr z, jr_004_56fa
 
 	inc [hl]
-	call Call_04_59FB
+	call SpawnExplosionAtEntity_04
 
 jr_004_56f9:
 	ret
 
 
 jr_004_56fa:
-	call Call_0891
+	call GetEntityTimer
 	ld [hl], $30
 	jp Call_3B8D
 
@@ -3067,8 +4390,8 @@ jr_004_56fa:
 	db $00, $06, $08, $06, $00, $fa, $f8, $fa, $f8, $fa, $00, $06, $08, $06, $00, $fa
 
 Jump_04_5712::
-	call Call_0891
-	jp z, Jump_004_5746
+	call GetEntityTimer
+	jp z, BossDropHeartContainer_04
 
 	and $03
 	jr nz, jr_004_5745
@@ -3081,20 +4404,20 @@ Jump_04_5712::
 	ld d, b
 	ld hl, $5702
 	add hl, de
-	ldh a, [$ffee]
+	ldh a, [hActiveEntityX]
 	add [hl]
-	ldh [$ffee], a
+	ldh [hActiveEntityX], a
 	ld hl, $570a
 	add hl, de
-	ldh a, [$ffec]
+	ldh a, [hActiveEntityDrawY]
 	add [hl]
-	ldh [$ffec], a
-	call Call_04_59FB
-	call Call_0891
+	ldh [hActiveEntityDrawY], a
+	call SpawnExplosionAtEntity_04
+	call GetEntityTimer
 	cp $10
 	jr nz, jr_004_5745
 
-	ld hl, $c2d0
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld [hl], $05
 
@@ -3102,10 +4425,10 @@ jr_004_5745:
 	ret
 
 
-Jump_004_5746:
+BossDropHeartContainer_04::
 	ld a, $36
 	call Call_3C01
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	cp $88
 	jr c, jr_004_5753
 
@@ -3118,10 +4441,10 @@ jr_004_5753:
 	ld a, $18
 
 jr_004_5759:
-	ld hl, $c200
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ldh a, [$ffd8]
+	ldh a, [hMultiPurpose1]
 	cp $70
 	jr c, jr_004_5766
 
@@ -3134,34 +4457,34 @@ jr_004_5766:
 	ld a, $20
 
 jr_004_576c:
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-	ld hl, $c320
+	ld hl, wEntitySpeedZ
 	add hl, de
 	ld [hl], $10
-	ldh a, [$ffda]
-	ld hl, $c310
+	ldh a, [hMultiPurpose3]
+	ld hl, wEntityZ
 	add hl, de
 	ld [hl], a
-	ld hl, $fff4
+	ld hl, hNoiseSfx
 	ld [hl], $1a
-	jp Call_04_6D4D
+	jp DespawnEntity_04
 
 
 Jump_004_5786:
 	call Call_3DBA
-	call Call_04_7F36
+	call ReturnIfNonInteractive_04
 	xor a
 	ld [$d3d6], a
 	ld e, $10
-	ld hl, $c360
+	ld hl, wEntityHealth
 	add hl, bc
 	ld a, [hl]
 	cp $02
 	jr c, jr_004_57a3
 
-	ld hl, $c300
+	ld hl, wEntityTimer2
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -3174,7 +4497,7 @@ jr_004_57a3:
 	ld e, $0b
 
 jr_004_57ad:
-	ld hl, $d201
+	ld hl, wSmasherBallSlot
 	ld a, [hl]
 	inc a
 	ld [hl], a
@@ -3183,10 +4506,10 @@ jr_004_57ad:
 
 	ld [hl], b
 	ld a, $1b
-	ldh [$fff4], a
+	ldh [hNoiseSfx], a
 
 Call_04_57BB::
-	ld hl, $c3d0
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	inc a
@@ -3194,16 +4517,16 @@ Call_04_57BB::
 	ld [hl], a
 	ld e, a
 	ld d, b
-	ld hl, $d000
+	ld hl, wEntityWorkRAM
 	add hl, de
-	ldh a, [$ffee]
+	ldh a, [hActiveEntityX]
 	ld [hl], a
-	ld hl, $d100
+	ld hl, wEntityWorkRAM2
 	add hl, de
-	ldh a, [$ffec]
+	ldh a, [hActiveEntityDrawY]
 	ld [hl], a
 	call Call_04_5ADC
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld e, [hl]
 	srl e
@@ -3240,16 +4563,16 @@ Jump_04_5878::
 	db $70, $00, $70, $20, $72, $00, $72, $20, $74, $00, $74, $20, $76, $00, $76, $20
 
 Call_04_58F8::
-	ld hl, $c2d0
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	cp $05
 	jp nc, Jump_004_59fa
 
-	ld hl, $c340
+	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $08
-	ld hl, $c3b0
+	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	rla
@@ -3264,128 +4587,128 @@ Call_04_58F8::
 	add hl, de
 	ld c, $08
 	call Call_3D26
-	ld hl, $c340
+	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $02
-	ld hl, $c3d0
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
-	ldh [$ffd7], a
-	ld hl, $c2d0
+	ldh [hMultiPurpose0], a
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	cp $04
 	jp nc, Jump_004_59fa
 
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	sub $0c
 	and $7f
 	ld e, a
 	ld d, b
-	ld hl, $d000
+	ld hl, wEntityWorkRAM
 	add hl, de
 	ld a, [hl]
-	ldh [$ffee], a
-	ld hl, $d100
+	ldh [hActiveEntityX], a
+	ld hl, wEntityWorkRAM2
 	add hl, de
 	ld a, [hl]
-	ldh [$ffec], a
+	ldh [hActiveEntityDrawY], a
 	ld a, $00
-	ldh [$fff1], a
+	ldh [hActiveEntitySpriteVariant], a
 	ld de, $58e8
 	call Call_3C3B
-	ld hl, $c2d0
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	cp $03
 	jp nc, Jump_004_59fa
 
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	sub $18
 	and $7f
 	ld e, a
 	ld d, b
-	ld hl, $d000
+	ld hl, wEntityWorkRAM
 	add hl, de
 	ld a, [hl]
-	ldh [$ffee], a
-	ld hl, $d100
+	ldh [hActiveEntityX], a
+	ld hl, wEntityWorkRAM2
 	add hl, de
 	ld a, [hl]
-	ldh [$ffec], a
+	ldh [hActiveEntityDrawY], a
 	ld a, $00
-	ldh [$fff1], a
+	ldh [hActiveEntitySpriteVariant], a
 	ld de, $58e8
 	call Call_3C3B
-	ld hl, $c2d0
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	cp $02
 	jr nc, jr_004_59fa
 
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	sub $24
 	and $7f
 	ld e, a
 	ld d, b
-	ld hl, $d000
+	ld hl, wEntityWorkRAM
 	add hl, de
 	ld a, [hl]
-	ldh [$ffee], a
-	ld hl, $d100
+	ldh [hActiveEntityX], a
+	ld hl, wEntityWorkRAM2
 	add hl, de
 	ld a, [hl]
-	ldh [$ffec], a
+	ldh [hActiveEntityDrawY], a
 	ld a, $01
-	ldh [$fff1], a
+	ldh [hActiveEntitySpriteVariant], a
 	ld de, $58e8
 	call Call_3C3B
-	ld hl, $c2d0
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	and a
 	jr nz, jr_004_59fa
 
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	sub $2e
 	and $7f
 	ld e, a
 	ld d, b
-	ld hl, $d000
+	ld hl, wEntityWorkRAM
 	add hl, de
 	ld a, [hl]
-	ldh [$ffee], a
-	ld hl, $d100
+	ldh [hActiveEntityX], a
+	ld hl, wEntityWorkRAM2
 	add hl, de
 	ld a, [hl]
-	ldh [$ffec], a
-	ldh a, [$ffe7]
+	ldh [hActiveEntityDrawY], a
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
 	add $02
-	ldh [$fff1], a
-	ldh a, [$ffe7]
+	ldh [hActiveEntitySpriteVariant], a
+	ldh a, [hFrameCounter]
 	rla
 	rla
 	and $10
-	ld hl, $ffed
+	ld hl, hActiveEntityFlipAttribute
 	xor [hl]
 	ld [hl], a
 	ld de, $58e8
 	call Call_3C3B
-	ld hl, $c420
+	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld a, [hl]
 	and a
 	jr nz, jr_004_59fa
 
-	ld hl, $c430
+	ld hl, wEntityOptions1
 	add hl, bc
 	ld [hl], $90
 	call Call_3BEB
-	ld hl, $c430
+	ld hl, wEntityOptions1
 	add hl, bc
 	ld [hl], $d0
 
@@ -3394,21 +4717,21 @@ jr_004_59fa:
 	ret
 
 
-Call_04_59FB::
-	call Call_04_7F3C
-	ldh a, [$ffee]
-	ldh [$ffd7], a
-	ldh a, [$ffec]
-	ldh [$ffd8], a
+SpawnExplosionAtEntity_04::
+	call ReturnIfGameFrozen_04
+	ldh a, [hActiveEntityX]
+	ldh [hMultiPurpose0], a
+	ldh a, [hActiveEntityDrawY]
+	ldh [hMultiPurpose1], a
 	ld a, $02
-	call Call_0953
+	call AddTransientVfx
 	ld a, $13
-	ldh [$fff4], a
+	ldh [hNoiseSfx], a
 	ret
 
 
 Call_04_5A10::
-	ld hl, $c460
+	ld hl, wEntityLoadOrder
 	add hl, bc
 	ld e, [hl]
 	sla e
@@ -3417,7 +4740,7 @@ Call_04_5A10::
 	sla e
 	sla e
 	ld d, b
-	ld hl, $d000
+	ld hl, wEntityWorkRAM
 	add hl, de
 	push de
 	ld e, $20
@@ -3431,7 +4754,7 @@ jr_004_5a27:
 	jr nz, jr_004_5a27
 
 	pop de
-	ld hl, $d100
+	ld hl, wEntityWorkRAM2
 	add hl, de
 	ld e, $20
 
@@ -3454,11 +4777,11 @@ jr_004_5a36:
 
 Call_04_5A8B::
 	call Call_04_5B75
-	ld a, [$c124]
+	ld a, [wRoomTransitionState]
 	and a
 	jr nz, jr_004_5a9c
 
-	ld hl, $c410
+	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -3468,15 +4791,15 @@ jr_004_5a9c:
 	call Call_04_5A10
 
 jr_004_5a9f:
-	call Call_04_7F36
-	ld hl, $c3d0
+	call ReturnIfNonInteractive_04
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	inc a
 	and $1f
 	ld [hl], a
-	ldh [$ffd7], a
-	ld hl, $c460
+	ldh [hMultiPurpose0], a
+	ld hl, wEntityLoadOrder
 	add hl, bc
 	ld e, [hl]
 	sla e
@@ -3486,36 +4809,36 @@ jr_004_5a9f:
 	sla e
 	ld d, $00
 	push de
-	ld hl, $d000
+	ld hl, wEntityWorkRAM
 	add hl, de
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	ld e, a
 	add hl, de
-	ldh a, [$ffee]
+	ldh a, [hActiveEntityX]
 	ld [hl], a
 	pop de
-	ld hl, $d100
+	ld hl, wEntityWorkRAM2
 	add hl, de
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	ld e, a
 	add hl, de
-	ldh a, [$ffec]
+	ldh a, [hActiveEntityDrawY]
 	ld [hl], a
-	call Call_04_6D53
+	call ApplyRecoilIfNeeded_04
 	call Call_3BB4
 
 Call_04_5ADC::
-	ld hl, $c420
+	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld a, [hl]
 	and a
 	jr nz, jr_004_5ae7
 
-	call Call_04_6D9D
+	call UpdateEntityPosWithSpeed_04
 
 jr_004_5ae7:
 	call Call_3B9E
-	ld hl, $c2a0
+	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -3536,14 +4859,14 @@ jr_004_5ae7:
 	ld e, $0c
 
 jr_004_5b06:
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], e
-	call Call_27ED
+	call GetRandomByte
 	rra
 	jr c, jr_004_5b19
 
-	ld hl, $c2c0
+	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
 	cpl
@@ -3551,30 +4874,30 @@ jr_004_5b06:
 	ld [hl], a
 
 jr_004_5b19:
-	call Call_0891
+	call GetEntityTimer
 	ld [hl], $10
 
 jr_004_5b1e:
-	call Call_088C
+	call GetEntityTimer1
 	jr nz, jr_004_5b5c
 
 	ld [hl], $04
-	ldh a, [$ffeb]
+	ldh a, [hActiveEntityType]
 	cp $59
 	jr nz, jr_004_5b2d
 
 	ld [hl], $06
 
 jr_004_5b2d:
-	ld hl, $c2c0
+	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, bc
 	add [hl]
 	and $0f
 	ld [hl], a
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld e, [hl]
 	ld d, b
@@ -3585,28 +4908,28 @@ jr_004_5b2d:
 	ld hl, $5a77
 	add hl, de
 	ld a, [hl]
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
 	ld hl, $5a7b
 	add hl, de
 	ld a, [hl]
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
 
 jr_004_5b5c:
-	call Call_0891
+	call GetEntityTimer
 	jr nz, jr_004_5b74
 
-	call Call_27ED
+	call GetRandomByte
 	and $1f
 	add $10
 	ld [hl], a
-	call Call_27ED
+	call GetRandomByte
 	and $02
 	dec a
-	ld hl, $c2c0
+	ld hl, wEntityPrivate2
 	add hl, bc
 	ld [hl], a
 
@@ -3617,12 +4940,12 @@ jr_004_5b74:
 Call_04_5B75::
 	ld de, $5a3f
 	call Call_3C3B
-	call Call_04_7F36
-	ld hl, $c3d0
+	call ReturnIfNonInteractive_04
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
-	ldh [$ffd7], a
-	ld hl, $c460
+	ldh [hMultiPurpose0], a
+	ld hl, wEntityLoadOrder
 	add hl, bc
 	ld e, [hl]
 	sla e
@@ -3633,56 +4956,56 @@ Call_04_5B75::
 	ld d, b
 	push de
 	push de
-	ld hl, $d000
+	ld hl, wEntityWorkRAM
 	add hl, de
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	sub $09
 	and $1f
 	ld e, a
 	ld d, b
 	add hl, de
 	ld a, [hl]
-	ldh [$ffee], a
+	ldh [hActiveEntityX], a
 	pop de
-	ld hl, $d100
+	ld hl, wEntityWorkRAM2
 	add hl, de
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	sub $09
 	and $1f
 	ld e, a
 	ld d, b
 	add hl, de
 	ld a, [hl]
-	ldh [$ffec], a
+	ldh [hActiveEntityDrawY], a
 	ld a, $08
-	ldh [$fff1], a
+	ldh [hActiveEntitySpriteVariant], a
 	ld de, $5a3f
 	call Call_3C3B
 	pop de
 	push de
-	ld hl, $d000
+	ld hl, wEntityWorkRAM
 	add hl, de
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	sub $10
 	and $1f
 	ld e, a
 	ld d, b
 	add hl, de
 	ld a, [hl]
-	ldh [$ffee], a
+	ldh [hActiveEntityX], a
 	pop de
-	ld hl, $d100
+	ld hl, wEntityWorkRAM2
 	add hl, de
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	sub $10
 	and $1f
 	ld e, a
 	ld d, b
 	add hl, de
 	ld a, [hl]
-	ldh [$ffec], a
+	ldh [hActiveEntityDrawY], a
 	ld a, $09
-	ldh [$fff1], a
+	ldh [hActiveEntitySpriteVariant], a
 	ld de, $5a3f
 	call Call_3C3B
 	call Call_3DBA
@@ -3696,34 +5019,34 @@ Call_04_5BFF::
 	jr jr_004_5c0d
 
 Call_04_5C04::
-	call Call_04_7F23
+	call FlipSpriteBySpeedX_04
 	ld de, $5bf3
 	call Call_3C3B
 
 jr_004_5c0d:
-	ldh a, [$fff0]
+	ldh a, [hActiveEntityState]
 	and a
 	jr z, jr_004_5c3a
 
 	ld a, $ff
 	call Call_3B87
-	call Call_04_6E08
+	call GetEntityXDistanceToLink_04
 	add $10
 	cp $20
 	jr nc, jr_004_5c39
 
-	call Call_04_6E18
+	call GetEntityYDistanceToLink_04
 	add $10
 	cp $20
 	jr nc, jr_004_5c39
 
-	ld a, [$c133]
+	ld a, [wLinkCollisionFlags]
 	and a
 	jr z, jr_004_5c39
 
 	call Call_3B8D
 	ld [hl], b
-	ld hl, $c300
+	ld hl, wEntityTimer2
 	add hl, bc
 	ld [hl], $30
 
@@ -3732,7 +5055,7 @@ jr_004_5c39:
 
 
 jr_004_5c3a:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
@@ -3740,7 +5063,7 @@ jr_004_5c3a:
 	xor c
 	and $01
 	call Call_3B87
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $00
 	jr z, jr_004_5c51
 
@@ -3748,53 +5071,53 @@ jr_004_5c3a:
 	call Call_3B87
 
 jr_004_5c51:
-	call Call_04_7F36
-	call Call_04_6D53
+	call ReturnIfNonInteractive_04
+	call ApplyRecoilIfNeeded_04
 	call Call_3BEB
-	call Call_04_6D9D
-	call Call_04_6DD6
+	call UpdateEntityPosWithSpeed_04
+	call AddEntityZSpeedToPos_04
 	call Call_04_5CFF
-	ld hl, $c300
+	ld hl, wEntityTimer2
 	add hl, bc
 	ld a, [hl]
 	and a
 	jp nz, Jump_004_5cfe
 
 	call Call_3BBF
-	call Call_0891
+	call GetEntityTimer
 	jr nz, jr_004_5c83
 
-	call Call_27ED
+	call GetRandomByte
 	and $1f
 	add $20
 	ld [hl], a
 	and $01
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], a
 
 jr_004_5c83:
-	call Call_088C
+	call GetEntityTimer1
 	jr nz, jr_004_5c97
 
-	call Call_27ED
+	call GetRandomByte
 	and $0f
 	add $18
 	ld [hl], a
 	and $01
-	ld hl, $c2c0
+	ld hl, wEntityPrivate2
 	add hl, bc
 	ld [hl], a
 
 jr_004_5c97:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	xor c
 	and $03
 	jr nz, jr_004_5cfe
 
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, bc
-	ldh a, [$ffee]
+	ldh a, [hActiveEntityX]
 	cp $28
 	jr nc, jr_004_5cac
 
@@ -3808,13 +5131,13 @@ jr_004_5cac:
 	ld [hl], $01
 
 jr_004_5cb2:
-	call Call_0891
+	call GetEntityTimer
 	ld [hl], $20
 
 jr_004_5cb7:
-	ld hl, $c2c0
+	ld hl, wEntityPrivate2
 	add hl, bc
-	ldh a, [$ffec]
+	ldh a, [hActiveEntityDrawY]
 	cp $28
 	jr nc, jr_004_5cc5
 
@@ -3828,18 +5151,18 @@ jr_004_5cc5:
 	ld [hl], $01
 
 jr_004_5ccb:
-	call Call_088C
+	call GetEntityTimer1
 	ld [hl], $20
 
 jr_004_5cd0:
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld e, [hl]
 	ld d, b
 	ld hl, $5bfb
 	add hl, de
 	ld a, [hl]
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	sub [hl]
 	and $80
@@ -3850,14 +5173,14 @@ jr_004_5cd0:
 
 jr_004_5ce6:
 	dec [hl]
-	ld hl, $c2c0
+	ld hl, wEntityPrivate2
 	add hl, bc
 	ld e, [hl]
 	ld d, b
 	ld hl, $5bfd
 	add hl, de
 	ld a, [hl]
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	sub [hl]
 	and $80
@@ -3875,11 +5198,11 @@ jr_004_5cfe:
 
 
 Call_04_5CFF::
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $03
 	jr nz, jr_004_5d1c
 
-	ld hl, $c310
+	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	cp $10
@@ -3916,16 +5239,16 @@ jr_004_5d1c:
 	db $08, $f8, $6a, $20, $08, $00, $6e, $20, $08, $08, $6c, $20, $08, $10, $64, $20
 
 Call_04_5D9D::
-	call Call_04_7F23
-	ldh a, [$ffed]
+	call FlipSpriteBySpeedX_04
+	ldh a, [hActiveEntityFlipAttribute]
 	push af
 	rla
 	and $40
-	ldh [$ffd7], a
+	ldh [hMultiPurpose0], a
 	pop af
 	and $0f
-	ldh [$ffed], a
-	ld hl, $c3b0
+	ldh [hActiveEntityFlipAttribute], a
+	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	rla
@@ -3934,7 +5257,7 @@ Call_04_5D9D::
 	rla
 	rla
 	and $e0
-	ld hl, $ffd7
+	ld hl, hMultiPurpose0
 	add [hl]
 	ld e, a
 	ld d, b
@@ -3949,22 +5272,22 @@ Call_04_5D9D::
 	db $7a, $00, $7a, $20, $ff, $00, $ff, $00, $76, $00, $78, $00, $78, $20, $76, $20
 
 Call_04_5DE9::
-	ldh a, [$fff1]
+	ldh a, [hActiveEntitySpriteVariant]
 	cp $03
 	jr nz, jr_004_5e14
 
-	ldh a, [$ffee]
+	ldh a, [hActiveEntityX]
 	sub $08
-	ldh [$ffee], a
+	ldh [hActiveEntityX], a
 	ld a, $06
-	ldh [$fff1], a
+	ldh [hActiveEntitySpriteVariant], a
 	ld de, $5dc9
 	call Call_3C3B
-	ldh a, [$ffee]
+	ldh a, [hActiveEntityX]
 	add $10
-	ldh [$ffee], a
+	ldh [hActiveEntityX], a
 	ld a, $07
-	ldh [$fff1], a
+	ldh [hActiveEntitySpriteVariant], a
 	ld de, $5dc9
 	call Call_3C3B
 	call Call_3DBA
@@ -3975,9 +5298,9 @@ jr_004_5e14:
 	call Call_3C3B
 
 jr_004_5e1a:
-	call Call_04_7F36
-	call Call_04_6D53
-	ldh a, [$fff0]
+	call ReturnIfNonInteractive_04
+	call ApplyRecoilIfNeeded_04
+	ldh a, [hActiveEntityState]
 	rst $00
 
 JumpTable_04_5E23::
@@ -3987,14 +5310,14 @@ JumpTable_04_5E23::
 
 Jump_04_5E29::
 	call Call_3BB4
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	rra
 	and $01
 	call Call_3B87
-	call Call_0891
+	call GetEntityTimer
 	cp $18
 	jr nz, jr_004_5e42
 
@@ -4004,27 +5327,27 @@ Jump_04_5E29::
 jr_004_5e42:
 	jr nc, jr_004_5e6a
 
-	call Call_04_6E08
+	call GetEntityXDistanceToLink_04
 	add $20
 	cp $40
 	jr nc, jr_004_5e6a
 
-	call Call_04_6E18
+	call GetEntityYDistanceToLink_04
 	add $20
 	cp $40
 	jr nc, jr_004_5e6a
 
-	ld hl, $c420
+	ld hl, wEntityFlashTimer
 	add hl, bc
 	ld a, [hl]
 	and a
 	jr nz, jr_004_5e6a
 
-	call Call_0891
+	call GetEntityTimer
 	ld [hl], $20
 	call Call_3B8D
 	ld a, $3c
-	ldh [$fff2], a
+	ldh [hJingle], a
 
 jr_004_5e6a:
 	ret
@@ -4033,7 +5356,7 @@ jr_004_5e6a:
 	db $04, $03, $02
 
 Jump_04_5E6E::
-	call Call_0891
+	call GetEntityTimer
 	cp $18
 	jp nc, Call_3BB4
 
@@ -4044,7 +5367,7 @@ Jump_04_5E6E::
 	call Call_3B8D
 	ld a, $ff
 	call Call_3B87
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	sub $48
@@ -4052,7 +5375,7 @@ Jump_04_5E6E::
 	ld a, $48
 	sub e
 	ld [hl], a
-	ld hl, $c200
+	ld hl, wEntityX
 	add hl, bc
 	ld a, [hl]
 	sub $50
@@ -4080,7 +5403,7 @@ jr_004_5e9c:
 	db $02, $03, $04
 
 Jump_04_5EAF::
-	call Call_0891
+	call GetEntityTimer
 	cp $18
 	jr nc, jr_004_5eee
 
@@ -4098,13 +5421,13 @@ Call_04_5EC0::
 	call Call_3C01
 	jr c, jr_004_5ede
 
-	ld hl, $c200
+	ld hl, wEntityX
 	add hl, de
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	ld [hl], a
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, de
-	ldh a, [$ffd8]
+	ldh a, [hMultiPurpose1]
 	ld [hl], a
 	push bc
 	push de
@@ -4138,24 +5461,24 @@ jr_004_5eee:
 Call_04_5EF7::
 	ld de, $5eef
 	call Call_3C3B
-	call Call_04_7F36
-	ldh a, [$ffe7]
+	call ReturnIfNonInteractive_04
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
 	call Call_3B87
-	call Call_04_6D9D
+	call UpdateEntityPosWithSpeed_04
 	call Call_3BA9
 	call Call_3BCA
 	call Call_3BEB
-	ld hl, $c2a0
+	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and a
 	jr z, jr_004_5f24
 
-	call Call_04_6D4D
+	call DespawnEntity_04
 	call Call_04_6BF2
 
 jr_004_5f24:
@@ -4168,59 +5491,59 @@ jr_004_5f24:
 	db $9a, $10, $9c, $10
 
 Call_04_5F59::
-	ld hl, $c440
+	ld hl, wEntityPrivate4
 	add hl, bc
 	ld a, [hl]
 	and a
 	jr z, jr_004_5f93
 
-	ldh a, [$ffec]
+	ldh a, [hActiveEntityDrawY]
 	add $04
-	ldh [$ffec], a
+	ldh [hActiveEntityDrawY], a
 	ld de, $5f55
 	call Call_3C3B
-	call Call_04_6D9D
-	call Call_04_6DD6
-	ld hl, $c320
+	call UpdateEntityPosWithSpeed_04
+	call AddEntityZSpeedToPos_04
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	dec [hl]
-	ld hl, $c310
+	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and $80
 	jr z, jr_004_5f8e
 
-	call Call_04_6D4D
+	call DespawnEntity_04
 	xor a
-	ld [$db7f], a
-	ld [$c167], a
-	jp Call_0898
+	ld [wTradeSceneState], a
+	ld [wLinkFrozen], a
+	jp SpawnHeldItemEntity
 
 
 jr_004_5f8e:
 	ld a, $02
-	ldh [$ffa1], a
+	ldh [hLinkInteractiveMotionBlocked], a
 	ret
 
 
 jr_004_5f93:
-	ldh a, [$fff9]
+	ldh a, [hIsSideScrolling]
 	and a
 	jp nz, Jump_004_607b
 
-	ld hl, $c340
+	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $84
-	ld hl, $c390
+	ld hl, wEntityPrivate5
 	add hl, bc
 	ld a, [hl]
-	ldh [$ffe8], a
-	ld a, [$c19f]
+	ldh [hBGTilesRequestCopy], a
+	ld a, [wDialogState]
 	and a
 	ld hl, $5f45
 	jr nz, jr_004_5fbf
 
-	ld hl, $c3d0
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	inc [hl]
@@ -4235,8 +5558,8 @@ jr_004_5fbf:
 	call Call_3D26
 	ld a, $04
 	call Call_3DD0
-	call Call_04_7B6B
-	ldh a, [$fff0]
+	call BlockLinkAtEntity_04
+	ldh a, [hActiveEntityState]
 	rst $00
 
 JumpTable_04_5FCF::
@@ -4245,11 +5568,11 @@ JumpTable_04_5FCF::
 	dw Jump_04_6016
 
 Jump_04_5FD5::
-	call Call_04_7BD3
+	call CanTalkToEntity_04
 	jr nc, jr_004_5fe2
 
 	ld a, $45
-	call Call_2197
+	call OpenDialog
 	call Call_3B8D
 
 jr_004_5fe2:
@@ -4257,31 +5580,31 @@ jr_004_5fe2:
 
 
 Jump_04_5FE3::
-	ld a, [$c19f]
+	ld a, [wDialogState]
 	and a
 	jr nz, jr_004_600e
 
 	call Call_3B8D
-	ld a, [$c177]
+	ld a, [wDialogAnswer]
 	and a
 	jr z, jr_004_5ff8
 
 	ld [hl], b
 	ld a, $46
-	jp Call_2197
+	jp OpenDialog
 
 
 jr_004_5ff8:
-	ld a, [$db5e]
+	ld a, [wRupeeCountLow]
 	sub $10
-	ld a, [$db5d]
+	ld a, [wRupeeCountHigh]
 	sbc $00
 	jr c, jr_004_600f
 
 	ld a, $0a
-	ld [$db92], a
+	ld [wSubtractRupeeBufferLow], a
 	ld a, $47
-	call Call_2197
+	call OpenDialog
 
 jr_004_600e:
 	ret
@@ -4290,12 +5613,12 @@ jr_004_600e:
 jr_004_600f:
 	ld [hl], b
 	ld a, $4e
-	call Call_2197
+	call OpenDialog
 	ret
 
 
 Jump_04_6016::
-	ld a, [$c19f]
+	ld a, [wDialogState]
 	and a
 	jr nz, jr_004_6022
 
@@ -4315,8 +5638,8 @@ jr_004_6022:
 
 Jump_004_607b:
 	ld a, $01
-	ld [$c167], a
-	ld hl, $c2b0
+	ld [wLinkFrozen], a
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	rst $00
@@ -4333,8 +5656,8 @@ JumpTable_04_6086::
 
 Jump_04_60A7::
 	ld a, $02
-	ldh [$ffa1], a
-	ld hl, $c2c0
+	ldh [hLinkInteractiveMotionBlocked], a
+	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -4350,63 +5673,63 @@ jr_004_60b7:
 	ld hl, $608d
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c200
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
 	ld hl, $6092
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
 	ld hl, $6097
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, de
 	ld [hl], a
 	ld hl, $609c
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], a
 	ld hl, $60a1
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c2e0
+	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], a
 	dec c
 	jr nz, jr_004_60b7
 
 	xor a
-	ld [$d004], a
+	ld [wSceneVar4], a
 	pop bc
 	ret
 
 
 jr_004_60f7:
-	ldh a, [$fff1]
+	ldh a, [hActiveEntitySpriteVariant]
 	ld e, a
 	ld d, b
 	ld hl, $604b
 	add hl, de
 	ld a, [hl]
-	ldh [$ff9d], a
+	ldh [hLinkAnimationState], a
 	ld hl, $6055
 	add hl, de
-	ldh a, [$ff98]
+	ldh a, [hLinkX]
 	add [hl]
-	ldh [$ffee], a
+	ldh [hActiveEntityX], a
 	ld hl, $605f
 	add hl, de
-	ldh a, [$ff99]
+	ldh a, [hLinkY]
 	add [hl]
-	ldh [$ffec], a
+	ldh [hActiveEntityDrawY], a
 	ld de, $6023
 	call Call_3C3B
-	ldh a, [$fff0]
+	ldh a, [hActiveEntityState]
 	rst $00
 
 JumpTable_04_611D::
@@ -4419,19 +5742,19 @@ JumpTable_04_611D::
 	dw Jump_04_6231
 
 Jump_04_612B::
-	ld a, [$c19f]
+	ld a, [wDialogState]
 	and a
 	jr nz, jr_004_6143
 
-	ldh a, [$ffcc]
+	ldh a, [hJoypadPressed]
 	and $30
 	jr z, jr_004_6143
 
 	call Call_3B8D
-	call Call_0891
+	call GetEntityTimer
 	ld [hl], $23
 	xor a
-	ld [$d002], a
+	ld [wSceneVar2], a
 
 jr_004_6143:
 	ld a, $09
@@ -4442,34 +5765,34 @@ jr_004_6143:
 	db $01, $08, $08, $08, $08, $08, $01, $02, $03, $00
 
 Jump_04_6153::
-	call Call_0891
+	call GetEntityTimer
 	jr nz, jr_004_618e
 
 	call Call_3B8D
 	ld a, $02
-	ld [$c3b0], a
+	ld [wEntitySpriteVariant], a
 	ld a, $54
 	call Call_3C01
-	ld hl, $c200
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], $78
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], $18
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, de
 	ld [hl], $e2
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, de
 	ld [hl], $fa
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $01
-	ld hl, $c2e0
+	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $14
 	ld a, $08
-	ldh [$fff2], a
+	ldh [hJingle], a
 	ret
 
 
@@ -4484,21 +5807,21 @@ Call_04_6192::
 	ld hl, $6149
 	add hl, de
 	ld a, [hl]
-	ld [$c3b0], a
+	ld [wEntitySpriteVariant], a
 	ld e, a
 	ld d, b
 	ld hl, $6069
 	add hl, de
-	ldh a, [$ff98]
+	ldh a, [hLinkX]
 	add [hl]
-	ldh [$ffee], a
+	ldh [hActiveEntityX], a
 	ld hl, $6072
 	add hl, de
-	ldh a, [$ff99]
+	ldh a, [hLinkY]
 	add [hl]
-	ldh [$ffec], a
+	ldh [hActiveEntityDrawY], a
 	xor a
-	ldh [$fff1], a
+	ldh [hActiveEntitySpriteVariant], a
 	ld de, $6232
 	call Call_3C3B
 	jp Call_3DBA
@@ -4509,36 +5832,36 @@ Jump_04_61BC::
 
 
 Jump_04_61BD::
-	ld a, [$c19f]
+	ld a, [wDialogState]
 	and a
 	jr nz, jr_004_61fe
 
-	ld a, [$c177]
+	ld a, [wDialogAnswer]
 	and a
 	jr nz, jr_004_61f6
 
-	ld a, [$d004]
+	ld a, [wSceneVar4]
 	cp $05
 	jr c, jr_004_61db
 
 	ld a, $4b
-	call Call_2197
+	call OpenDialog
 	call Call_3B8D
 	ld [hl], $05
 	ret
 
 
 jr_004_61db:
-	ld a, [$db5e]
+	ld a, [wRupeeCountLow]
 	sub $10
-	ld a, [$db5d]
+	ld a, [wRupeeCountHigh]
 	sbc $00
 	jr c, jr_004_61ff
 
 	ld a, $0a
-	ld [$db92], a
+	ld [wSubtractRupeeBufferLow], a
 	ld a, $47
-	call Call_2197
+	call OpenDialog
 	call Call_3B8D
 	ld [hl], b
 	ret
@@ -4546,7 +5869,7 @@ jr_004_61db:
 
 jr_004_61f6:
 	ld a, $46
-	call Call_2197
+	call OpenDialog
 	call Call_3B8D
 
 jr_004_61fe:
@@ -4555,12 +5878,12 @@ jr_004_61fe:
 
 jr_004_61ff:
 	ld a, $4e
-	call Call_2197
+	call OpenDialog
 	jp Call_3B8D
 
 
 Jump_04_6207::
-	ld a, [$c19f]
+	ld a, [wDialogState]
 	and a
 	jr nz, jr_004_6213
 
@@ -4572,24 +5895,24 @@ jr_004_6213:
 
 
 Jump_04_6214::
-	ld a, [$c19f]
+	ld a, [wDialogState]
 	and a
 	jr nz, jr_004_6230
 
 	call Call_3B8D
 	ld [hl], $04
-	ld a, [$c177]
+	ld a, [wDialogAnswer]
 	and a
 	jr nz, jr_004_622b
 
 	ld a, $4c
-	call Call_2197
+	call OpenDialog
 	ret
 
 
 jr_004_622b:
 	ld a, $46
-	call Call_2197
+	call OpenDialog
 
 jr_004_6230:
 	ret
@@ -4604,15 +5927,15 @@ Jump_04_6231::
 
 Jump_04_6246::
 	ld a, c
-	ld [$d003], a
+	ld [wSceneVar3], a
 	ld de, $6232
 	call Call_3C3B
-	ldh a, [$ffee]
-	ld [$d000], a
-	ldh a, [$ffef]
-	ld [$d001], a
-	call Call_04_7F36
-	ldh a, [$fff0]
+	ldh a, [hActiveEntityX]
+	ld [wEntityWorkRAM], a
+	ldh a, [hActiveEntityY]
+	ld [wSceneVar1], a
+	call ReturnIfNonInteractive_04
+	ldh a, [hActiveEntityState]
 	rst $00
 
 JumpTable_04_6260::
@@ -4620,17 +5943,17 @@ JumpTable_04_6260::
 	dw Jump_04_62CD
 
 Jump_04_6264::
-	call Call_04_6DAA
-	call Call_04_6DA0
-	ldh a, [$ffcb]
+	call AddEntitySpeedToPosX_04
+	call AddEntitySpeedToPosY_04
+	ldh a, [hJoypadHeld]
 	and $01
 	jr z, jr_004_6281
 
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $01
 	jr nz, jr_004_6281
 
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -4640,15 +5963,15 @@ Jump_04_6264::
 	jr jr_004_6286
 
 jr_004_6281:
-	call Call_0891
+	call GetEntityTimer
 	jr nz, jr_004_62ac
 
 jr_004_6286:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $01
 	jr nz, jr_004_6296
 
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 	cp $20
@@ -4657,7 +5980,7 @@ jr_004_6286:
 	inc [hl]
 
 jr_004_6296:
-	ld hl, $c3d0
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	inc a
@@ -4667,7 +5990,7 @@ jr_004_6296:
 
 	xor a
 	ld [hl], a
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -4676,7 +5999,7 @@ jr_004_6296:
 	inc [hl]
 
 jr_004_62ac:
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	cp $2a
@@ -4686,49 +6009,49 @@ jr_004_62ac:
 	call Call_3B8D
 
 Jump_004_62bb:
-	ldh a, [$ffec]
-	ldh [$ffd8], a
-	ldh a, [$ffee]
-	ldh [$ffd7], a
+	ldh a, [hActiveEntityDrawY]
+	ldh [hMultiPurpose1], a
+	ldh a, [hActiveEntityX]
+	ldh [hMultiPurpose0], a
 	ld a, $01
-	call Call_0953
+	call AddTransientVfx
 	ld a, $0e
-	ldh [$fff2], a
+	ldh [hJingle], a
 
 jr_004_62cc:
 	ret
 
 
 Jump_04_62CD::
-	ld hl, $c3b0
+	ld hl, wEntitySpriteVariant
 	ld [hl], $00
-	call Call_0891
+	call GetEntityTimer
 	jr z, jr_004_62dc
 
-	ld hl, $c3b0
+	ld hl, wEntitySpriteVariant
 	ld [hl], $04
 
 jr_004_62dc:
-	call Call_088C
+	call GetEntityTimer1
 	jr z, jr_004_62e6
 
-	ld hl, $c3b0
+	ld hl, wEntitySpriteVariant
 	ld [hl], $05
 
 jr_004_62e6:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	rra
 	and $01
 	call Call_3B87
-	call Call_04_6D9D
-	ldh a, [$ffe7]
+	call UpdateEntityPosWithSpeed_04
+	ldh a, [hFrameCounter]
 	and $07
 	jr nz, jr_004_6319
 
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 	sub $04
@@ -4744,7 +6067,7 @@ jr_004_6309:
 	dec [hl]
 
 jr_004_630a:
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -4760,50 +6083,50 @@ jr_004_6318:
 	dec [hl]
 
 jr_004_6319:
-	ldh a, [$ffcc]
+	ldh a, [hJoypadPressed]
 	and $30
 	jr z, jr_004_637e
 
-	call Call_0891
+	call GetEntityTimer
 	ld [hl], $08
-	ldh a, [$ff98]
+	ldh a, [hLinkX]
 	push af
 	sub $17
-	ldh [$ff98], a
+	ldh [hLinkX], a
 	ld a, $04
 	call Call_3C25
 	pop af
-	ldh [$ff98], a
-	ldh a, [$ffec]
+	ldh [hLinkX], a
+	ldh a, [hActiveEntityDrawY]
 	cp $25
 	jr nc, jr_004_6372
 
-	ldh a, [$ffee]
+	ldh a, [hActiveEntityX]
 	cp $70
 	jr c, jr_004_6372
 
-	ld hl, $c290
+	ld hl, wEntityState
 	ld [hl], $03
 	ld a, $48
-	call Call_2197
-	call Call_04_6D4D
+	call OpenDialog
+	call DespawnEntity_04
 	ld e, $0f
 	ld d, b
 
 jr_004_634f:
-	ld hl, $c280
+	ld hl, wEntityStatus
 	add hl, de
 	ld a, [hl]
 	and a
 	jr z, jr_004_636c
 
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, de
 	ld a, [hl]
 	cp $02
 	jr c, jr_004_636c
 
-	ld hl, $c290
+	ld hl, wEntityState
 	add hl, de
 	ld a, [hl]
 	cp $02
@@ -4819,7 +6142,7 @@ jr_004_636c:
 	jr nz, jr_004_634f
 
 jr_004_6372:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
@@ -4828,46 +6151,46 @@ jr_004_6372:
 	jr jr_004_63a3
 
 jr_004_637e:
-	ldh a, [$ffcc]
+	ldh a, [hJoypadPressed]
 	and $05
 	jr z, jr_004_63a3
 
-	ldh a, [$ffec]
+	ldh a, [hActiveEntityDrawY]
 	cp $30
 	jr c, jr_004_63a3
 
-	ld hl, $c300
+	ld hl, wEntityTimer2
 	add hl, bc
 	ld a, [hl]
 	and a
 	jr nz, jr_004_63a3
 
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], $fa
 
 Jump_04_6398::
-	ld hl, $c300
+	ld hl, wEntityTimer2
 	add hl, bc
 	ld [hl], $50
-	call Call_088C
+	call GetEntityTimer1
 	ld [hl], $10
 
 jr_004_63a3:
-	ldh a, [$ffee]
-	ld hl, $c200
+	ldh a, [hActiveEntityX]
+	ld hl, wEntityX
 	add hl, bc
 	cp [hl]
 	jr nz, jr_004_63b5
 
-	ldh a, [$ffef]
-	ld hl, $c210
+	ldh a, [hActiveEntityY]
+	ld hl, wEntityY
 	add hl, bc
 	cp [hl]
 	jr z, jr_004_63c7
 
 jr_004_63b5:
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 	push af
@@ -4884,7 +6207,7 @@ jr_004_63c1:
 	ld [hl], a
 
 jr_004_63c7:
-	ld hl, $c2a0
+	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -4894,7 +6217,7 @@ jr_004_63c7:
 	call Call_3B87
 
 jr_004_63d3:
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 	rla
@@ -4911,24 +6234,24 @@ jr_004_63e0:
 	db $4a, $20, $4c, $20, $4e, $20, $4c, $20, $4a, $20, $48, $20, $4e, $20, $48, $20
 
 Jump_04_6401::
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
 	and a
 	jr nz, jr_004_640f
 
-	ldh a, [$fff1]
+	ldh a, [hActiveEntitySpriteVariant]
 	add $04
-	ldh [$fff1], a
+	ldh [hActiveEntitySpriteVariant], a
 
 jr_004_640f:
 	ld de, $63e1
 	call Call_3C3B
 
 Jump_004_6415:
-	call Call_04_7F36
-	call Call_04_6D9D
-	ldh a, [$fff0]
+	call ReturnIfNonInteractive_04
+	call UpdateEntityPosWithSpeed_04
+	ldh a, [hActiveEntityState]
 	rst $00
 
 JumpTable_04_641E::
@@ -4941,17 +6264,17 @@ JumpTable_04_641E::
 
 Jump_04_642A::
 	call Call_04_6766
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	cp $03
 	jp z, Jump_004_6703
 
-	call Call_0891
+	call GetEntityTimer
 	jr nz, jr_004_6449
 
 	ld [hl], $30
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
 	xor $01
@@ -4959,11 +6282,11 @@ Jump_04_642A::
 	call Call_3B8D
 
 jr_004_6449:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $03
 	jr nz, jr_004_645e
 
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -4985,13 +6308,13 @@ jr_004_645e:
 
 Jump_04_6462::
 	call Call_04_6766
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	cp $03
 	jp z, Jump_004_672d
 
-	call Call_0891
+	call GetEntityTimer
 	jr nz, jr_004_647a
 
 	ld [hl], $50
@@ -4999,21 +6322,21 @@ Jump_04_6462::
 	ld [hl], b
 
 jr_004_647a:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
 	call Call_3B87
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $03
 	jr nz, jr_004_64a7
 
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	push hl
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, bc
 	ld e, [hl]
 	ld d, $00
@@ -5034,14 +6357,14 @@ jr_004_64a6:
 	dec [hl]
 
 jr_004_64a7:
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	cp $34
 	jr nc, jr_004_64b6
 
 	inc [hl]
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], b
 
@@ -5052,67 +6375,67 @@ jr_004_64b6:
 	db $f2, $14
 
 Jump_04_64B9::
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
 	call Call_3B87
-	call Call_0891
+	call GetEntityTimer
 	jr nz, jr_004_64cb
 
 	call Call_3B8D
 
 jr_004_64cb:
-	ldh a, [$ff98]
+	ldh a, [hLinkX]
 	push af
-	ldh a, [$ff99]
+	ldh a, [hLinkY]
 	push af
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, bc
 	ld e, [hl]
 	ld d, b
 	ld hl, $64b7
 	add hl, de
-	ld a, [$d000]
+	ld a, [wEntityWorkRAM]
 	add [hl]
-	ldh [$ff98], a
-	ld a, [$d001]
-	ldh [$ff99], a
+	ldh [hLinkX], a
+	ld a, [wSceneVar1]
+	ldh [hLinkY], a
 	ld a, $04
 	call Call_3C25
 	pop af
-	ldh [$ff99], a
+	ldh [hLinkY], a
 	pop af
-	ldh [$ff98], a
-	jp Call_04_6D9D
+	ldh [hLinkX], a
+	jp UpdateEntityPosWithSpeed_04
 
 
 Jump_04_64F4::
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	and $01
 	add $02
 	call Call_3B87
-	ldh a, [$ff98]
+	ldh a, [hLinkX]
 	push af
-	ldh a, [$ff99]
+	ldh a, [hLinkY]
 	push af
-	ld a, [$d000]
+	ld a, [wEntityWorkRAM]
 	add $04
-	ldh [$ff98], a
-	ld a, [$d001]
-	ldh [$ff99], a
+	ldh [hLinkX], a
+	ld a, [wSceneVar1]
+	ldh [hLinkY], a
 	ld a, $10
 	call Call_3C25
 	pop af
-	ldh [$ff99], a
+	ldh [hLinkY], a
 	pop af
-	ldh [$ff98], a
-	call Call_04_6D9D
-	ld a, [$d000]
-	ld hl, $ffee
+	ldh [hLinkX], a
+	call UpdateEntityPosWithSpeed_04
+	ld a, [wEntityWorkRAM]
+	ld hl, hActiveEntityX
 	sub [hl]
 	add $08
 	cp $10
@@ -5120,10 +6443,10 @@ Jump_04_64F4::
 
 	call Call_3DAF
 	call Call_3B8D
-	ld a, [$d003]
+	ld a, [wSceneVar3]
 	ld e, a
 	ld d, b
-	ld hl, $c280
+	ld hl, wEntityStatus
 	add hl, de
 	ld [hl], b
 
@@ -5134,42 +6457,42 @@ jr_004_653c:
 	db $54, $00, $08, $f8
 
 Jump_04_6541::
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, bc
 	ld e, [hl]
 	ld d, b
 	ld hl, $653f
 	add hl, de
-	ldh a, [$ffee]
+	ldh a, [hActiveEntityX]
 	add [hl]
-	ldh [$ffee], a
-	ld hl, $fff1
+	ldh [hActiveEntityX], a
+	ld hl, hActiveEntitySpriteVariant
 	ld [hl], b
 	ld de, $653d
 	call Call_3CD0
 	call Call_3DBA
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
 	call Call_3B87
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $07
 	jr nz, jr_004_65a2
 
-	ldh a, [$ff98]
+	ldh a, [hLinkX]
 	push af
-	ldh a, [$ff99]
+	ldh a, [hLinkY]
 	push af
 	ld a, $00
-	ldh [$ff98], a
+	ldh [hLinkX], a
 	ld a, $59
-	ldh [$ff99], a
+	ldh [hLinkY], a
 	ld a, $08
 	call Call_3C30
-	ldh a, [$ffd7]
-	ld hl, $c250
+	ldh a, [hMultiPurpose0]
+	ld hl, wEntitySpeedY
 	add hl, bc
 	sub [hl]
 	inc [hl]
@@ -5180,8 +6503,8 @@ Jump_04_6541::
 	dec [hl]
 
 jr_004_658e:
-	ldh a, [$ffd8]
-	ld hl, $c240
+	ldh a, [hMultiPurpose1]
+	ld hl, wEntitySpeedX
 	add hl, bc
 	sub [hl]
 	inc [hl]
@@ -5193,38 +6516,38 @@ jr_004_658e:
 
 jr_004_659c:
 	pop af
-	ldh [$ff99], a
+	ldh [hLinkY], a
 	pop af
-	ldh [$ff98], a
+	ldh [hLinkX], a
 
 jr_004_65a2:
-	ldh a, [$ffcc]
+	ldh a, [hJoypadPressed]
 	and $30
 	jr z, jr_004_65f8
 
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	cp $03
 	jr nz, jr_004_65b8
 
-	call Call_27ED
+	call GetRandomByte
 	and $03
 	jr z, jr_004_65f8
 
 jr_004_65b8:
-	ldh a, [$ff98]
+	ldh a, [hLinkX]
 	push af
 	sub $14
-	ldh [$ff98], a
-	ldh a, [$ff99]
+	ldh [hLinkX], a
+	ldh a, [hLinkY]
 	push af
 	add $08
-	ldh [$ff99], a
+	ldh [hLinkY], a
 	ld a, $03
 	call Call_3C30
-	ldh a, [$ffd7]
-	ld hl, $c250
+	ldh a, [hMultiPurpose0]
+	ld hl, wEntitySpeedY
 	add hl, bc
 	sub [hl]
 	inc [hl]
@@ -5238,8 +6561,8 @@ jr_004_65b8:
 	dec [hl]
 
 jr_004_65dc:
-	ldh a, [$ffd8]
-	ld hl, $c240
+	ldh a, [hMultiPurpose1]
+	ld hl, wEntitySpeedX
 	add hl, bc
 	sub [hl]
 	inc [hl]
@@ -5254,15 +6577,15 @@ jr_004_65dc:
 
 jr_004_65ed:
 	pop af
-	ldh [$ff99], a
+	ldh [hLinkY], a
 	pop af
-	ldh [$ff98], a
-	call Call_0891
+	ldh [hLinkX], a
+	call GetEntityTimer
 	ld [hl], $10
 
 jr_004_65f8:
-	call Call_04_6D9D
-	ld hl, $c240
+	call UpdateEntityPosWithSpeed_04
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -5270,52 +6593,52 @@ jr_004_65f8:
 
 	rlca
 	and $01
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, bc
 	ld [hl], a
 
 jr_004_660b:
-	ld hl, $c3b0
+	ld hl, wEntitySpriteVariant
 	ld [hl], $05
-	call Call_0891
+	call GetEntityTimer
 	jr z, jr_004_6620
 
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $30
 	jr z, jr_004_6620
 
-	ld hl, $c3b0
+	ld hl, wEntitySpriteVariant
 	ld [hl], $07
 
 jr_004_6620:
-	ldh a, [$ffec]
+	ldh a, [hActiveEntityDrawY]
 	cp $2c
 	jr nc, jr_004_663e
 
-	ldh a, [$ffee]
+	ldh a, [hActiveEntityX]
 	cp $74
 	jr c, jr_004_663e
 
 	call Call_3B8D
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], $05
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], $f0
 	jp Jump_004_62bb
 
 
 jr_004_663e:
-	ldh a, [$ffee]
+	ldh a, [hActiveEntityX]
 	cp $03
 	jr nc, jr_004_6651
 
-	ld hl, $c290
+	ld hl, wEntityState
 	ld [hl], $03
 	ld a, $49
-	call Call_2197
-	jp Call_04_6D4D
+	call OpenDialog
+	jp DespawnEntity_04
 
 
 jr_004_6651:
@@ -5323,10 +6646,10 @@ jr_004_6651:
 
 
 Jump_04_6652::
-	ld hl, $c3b0
+	ld hl, wEntitySpriteVariant
 	ld [hl], $01
-	call Call_04_6D9D
-	ld hl, $c250
+	call UpdateEntityPosWithSpeed_04
+	ld hl, wEntitySpeedY
 	add hl, bc
 	inc [hl]
 	nop
@@ -5334,19 +6657,19 @@ Jump_04_6652::
 	cp $0c
 	jr nz, jr_004_66cb
 
-	ld hl, $c290
+	ld hl, wEntityState
 	ld [hl], $03
 	ld a, c
 	cp $0f
 	jr nz, jr_004_66b0
 
-	ldh a, [$fff8]
+	ldh a, [hRoomStatus]
 	and $10
 	jr nz, jr_004_66b0
 
 	ld a, $01
-	ldh [$fff2], a
-	ldh a, [$fff6]
+	ldh [hJingle], a
+	ldh a, [hMapRoom]
 	ld e, a
 	ld d, $01
 	ld hl, $d900
@@ -5354,7 +6677,7 @@ Jump_04_6652::
 	ld a, [hl]
 	or $10
 	ld [hl], a
-	ldh [$fff8], a
+	ldh [hRoomStatus], a
 	ld a, [$db5c]
 	inc a
 	ld [$db5c], a
@@ -5363,9 +6686,9 @@ Jump_04_6652::
 
 	xor a
 	ld [$db5c], a
-	ld hl, $db93
+	ld hl, wAddHealthBuffer
 	ld [hl], $40
-	ld hl, $db5b
+	ld hl, wMaxHearts
 	inc [hl]
 	ld a, $ff
 	jr jr_004_66a6
@@ -5374,13 +6697,13 @@ jr_004_66a4:
 	ld a, $fe
 
 jr_004_66a6:
-	call Call_2185
-	ld hl, $db90
+	call OpenDialogTable1
+	ld hl, wAddRupeeBufferLow
 	ld [hl], $20
 	jr jr_004_66c8
 
 jr_004_66b0:
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	cp $03
@@ -5392,12 +6715,12 @@ jr_004_66b0:
 	ld a, $4d
 
 jr_004_66c1:
-	ld hl, $db90
+	ld hl, wAddRupeeBufferLow
 	ld [hl], e
-	call Call_2197
+	call OpenDialog
 
 jr_004_66c8:
-	call Call_04_6D4D
+	call DespawnEntity_04
 
 jr_004_66cb:
 	ret
@@ -5407,15 +6730,15 @@ jr_004_66cb:
 	db $42, $20, $44, $20, $46, $20, $44, $20, $42, $20, $40, $20, $46, $20, $40, $20
 
 Jump_04_66EC::
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
 	and a
 	jr nz, jr_004_66fa
 
-	ldh a, [$fff1]
+	ldh a, [hActiveEntitySpriteVariant]
 	add $04
-	ldh [$fff1], a
+	ldh [hActiveEntitySpriteVariant], a
 
 jr_004_66fa:
 	ld de, $66cc
@@ -5424,11 +6747,11 @@ jr_004_66fa:
 
 
 Jump_004_6703:
-	call Call_0891
+	call GetEntityTimer
 	jr nz, jr_004_6715
 
 	ld [hl], $18
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
 	xor $01
@@ -5436,11 +6759,11 @@ Jump_004_6703:
 	call Call_3B8D
 
 jr_004_6715:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $03
 	jr nz, jr_004_672a
 
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -5462,7 +6785,7 @@ jr_004_672a:
 	db $08, $f8
 
 Jump_004_672d:
-	call Call_0891
+	call GetEntityTimer
 	jr nz, jr_004_6738
 
 	ld [hl], $50
@@ -5470,21 +6793,21 @@ Jump_004_672d:
 	ld [hl], b
 
 jr_004_6738:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
 	call Call_3B87
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $03
 	jr nz, jr_004_6765
 
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	push hl
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, bc
 	ld e, [hl]
 	ld d, $00
@@ -5509,45 +6832,45 @@ jr_004_6765:
 
 
 Call_04_6766::
-	ld a, [$d002]
+	ld a, [wSceneVar2]
 	and a
 	jr nz, jr_004_67c5
 
-	ld a, [$d003]
+	ld a, [wSceneVar3]
 	ld e, a
 	ld d, b
-	ld hl, $c280
+	ld hl, wEntityStatus
 	add hl, de
 	ld a, [hl]
 	and a
 	jr z, jr_004_67c5
 
-	ld hl, $c290
+	ld hl, wEntityState
 	add hl, de
 	ld a, [hl]
 	and a
 	jr z, jr_004_67c5
 
-	ld a, [$d000]
-	ld hl, $ffee
+	ld a, [wEntityWorkRAM]
+	ld hl, hActiveEntityX
 	sub [hl]
 	rlca
 	rlca
 	and $01
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, bc
 	cp [hl]
 	jr nz, jr_004_67c5
 
-	ld a, [$d000]
-	ld hl, $ffee
+	ld a, [wEntityWorkRAM]
+	ld hl, hActiveEntityX
 	sub [hl]
 	add $18
 	cp $30
 	jr nc, jr_004_67c5
 
-	ld a, [$d001]
-	ld hl, $ffef
+	ld a, [wSceneVar1]
+	ld hl, hActiveEntityY
 	sub [hl]
 	add $10
 	cp $20
@@ -5555,12 +6878,12 @@ Call_04_6766::
 
 	call Call_3B8D
 	ld [hl], $02
-	ld hl, $d002
+	ld hl, wSceneVar2
 	inc [hl]
-	ld hl, $d004
+	ld hl, wSceneVar4
 	inc [hl]
-	call Call_0891
-	call Call_27ED
+	call GetEntityTimer
+	call GetRandomByte
 	and $3f
 	add $30
 	ld [hl], a
@@ -5570,18 +6893,18 @@ jr_004_67c5:
 
 
 Call_04_67C6::
-	call Call_090F
-	ldh a, [$ff98]
+	call StartWarpFadeOutMusic
+	ldh a, [hLinkX]
 	swap a
 	and $0f
 	ld e, a
-	ldh a, [$ff99]
+	ldh a, [hLinkY]
 	sub $08
 	and $f0
 	or e
-	ld [$d416], a
+	ld [wWarpDestPosition], a
 	xor a
-	ld [$c167], a
+	ld [wLinkFrozen], a
 	ret
 
 
@@ -5591,7 +6914,7 @@ Call_04_67EF::
 	ld hl, $d45e
 	inc [hl]
 	ld de, $67df
-	ldh a, [$fff7]
+	ldh a, [hMapId]
 	cp $01
 	jr nz, jr_004_67ff
 
@@ -5599,9 +6922,9 @@ Call_04_67EF::
 
 jr_004_67ff:
 	call Call_3C3B
-	call Call_04_7F36
+	call ReturnIfNonInteractive_04
 	call Call_3BEB
-	ldh a, [$fff0]
+	ldh a, [hActiveEntityState]
 	rst $00
 
 JumpTable_04_680B::
@@ -5611,7 +6934,7 @@ JumpTable_04_680B::
 	db $00, $03, $01, $02
 
 Jump_04_6813::
-	call Call_0887
+	call GetEntityDropTimer
 	jr nz, jr_004_681e
 
 	ld [hl], $10
@@ -5620,16 +6943,16 @@ Jump_04_6813::
 
 
 jr_004_681e:
-	ld a, [$c11c]
+	ld a, [wLinkMotionState]
 	cp $00
 	jp nz, Jump_004_68b0
 
-	ldh a, [$ff9a]
+	ldh a, [hLinkSpeedX]
 	push af
-	ldh a, [$ff9b]
+	ldh a, [hLinkSpeedY]
 	push af
 	ld e, $00
-	ldh a, [$ffeb]
+	ldh a, [hActiveEntityType]
 	cp $52
 	ld a, $14
 	jr nz, jr_004_6839
@@ -5641,7 +6964,7 @@ jr_004_6839:
 	push de
 	call Call_3C30
 	pop de
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	bit 0, e
 	jr z, jr_004_6846
 
@@ -5649,8 +6972,8 @@ jr_004_6839:
 	inc a
 
 jr_004_6846:
-	ldh [$ff9b], a
-	ldh a, [$ffd8]
+	ldh [hLinkSpeedY], a
+	ldh a, [hMultiPurpose1]
 	bit 0, e
 	jr z, jr_004_6850
 
@@ -5658,52 +6981,52 @@ jr_004_6846:
 	inc a
 
 jr_004_6850:
-	ldh [$ff9a], a
+	ldh [hLinkSpeedX], a
 	push bc
-	call Call_20D6
+	call ApplyLinkSpeed
 	call Call_3E49
 	pop bc
 	pop af
-	ldh [$ff9b], a
+	ldh [hLinkSpeedY], a
 	pop af
-	ldh [$ff9a], a
+	ldh [hLinkSpeedX], a
 	xor a
-	ld [$c144], a
-	ldh a, [$ffeb]
+	ld [wLinkPushingTimer], a
+	ldh a, [hActiveEntityType]
 	cp $52
 	jp nz, Jump_004_68b0
 
-	ld a, [$c146]
+	ld a, [wIsLinkInTheAir]
 	and a
 	jr nz, jr_004_68a0
 
-	call Call_04_6E08
+	call GetEntityXDistanceToLink_04
 	add $04
 	cp $08
 	jr nc, jr_004_68a0
 
-	call Call_04_6E18
+	call GetEntityYDistanceToLink_04
 	add $04
 	cp $08
 	jr nc, jr_004_68a0
 
-	ldh a, [$ffee]
-	ldh [$ff98], a
-	ldh a, [$ffec]
-	ldh [$ff99], a
+	ldh a, [hActiveEntityX]
+	ldh [hLinkX], a
+	ldh a, [hActiveEntityDrawY]
+	ldh [hLinkY], a
 	ld a, $06
-	ld [$c11c], a
-	call Call_093B
-	ld [$c198], a
+	ld [wLinkMotionState], a
+	call ResetSpinAttackAndDash
+	ld [wLinkMotionCounter], a
 	ld a, $ff
-	ld [$dbcb], a
+	ld [wHoleCollisionType], a
 	ld a, $0c
-	ldh [$fff3], a
+	ldh [hWaveSfx], a
 	ret
 
 
 jr_004_68a0:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
@@ -5713,30 +7036,30 @@ jr_004_68a0:
 	ld hl, $680f
 	add hl, de
 	ld a, [hl]
-	ldh [$ff9e], a
+	ldh [hLinkDirection], a
 
 Jump_004_68b0:
 	call Call_04_68D9
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	rra
 	and $01
 	call Call_3B87
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $1f
 	jr nz, jr_004_68c8
 
 	ld a, $1f
-	ldh [$fff4], a
+	ldh [hNoiseSfx], a
 
 jr_004_68c8:
 	ret
 
 
 Jump_04_68C9::
-	call Call_0887
+	call GetEntityDropTimer
 	jr nz, jr_004_68d4
 
 	ld [hl], $40
@@ -5758,7 +7081,7 @@ Jump_004_68dc:
 	cp c
 	jp z, Jump_004_6971
 
-	ld hl, $c280
+	ld hl, wEntityStatus
 	add hl, de
 	ld a, [hl]
 	and a
@@ -5768,38 +7091,38 @@ Jump_004_68dc:
 	push bc
 	push de
 	pop bc
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	xor c
 	and $01
 	jr nz, jr_004_6970
 
-	ldh a, [$ff98]
+	ldh a, [hLinkX]
 	push af
-	ldh a, [$ff99]
+	ldh a, [hLinkY]
 	push af
-	ldh a, [$ffee]
-	ldh [$ff98], a
-	ldh a, [$ffef]
-	ldh [$ff99], a
-	ld hl, $c240
+	ldh a, [hActiveEntityX]
+	ldh [hLinkX], a
+	ldh a, [hActiveEntityY]
+	ldh [hLinkY], a
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	push af
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 	push af
 	ld a, $10
 	call Call_3C30
 	ld e, $00
-	ldh a, [$ffeb]
+	ldh a, [hActiveEntityType]
 	cp $52
 	jr nz, jr_004_6920
 
 	inc e
 
 jr_004_6920:
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	bit 0, e
 	jr nz, jr_004_6928
 
@@ -5807,10 +7130,10 @@ jr_004_6920:
 	inc a
 
 jr_004_6928:
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
-	ldh a, [$ffd8]
+	ldh a, [hMultiPurpose1]
 	bit 0, e
 	jr nz, jr_004_6935
 
@@ -5818,41 +7141,41 @@ jr_004_6928:
 	inc a
 
 jr_004_6935:
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
 	call Call_3DBA
-	call Call_04_6D9D
+	call UpdateEntityPosWithSpeed_04
 	call Call_3B9E
-	ldh a, [$ffee]
-	ld hl, $ff98
+	ldh a, [hActiveEntityX]
+	ld hl, hLinkX
 	sub [hl]
 	add $02
 	cp $04
 	jr nc, jr_004_695e
 
-	ldh a, [$ffec]
-	ld hl, $ff99
+	ldh a, [hActiveEntityDrawY]
+	ld hl, hLinkY
 	sub [hl]
 	add $02
 	cp $04
 	jr nc, jr_004_695e
 
-	call Call_04_6D4D
+	call DespawnEntity_04
 
 jr_004_695e:
 	pop af
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
 	pop af
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
 	pop af
-	ldh [$ff99], a
+	ldh [hLinkY], a
 	pop af
-	ldh [$ff98], a
+	ldh [hLinkX], a
 
 jr_004_6970:
 	pop bc
@@ -5868,18 +7191,18 @@ Jump_004_6971:
 
 
 Call_04_697A::
-	ldh a, [$fff7]
+	ldh a, [hMapId]
 	cp $14
 	jr c, jr_004_6995
 
-	ldh a, [$fff8]
+	ldh a, [hRoomStatus]
 	and $10
-	jp nz, Call_04_6D4D
+	jp nz, DespawnEntity_04
 
-	ld hl, $c460
+	ld hl, wEntityLoadOrder
 	add hl, bc
 	ld [hl], $ff
-	ld hl, $c4e0
+	ld hl, wEntityDropType
 	add hl, bc
 	ld [hl], $3c
 	jr jr_004_69a1
@@ -5887,22 +7210,22 @@ Call_04_697A::
 jr_004_6995:
 	ld e, a
 	ld d, b
-	ld hl, $db65
+	ld hl, wDungeonFlags
 	add hl, de
 	ld a, [hl]
 	and $01
-	jp nz, Call_04_6D4D
+	jp nz, DespawnEntity_04
 
 jr_004_69a1:
 	call Call_04_6A94
 	call Call_3DBA
-	call Call_04_7F36
-	call Call_04_6D53
-	ld hl, $c430
+	call ReturnIfNonInteractive_04
+	call ApplyRecoilIfNeeded_04
+	ld hl, wEntityOptions1
 	add hl, bc
 	ld [hl], $00
 	call Call_3BB4
-	ldh a, [$fff0]
+	ldh a, [hActiveEntityState]
 	rst $00
 
 JumpTable_04_69B9::
@@ -5911,10 +7234,10 @@ JumpTable_04_69B9::
 	dw Jump_04_6A37
 
 Jump_04_69BF::
-	call Call_0891
+	call GetEntityTimer
 	jr nz, jr_004_69f1
 
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	xor c
 	and $07
 	jr nz, jr_004_69d0
@@ -5923,19 +7246,19 @@ Jump_04_69BF::
 	call Call_3C25
 
 jr_004_69d0:
-	call Call_04_6D9D
+	call UpdateEntityPosWithSpeed_04
 	call Call_3B9E
-	call Call_04_6E08
+	call GetEntityXDistanceToLink_04
 	add $30
 	cp $60
 	jr nc, jr_004_69f1
 
-	call Call_04_6E18
+	call GetEntityYDistanceToLink_04
 	add $30
 	cp $60
 	jr nc, jr_004_69f1
 
-	call Call_0891
+	call GetEntityTimer
 	ld [hl], $28
 	call Call_3B8D
 
@@ -5944,12 +7267,12 @@ jr_004_69f0:
 
 
 jr_004_69f1:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $01
 	jr nz, jr_004_69f0
 
 Jump_004_69f7:
-	ld hl, $c3d0
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	inc [hl]
 	ld a, [hl]
@@ -5964,15 +7287,15 @@ Jump_004_69f7:
 	db $04, $0c, $00, $08
 
 Jump_04_6A0A::
-	call Call_0891
+	call GetEntityTimer
 	jr nz, jr_004_6a34
 
-	call Call_04_6E28
-	ld hl, $c380
+	call GetEntityDirectionToLink_04
+	ld hl, wEntityDirection
 	add hl, bc
 	ld [hl], e
 	ld d, b
-	ld hl, $c3d0
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	and $0f
@@ -5981,10 +7304,10 @@ Jump_04_6A0A::
 	cp [hl]
 	jr nz, jr_004_6a34
 
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], $38
-	ld hl, $c440
+	ld hl, wEntityPrivate4
 	add hl, bc
 	ld [hl], b
 	call Call_3B8D
@@ -5994,21 +7317,21 @@ jr_004_6a34:
 
 
 Jump_04_6A37::
-	call Call_04_6DF0
-	ld hl, $c2b0
+	call AddPrivate1SpeedToPrivate3_04
+	ld hl, wEntityPrivate1
 	add hl, bc
 	dec [hl]
 	dec [hl]
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $03
 	jr nz, jr_004_6a4b
 
-	ld hl, $c440
+	ld hl, wEntityPrivate4
 	add hl, bc
 	inc [hl]
 
 jr_004_6a4b:
-	ld hl, $c2d0
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -6021,9 +7344,9 @@ jr_004_6a57:
 	ld [hl], b
 	call Call_3B8D
 	ld [hl], b
-	call Call_0891
+	call GetEntityTimer
 	ld [hl], $10
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, bc
 	ld e, [hl]
 	ld d, b
@@ -6031,7 +7354,7 @@ jr_004_6a57:
 	add hl, de
 	ld a, [hl]
 	add $08
-	ld hl, $c3d0
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld [hl], a
 
@@ -6045,18 +7368,18 @@ jr_004_6a73:
 Call_04_6A94::
 	ld de, $6a74
 	call Call_3C3B
-	ld hl, $c2d0
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	and a
 	jr z, jr_004_6afe
 
 	xor a
-	ldh [$ffd7], a
-	ld hl, $c380
+	ldh [hMultiPurpose0], a
+	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c2d0
+	ld hl, wEntityPrivate3
 	add hl, bc
 	bit 1, a
 	jr nz, jr_004_6ad8
@@ -6065,18 +7388,18 @@ Call_04_6A94::
 	ld a, [hl]
 	jr nz, jr_004_6abd
 
-	ld hl, $ffd7
+	ld hl, hMultiPurpose0
 	inc [hl]
 	cpl
 	inc a
 
 jr_004_6abd:
-	ld hl, $ffee
+	ld hl, hActiveEntityX
 	add [hl]
 	ld [hl], a
-	ld hl, $c440
+	ld hl, wEntityPrivate4
 	add hl, bc
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	and a
 	ld a, [hl]
 	jr z, jr_004_6acf
@@ -6085,7 +7408,7 @@ jr_004_6abd:
 	and $0f
 
 jr_004_6acf:
-	ld hl, $ffec
+	ld hl, hActiveEntityDrawY
 	add [hl]
 	add $f3
 	ld [hl], a
@@ -6096,18 +7419,18 @@ jr_004_6ad8:
 	ld a, [hl]
 	jr nz, jr_004_6ae3
 
-	ld hl, $ffd7
+	ld hl, hMultiPurpose0
 	inc [hl]
 	cpl
 	inc a
 
 jr_004_6ae3:
-	ld hl, $ffec
+	ld hl, hActiveEntityDrawY
 	add [hl]
 	ld [hl], a
-	ld hl, $c440
+	ld hl, wEntityPrivate4
 	add hl, bc
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	and a
 	ld a, [hl]
 	jr nz, jr_004_6af5
@@ -6116,14 +7439,14 @@ jr_004_6ae3:
 	and $0f
 
 jr_004_6af5:
-	ld hl, $ffee
+	ld hl, hActiveEntityX
 	add [hl]
 	add $f8
 	ld [hl], a
 	jr jr_004_6b1e
 
 jr_004_6afe:
-	ld hl, $c3d0
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	and $0f
@@ -6131,62 +7454,62 @@ jr_004_6afe:
 	ld d, $00
 	ld hl, $6a80
 	add hl, de
-	ldh a, [$ffec]
+	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	add $f0
-	ldh [$ffec], a
+	ldh [hActiveEntityDrawY], a
 	ld hl, $6a84
 	add hl, de
-	ldh a, [$ffee]
+	ldh a, [hActiveEntityX]
 	add [hl]
 	add $f3
-	ldh [$ffee], a
+	ldh [hActiveEntityX], a
 
 jr_004_6b1e:
 	ld a, $02
-	ldh [$fff1], a
+	ldh [hActiveEntitySpriteVariant], a
 	ld de, $6a74
 	call Call_3C3B
-	ld hl, $c440
+	ld hl, wEntityPrivate4
 	add hl, bc
 	ld a, [hl]
 	and a
 	jp z, Jump_004_6bb0
 
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	and $80
 	jr nz, jr_004_6b4b
 
-	call Call_088C
+	call GetEntityTimer1
 	jr nz, jr_004_6b4b
 
-	ld hl, $c430
+	ld hl, wEntityOptions1
 	add hl, bc
 	ld [hl], $40
 	call Call_3BB4
 	call Call_04_6BB1
 
 jr_004_6b4b:
-	ldh a, [$ffee]
+	ldh a, [hActiveEntityX]
 	add $04
-	ld hl, $c200
+	ld hl, wEntityX
 	add hl, bc
 	sub [hl]
 	sra a
 	sra a
-	ldh [$ffd7], a
-	ldh [$ffd9], a
-	ldh a, [$ffec]
-	ld hl, $c210
+	ldh [hMultiPurpose0], a
+	ldh [hMultiPurpose2], a
+	ldh a, [hActiveEntityDrawY]
+	ld hl, wEntityY
 	add hl, bc
 	sub [hl]
 	sra a
 	sra a
-	ldh [$ffd8], a
-	ldh [$ffda], a
-	ld a, [$c3c0]
+	ldh [hMultiPurpose1], a
+	ldh [hMultiPurpose3], a
+	ld a, [wOAMNextIndex]
 	ld e, a
 	ld d, $00
 	ld hl, $c030
@@ -6197,14 +7520,14 @@ jr_004_6b4b:
 	ld a, $03
 
 jr_004_6b7c:
-	ldh [$ffdb], a
-	ldh a, [$ffec]
-	ld hl, $ffd8
+	ldh [hMultiPurpose4], a
+	ldh a, [hActiveEntityDrawY]
+	ld hl, hMultiPurpose1
 	add [hl]
 	ld [de], a
 	inc de
-	ldh a, [$ffee]
-	ld hl, $ffd7
+	ldh a, [hActiveEntityX]
+	ld hl, hMultiPurpose0
 	add [hl]
 	ld [de], a
 	inc de
@@ -6214,15 +7537,15 @@ jr_004_6b7c:
 	ld a, $00
 	ld [de], a
 	inc de
-	ldh a, [$ffd7]
-	ld hl, $ffd9
+	ldh a, [hMultiPurpose0]
+	ld hl, hMultiPurpose2
 	add [hl]
-	ldh [$ffd7], a
-	ldh a, [$ffd8]
-	ld hl, $ffda
+	ldh [hMultiPurpose0], a
+	ldh a, [hMultiPurpose1]
+	ld hl, hMultiPurpose3
 	add [hl]
-	ldh [$ffd8], a
-	ldh a, [$ffdb]
+	ldh [hMultiPurpose1], a
+	ldh a, [hMultiPurpose4]
 	dec a
 	jr nz, jr_004_6b7c
 
@@ -6234,53 +7557,53 @@ Jump_004_6bb0:
 
 
 Call_04_6BB1::
-	ldh a, [$ffee]
-	ldh [$ffdb], a
+	ldh a, [hActiveEntityX]
+	ldh [hMultiPurpose4], a
 	swap a
 	and $0f
 	ld e, a
-	ldh a, [$ffec]
+	ldh a, [hActiveEntityDrawY]
 	sub $10
 	add $04
-	ldh [$ffdc], a
+	ldh [hMultiPurpose5], a
 	and $f0
 	or e
 	ld e, a
 	ld d, $00
-	ld hl, $d711
+	ld hl, wRoomObjects
 	ld a, h
 	add hl, de
 	ld h, a
 	ld a, [hl]
-	ldh [$ffaf], a
+	ldh [hRoomObjectType], a
 	ld e, a
-	ld a, [$dba5]
+	ld a, [wIsIndoor]
 	ld d, a
-	call Call_29DB
+	call GetObjectPhysics
 	cp $00
 	jr z, jr_004_6bff
 
 	cp $01
 	jr nz, jr_004_6bff
 
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	cpl
 	inc a
 	ld [hl], a
-	call Call_088C
+	call GetEntityTimer1
 	ld [hl], $08
 	ld a, $07
-	ldh [$fff2], a
+	ldh [hJingle], a
 
 Call_04_6BF2::
-	ldh a, [$ffee]
-	ldh [$ffd7], a
-	ldh a, [$ffec]
-	ldh [$ffd8], a
+	ldh a, [hActiveEntityX]
+	ldh [hMultiPurpose0], a
+	ldh a, [hActiveEntityDrawY]
+	ldh [hMultiPurpose1], a
 	ld a, $05
-	call Call_0953
+	call AddTransientVfx
 
 jr_004_6bff:
 	ret
@@ -6292,16 +7615,16 @@ jr_004_6bff:
 	db $10, $0e, $0c, $06
 
 Call_04_6C34::
-	ldh a, [$fff0]
+	ldh a, [hActiveEntityState]
 	and a
 	jp nz, Jump_004_6ce2
 
 	ld de, $6c00
 	call Call_3C3B
-	call Call_04_7F36
+	call ReturnIfNonInteractive_04
 	call Call_3BBF
 	call Call_3B9E
-	call Call_0891
+	call GetEntityTimer
 	jr z, jr_004_6c87
 
 	cp $10
@@ -6312,29 +7635,29 @@ Call_04_6C34::
 	jr c, jr_004_6c86
 
 	ld a, $08
-	ldh [$fff4], a
-	ldh a, [$ffd7]
-	ld hl, $c200
+	ldh [hNoiseSfx], a
+	ldh a, [hMultiPurpose0]
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ldh a, [$ffd8]
-	ld hl, $c210
+	ldh a, [hMultiPurpose1]
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-	ldh a, [$ffd9]
-	ld hl, $c380
+	ldh a, [hMultiPurpose2]
+	ld hl, wEntityDirection
 	add hl, de
 	ld [hl], a
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, de
 	ld [hl], a
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, de
 	ld [hl], a
 
@@ -6343,7 +7666,7 @@ jr_004_6c86:
 
 
 jr_004_6c87:
-	ld hl, $c3d0
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	inc a
@@ -6351,50 +7674,50 @@ jr_004_6c87:
 	and $07
 	jr nz, jr_004_6ce1
 
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
 	inc a
 	and $0f
 	ld [hl], a
 	srl a
-	ld hl, $c3b0
+	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld [hl], a
 	ld a, $2a
 	call Call_3C01
 	jr c, jr_004_6ce1
 
-	ldh a, [$ffd7]
-	ld hl, $c200
+	ldh a, [hMultiPurpose0]
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ldh a, [$ffd8]
-	ld hl, $c210
+	ldh a, [hMultiPurpose1]
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-	ld hl, $c290
+	ld hl, wEntityState
 	add hl, de
 	ld [hl], $01
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], c
-	ld hl, $c340
+	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], $c0
 	push bc
-	ldh a, [$ffd9]
+	ldh a, [hMultiPurpose2]
 	ld c, a
 	ld hl, $6c24
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, de
 	ld [hl], a
 	ld hl, $6c20
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, de
 	ld [hl], a
 	pop bc
@@ -6405,43 +7728,43 @@ jr_004_6ce1:
 
 Jump_004_6ce2:
 	call Call_3BA9
-	ld hl, $c2a0
+	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and a
-	jp nz, Call_04_6D4D
+	jp nz, DespawnEntity_04
 
-	ldh a, [$ffee]
-	ld hl, $ff98
+	ldh a, [hActiveEntityX]
+	ld hl, hLinkX
 	sub [hl]
 	add $10
 	cp $20
 	jr nc, jr_004_6d2f
 
-	ldh a, [$ffef]
-	ld hl, $ff99
+	ldh a, [hActiveEntityY]
+	ld hl, hLinkY
 	sub [hl]
 	add $10
 	cp $20
 	jr nc, jr_004_6d2f
 
-	call Call_04_6D4D
-	ld a, [$dbc7]
+	call DespawnEntity_04
+	ld a, [wInvincibilityCounter]
 	and a
 	jr nz, jr_004_6d2f
 
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld e, [hl]
 	ld d, b
-	ld hl, $c2e0
+	ld hl, wEntityTimer
 	add hl, de
 	ld a, [hl]
 	and a
 	jr nz, jr_004_6d2f
 
 	ld [hl], $20
-	ld hl, $c420
+	ld hl, wEntityFlashTimer
 	add hl, de
 	ld [hl], $10
 	push bc
@@ -6454,35 +7777,35 @@ Jump_004_6ce2:
 
 
 jr_004_6d2f:
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c200
+	ld hl, wEntityX
 	add hl, bc
 	add [hl]
 	ld [hl], a
 	cp $9c
-	jp nc, Call_04_6D4D
+	jp nc, DespawnEntity_04
 
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, bc
 	add [hl]
 	ld [hl], a
 	cp $78
 	ret c
 
-Call_04_6D4D::
-	ld hl, $c280
+DespawnEntity_04::
+	ld hl, wEntityStatus
 	add hl, bc
 	ld [hl], b
 	ret
 
 
-Call_04_6D53::
-	ld hl, $c410
+ApplyRecoilIfNeeded_04::
+	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -6491,28 +7814,28 @@ Call_04_6D53::
 	dec a
 	ld [hl], a
 	call Call_3EB8
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	push af
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 	push af
-	ld hl, $c3f0
+	ld hl, wEntityRecoilSpeedX
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
-	ld hl, $c400
+	ld hl, wEntityRecoilSpeedY
 	add hl, bc
 	ld a, [hl]
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
-	call Call_04_6D9D
-	ld hl, $c430
+	call UpdateEntityPosWithSpeed_04
+	ld hl, wEntityOptions1
 	add hl, bc
 	ld a, [hl]
 	and $20
@@ -6521,11 +7844,11 @@ Call_04_6D53::
 	call Call_3B9E
 
 jr_004_6d8f:
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	pop af
 	ld [hl], a
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	pop af
 	ld [hl], a
@@ -6535,21 +7858,21 @@ jr_004_6d9c:
 	ret
 
 
-Call_04_6D9D::
-	call Call_04_6DAA
+UpdateEntityPosWithSpeed_04::
+	call AddEntitySpeedToPosX_04
 
-Call_04_6DA0::
+AddEntitySpeedToPosY_04::
 	push bc
 	ld a, c
 	add $10
 	ld c, a
-	call Call_04_6DAA
+	call AddEntitySpeedToPosX_04
 	pop bc
 	ret
 
 
-Call_04_6DAA::
-	ld hl, $c240
+AddEntitySpeedToPosX_04::
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -6558,12 +7881,12 @@ Call_04_6DAA::
 	push af
 	swap a
 	and $f0
-	ld hl, $c260
+	ld hl, wEntitySpeedXAcc
 	add hl, bc
 	add [hl]
 	ld [hl], a
 	rl d
-	ld hl, $c200
+	ld hl, wEntityX
 
 Jump_004_6dc2:
 jr_004_6dc2:
@@ -6587,8 +7910,8 @@ jr_004_6dd5:
 	ret
 
 
-Call_04_6DD6::
-	ld hl, $c320
+AddEntityZSpeedToPos_04::
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -6597,34 +7920,34 @@ Call_04_6DD6::
 	push af
 	swap a
 	and $f0
-	ld hl, $c330
+	ld hl, wEntitySpeedZAcc
 	add hl, bc
 	add [hl]
 	ld [hl], a
 	rl d
-	ld hl, $c310
+	ld hl, wEntityZ
 	jr jr_004_6dc2
 
-Call_04_6DF0::
-	ld hl, $c2b0
+AddPrivate1SpeedToPrivate3_04::
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	push af
 	swap a
 	and $f0
-	ld hl, $c2c0
+	ld hl, wEntityPrivate2
 	add hl, bc
 	add [hl]
 	ld [hl], a
 	rl d
-	ld hl, $c2d0
+	ld hl, wEntityPrivate3
 	jp Jump_004_6dc2
 
 
-Call_04_6E08::
+GetEntityXDistanceToLink_04::
 	ld e, $00
-	ldh a, [$ff98]
-	ld hl, $c200
+	ldh a, [hLinkX]
+	ld hl, wEntityX
 	add hl, bc
 	sub [hl]
 	bit 7, a
@@ -6637,10 +7960,10 @@ jr_004_6e16:
 	ret
 
 
-Call_04_6E18::
+GetEntityYDistanceToLink_04::
 	ld e, $02
-	ldh a, [$ff99]
-	ld hl, $c210
+	ldh a, [hLinkY]
+	ld hl, wEntityY
 	add hl, bc
 	sub [hl]
 	bit 7, a
@@ -6653,10 +7976,10 @@ jr_004_6e26:
 	ret
 
 
-Call_04_6E28::
-	call Call_04_6E08
+GetEntityDirectionToLink_04::
+	call GetEntityXDistanceToLink_04
 	ld a, e
-	ldh [$ffd7], a
+	ldh [hMultiPurpose0], a
 	ld a, d
 	bit 7, a
 	jr z, jr_004_6e35
@@ -6666,9 +7989,9 @@ Call_04_6E28::
 
 jr_004_6e35:
 	push af
-	call Call_04_6E18
+	call GetEntityYDistanceToLink_04
 	ld a, e
-	ldh [$ffd8], a
+	ldh [hMultiPurpose1], a
 	ld a, d
 	bit 7, a
 	jr z, jr_004_6e43
@@ -6681,11 +8004,11 @@ jr_004_6e43:
 	cp d
 	jr nc, jr_004_6e4b
 
-	ldh a, [$ffd7]
+	ldh a, [hMultiPurpose0]
 	jr jr_004_6e4d
 
 jr_004_6e4b:
-	ldh a, [$ffd8]
+	ldh a, [hMultiPurpose1]
 
 jr_004_6e4d:
 	ld e, a
@@ -6693,78 +8016,78 @@ jr_004_6e4d:
 
 
 Call_04_6E4F::
-	ld a, [$db73]
+	ld a, [wIsMarinFollowingLink]
 	push af
-	ldh a, [$fff8]
+	ldh a, [hRoomStatus]
 	and $10
 	jr z, jr_004_6e5d
 
 	xor a
-	ld [$db73], a
+	ld [wIsMarinFollowingLink], a
 
 jr_004_6e5d:
 	call Call_04_6E65
 	pop af
-	ld [$db73], a
+	ld [wIsMarinFollowingLink], a
 	ret
 
 
 Call_04_6E65::
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	and a
 	jp nz, Jump_004_7440
 
 	ld a, c
-	ld [$d210], a
+	ld [wSongShowTimer], a
 	ld a, $02
 	ld [$c50a], a
-	call Call_088C
+	call GetEntityTimer1
 	dec a
 	jr nz, jr_004_6e81
 
 	ld a, $19
-	ldh [$fff2], a
+	ldh [hJingle], a
 
 jr_004_6e81:
-	ldh a, [$fff1]
+	ldh a, [hActiveEntitySpriteVariant]
 	inc a
 	jr z, jr_004_6e9d
 
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $1f
 	jr nz, jr_004_6e94
 
-	call Call_04_6E28
-	ld hl, $c380
+	call GetEntityDirectionToLink_04
+	ld hl, wEntityDirection
 	add hl, bc
 	ld [hl], e
 
 jr_004_6e94:
-	call Call_04_7C20
+	call AnimateEntityWalking_04
 	ld de, $7662
 	call Call_3C3B
 
 jr_004_6e9d:
 	call Call_04_7377
 	call Call_3DBA
-	call Call_04_7B6B
+	call BlockLinkAtEntity_04
 	call Call_04_7330
-	ldh a, [$fff0]
+	ldh a, [hActiveEntityState]
 	cp $03
 	jr c, jr_004_6ebc
 
-	ld a, [$db73]
+	ld a, [wIsMarinFollowingLink]
 	and a
 	jr z, jr_004_6ebc
 
 	ld a, $02
-	ldh [$ffa1], a
-	ld [$c167], a
+	ldh [hLinkInteractiveMotionBlocked], a
+	ld [wLinkFrozen], a
 
 jr_004_6ebc:
-	ldh a, [$fff0]
+	ldh a, [hActiveEntityState]
 	rst $00
 
 JumpTable_04_6EBF::
@@ -6797,37 +8120,37 @@ jr_004_6efb:
 	ld a, $4f
 	ld e, $0e
 	call Call_3C13
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $01
 	ld hl, $6ed0
 	add hl, de
 	ld a, [hl]
-	ld hl, $c200
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
 	ld hl, $6ed6
 	add hl, de
 	ld a, [hl]
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
 	ld hl, $6ee2
 	add hl, de
 	ld a, [hl]
-	ld hl, $c3b0
+	ld hl, wEntitySpriteVariant
 	add hl, de
 	ld [hl], a
 	ld hl, $6ee8
 	add hl, de
 	ld a, [hl]
-	ld hl, $c340
+	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], a
 	ld hl, $6edc
 	add hl, de
 	ld a, [hl]
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, de
 	ld [hl], a
 	push bc
@@ -6842,53 +8165,53 @@ jr_004_6efb:
 	xor a
 	ld [$d206], a
 	ld a, $10
-	ld [$d202], a
+	ld [wSmasherSlot], a
 	ld [$d203], a
 	ld a, $16
-	ld [$d205], a
+	ld [wEvilEagleAttack], a
 	ld a, $18
-	ld [$d204], a
+	ld [wTarinSlot], a
 	ld a, $00
 	ld [$d200], a
 	ld a, $04
-	ld [$d201], a
+	ld [wSmasherBallSlot], a
 	call Call_3B8D
-	ld a, [$db0e]
-	ld hl, $c390
+	ld a, [wTradeSequenceItem]
+	ld hl, wEntityPrivate5
 	add hl, bc
 	ld [hl], a
 	ret
 
 
 Jump_04_6F72::
-	ld a, [$c167]
+	ld a, [wLinkFrozen]
 	and a
 	ret nz
 
-	ld a, [$db73]
+	ld a, [wIsMarinFollowingLink]
 	and a
 	jr z, jr_004_6f8e
 
-	ldh a, [$ff98]
+	ldh a, [hLinkX]
 	cp $6c
 	jr c, jr_004_6f8e
 
 	ld hl, $daa0
 	set 4, [hl]
 	ld a, $6b
-	ldh [$ff98], a
+	ldh [hLinkX], a
 	jr jr_004_6f93
 
 jr_004_6f8e:
-	call Call_04_7B8E
+	call CanTalkToEntityWide_04
 	jr nc, jr_004_6fce
 
 jr_004_6f93:
 	xor a
-	ld [$c120], a
-	ldh [$ff9a], a
+	ld [wLinkWalkingFrameCount], a
+	ldh [hLinkSpeedX], a
 	ld e, $06
-	ld hl, $c390
+	ld hl, wEntityPrivate5
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -6897,19 +8220,19 @@ jr_004_6f93:
 	dec e
 
 jr_004_6fa4:
-	ld hl, $c440
+	ld hl, wEntityPrivate4
 	add hl, bc
 	ld a, [hl]
 	cp e
 	jr c, jr_004_6fb2
 
 	ld a, $40
-	call Call_2197
+	call OpenDialog
 	ret
 
 
 jr_004_6fb2:
-	ld a, [$db73]
+	ld a, [wIsMarinFollowingLink]
 	and a
 	jr z, jr_004_6fbc
 
@@ -6917,7 +8240,7 @@ jr_004_6fb2:
 	jr jr_004_6fc8
 
 jr_004_6fbc:
-	ld hl, $c2d0
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -6927,7 +8250,7 @@ jr_004_6fbc:
 	ld a, $3e
 
 jr_004_6fc8:
-	call Call_2197
+	call OpenDialog
 	call Call_3B8D
 
 jr_004_6fce:
@@ -6936,41 +8259,41 @@ jr_004_6fce:
 
 Jump_04_6FCF::
 	ld a, $02
-	ldh [$ffa1], a
-	ld a, [$c19f]
+	ldh [hLinkInteractiveMotionBlocked], a
+	ld a, [wDialogState]
 	and a
 	jr nz, jr_004_700b
 
-	ld a, [$c173]
+	ld a, [wDialogIndex]
 	cp $f8
 	jr z, jr_004_6fe7
 
-	ld a, [$c177]
+	ld a, [wDialogAnswer]
 	cp $01
 	jr nc, jr_004_6ffa
 
 jr_004_6fe7:
-	ld a, [$db5e]
+	ld a, [wRupeeCountLow]
 	sub $10
-	ld a, [$db5d]
+	ld a, [wRupeeCountHigh]
 	sbc $00
 	jr nc, jr_004_700c
 
 	ld a, $34
-	call Call_2197
+	call OpenDialog
 	jr Call_04_7005
 
 jr_004_6ffa:
-	ld a, [$db73]
+	ld a, [wIsMarinFollowingLink]
 	and a
 	jr z, Call_04_7005
 
 	ld a, $f8
-	jp Call_2197
+	jp OpenDialog
 
 
 Call_04_7005::
-	ld hl, $c290
+	ld hl, wEntityState
 	add hl, bc
 	ld [hl], $01
 
@@ -6979,14 +8302,14 @@ jr_004_700b:
 
 
 jr_004_700c:
-	ld a, [$db73]
+	ld a, [wIsMarinFollowingLink]
 	and a
 	jr z, jr_004_7015
 
-	ld [$db74], a
+	ld [wIsMarinInAnimalVillage], a
 
 jr_004_7015:
-	ld hl, $c2d0
+	ld hl, wEntityPrivate3
 	add hl, bc
 	ld a, [hl]
 	ld [hl], $01
@@ -6997,15 +8320,15 @@ jr_004_7015:
 	ld a, $3f
 
 jr_004_7023:
-	call Call_2197
+	call OpenDialog
 	ld a, $0a
-	ld [$db92], a
+	ld [wSubtractRupeeBufferLow], a
 	call Call_3B8D
 	ret
 
 
 Jump_04_702F::
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
@@ -7014,14 +8337,14 @@ Jump_04_702F::
 	ld [$d200], a
 	ld a, $10
 	ld [$d203], a
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $10
-	ld [$d202], a
-	ld a, [$db73]
+	ld [wSmasherSlot], a
+	ld a, [wIsMarinFollowingLink]
 	and a
 	jr z, jr_004_7095
 
-	call Call_0887
+	call GetEntityDropTimer
 	jr z, jr_004_7058
 
 	dec a
@@ -7034,11 +8357,11 @@ jr_004_7057:
 
 
 jr_004_7058:
-	call Call_04_7F36
+	call ReturnIfNonInteractive_04
 	push bc
-	ld a, [$c50f]
+	ld a, [wSingingMarinSlot]
 	ld c, a
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $10
 	ld a, $04
 	jr z, jr_004_7069
@@ -7047,23 +8370,23 @@ jr_004_7058:
 
 jr_004_7069:
 	call Call_3B87
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], $f8
-	call Call_04_6DAA
-	ld hl, $c200
+	call AddEntitySpeedToPosX_04
+	ld hl, wEntityX
 	add hl, bc
 	pop bc
 	ld a, [hl]
 	cp $28
 	jr nz, jr_004_7094
 
-	call Call_0887
+	call GetEntityDropTimer
 	ld [hl], $18
-	ld a, [$c50f]
+	ld a, [wSingingMarinSlot]
 	ld e, a
 	ld d, b
-	ld hl, $c3b0
+	ld hl, wEntitySpriteVariant
 	add hl, de
 	ld [hl], $02
 	ld e, $01
@@ -7074,11 +8397,11 @@ jr_004_7094:
 
 
 jr_004_7095:
-	ldh a, [$ffcb]
+	ldh a, [hJoypadHeld]
 	and $20
 	jr z, jr_004_70ac
 
-	ldh a, [$ff98]
+	ldh a, [hLinkX]
 	cp $20
 	jr c, jr_004_70ac
 
@@ -7090,7 +8413,7 @@ Call_04_70A5::
 
 Call_04_70A8::
 	ld a, $20
-	ldh [$fff4], a
+	ldh [hNoiseSfx], a
 
 jr_004_70ac:
 	ret
@@ -7100,10 +8423,10 @@ Jump_04_70AD::
 	call Call_04_70F3
 	ld a, $10
 	ld [$d203], a
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $10
-	ld [$d202], a
-	ld a, [$db73]
+	ld [wSmasherSlot], a
+	ld a, [wIsMarinFollowingLink]
 	and a
 	jr z, jr_004_70c9
 
@@ -7112,40 +8435,40 @@ Jump_04_70AD::
 	jr jr_004_70cf
 
 jr_004_70c9:
-	ldh a, [$ffcb]
+	ldh a, [hJoypadHeld]
 	and $20
 	jr z, jr_004_70e0
 
 jr_004_70cf:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $03
 	jr nz, jr_004_70f2
 
-	ld a, [$d204]
+	ld a, [wTarinSlot]
 	inc a
-	ld [$d204], a
+	ld [wTarinSlot], a
 	cp $88
 	jr c, jr_004_70f2
 
 jr_004_70e0:
 	call Call_3B8D
-	ld a, [$db73]
+	ld a, [wIsMarinFollowingLink]
 	and a
 	jr z, Call_04_70EE
 
-	call Call_0887
+	call GetEntityDropTimer
 	ld [hl], $10
 
 Call_04_70EE::
 	ld a, $21
-	ldh [$fff4], a
+	ldh [hNoiseSfx], a
 
 jr_004_70f2:
 	ret
 
 
 Call_04_70F3::
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
@@ -7153,27 +8476,27 @@ Call_04_70F3::
 	and $01
 	ld [$d200], a
 	ld a, $01
-	ldh [$ffa1], a
+	ldh [hLinkInteractiveMotionBlocked], a
 	ld a, $02
-	ldh [$ff9e], a
+	ldh [hLinkDirection], a
 	ret
 
 
 Jump_04_7107::
 	call Call_04_70F3
 	ld a, $10
-	ld [$d202], a
-	ldh a, [$ffe7]
+	ld [wSmasherSlot], a
+	ldh a, [hFrameCounter]
 	and $10
 	ld [$d203], a
-	call Call_0887
+	call GetEntityDropTimer
 	ret nz
 
-	ld a, [$db73]
+	ld a, [wIsMarinFollowingLink]
 	and a
 	jr nz, jr_004_7126
 
-	ldh a, [$ffcb]
+	ldh a, [hJoypadHeld]
 	and $10
 	jr z, jr_004_712c
 
@@ -7188,36 +8511,36 @@ jr_004_712c:
 Jump_04_712D::
 	call Call_04_70F3
 	ld a, $10
-	ld [$d202], a
-	ldh a, [$ffe7]
+	ld [wSmasherSlot], a
+	ldh a, [hFrameCounter]
 	and $10
 	ld [$d203], a
-	ld a, [$db73]
+	ld a, [wIsMarinFollowingLink]
 	and a
 	jr z, jr_004_7144
 
 	jr jr_004_714a
 
 jr_004_7144:
-	ldh a, [$ffcb]
+	ldh a, [hJoypadHeld]
 	and $10
 	jr z, jr_004_715b
 
 jr_004_714a:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $03
 	jr nz, jr_004_716b
 
-	ld a, [$d205]
+	ld a, [wEvilEagleAttack]
 	inc a
-	ld [$d205], a
+	ld [wEvilEagleAttack], a
 	cp $55
 	jr c, jr_004_716b
 
 jr_004_715b:
 	call Call_3B8D
 	call Call_04_70EE
-	call Call_0891
+	call GetEntityTimer
 	ld [hl], $60
 	ld e, $00
 	call Call_04_71A8
@@ -7227,27 +8550,27 @@ jr_004_716b:
 
 
 Jump_04_716C::
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
 	ld [$d200], a
 	ld a, $10
-	ld [$d202], a
+	ld [wSmasherSlot], a
 	ld [$d203], a
-	call Call_0891
+	call GetEntityTimer
 	cp $30
 	jr nc, jr_004_718a
 
-	ld hl, $d201
+	ld hl, wSmasherBallSlot
 	ld [hl], $02
 
 jr_004_718a:
 	and a
 	jr nz, jr_004_71b5
 
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $03
 	jr nz, jr_004_71b5
 
@@ -7257,20 +8580,20 @@ jr_004_718a:
 	cp $0f
 	jr nz, jr_004_71b5
 
-	call Call_0891
+	call GetEntityTimer
 	ld [hl], $ff
 	call Call_3B8D
 	ld e, $00
 
 Call_04_71A8::
-	ld a, [$db73]
+	ld a, [wIsMarinFollowingLink]
 	and a
 	ret z
 
 	ld a, e
-	ldh [$ff9e], a
+	ldh [hLinkDirection], a
 	push bc
-	call Call_087C
+	call UpdateLinkAnimationStateFar
 	pop bc
 
 jr_004_71b5:
@@ -7278,13 +8601,13 @@ jr_004_71b5:
 
 
 Jump_04_71B6::
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
 	ld [$d200], a
-	call Call_0891
+	call GetEntityTimer
 	cp $c8
 	jr nz, jr_004_71cc
 
@@ -7295,14 +8618,14 @@ jr_004_71cc:
 	cp $a0
 	jr nz, jr_004_71d5
 
-	ld hl, $d201
+	ld hl, wSmasherBallSlot
 	ld [hl], $03
 
 jr_004_71d5:
 	cp $50
 	jr nz, jr_004_71e2
 
-	ld hl, $d201
+	ld hl, wSmasherBallSlot
 	ld [hl], $04
 	call Call_04_72AB
 	ret
@@ -7320,13 +8643,13 @@ jr_004_71eb:
 
 
 Jump_04_71EC::
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
 	ld [$d200], a
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $03
 	jr nz, jr_004_7208
 
@@ -7342,47 +8665,47 @@ jr_004_7208:
 
 
 Jump_04_7209::
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
 	ld [$d200], a
-	ldh a, [$ff98]
+	ldh a, [hLinkX]
 	push af
-	ldh a, [$ff99]
+	ldh a, [hLinkY]
 	push af
 	ld a, $16
-	ldh [$ff99], a
+	ldh [hLinkY], a
 	ld a, $18
-	ldh [$ff98], a
-	ld a, [$d204]
+	ldh [hLinkX], a
+	ld a, [wTarinSlot]
 	ld [$c201], a
-	ld a, [$d205]
+	ld a, [wEvilEagleAttack]
 	ld [$c211], a
 	push bc
 	ld c, $01
 	ld a, $04
 	call Call_3C25
-	call Call_04_6D9D
+	call UpdateEntityPosWithSpeed_04
 	ld a, [$c201]
-	ld [$d204], a
+	ld [wTarinSlot], a
 	ld a, [$c211]
-	ld [$d205], a
+	ld [wEvilEagleAttack], a
 	pop bc
 	pop af
-	ldh [$ff99], a
+	ldh [hLinkY], a
 	pop af
-	ldh [$ff98], a
-	ld a, [$d204]
+	ldh [hLinkX], a
+	ld a, [wTarinSlot]
 	cp $18
 	jr nz, jr_004_7264
 
-	ld a, [$d205]
+	ld a, [wEvilEagleAttack]
 	cp $16
 	jr nz, jr_004_7264
 
-	call Call_0891
+	call GetEntityTimer
 	ld [hl], $c0
 	call Call_3B8D
 	call Call_04_70EE
@@ -7392,19 +8715,19 @@ jr_004_7264:
 
 
 Jump_04_7265::
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
 	ld [$d200], a
-	call Call_0891
+	call GetEntityTimer
 	cp $60
 	jr nz, jr_004_729b
 
-	ld hl, $d201
+	ld hl, wSmasherBallSlot
 	ld [hl], $02
-	ld hl, $c2c0
+	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -7414,14 +8737,14 @@ Jump_04_7265::
 	dec a
 	ld e, a
 	ld d, b
-	ld hl, $c290
+	ld hl, wEntityState
 	add hl, de
 	ld [hl], $02
-	ld a, [$db73]
+	ld a, [wIsMarinFollowingLink]
 	and a
 	jr z, jr_004_729a
 
-	ld hl, $c3b0
+	ld hl, wEntitySpriteVariant
 	add hl, de
 	ld [hl], $07
 
@@ -7433,7 +8756,7 @@ jr_004_729b:
 	and a
 	jr nz, jr_004_72a6
 
-	ld hl, $d201
+	ld hl, wSmasherBallSlot
 	ld [hl], $04
 	call Call_3B8D
 
@@ -7447,7 +8770,7 @@ Jump_04_72A7::
 
 
 Call_04_72AB::
-	ld a, [$db73]
+	ld a, [wIsMarinFollowingLink]
 	and a
 	jr z, jr_004_72d8
 
@@ -7455,19 +8778,19 @@ Call_04_72AB::
 	call Call_3B87
 	ld a, $4f
 	call Call_3C01
-	ld a, [$d204]
-	ld hl, $c200
+	ld a, [wTarinSlot]
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ld a, [$d205]
+	ld a, [wEvilEagleAttack]
 	add $18
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-	ld hl, $c3b0
+	ld hl, wEntitySpriteVariant
 	add hl, de
 	ld [hl], $06
-	ld hl, $c2b0
+	ld hl, wEntityPrivate1
 	add hl, de
 	inc [hl]
 
@@ -7476,52 +8799,52 @@ jr_004_72d8:
 	ld d, b
 
 jr_004_72db:
-	ld hl, $c280
+	ld hl, wEntityStatus
 	add hl, de
 	ld a, [hl]
 	and a
 	jr z, jr_004_7329
 
-	ld hl, $c290
+	ld hl, wEntityState
 	add hl, de
 	ld a, [hl]
 	and a
 	jr nz, jr_004_7329
 
-	ld hl, $c3a0
+	ld hl, wEntityType
 	add hl, de
 	ld a, [hl]
 	cp $4f
 	jr nz, jr_004_7329
 
-	ld hl, $c200
+	ld hl, wEntityX
 	add hl, de
-	ld a, [$d204]
+	ld a, [wTarinSlot]
 	sub [hl]
 	add $04
 	cp $08
 	jr nc, jr_004_7329
 
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, de
-	ld a, [$d205]
+	ld a, [wEvilEagleAttack]
 	add $18
 	sub [hl]
 	add $06
 	cp $0c
 	jr nc, jr_004_7329
 
-	ld hl, $c290
+	ld hl, wEntityState
 	add hl, de
 	ld [hl], $01
 	ld a, e
 	inc a
-	ld hl, $c2c0
+	ld hl, wEntityPrivate2
 	add hl, bc
 	ld [hl], a
-	call Call_088C
+	call GetEntityTimer1
 	ld [hl], $10
-	ld hl, $c440
+	ld hl, wEntityPrivate4
 	inc [hl]
 	ret
 
@@ -7536,7 +8859,7 @@ jr_004_7329:
 
 
 Call_04_7330::
-	ld hl, $c2c0
+	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
 	and a
@@ -7545,20 +8868,20 @@ Call_04_7330::
 	dec a
 	ld e, a
 	ld d, b
-	ld a, [$d204]
-	ld hl, $c200
+	ld a, [wTarinSlot]
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ld a, [$d205]
+	ld a, [wEvilEagleAttack]
 	add $18
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
 	ld a, $10
 	ld hl, $d206
 	sub [hl]
 	add $fe
-	ld hl, $c310
+	ld hl, wEntityZ
 	add hl, de
 	ld [hl], a
 
@@ -7570,53 +8893,53 @@ jr_004_735a:
 	db $72, $00, $72, $20, $7e, $00, $7e, $20, $26, $00, $26, $00
 
 Call_04_7377::
-	ld a, [$d204]
-	ldh [$ffee], a
-	ld a, [$d205]
+	ld a, [wTarinSlot]
+	ldh [hActiveEntityX], a
+	ld a, [wEvilEagleAttack]
 	ld hl, $d206
 	add [hl]
 	add $08
-	ldh [$ffec], a
-	ld a, [$d201]
-	ldh [$fff1], a
+	ldh [hActiveEntityDrawY], a
+	ld a, [wSmasherBallSlot]
+	ldh [hActiveEntitySpriteVariant], a
 	ld de, $735b
 	call Call_3C3B
-	ld a, [$d204]
-	ldh [$ffee], a
-	ld a, [$d205]
-	ldh [$ffec], a
+	ld a, [wTarinSlot]
+	ldh [hActiveEntityX], a
+	ld a, [wEvilEagleAttack]
+	ldh [hActiveEntityDrawY], a
 	ld a, [$d200]
-	ldh [$fff1], a
+	ldh [hActiveEntitySpriteVariant], a
 	ld de, $735b
 	call Call_3C3B
 	ld a, [$d206]
 	cp $08
 	jr c, jr_004_73c4
 
-	ld a, [$d204]
-	ldh [$ffee], a
-	ld a, [$d205]
+	ld a, [wTarinSlot]
+	ldh [hActiveEntityX], a
+	ld a, [wEvilEagleAttack]
 	add $10
-	ldh [$ffec], a
+	ldh [hActiveEntityDrawY], a
 	ld a, $05
-	ldh [$fff1], a
+	ldh [hActiveEntitySpriteVariant], a
 	ld de, $735b
 	call Call_3C3B
 
 jr_004_73c4:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $01
 	jr nz, jr_004_73f0
 
-	ld a, [$d204]
-	ldh [$ffee], a
-	ld a, [$d205]
+	ld a, [wTarinSlot]
+	ldh [hActiveEntityX], a
+	ld a, [wEvilEagleAttack]
 	add $20
-	ldh [$ffec], a
+	ldh [hActiveEntityDrawY], a
 	xor a
-	ldh [$fff1], a
+	ldh [hActiveEntitySpriteVariant], a
 	ld de, $7373
-	ld a, [$c3c0]
+	ld a, [wOAMNextIndex]
 	push af
 	call Call_3C3B
 	pop af
@@ -7639,7 +8962,7 @@ jr_004_73f0:
 	ld [hli], a
 	ld a, $7a
 	ld [hli], a
-	ld a, [$d202]
+	ld a, [wSmasherSlot]
 	ld [hli], a
 	ld a, $60
 	ld [hli], a
@@ -7647,7 +8970,7 @@ jr_004_73f0:
 	ld [hli], a
 	ld a, $3e
 	ld [hli], a
-	ld a, [$d202]
+	ld a, [wSmasherSlot]
 	ld [hli], a
 	ld a, $50
 	ld [hli], a
@@ -7672,7 +8995,7 @@ jr_004_73f0:
 	db $6c, $00, $6e, $00, $6e, $20, $6c, $20
 
 Jump_004_7440:
-	ldh a, [$fff1]
+	ldh a, [hActiveEntitySpriteVariant]
 	cp $06
 	jr c, jr_004_7458
 
@@ -7680,7 +9003,7 @@ Jump_004_7440:
 	cp $07
 	jr z, jr_004_7456
 
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $10
 	jr nz, jr_004_7456
 
@@ -7693,9 +9016,9 @@ jr_004_7458:
 	cp $03
 	jr nz, jr_004_7465
 
-	ld a, [$db4b]
+	ld a, [wHasToadstool]
 	and a
-	jp nz, Call_04_6D4D
+	jp nz, DespawnEntity_04
 
 	jr jr_004_7478
 
@@ -7703,9 +9026,9 @@ jr_004_7465:
 	cp $00
 	jr nz, jr_004_7478
 
-	ld a, [$db0e]
+	ld a, [wTradeSequenceItem]
 	and a
-	jp nz, Call_04_6D4D
+	jp nz, DespawnEntity_04
 
 	ld de, $7434
 
@@ -7718,8 +9041,8 @@ jr_004_7478:
 	call Call_3CD0
 
 jr_004_747e:
-	call Call_04_7F36
-	ldh a, [$fff0]
+	call ReturnIfNonInteractive_04
+	ldh a, [hActiveEntityState]
 	rst $00
 
 JumpTable_04_7484::
@@ -7731,8 +9054,8 @@ JumpTable_04_7484::
 	dw Jump_04_7602
 
 Jump_04_7490::
-	call Call_04_6D9D
-	ld hl, $c380
+	call UpdateEntityPosWithSpeed_04
+	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
 	rst $00
@@ -7745,7 +9068,7 @@ JumpTable_04_7499::
 	dw Jump_04_74AA
 
 Jump_04_74A3::
-	ldh a, [$ffee]
+	ldh a, [hActiveEntityX]
 	cp $3a
 	jp c, Jump_004_7614
 
@@ -7754,7 +9077,7 @@ Jump_04_74AA::
 
 
 Jump_04_74AB::
-	ldh a, [$ffec]
+	ldh a, [hActiveEntityDrawY]
 	cp $4e
 	jp nc, Jump_004_7614
 
@@ -7762,7 +9085,7 @@ Jump_04_74AB::
 
 
 Jump_04_74B3::
-	ldh a, [$ffee]
+	ldh a, [hActiveEntityX]
 	cp $78
 	jp nc, Jump_004_7614
 
@@ -7770,7 +9093,7 @@ Jump_04_74B3::
 
 
 Jump_04_74BB::
-	ldh a, [$ffec]
+	ldh a, [hActiveEntityDrawY]
 	cp $2e
 	jp c, Jump_004_7614
 
@@ -7778,7 +9101,7 @@ Jump_04_74BB::
 
 
 Jump_04_74C3::
-	call Call_04_6E28
+	call GetEntityDirectionToLink_04
 	ld a, e
 	xor $01
 	ld e, a
@@ -7787,20 +9110,20 @@ Jump_04_74C3::
 
 
 Jump_04_74CE::
-	ld a, [$db73]
+	ld a, [wIsMarinFollowingLink]
 	and a
 	jr z, jr_004_74d8
 
 	ld a, $02
-	ldh [$ffa1], a
+	ldh [hLinkInteractiveMotionBlocked], a
 
 jr_004_74d8:
-	call Call_04_6DD6
-	ld hl, $c320
+	call AddEntityZSpeedToPos_04
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	dec [hl]
 	dec [hl]
-	ld hl, $c310
+	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and $80
@@ -7808,7 +9131,7 @@ jr_004_74d8:
 
 	xor a
 	ld [hl], a
-	ld hl, $c320
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld a, [hl]
 	sra a
@@ -7822,14 +9145,14 @@ jr_004_74d8:
 
 jr_004_74fc:
 	ld a, $09
-	ldh [$fff2], a
+	ldh [hJingle], a
 
 jr_004_7500:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $03
 	jr nz, jr_004_7511
 
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	cp $56
@@ -7845,7 +9168,7 @@ jr_004_7511:
 jr_004_7512:
 	add $0a
 	ld [hl], a
-	ld hl, $c310
+	ld hl, wEntityZ
 	add hl, bc
 	ld [hl], $0a
 	call Call_3B8D
@@ -7855,20 +9178,20 @@ jr_004_7512:
 	db $44, $43, $42, $41, $3d, $2a
 
 Jump_04_7525::
-	ld a, [$db73]
+	ld a, [wIsMarinFollowingLink]
 	and a
 	jr z, jr_004_752f
 
 	ld a, $02
-	ldh [$ffa1], a
+	ldh [hLinkInteractiveMotionBlocked], a
 
 jr_004_752f:
-	call Call_04_6DD6
-	ld hl, $c320
+	call AddEntityZSpeedToPos_04
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	dec [hl]
 	dec [hl]
-	ld hl, $c310
+	ld hl, wEntityZ
 	add hl, bc
 	ld a, [hl]
 	and $80
@@ -7876,7 +9199,7 @@ jr_004_752f:
 
 	xor a
 	ld [hl], a
-	ld hl, $c320
+	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld a, [hl]
 	sra a
@@ -7889,62 +9212,62 @@ jr_004_752f:
 	ld [hl], a
 
 jr_004_7553:
-	ldh a, [$fff1]
+	ldh a, [hActiveEntitySpriteVariant]
 	cp $06
 	jr c, jr_004_7561
 
 	ld a, $f9
-	call Call_2197
+	call OpenDialog
 	jp Call_3B8D
 
 
 jr_004_7561:
-	ldh a, [$ffee]
-	ld hl, $ff98
+	ldh a, [hActiveEntityX]
+	ld hl, hLinkX
 	sub [hl]
 	add $07
 	cp $0e
 	ret nc
 
-	ldh a, [$ffec]
-	ld hl, $ff99
+	ldh a, [hActiveEntityDrawY]
+	ld hl, hLinkY
 	sub [hl]
 	add $05
 	cp $0a
 	ret nc
 
-	ld a, [$d210]
+	ld a, [wSongShowTimer]
 	ld e, a
 	ld d, b
-	ld hl, $c480
+	ld hl, wEntityDyingTimer
 	add hl, de
 	ld a, [hl]
 	and a
 	ret nz
 
 	ld [hl], $18
-	ldh a, [$fff1]
+	ldh a, [hActiveEntitySpriteVariant]
 	cp $00
 	jr nz, jr_004_7596
 
 	ld a, $01
-	ld [$db0e], a
-	call Call_0898
-	jp Call_04_6D4D
+	ld [wTradeSequenceItem], a
+	call SpawnHeldItemEntity
+	jp DespawnEntity_04
 
 
 jr_004_7596:
-	call Call_04_6D4D
-	ld hl, $fff3
+	call DespawnEntity_04
+	ld hl, hWaveSfx
 	ld [hl], $01
-	ldh a, [$fff1]
+	ldh a, [hActiveEntitySpriteVariant]
 	ld e, a
 	ld d, b
 	ld hl, $751f
 	add hl, de
 	ld a, [hl]
-	call Call_2197
-	ldh a, [$fff1]
+	call OpenDialog
+	ldh a, [hActiveEntitySpriteVariant]
 	dec a
 	jr nz, jr_004_75b0
 
@@ -7955,9 +9278,9 @@ jr_004_75b0:
 	dec a
 	jr nz, jr_004_75bc
 
-	ld a, [$db90]
+	ld a, [wAddRupeeBufferLow]
 	add $1e
-	ld [$db90], a
+	ld [wAddRupeeBufferLow], a
 	ret
 
 
@@ -7965,8 +9288,8 @@ jr_004_75bc:
 	dec a
 	jr nz, jr_004_75dc
 
-	ld hl, $db76
-	ld a, [$db4c]
+	ld hl, wMaxMagicPowder
+	ld a, [wMagicPowderCount]
 	cp [hl]
 	jr nc, jr_004_75cf
 
@@ -7978,11 +9301,11 @@ jr_004_75bc:
 	ld a, [hl]
 
 jr_004_75cf:
-	ld [$db4c], a
+	ld [wMagicPowderCount], a
 	ld d, $0c
 	call Call_3E95
 	ld a, $0b
-	ldh [$ffa5], a
+	ldh [hBGChangeRequest], a
 	ret
 
 
@@ -7997,7 +9320,7 @@ jr_004_75dc:
 
 jr_004_75e5:
 	ld a, $ff
-	ld [$db93], a
+	ld [wAddHealthBuffer], a
 
 Jump_004_75ea:
 	ret
@@ -8005,13 +9328,13 @@ Jump_004_75ea:
 
 Jump_04_75EB::
 	ld a, $02
-	ldh [$ffa1], a
-	ld [$c167], a
-	ld a, [$c1ad]
+	ldh [hLinkInteractiveMotionBlocked], a
+	ld [wLinkFrozen], a
+	ld a, [wCanTalkToEntity]
 	and a
 	ret nz
 
-	ld [$db74], a
+	ld [wIsMarinInAnimalVillage], a
 	ld a, $18
 	ld [$c1bc], a
 	jp Call_3B8D
@@ -8019,15 +9342,15 @@ Jump_04_75EB::
 
 Jump_04_7602::
 	ld a, $02
-	ldh [$ffa1], a
-	ld [$c167], a
+	ldh [hLinkInteractiveMotionBlocked], a
+	ld [wLinkFrozen], a
 	ret
 
 
 	db $fc, $00, $04, $00, $00, $00, $04, $00, $fc, $00
 
 Jump_004_7614:
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
 	inc a
@@ -8040,38 +9363,38 @@ Call_04_761D::
 	ld hl, $760a
 	add hl, de
 	ld a, [hl]
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
 	ld hl, $760f
 	add hl, de
 	ld a, [hl]
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
 	ret
 
 
 Call_04_7634::
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $1f
 	jr nz, jr_004_7643
 
-	call Call_04_6E28
+	call GetEntityDirectionToLink_04
 	ld a, e
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, bc
 	ld [hl], a
 
 jr_004_7643:
-	call Call_04_7C20
+	call AnimateEntityWalking_04
 	ld de, $7662
 	call Call_3C3B
-	call Call_04_7B6B
-	call Call_04_7BD3
+	call BlockLinkAtEntity_04
+	call CanTalkToEntity_04
 	jr nc, jr_004_7661
 
-	ld a, [$d47f]
+	ld a, [wRoomLoadCounter]
 	cp $03
 	ld a, $39
 	jr c, jr_004_765e
@@ -8079,7 +9402,7 @@ jr_004_7643:
 	inc a
 
 jr_004_765e:
-	call Call_2197
+	call OpenDialog
 
 jr_004_7661:
 	ret
@@ -8098,34 +9421,34 @@ Call_04_7682::
 	call Call_04_7826
 
 jr_004_7690:
-	ld a, [$db4e]
+	ld a, [wSwordLevel]
 	and a
 	jr z, jr_004_769c
 
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	and $5f
 	jr nz, jr_004_76a5
 
 jr_004_769c:
-	call Call_04_6E28
+	call GetEntityDirectionToLink_04
 	ld a, e
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, bc
 	ld [hl], a
 
 jr_004_76a5:
-	call Call_04_7C20
+	call AnimateEntityWalking_04
 	ld de, $7662
 	call Call_3C3B
 	call Call_04_7AF5
-	ldh a, [$fff0]
+	ldh a, [hActiveEntityState]
 	cp $04
 	jr nc, jr_004_76ba
 
-	call Call_04_7B6B
+	call BlockLinkAtEntity_04
 
 jr_004_76ba:
-	ldh a, [$fff0]
+	ldh a, [hActiveEntityState]
 	rst $00
 
 JumpTable_04_76BD::
@@ -8156,35 +9479,35 @@ Jump_04_778F::
 	and a
 	jr z, jr_004_77d0
 
-	ld hl, $c210
+	ld hl, wEntityY
 	add hl, bc
 	ld [hl], $40
-	ld hl, $c200
+	ld hl, wEntityX
 	add hl, bc
 	ld [hl], $50
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, bc
 	ld [hl], $03
 	ld a, $02
-	ldh [$ffa1], a
-	ld [$c167], a
-	ld a, [$c16b]
+	ldh [hLinkInteractiveMotionBlocked], a
+	ld [wLinkFrozen], a
+	ld a, [wTransitionSequenceCounter]
 	cp $04
 	jr nz, jr_004_77cf
 
-	ldh a, [$ff99]
+	ldh a, [hLinkY]
 	sub $01
-	ldh [$ff99], a
+	ldh [hLinkY], a
 	cp $74
 	jr nz, jr_004_77cf
 
 	ld a, $38
-	call Call_2197
-	ld hl, $c290
+	call OpenDialog
+	ld hl, wEntityState
 	add hl, bc
 	ld [hl], $04
 	ld a, $19
-	ld [$d368], a
+	ld [wMusicTrackToPlay], a
 
 jr_004_77cf:
 	ret
@@ -8201,11 +9524,11 @@ jr_004_77d0:
 
 jr_004_77dc:
 	push bc
-	ld hl, $db00
+	ld hl, wItemB
 	ld c, $0b
 
 jr_004_77e2:
-	ld a, [$db7d]
+	ld a, [wBoomerangTradedItem]
 	cp $0b
 	jr z, jr_004_77ee
 
@@ -8222,11 +9545,11 @@ jr_004_77f0:
 	cp $ff
 	jr nz, jr_004_77e2
 
-	ld hl, $db00
+	ld hl, wItemB
 	ld c, $0b
 
 jr_004_77fb:
-	ld a, [$db7d]
+	ld a, [wBoomerangTradedItem]
 	cp $05
 	jr z, jr_004_7807
 
@@ -8262,7 +9585,7 @@ jr_004_7818:
 
 
 Call_04_7826::
-	ld de, $d601
+	ld de, wDrawCommand
 	push bc
 	ld hl, $c505
 	ld c, $04
@@ -8291,36 +9614,36 @@ Jump_04_7847::
 	and a
 	jr z, jr_004_786c
 
-	ld hl, $c380
+	ld hl, wEntityDirection
 	add hl, bc
 	ld a, [hl]
 	and $01
 	jr z, jr_004_786c
 
-	ld a, [$c11c]
+	ld a, [wLinkMotionState]
 	cp $00
 	jr nz, jr_004_786c
 
-	ldh a, [$ff99]
+	ldh a, [hLinkY]
 	cp $7b
 	jr c, jr_004_786c
 
 	sub $02
-	ldh [$ff99], a
+	ldh [hLinkY], a
 	ld a, $2f
-	jp Call_2197
+	jp OpenDialog
 
 
 jr_004_786c:
-	ldh a, [$ff99]
+	ldh a, [hLinkY]
 	cp $48
 	jr nc, jr_004_78d8
 
-	ldh a, [$ff9e]
+	ldh a, [hLinkDirection]
 	cp $02
 	jr nz, jr_004_78d8
 
-	ldh a, [$ffcc]
+	ldh a, [hJoypadPressed]
 	and $30
 	jr z, jr_004_78d8
 
@@ -8328,7 +9651,7 @@ jr_004_786c:
 	and a
 	jr z, jr_004_789f
 
-	ldh a, [$ff98]
+	ldh a, [hLinkX]
 	add $00
 	swap a
 	and $0f
@@ -8341,12 +9664,12 @@ jr_004_786c:
 	jr nz, jr_004_78d8
 
 	ld a, $13
-	ldh [$fff2], a
+	ldh [hJingle], a
 	jp Call_04_7908
 
 
 jr_004_789f:
-	ldh a, [$ff98]
+	ldh a, [hLinkX]
 	add $00
 	swap a
 	and $0f
@@ -8367,7 +9690,7 @@ jr_004_789f:
 	jr z, jr_004_78c3
 
 	ld a, $13
-	ldh [$fff2], a
+	ldh [hJingle], a
 
 jr_004_78c3:
 	push bc
@@ -8376,7 +9699,7 @@ jr_004_78c3:
 	ld e, a
 	ld hl, $770c
 	add hl, de
-	ld de, $d601
+	ld de, wDrawCommand
 	ld c, $0d
 
 jr_004_78d1:
@@ -8389,7 +9712,7 @@ jr_004_78d1:
 	pop bc
 
 jr_004_78d8:
-	call Call_04_7B8E
+	call CanTalkToEntityWide_04
 	jr nc, jr_004_78f7
 
 	ld a, [$c509]
@@ -8402,25 +9725,25 @@ jr_004_78d8:
 	ld hl, $7760
 	add hl, de
 	ld a, [hl]
-	call Call_2197
+	call OpenDialog
 	call Call_3B8D
 	ret
 
 
 jr_004_78f2:
 	ld a, $2e
-	call Call_2197
+	call OpenDialog
 
 jr_004_78f7:
 	ret
 
 
 Jump_04_78F8::
-	ld a, [$c19f]
+	ld a, [wDialogState]
 	and a
 	ret nz
 
-	ld a, [$c177]
+	ld a, [wDialogAnswer]
 	cp $00
 	jr z, jr_004_7946
 
@@ -8435,13 +9758,13 @@ Call_04_7908::
 	add hl, de
 	ld a, [$c509]
 	ld [hl], a
-	ld de, $d601
+	ld de, wDrawCommand
 	call Call_04_7926
 	xor a
 	ld [$c509], a
 
 jr_004_791f:
-	ld hl, $c290
+	ld hl, wEntityState
 	add hl, bc
 	ld [hl], $01
 	ret
@@ -8494,7 +9817,7 @@ jr_004_7956:
 	cp $04
 	jr nz, jr_004_7974
 
-	ld hl, $db00
+	ld hl, wItemB
 	ld d, $0c
 
 jr_004_795f:
@@ -8508,8 +9831,8 @@ jr_004_795f:
 	jr jr_004_79a7
 
 jr_004_7969:
-	ld a, [$db4d]
-	ld hl, $db77
+	ld a, [wBombCount]
+	ld hl, wMaxBombs
 	cp [hl]
 	jr nc, jr_004_79a0
 
@@ -8519,7 +9842,7 @@ jr_004_7974:
 	cp $06
 	jr nz, jr_004_7992
 
-	ld hl, $db00
+	ld hl, wItemB
 	ld d, $0c
 
 jr_004_797d:
@@ -8533,8 +9856,8 @@ jr_004_797d:
 	jr jr_004_79a7
 
 jr_004_7987:
-	ld a, [$db45]
-	ld hl, $db78
+	ld a, [wArrowCount]
+	ld hl, wMaxArrows
 	cp [hl]
 	jr nc, jr_004_79a0
 
@@ -8544,7 +9867,7 @@ jr_004_7992:
 	cp $03
 	jr nz, jr_004_79a7
 
-	ld hl, $db00
+	ld hl, wItemB
 	ld d, $0c
 
 jr_004_799b:
@@ -8569,17 +9892,17 @@ jr_004_79a7:
 	add hl, de
 	ld e, [hl]
 	ld d, a
-	ld a, [$db5e]
+	ld a, [wRupeeCountLow]
 	sub e
-	ld a, [$db5d]
+	ld a, [wRupeeCountHigh]
 	sbc d
 	jr nc, jr_004_79c9
 
 	ld a, $34
 
 jr_004_79bf:
-	call Call_2197
-	ld hl, $c290
+	call OpenDialog
+	ld hl, wEntityState
 	add hl, bc
 	ld [hl], $03
 	ret
@@ -8594,23 +9917,23 @@ jr_004_79c9:
 	ld d, b
 	ld hl, $7785
 	add hl, de
-	ld a, [$db92]
+	ld a, [wSubtractRupeeBufferLow]
 	add [hl]
-	ld [$db92], a
+	ld [wSubtractRupeeBufferLow], a
 	rl a
 	ld hl, $777c
 	add hl, de
 	rr a
-	ld a, [$db91]
+	ld a, [wSubtractRupeeBufferHigh]
 	adc [hl]
-	ld [$db91], a
-	ld hl, $c290
+	ld [wSubtractRupeeBufferHigh], a
+	ld hl, wEntityState
 	add hl, bc
 	ld [hl], $01
 	pop af
 	push af
 	ld a, $35
-	call Call_2197
+	call OpenDialog
 	pop af
 
 Call_04_79FA::
@@ -8632,12 +9955,12 @@ Jump_04_7A0E::
 	ld d, $05
 	call Call_3E95
 	ld a, $20
-	ld [$db45], a
+	ld [wArrowCount], a
 	ret
 
 
 Jump_04_7A19::
-	ld a, [$db45]
+	ld a, [wArrowCount]
 	add $0a
 	daa
 	jr nc, jr_004_7a23
@@ -8645,7 +9968,7 @@ Jump_04_7A19::
 	ld a, $99
 
 jr_004_7a23:
-	ld [$db45], a
+	ld [wArrowCount], a
 	ret
 
 
@@ -8669,10 +9992,10 @@ jr_004_7a37:
 
 
 Jump_04_7A3B::
-	ld a, [$db0d]
+	ld a, [wMedicineCount]
 	add $01
 	daa
-	ld [$db0d], a
+	ld [wMedicineCount], a
 	ret
 
 
@@ -8683,7 +10006,7 @@ Jump_04_7A45::
 
 
 Jump_04_7A4B::
-	ld a, [$db4d]
+	ld a, [wBombCount]
 	add $0a
 	daa
 	jr nc, jr_004_7a55
@@ -8691,7 +10014,7 @@ Jump_04_7A4B::
 	ld a, $99
 
 jr_004_7a55:
-	ld [$db4d], a
+	ld [wBombCount], a
 	ld d, $02
 	call Call_3E95
 	ret
@@ -8702,7 +10025,7 @@ jr_004_7a55:
 
 Jump_04_7A71::
 	ld a, $18
-	ld [$db93], a
+	ld [wAddHealthBuffer], a
 	ret
 
 
@@ -8713,7 +10036,7 @@ Jump_04_7A77::
 
 
 Jump_04_7A7D::
-	ld a, [$c19f]
+	ld a, [wDialogState]
 	and a
 	jr nz, jr_004_7a86
 
@@ -8724,35 +10047,35 @@ jr_004_7a86:
 
 
 Jump_04_7A87::
-	ld a, [$c19f]
+	ld a, [wDialogState]
 	and a
 	jr nz, jr_004_7ac1
 
 	ld a, $ca
 	call Call_3C01
 	ld a, $26
-	ldh [$fff4], a
-	ldh a, [$ffd7]
-	ld hl, $c200
+	ldh [hNoiseSfx], a
+	ldh a, [hMultiPurpose0]
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ldh a, [$ffd8]
-	ld hl, $c210
+	ldh a, [hMultiPurpose1]
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-	ld hl, $c2d0
+	ld hl, wEntityPrivate3
 	add hl, de
 	ld [hl], $01
-	ld hl, $c2e0
+	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $c0
-	call Call_0891
+	call GetEntityTimer
 	ld [hl], $c0
 	call Call_3B8D
 	xor a
-	ld [$db0d], a
+	ld [wMedicineCount], a
 	ld a, $ff
-	ld [$db94], a
+	ld [wSubtractHealthBuffer], a
 
 jr_004_7ac1:
 	ret
@@ -8760,17 +10083,17 @@ jr_004_7ac1:
 
 Jump_04_7AC2::
 	ld a, $02
-	ldh [$ffa1], a
-	call Call_0891
+	ldh [hLinkInteractiveMotionBlocked], a
+	call GetEntityTimer
 	jr nz, jr_004_7ada
 
-	ld a, [$db5a]
+	ld a, [wHealth]
 	and a
 	jr nz, jr_004_7ada
 
 	ld [$db46], a
 	ld [$c50a], a
-	jp Call_04_6D4D
+	jp DespawnEntity_04
 
 
 jr_004_7ada:
@@ -8784,7 +10107,7 @@ Call_04_7AF5::
 	ld a, $04
 
 jr_004_7af7:
-	ldh [$ffe6], a
+	ldh [hMultiPurposeF], a
 	ld e, a
 	ld d, b
 	ld hl, $c504
@@ -8794,20 +10117,20 @@ jr_004_7af7:
 	jr z, jr_004_7b31
 
 	dec a
-	ldh [$fff1], a
+	ldh [hActiveEntitySpriteVariant], a
 	ld hl, $7ada
-	ldh a, [$ffe6]
+	ldh a, [hMultiPurposeF]
 	ld e, a
 	add hl, de
 	ld a, [hl]
-	ldh [$ffee], a
+	ldh [hActiveEntityX], a
 	ld a, $32
-	ldh [$ffec], a
-	ldh a, [$fff1]
+	ldh [hActiveEntityDrawY], a
+	ldh a, [hActiveEntitySpriteVariant]
 	cp $01
 	jr nz, jr_004_7b1f
 
-	ld hl, $ffec
+	ld hl, hActiveEntityDrawY
 	ld [hl], $2f
 
 jr_004_7b1f:
@@ -8823,7 +10146,7 @@ jr_004_7b2b:
 	call Call_3CD0
 
 jr_004_7b31:
-	ldh a, [$ffe6]
+	ldh a, [hMultiPurposeF]
 	dec a
 	jr nz, jr_004_7af7
 
@@ -8838,16 +10161,16 @@ Call_04_7B3D::
 	jr z, jr_004_7b6a
 
 	dec a
-	ldh [$fff1], a
+	ldh [hActiveEntitySpriteVariant], a
 	ld a, $01
-	ld [$c15c], a
-	call Call_093B
-	ldh a, [$ff98]
-	ldh [$ffee], a
-	ldh a, [$ff99]
+	ld [wIsCarryingLiftedObject], a
+	call ResetSpinAttackAndDash
+	ldh a, [hLinkX]
+	ldh [hActiveEntityX], a
+	ldh a, [hLinkY]
 	sub $0e
-	ldh [$ffec], a
-	ldh a, [$fff1]
+	ldh [hActiveEntityDrawY], a
+	ldh a, [hActiveEntitySpriteVariant]
 	cp $05
 	jr nz, jr_004_7b64
 
@@ -8863,13 +10186,13 @@ jr_004_7b6a:
 	ret
 
 
-Call_04_7B6B::
+BlockLinkAtEntity_04::
 	call Call_3BD5
 	jr nc, jr_004_7b8d
 
-	call Call_094A
-	call Call_0942
-	ld a, [$c1a6]
+	call RestoreLinkPosition
+	call ResetPegasusBoots
+	ld a, [wHookshotChainSlot]
 	and a
 	jr z, jr_004_7b8d
 
@@ -8889,41 +10212,41 @@ jr_004_7b8d:
 	ret
 
 
-Call_04_7B8E::
-	ldh a, [$ff98]
-	ld hl, $ffee
+CanTalkToEntityWide_04::
+	ldh a, [hLinkX]
+	ld hl, hActiveEntityX
 	sub [hl]
 	add $20
 	cp $30
 	jr nc, jr_004_7bd1
 
-	ldh a, [$ff99]
-	ld hl, $ffef
+	ldh a, [hLinkY]
+	ld hl, hActiveEntityY
 	sub [hl]
 	add $10
 	cp $20
 	jr nc, jr_004_7bd1
 
-	call Call_04_6E28
-	ldh a, [$ff9e]
+	call GetEntityDirectionToLink_04
+	ldh a, [hLinkDirection]
 	xor $01
 	cp e
 	jr nz, jr_004_7bd1
 
-	ld hl, $c1ad
+	ld hl, wCanTalkToEntity
 	ld [hl], $01
-	ld a, [$c19f]
-	ld hl, $c14f
+	ld a, [wDialogState]
+	ld hl, wInventoryAppearing
 	or [hl]
-	ld hl, $c134
+	ld hl, wDialogCooldown
 	or [hl]
 	jr nz, jr_004_7bd1
 
-	ld a, [$db9a]
+	ld a, [wWindowY]
 	cp $80
 	jr nz, jr_004_7bd1
 
-	ldh a, [$ffcc]
+	ldh a, [hJoypadPressed]
 	and $10
 	jr z, jr_004_7bd1
 
@@ -8936,43 +10259,43 @@ jr_004_7bd1:
 	ret
 
 
-Call_04_7BD3::
-	ld a, [$c19f]
-	ld hl, $c14f
+CanTalkToEntity_04::
+	ld a, [wDialogState]
+	ld hl, wInventoryAppearing
 	or [hl]
-	ld hl, $c146
+	ld hl, wIsLinkInTheAir
 	or [hl]
-	ld hl, $c134
+	ld hl, wDialogCooldown
 	or [hl]
 	jr nz, jr_004_7c1a
 
-	ld a, [$db9a]
+	ld a, [wWindowY]
 	cp $80
 	jr nz, jr_004_7c1a
 
-	ldh a, [$ff98]
-	ld hl, $ffee
+	ldh a, [hLinkX]
+	ld hl, hActiveEntityX
 	sub [hl]
 	add $10
 	cp $20
 	jr nc, jr_004_7c1a
 
-	ldh a, [$ff99]
-	ld hl, $ffef
+	ldh a, [hLinkY]
+	ld hl, hActiveEntityY
 	sub [hl]
 	add $14
 	cp $28
 	jr nc, jr_004_7c1a
 
-	call Call_04_6E28
-	ldh a, [$ff9e]
+	call GetEntityDirectionToLink_04
+	ldh a, [hLinkDirection]
 	xor $01
 	cp e
 	jr nz, jr_004_7c1a
 
-	ld hl, $c1ad
+	ld hl, wCanTalkToEntity
 	ld [hl], $01
-	ldh a, [$ffcc]
+	ldh a, [hJoypadPressed]
 	and $10
 	jr z, jr_004_7c1a
 
@@ -8987,15 +10310,15 @@ jr_004_7c1a:
 
 	db $06, $04, $02, $00
 
-Call_04_7C20::
-	ld hl, $c380
+AnimateEntityWalking_04::
+	ld hl, wEntityDirection
 	add hl, bc
 	ld e, [hl]
 	ld d, b
 	ld hl, $7c1c
 	add hl, de
 	push hl
-	ld hl, $c3d0
+	ld hl, wEntityPrivateCounter
 	add hl, bc
 	inc [hl]
 	ld a, [hl]
@@ -9018,40 +10341,40 @@ Call_04_7C20::
 
 Call_04_7CA7::
 	ld de, $7c77
-	ldh a, [$fff7]
+	ldh a, [hMapId]
 	cp $07
 	jr nz, jr_004_7cb3
 
 	ld de, $7c8f
 
 jr_004_7cb3:
-	call Call_088C
+	call GetEntityTimer1
 	rla
 	rla
 	rla
 	and $10
-	ldh [$ffed], a
+	ldh [hActiveEntityFlipAttribute], a
 	call Call_3C3B
-	call Call_04_7F36
-	ld hl, $c410
+	call ReturnIfNonInteractive_04
+	ld hl, wEntityIgnoreHitsTimer
 	add hl, bc
 	ld a, [hl]
 	cp $08
 	jr nz, jr_004_7cd9
 
-	ldh a, [$fff0]
+	ldh a, [hActiveEntityState]
 	and a
 	jr nz, jr_004_7cd9
 
 	call Call_3B8D
-	call Call_0887
+	call GetEntityDropTimer
 	ld [hl], $6f
 
 jr_004_7cd9:
-	call Call_04_6D53
-	call Call_04_6D9D
+	call ApplyRecoilIfNeeded_04
+	call UpdateEntityPosWithSpeed_04
 	call Call_3B9E
-	ldh a, [$fff0]
+	ldh a, [hActiveEntityState]
 	rst $00
 
 JumpTable_04_7CE5::
@@ -9062,10 +10385,10 @@ JumpTable_04_7CE5::
 
 Jump_04_7CF1::
 	call Call_3BB4
-	call Call_0891
+	call GetEntityTimer
 	jr nz, jr_004_7d19
 
-	call Call_27ED
+	call GetRandomByte
 	and $1f
 	add $30
 	ld [hl], a
@@ -9075,18 +10398,18 @@ Jump_04_7CF1::
 	ld hl, $7ce9
 	add hl, de
 	ld a, [hl]
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
 	ld hl, $7ced
 	add hl, de
 	ld a, [hl]
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
 
 jr_004_7d19:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
@@ -9099,7 +10422,7 @@ jr_004_7d19:
 	db $05, $05, $04, $03, $02, $02, $02
 
 Jump_04_7D2C::
-	ld a, [$c14a]
+	ld a, [wIsUsingPegasusBoots]
 	and a
 	jr z, jr_004_7d37
 
@@ -9110,18 +10433,18 @@ Jump_04_7D2C::
 
 jr_004_7d37:
 	call Call_3BEB
-	call Call_04_6E08
+	call GetEntityXDistanceToLink_04
 	add $12
 	cp $24
 	jr nc, jr_004_7d4c
 
-	call Call_04_6E18
+	call GetEntityYDistanceToLink_04
 	add $12
 	cp $24
 	jr c, jr_004_7d5a
 
 jr_004_7d4c:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	xor c
 	and $03
 	jr nz, jr_004_7d58
@@ -9136,14 +10459,14 @@ jr_004_7d5a:
 	call Call_3DAF
 
 jr_004_7d5d:
-	call Call_0887
+	call GetEntityDropTimer
 	jp z, Jump_004_7e46
 
 	cp $18
 	jr nz, jr_004_7d6e
 
 	ld [hl], $0a
-	call Call_088C
+	call GetEntityTimer1
 	ld [hl], $30
 
 jr_004_7d6e:
@@ -9166,7 +10489,7 @@ jr_004_7d6e:
 
 Call_04_7D97::
 	ld de, $7d7f
-	ldh a, [$fff7]
+	ldh a, [hMapId]
 	cp $07
 	jr nz, jr_004_7da3
 
@@ -9174,17 +10497,17 @@ Call_04_7D97::
 
 jr_004_7da3:
 	call Call_3C3B
-	call Call_04_7F36
-	call Call_04_6D53
-	call Call_088C
+	call ReturnIfNonInteractive_04
+	call ApplyRecoilIfNeeded_04
+	call GetEntityTimer1
 	jr nz, jr_004_7db4
 
 	call Call_3BB4
 
 jr_004_7db4:
-	call Call_04_6D9D
+	call UpdateEntityPosWithSpeed_04
 	call Call_3B9E
-	ldh a, [$fff0]
+	ldh a, [hActiveEntityState]
 	rst $00
 
 JumpTable_04_7DBD::
@@ -9193,13 +10516,13 @@ JumpTable_04_7DBD::
 	dw Jump_04_7E0E
 
 Jump_04_7DC3::
-	call Call_0891
+	call GetEntityTimer
 	jr nz, jr_004_7dcb
 
 	call Call_3B8D
 
 jr_004_7dcb:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
@@ -9210,16 +10533,16 @@ jr_004_7dcb:
 
 
 Jump_04_7DD7::
-	call Call_27ED
+	call GetRandomByte
 	and $03
 	jr z, jr_004_7de5
 
-	call Call_27ED
+	call GetRandomByte
 	and $03
 	jr jr_004_7de8
 
 jr_004_7de5:
-	call Call_04_6E28
+	call GetEntityDirectionToLink_04
 
 jr_004_7de8:
 	ld e, a
@@ -9227,17 +10550,17 @@ jr_004_7de8:
 	ld hl, $7d8f
 	add hl, de
 	ld a, [hl]
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], a
 	ld hl, $7d93
 	add hl, de
 	ld a, [hl]
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], a
-	call Call_0891
-	call Call_27ED
+	call GetEntityTimer
+	call GetRandomByte
 	and $0f
 	add $20
 	ld [hl], a
@@ -9248,10 +10571,10 @@ jr_004_7de8:
 
 Jump_04_7E0E::
 	call Call_3BF6
-	call Call_0891
+	call GetEntityTimer
 	jr z, jr_004_7e46
 
-	ld hl, $c2a0
+	ld hl, wEntityCollisions
 	add hl, bc
 	ld a, [hl]
 	and $03
@@ -9264,7 +10587,7 @@ Jump_04_7E0E::
 	jr jr_004_7e3c
 
 jr_004_7e26:
-	ld hl, $c240
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	cpl
@@ -9273,7 +10596,7 @@ jr_004_7e26:
 	jr jr_004_7e38
 
 jr_004_7e30:
-	ld hl, $c250
+	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 	cpl
@@ -9282,10 +10605,10 @@ jr_004_7e30:
 
 jr_004_7e38:
 	ld a, $09
-	ldh [$fff2], a
+	ldh [hJingle], a
 
 jr_004_7e3c:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	rra
 	rra
 	and $01
@@ -9296,7 +10619,7 @@ jr_004_7e3c:
 Jump_004_7e46:
 jr_004_7e46:
 	call Call_04_7E4D
-	call Call_04_6D4D
+	call DespawnEntity_04
 	ret
 
 
@@ -9305,19 +10628,19 @@ Call_04_7E4D::
 	call Call_3C01
 	jr c, jr_004_7e71
 
-	call Call_08D7
-	ldh a, [$ffd7]
-	ld hl, $c200
+	call PlayClinkNoise
+	ldh a, [hMultiPurpose0]
+	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ldh a, [$ffd8]
-	ld hl, $c210
+	ldh a, [hMultiPurpose1]
+	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-	ld hl, $c2e0
+	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $17
-	ld hl, $c440
+	ld hl, wEntityPrivate4
 	add hl, de
 	ld [hl], $01
 
@@ -9330,11 +10653,11 @@ jr_004_7e71:
 Call_04_7E82::
 	ld de, $7e72
 	call Call_3C3B
-	call Call_04_7F36
-	call Call_04_6D53
-	call Call_04_6D9D
+	call ReturnIfNonInteractive_04
+	call ApplyRecoilIfNeeded_04
+	call UpdateEntityPosWithSpeed_04
 	call Call_3B9E
-	ldh a, [$fff0]
+	ldh a, [hActiveEntityState]
 	and $03
 	rst $00
 
@@ -9347,7 +10670,7 @@ JumpTable_04_7E99::
 Jump_04_7EA1::
 	ld a, $ff
 	call Call_3B87
-	call Call_0891
+	call GetEntityTimer
 	jr nz, jr_004_7eb3
 
 	ld [hl], $1f
@@ -9361,10 +10684,10 @@ jr_004_7eb3:
 	db $01, $00
 
 Jump_04_7EB6::
-	call Call_0891
+	call GetEntityTimer
 	jr nz, jr_004_7ec7
 
-	call Call_27ED
+	call GetRandomByte
 	and $3f
 	add $70
 	ld [hl], a
@@ -9390,7 +10713,7 @@ Jump_004_7eca:
 
 Jump_04_7EDA::
 	call Call_3BB4
-	call Call_0891
+	call GetEntityTimer
 	jr nz, jr_004_7eeb
 
 	ld [hl], $1f
@@ -9400,7 +10723,7 @@ Jump_04_7EDA::
 
 
 jr_004_7eeb:
-	ldh a, [$ffe7]
+	ldh a, [hFrameCounter]
 	xor c
 	push af
 	and $0f
@@ -9423,10 +10746,10 @@ jr_004_7ef8:
 	db $00, $01
 
 Jump_04_7F07::
-	call Call_0891
+	call GetEntityTimer
 	jr nz, jr_004_7f1d
 
-	call Call_27ED
+	call GetRandomByte
 	and $1f
 	add $30
 	ld [hl], a
@@ -9441,8 +10764,8 @@ jr_004_7f1d:
 	jp Jump_004_7eca
 
 
-Call_04_7F23::
-	ld hl, $c240
+FlipSpriteBySpeedX_04::
+	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	rl a
@@ -9452,30 +10775,30 @@ Call_04_7F23::
 	ld a, $20
 
 jr_004_7f30:
-	ld hl, $ffed
+	ld hl, hActiveEntityFlipAttribute
 	xor [hl]
 	ld [hl], a
 	ret
 
 
-Call_04_7F36::
-	ldh a, [$ffea]
+ReturnIfNonInteractive_04::
+	ldh a, [hActiveEntityStatus]
 	cp $05
 	jr nz, jr_004_7f56
 
-Call_04_7F3C::
-	ld a, [$db95]
+ReturnIfGameFrozen_04::
+	ld a, [wGameplayType]
 	cp $07
 	jr z, jr_004_7f56
 
-	ld hl, $c1a8
-	ld a, [$c19f]
+	ld hl, wLinkShowItemPoseActive
+	ld a, [wDialogState]
 	or [hl]
-	ld hl, $c14f
+	ld hl, wInventoryAppearing
 	or [hl]
 	jr nz, jr_004_7f56
 
-	ld a, [$c124]
+	ld a, [wRoomTransitionState]
 	and a
 	jr z, jr_004_7f57
 

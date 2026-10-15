@@ -5,18 +5,18 @@
 
 SECTION "ROM Bank $01f", ROMX[$4000], BANK[$1f]
 
-	jp Jump_01f_4009
+	jp InitSoundEngine
 
 
 Call_1F_4003::
 	jp Jump_01f_7b17
 
 
-	jp Jump_01f_401e
+	jp UpdateSoundEffects
 
 
-Jump_01f_4009:
-	ld hl, $d300
+InitSoundEngine::
+	ld hl, wMusicTranspose
 
 jr_01f_400c:
 	ld [hl], $00
@@ -32,14 +32,14 @@ jr_01f_400c:
 	ret
 
 
-Jump_01f_401e:
+UpdateSoundEffects::
 	call Call_1F_4204
 	call Call_1F_53ED
 	call Call_1F_64E8
 	xor a
-	ld [$d360], a
-	ld [$d370], a
-	ld [$d378], a
+	ld [wJingleToPlay], a
+	ld [wWaveSfxToPlay], a
+	ld [wNoiseSfxToPlay], a
 	ret
 
 
@@ -75,7 +75,7 @@ Jump_01f_401e:
 	db $3d, $53
 
 Call_1F_4204::
-	ld hl, $d360
+	ld hl, wJingleToPlay
 	ld a, [hl]
 	and a
 	jr z, jr_01f_421c
@@ -83,7 +83,7 @@ Call_1F_4204::
 	cp $01
 	jr z, jr_01f_4216
 
-	ld a, [$d3c6]
+	ld a, [wJingleLocked]
 	and a
 	jp nz, Jump_01f_53e6
 
@@ -102,8 +102,8 @@ jr_01f_421c:
 
 jr_01f_4223:
 	call Call_1F_7A60
-	ld de, $d390
-	ld bc, $d394
+	ld de, wJingleTimer
+	ld bc, wJingleStep
 	jp hl
 
 
@@ -151,7 +151,7 @@ jr_01f_4223:
 	db $80, $00, $40, $ff, $c0, $ff, $80, $ff, $40, $ff, $00, $00, $9f, $a0, $00, $c2
 	db $01
 
-	ld a, [$d361]
+	ld a, [wActiveJingle]
 	cp $13
 	jp z, Jump_01f_53e6
 
@@ -230,7 +230,7 @@ jr_01f_4505:
 jr_01f_4616:
 	ld hl, $4630
 	call Call_1F_7B0D
-	ld bc, $d394
+	ld bc, wJingleStep
 	ld hl, $4630
 	jp Jump_01f_7add
 
@@ -253,7 +253,7 @@ Jump_01f_463d:
 	jp Jump_01f_53b5
 
 
-	ld a, [$d361]
+	ld a, [wActiveJingle]
 	cp $13
 	jp z, Jump_01f_53e6
 
@@ -534,11 +534,11 @@ jr_01f_46ca:
 	db $62, $b6, $87, $04, $3e, $01, $ea, $a0, $d3, $3e, $01, $ea, $c6, $d3
 
 Jump_01f_539a:
-	ld a, [$d360]
-	ld [$d361], a
+	ld a, [wJingleToPlay]
+	ld [wActiveJingle], a
 	xor a
-	ld [$d390], a
-	ld [$d394], a
+	ld [wJingleTimer], a
+	ld [wJingleStep], a
 	ld [$d3e2], a
 	ld a, [$d31f]
 	set 7, a
@@ -552,13 +552,13 @@ Jump_01f_53b5:
 
 Jump_01f_53bb:
 	xor a
-	ld [$d361], a
-	ld [$d390], a
+	ld [wActiveJingle], a
+	ld [wJingleTimer], a
 	ldh [rNR10], a
-	ld [$d394], a
+	ld [wJingleStep], a
 	ld [$d3bc], a
 	ld [$d3a0], a
-	ld [$d3c6], a
+	ld [wJingleLocked], a
 	ld a, [$d31f]
 	res 7, a
 	ld [$d31f], a
@@ -569,12 +569,12 @@ Jump_01f_53bb:
 
 Jump_01f_53e6:
 	xor a
-	ld [$d360], a
+	ld [wJingleToPlay], a
 	jp Call_1F_4204
 
 
 Call_1F_53ED::
-	ld hl, $d370
+	ld hl, wWaveSfxToPlay
 	ld a, [hl]
 	and a
 	jr z, jr_01f_5405
@@ -582,7 +582,7 @@ Call_1F_53ED::
 	cp $14
 	jr z, jr_01f_53ff
 
-	ld a, [$d3c8]
+	ld a, [wWaveSfxLocked]
 	and a
 	jp nz, Jump_01f_6385
 
@@ -601,9 +601,9 @@ jr_01f_5405:
 
 jr_01f_540c:
 	call Call_1F_7A60
-	ld de, $d392
-	ld bc, $d396
-	ld a, [$d3cd]
+	ld de, wWaveSfxTimer
+	ld bc, wWaveSfxStep
+	ld a, [wMusicBlocksWaveSfx]
 	and a
 	ret nz
 
@@ -707,7 +707,7 @@ jr_01f_540c:
 	db $7a, $c3, $81, $7a, $0d, $5a, $13, $5a, $0d, $5a, $07, $5a, $80, $fb, $20, $00
 	db $c2, $03, $80, $fd, $40, $80, $c3, $04, $80, $fd, $60, $00, $c4, $05
 
-	ld a, [$d371]
+	ld a, [wActiveWaveSfx]
 	cp $0f
 	jp z, Jump_01f_6385
 
@@ -866,15 +866,15 @@ jr_01f_540c:
 	db $87, $03, $a2, $87, $03, $83, $87, $03, $a7, $c7, $03, $3e, $01, $ea, $c8, $d3
 
 Jump_01f_62f8:
-	ld a, [$d370]
-	ld [$d371], a
+	ld a, [wWaveSfxToPlay]
+	ld [wActiveWaveSfx], a
 	push hl
 	ld hl, $d33f
 	set 7, [hl]
 	pop hl
 	xor a
-	ld [$d392], a
-	ld [$d396], a
+	ld [wWaveSfxTimer], a
+	ld [wWaveSfxStep], a
 	ldh [rNR30], a
 	jp Jump_01f_7a81
 
@@ -884,15 +884,15 @@ Jump_01f_62f8:
 
 Jump_01f_632d:
 	xor a
-	ld [$d392], a
-	ld [$d396], a
-	ld [$d371], a
+	ld [wWaveSfxTimer], a
+	ld [wWaveSfxStep], a
+	ld [wActiveWaveSfx], a
 	ldh [rNR30], a
-	ld [$d3c8], a
+	ld [wWaveSfxLocked], a
 	ld hl, $d33f
 	res 7, [hl]
 	ld a, $01
-	ld [$d3e7], a
+	ld [wWaveRamDirty], a
 	ret
 
 
@@ -931,7 +931,7 @@ Call_1F_636F::
 
 Jump_01f_6385:
 	xor a
-	ld [$d370], a
+	ld [wWaveSfxToPlay], a
 	jp Call_1F_53ED
 
 
@@ -959,12 +959,12 @@ Jump_01f_6385:
 	db $2c, $77, $8c, $77, $03, $7a, $e8, $77, $07, $79, $5d, $79
 
 Call_1F_64E8::
-	ld hl, $d378
+	ld hl, wNoiseSfxToPlay
 	ld a, [hl]
 	and a
 	jr z, jr_01f_64fc
 
-	ld a, [$d3c9]
+	ld a, [wNoiseSfxLocked]
 	and a
 	jp nz, Jump_01f_7a28
 
@@ -982,8 +982,8 @@ jr_01f_64fc:
 
 jr_01f_6504:
 	call Call_1F_7A60
-	ld de, $d393
-	ld bc, $d398
+	ld de, wNoiseSfxTimer
+	ld bc, wNoiseSfxStep
 	jp hl
 
 
@@ -993,7 +993,7 @@ jr_01f_650e:
 	ret z
 
 	ld a, $1e
-	ld [$d378], a
+	ld [wNoiseSfxToPlay], a
 	jr Call_1F_64E8
 
 	db $3e, $01, $ea, $79, $d3, $21, $2f, $65, $c3, $87, $7a, $af, $ea, $79, $d3, $21
@@ -1037,7 +1037,7 @@ jr_01f_650e:
 	db $8f, $66, $94, $66, $99, $66, $00, $61, $24, $80, $0c, $00, $51, $25, $80, $0c
 	db $00, $32, $27, $80, $0c, $00, $22, $34, $80, $0c
 
-	ld a, [$d379]
+	ld a, [wActiveNoiseSfx]
 	cp $05
 	jp z, Jump_01f_7a28
 
@@ -1083,7 +1083,7 @@ jr_01f_650e:
 	db $e5, $79, $cd, $6d, $7a, $c0, $cd, $71, $7a, $fe, $02, $ca, $03, $7a, $21, $ab
 	db $67, $c3, $87, $7a, $3c, $c0, $18, $c0, $01, $3c, $60, $18, $c0, $02
 
-	ld a, [$d379]
+	ld a, [wActiveNoiseSfx]
 	cp $02
 	jp z, Jump_01f_7a28
 
@@ -1115,7 +1115,7 @@ jr_01f_650e:
 	db $03, $ca, $03, $7a, $21, $45, $68, $cd, $60, $7a, $c3, $87, $7a, $4e, $68, $53
 	db $68, $1e, $29, $46, $c0, $10, $00, $29, $64, $80, $08, $00, $81, $64, $80, $06
 
-	ld a, [$d379]
+	ld a, [wActiveNoiseSfx]
 	and a
 	jp nz, Jump_01f_7a28
 
@@ -1165,7 +1165,7 @@ jr_01f_650e:
 	db $45, $6a, $00, $20, $47, $80, $02, $00, $40, $37, $80, $01, $00, $60, $27, $80
 	db $01, $00, $80, $17, $80, $01, $00, $a0, $07, $80, $01, $3c, $c0, $03, $c0, $01
 
-	ld a, [$d379]
+	ld a, [wActiveNoiseSfx]
 	cp $03
 	jp z, Jump_01f_7a28
 
@@ -1432,11 +1432,11 @@ jr_01f_650e:
 	db $80, $04, $2f, $20, $15, $c0, $04, $3e, $01, $ea, $c9, $d3
 
 Jump_01f_79e5:
-	ld a, [$d378]
-	ld [$d379], a
+	ld a, [wNoiseSfxToPlay]
+	ld [wActiveNoiseSfx], a
 	xor a
-	ld [$d393], a
-	ld [$d398], a
+	ld [wNoiseSfxTimer], a
+	ld [wNoiseSfxStep], a
 	ld a, [$d34f]
 	set 7, a
 	ld [$d34f], a
@@ -1447,11 +1447,11 @@ Jump_01f_79e5:
 
 Jump_01f_7a03:
 	xor a
-	ld [$d379], a
-	ld [$d393], a
-	ld [$d398], a
+	ld [wActiveNoiseSfx], a
+	ld [wNoiseSfxTimer], a
+	ld [wNoiseSfxStep], a
 	ld [$d3bf], a
-	ld [$d3c9], a
+	ld [wNoiseSfxLocked], a
 	ld a, [$d34f]
 	res 7, a
 	ld [$d34f], a
@@ -1468,7 +1468,7 @@ Jump_01f_7a21:
 
 Jump_01f_7a28:
 	xor a
-	ld [$d378], a
+	ld [wNoiseSfxToPlay], a
 	jp Call_1F_64E8
 
 
@@ -1644,49 +1644,49 @@ Jump_01f_7b17:
 	ld a, $ff
 	ldh [rNR51], a
 	ld a, $03
-	ld [$d355], a
+	ld [wMusicPanMode], a
 	xor a
-	ld [$d369], a
+	ld [wActiveMusicTrack], a
 	xor a
-	ld [$d361], a
-	ld [$d371], a
-	ld [$d379], a
+	ld [wActiveJingle], a
+	ld [wActiveWaveSfx], a
+	ld [wActiveNoiseSfx], a
 	ld [$d31f], a
 	ld [$d32f], a
 	ld [$d33f], a
 	ld [$d34f], a
-	ld [$d39e], a
-	ld [$d39f], a
-	ld [$d3d9], a
-	ld [$d3da], a
-	ld [$d3b6], a
+	ld [wMusicWaveDecay], a
+	ld [wMusicWaveDecayFrame], a
+	ld [wMusicWaveSwell], a
+	ld [wMusicWaveSwellFrame], a
+	ld [wMusicPitchDrop], a
 	ld [$d3b7], a
 	ld [$d3b8], a
 	ld [$d3b9], a
 	ld [$d3ba], a
 	ld [$d3bb], a
-	ld [$d394], a
+	ld [wJingleStep], a
 	ld [$d395], a
-	ld [$d396], a
-	ld [$d398], a
-	ld [$d390], a
+	ld [wWaveSfxStep], a
+	ld [wNoiseSfxStep], a
+	ld [wJingleTimer], a
 	ld [$d391], a
-	ld [$d392], a
-	ld [$d393], a
-	ld [$d3c6], a
+	ld [wWaveSfxTimer], a
+	ld [wNoiseSfxTimer], a
+	ld [wJingleLocked], a
 	ld [$d3c7], a
-	ld [$d3c8], a
-	ld [$d3c9], a
+	ld [wWaveSfxLocked], a
+	ld [wNoiseSfxLocked], a
 	ld [$d3a0], a
 	ld [$d3a1], a
 	ld [$d3a2], a
 	ld [$d3a3], a
-	ld [$d3cd], a
+	ld [wMusicBlocksWaveSfx], a
 	ld [$d3d6], a
 	ld [$d3d7], a
 	ld [$d3d8], a
 	ld [$d3dc], a
-	ld [$d3e7], a
+	ld [wWaveRamDirty], a
 	ld [$d3e2], a
 	ld [$d3e3], a
 	ld [$d3e4], a
@@ -1768,57 +1768,57 @@ Jump_01f_7b17:
 	db $ff, $ff, $ff, $ff
 
 Call_1F_7F80::
-	ldh a, [$ffa8]
+	ldh a, [hVolumeFadeOutTimer]
 	and a
 	jr z, jr_01f_7f9e
 
 	sub $01
-	ldh [$ffa8], a
+	ldh [hVolumeFadeOutTimer], a
 	and $03
 	jr nz, jr_01f_7f9e
 
-	ldh a, [$ffa9]
+	ldh a, [hVolumeRight]
 	and a
 	jr z, jr_01f_7f95
 
 	dec a
-	ldh [$ffa9], a
+	ldh [hVolumeRight], a
 
 jr_01f_7f95:
-	ldh a, [$ffaa]
+	ldh a, [hVolumeLeft]
 	and a
 	jr z, jr_01f_7f9e
 
 	sub $10
-	ldh [$ffaa], a
+	ldh [hVolumeLeft], a
 
 jr_01f_7f9e:
-	ldh a, [$ffab]
+	ldh a, [hVolumeFadeInTimer]
 	and a
 	jr z, jr_01f_7fbe
 
 	sub $01
-	ldh [$ffab], a
+	ldh [hVolumeFadeInTimer], a
 	and $01
 	jr nz, jr_01f_7fbe
 
-	ldh a, [$ffa9]
+	ldh a, [hVolumeRight]
 	cp $07
 	jr nc, jr_01f_7fb4
 
 	inc a
-	ldh [$ffa9], a
+	ldh [hVolumeRight], a
 
 jr_01f_7fb4:
-	ldh a, [$ffaa]
+	ldh a, [hVolumeLeft]
 	cp $70
 	jr nc, jr_01f_7fbe
 
 	add $10
-	ldh [$ffaa], a
+	ldh [hVolumeLeft], a
 
 jr_01f_7fbe:
-	ld hl, $ffa9
+	ld hl, hVolumeRight
 	ldh a, [rNR50]
 	and $f8
 	or [hl]
@@ -1826,31 +1826,31 @@ jr_01f_7fbe:
 	and $8f
 	or [hl]
 	ldh [rNR50], a
-	ldh a, [$fff2]
+	ldh a, [hJingle]
 	and a
 	jr z, jr_01f_7fd7
 
-	ld [$d360], a
+	ld [wJingleToPlay], a
 	xor a
-	ldh [$fff2], a
+	ldh [hJingle], a
 
 jr_01f_7fd7:
-	ldh a, [$fff3]
+	ldh a, [hWaveSfx]
 	and a
 	jr z, jr_01f_7fe2
 
-	ld [$d370], a
+	ld [wWaveSfxToPlay], a
 	xor a
-	ldh [$fff3], a
+	ldh [hWaveSfx], a
 
 jr_01f_7fe2:
-	ldh a, [$fff4]
+	ldh a, [hNoiseSfx]
 	and a
 	jr z, jr_01f_7fed
 
-	ld [$d378], a
+	ld [wNoiseSfxToPlay], a
 	xor a
-	ldh [$fff4], a
+	ldh [hNoiseSfx], a
 
 jr_01f_7fed:
 	ret
