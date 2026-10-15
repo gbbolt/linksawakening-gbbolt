@@ -25,15 +25,15 @@ SaveMenuSteps::
 	dw SaveMenuLoadScreen
 	dw SaveMenuFadeIn
 	dw SaveMenuInput
-	dw Jump_01_55FD
+	dw ReturnToWorld
 ;@ def SaveMenuInit()
 ;@ path: menu/save
 ;@ Step 0: keeps drawing Link and fades the world out; when the fade is complete, resets the scroll
 ;@ offsets and requests the tile set of the menu.
 ;@ test: skip calls into the fade and the sprite code of bank 0
 SaveMenuInit::
-;> Call_1CCC()                       # draw Link
-	call Call_1CCC
+;> DrawLinkOAM()                       # draw Link
+	call DrawLinkOAM
 ;> UpdateEntitiesBank1()                       # draw the entities
 	call UpdateEntitiesBank1
 ;> FadePalettesToWhite()                       # one step of the fade out
@@ -57,11 +57,11 @@ SaveMenuInit::
 ;> wInventoryAppearing = 0
 	ld [wInventoryAppearing], a
 ;> mem[0xC1B8] = 0
-	ld [$c1b8], a
+	ld [wSongMenuOpenTimer], a
 ;> mem[0xC1B9] = 0
-	ld [$c1b9], a
+	ld [wSongMenuCloseTimer], a
 ;> mem[0xC1B5] = 0
-	ld [$c1b5], a
+	ld [wSongMenuShown], a
 ;> wTileMapToLoad = 0x0F             # the menu tile set
 	ld a, $0f
 	ld [wTileMapToLoad], a
@@ -430,7 +430,7 @@ GameOverSpin::
 	xor a
 	ld [wScrollXOffset], a
 ;> mem[0xD415] = 0
-	ld [$d415], a
+	ld [wKillCounter], a
 ;> mem[0xD47C] = 0
 	ld [$d47c], a
 ;> mem[0xD47A] = 0
@@ -438,7 +438,7 @@ GameOverSpin::
 ;> fill(0xC3CB, 0, 3)
 	ld [$c3cb], a
 	ld [$c3cc], a
-	ld [$c3cd], a
+	ld [wRoomDarkness], a
 ;> return
 	ret
 
@@ -466,7 +466,7 @@ GameOverSpin::
 	ld hl, GameOverSpinValues
 	add hl, de
 	ld a, [hl]
-	ld [$c3cd], a
+	ld [wRoomDarkness], a
 ;=@c
 	ld a, $01
 	ld [$c3cb], a
@@ -513,7 +513,7 @@ GameOverLoadScreen::
 ;> hLinkMotionStep += 1
 	ld hl, hLinkMotionStep
 	inc [hl]
-;> SaveDungeonItemFlags()                           # Call_01_5BCF: dungeon item flags back to their slot
+;> SaveDungeonItemFlags()                           # StoreDungeonItemFlags: dungeon item flags back to their slot
 	call SaveDungeonItemFlags
 	ret
 
@@ -707,7 +707,7 @@ WorldSteps::
 ;@ path: world/load
 ;@ Minimap layout for each map (hMapId $00-$0C, one byte), copied to wMinimapLayout when a map is
 ;@ entered: only Eagle's Tower (map 6) uses a non-zero value ($30): its floors differ from the plain
-;@ dungeon minimap (see Call_01_5357).
+;@ dungeon minimap (see DrawMinimapFrame).
 MapMinimapLayouts::
 	db $00, $00, $00, $00, $00, $00, $30, $00, $00, $00, $00, $00, $00
 
@@ -789,8 +789,8 @@ WorldLoadPickLayout::
 ;>@b1     wBGMapToLoad = 9                    # (Eagle's Tower side views too)
 ;>@b2     return
 .minimap
-;> Call_01_5357()                       # build the minimap draw commands
-	call Call_01_5357
+;> DrawMinimapFrame()                       # build the minimap draw commands
+	call DrawMinimapFrame
 ;> wBGMapToLoad = 7
 	ld a, $07
 	ld [wBGMapToLoad], a
@@ -860,8 +860,8 @@ WorldLoadPlaceLink::
 	call LoadRoom
 ;> LoadRoomEntities()
 	call LoadRoomEntities
-;> Call_01_5D6B()                        # the companions following Link
-	call Call_01_5D6B
+;> SpawnFollowers()                        # the companions following Link
+	call SpawnFollowers
 ;> mem[0xFFA6] = 0xFF
 	ld a, $ff
 	ldh [hAnimatedTilesFrameCount], a
@@ -1007,8 +1007,8 @@ WorldLoadDrawRoom2::
 ;@ fixed palettes, when $C3CB is set). Ends in bank 2's room start code (SelectAreaMusicFar).
 ;@ test: skip writes LCDC and calls bank 2
 WorldLoadStartFadeIn::
-;> Call_01_5643()                        # window at the bottom again
-	call Call_01_5643
+;> ResetWindow()                        # window at the bottom again
+	call ResetWindow
 ;> wLCDControl = rLCDC | 0x20            # window on
 	ldh a, [rLCDC]
 	or $20
@@ -3567,150 +3567,239 @@ DrawCopyDestName::
 	ld de, wSaveSlotNames + 10
 	jp DrawFileName
 
+;@ path: menu/fileselect
+;@ Health (eighths of a heart) a file starts with when its health is 0 (after a game over that was
+;@ saved), indexed by the number of heart containers (wMaxHearts 0-14; one byte each): 3 hearts for
+;@ up to 5 containers, 5 hearts for 6-9, 7 for 10-13, 10 for 14.
 DefaultHealthByMaxHearts::
-	db $18, $18, $18, $18, $18, $18, $28, $28, $28
-	db $28, $38, $38, $38, $38, $50
+	db $18, $18, $18, $18, $18, $18, $28, $28, $28, $28, $38, $38, $38, $38, $50
 
+;@ def StartGameplay()
+;@ path: world/load
+;@ Starts playing the chosen file (also after continuing from the game over menu): refills an empty
+;@ health bar, loads the file's $380 bytes of data from battery RAM into wRoomStatus.. (unless the
+;@ game over menu kept the RAM), switches to game mode $0B (the world) and clears the pending health
+;@ and rupee changes. Link starts at the file's saved restart point, or for a new file in the house
+;@ he wakes up in (room $A3 of map $10) with the starting capacities.
+;@ test: skip reads battery RAM
 StartGameplay::
+;> hIsSideScrolling = 0
 	xor a
 	ldh [hIsSideScrolling], a
+;> if wHealth == 0:
 	ld a, [wHealth]
 	and a
-	jr nz, jr_001_5141
-
+	jr nz, .load
+;>@h     wHealth = DefaultHealthByMaxHearts[wMaxHearts]
 	ld a, [wMaxHearts]
 	ld e, a
 	ld d, $00
-	ld hl, $511b
+	ld hl, DefaultHealthByMaxHearts
 	add hl, de
 	ld a, [hl]
+;=@h
 	ld [wHealth], a
-
-jr_001_5141:
+.load
+;> keep = wContinueWithoutSave
 	ld hl, wContinueWithoutSave
 	ld a, [hl]
+;> wContinueWithoutSave = 0
 	ld [hl], $00
+;> if not keep:
 	and a
-	jr nz, jr_001_516a
-
+	jr nz, .play
+;>@s     src = SaveSlotDataAddresses[wSaveSlot]
 	ld a, [wSaveSlot]
 	sla a
 	ld e, a
 	ld d, $00
-	ld hl, $493c
+	ld hl, SaveSlotDataAddresses
 	add hl, de
+;=@s
 	ld c, [hl]
 	inc hl
 	ld b, [hl]
+;>@c     copy(wRoomStatus, src, 0x380)      # (battery RAM switched on for each byte)
 	ld hl, wRoomStatus
 	ld de, $0380
-
-jr_001_515f:
+.copy
 	call EnableSRAM
 	ld a, [bc]
 	inc bc
+;=@c
 	ld [hli], a
 	dec de
 	ld a, e
 	or d
-	jr nz, jr_001_515f
-
-jr_001_516a:
+	jr nz, .copy
+.play
+;> wGameplayType = 0x0B                  # the world
 	ld a, $0b
 	ld [wGameplayType], a
+;> wGameplaySubtype = 0
 	xor a
 	ld [wGameplaySubtype], a
+;> wLinkMotionState = 0
 	xor a
 	ld [wLinkMotionState], a
+;> hLinkMotionStep = 0
 	ldh [hLinkMotionStep], a
+;> wAddHealthBuffer = 0
 	ld [wAddHealthBuffer], a
+;> wSubtractHealthBuffer = 0
 	ld [wSubtractHealthBuffer], a
+;> wAddRupeeBufferLow = 0
 	ld [wAddRupeeBufferLow], a
+;> wAddRupeeBufferHigh = 0
 	ld [wAddRupeeBufferHigh], a
+;> wSubtractRupeeBufferLow = 0
 	ld [wSubtractRupeeBufferLow], a
+;> wSubtractRupeeBufferHigh = 0
 	ld [wSubtractRupeeBufferHigh], a
+;> if wIronBallRoom == 0:
 	ld a, [wIronBallRoom]
 	and a
-	jr nz, jr_001_51a0
-
+	jr nz, .spawn
+;>     wIronBallRoom = 0x16
 	ld a, $16
 	ld [wIronBallRoom], a
+;>     wIronBallX = 0x50
 	ld a, $50
 	ld [wIronBallX], a
+;>     wIronBallY = 0x27
 	ld a, $27
 	ld [wIronBallY], a
-
-jr_001_51a0:
+.spawn
+;> if wSpawnX == 0:                      # a new file
 	ld a, [wSpawnX]
 	and a
-	jr z, jr_001_51dd
-
+	jr z, .newGame
+;>@n1     wMaxArrows = 0x30
+;>@n2     wMaxBombs = 0x30
+;>@n3     wMaxMagicPowder = 0x20
+;>@n4     mem[0xDB9C] = 0xA3
+;>@n5     hMapRoom = 0xA3                  # the house where Link wakes up
+;>@n6     wIsIndoor = 1
+;>@n7     hMapId = 0x10
+;>@n8     wMapEntrancePositionX = 0x50
+;>@n9     wMapEntrancePositionY = 0x60
+;>@na     hLinkAnimationState = 0
+;>@nb     hLinkDirection = 3               # down
+;>@nc     wIronBallRoom = 0x16
+;>@nd     wIronBallX = 0x50
+;>@ne     wIronBallY = 0x27
+;>@nf     wBGMapToLoad = 2
+;>@ng     return
+;> wMapEntrancePositionX = wSpawnX
 	ld [wMapEntrancePositionX], a
+;> wMapEntrancePositionY = wSpawnY
 	ld a, [wSpawnY]
 	ld [wMapEntrancePositionY], a
+;> hMapRoom = wSpawnRoom
 	ld a, [wSpawnRoom]
 	ldh [hMapRoom], a
+;> mem[0xDB9C] = wSpawnRoom
 	ld [$db9c], a
+;> hMapId = wSpawnMapId
 	ld a, [wSpawnMapId]
 	ldh [hMapId], a
+;> wIndoorRoom = wSpawnIndoorRoom
 	ld a, [wSpawnIndoorRoom]
 	ld [wIndoorRoom], a
+;> hIsSideScrolling = 0
 	xor a
 	ldh [hIsSideScrolling], a
+;> wIsIndoor = wSpawnIsIndoor & 1
 	ld a, [wSpawnIsIndoor]
 	and $01
 	ld [wIsIndoor], a
-	jr z, jr_001_51d7
-
+;> if wIsIndoor:
+	jr z, .done
+;>     hLinkAnimationState = 4
 	ld a, $04
 	ldh [hLinkAnimationState], a
+;>     hLinkDirection = 2                # up
 	ld a, $02
 	ldh [hLinkDirection], a
-
-jr_001_51d7:
+.done
+;> wBGMapToLoad = 2
 	ld a, $02
 	ld [wBGMapToLoad], a
 	ret
-
-
-jr_001_51dd:
+.newGame
+;=@n1
 	ld a, $30
 	ld [wMaxArrows], a
+;=@n2
 	ld a, $30
 	ld [wMaxBombs], a
+;=@n3
 	ld a, $20
 	ld [wMaxMagicPowder], a
+;=@n4
 	ld a, $a3
 	ld [$db9c], a
+;=@n5
 	ldh [hMapRoom], a
+;=@n6
 	ld a, $01
 	ld [wIsIndoor], a
+;=@n7
 	ld a, $10
 	ldh [hMapId], a
+;=@n8
 	ld a, $50
 	ld [wMapEntrancePositionX], a
+;=@n9
 	ld a, $60
 	ld [wMapEntrancePositionY], a
+;=@na
 	xor a
 	ldh [hLinkAnimationState], a
+;=@nb
 	ld a, $03
 	ldh [hLinkDirection], a
+;=@nc
 	ld a, $16
 	ld [wIronBallRoom], a
+;=@nd
 	ld a, $50
 	ld [wIronBallX], a
+;=@ne
 	ld a, $27
 	ld [wIronBallY], a
-	jr jr_001_51d7
+;=@nf
+	jr .done
+;=@ng
 
+;@ path: world/minimap
+;@ High byte of the VRAM address of each frame command of the dungeon subscreen's minimap, in four
+;@ layouts of 4 entries (index = 4 x layout, layout = bits 4-5 of wMinimapLayout); each layout lists
+;@ three commands and ends with $FF. Read together with MinimapFrameLow, MinimapFrameMode and
+;@ MinimapFrameTile (same index): one 4-byte background draw command per entry (VRAM high, low,
+;@ mode = count - 1 with bit 7 vertical and bit 6 repeat one tile, tile).
+;@ Layout 0: blank columns at $9D32 (9 tiles down), plus tile $BA at $9D09.
 MinimapFrameHigh::
 	db $9d, $9d, $9d, $ff, $9d, $9d, $9d, $ff, $9d, $9d, $9c, $ff, $9d, $9d, $9c, $ff
+;@ path: world/minimap
+;@ Low byte of the VRAM address of each minimap frame command (see MinimapFrameHigh; 16 bytes).
 MinimapFrameLow::
 	db $32, $32, $09, $ff, $2e, $2e, $09, $ff, $8a, $32, $e9, $ff, $8a, $2e, $e9, $ff
+;@ path: world/minimap
+;@ Mode byte of each minimap frame command (see MinimapFrameHigh; 16 bytes): $C8 = 9 tiles down
+;@ repeating one tile, $48 = 9 tiles across repeating one tile, $00 = one tile.
 MinimapFrameMode::
 	db $c8, $c8, $00, $ff, $c8, $c8, $00, $ff, $48, $c8, $00, $ff, $48, $c8, $00, $ff
+;@ path: world/minimap
+;@ Tile of each minimap frame command (see MinimapFrameHigh; 16 bytes): $7F blank, $BA.
 MinimapFrameTile::
 	db $7f, $7f, $ba, $ff, $7f, $7f, $ba, $ff, $7f, $7f, $ba, $ff, $7f, $7f, $ba, $ff
+;@ path: world/minimap
+;@ High byte of the VRAM address of each extra single-tile minimap piece (68 bytes), used only when
+;@ the layout (bits 4-5 of wMinimapLayout) is not 0: the list starts at index 8 x layout, + 4 when
+;@ the variant (bits 0-1) is set for layouts 1-2, or + 11 x variant for layout 3, and ends where this
+;@ table holds $FF. Read with MinimapFloorLow and MinimapFloorTile (same index); each entry becomes
+;@ a draw command of one tile.
 MinimapFloorHigh::
 	db $00, $00, $00, $ff, $00, $00, $00, $ff, $9d, $9d, $ff, $00, $9d, $9d, $9d, $ff
 	db $9d, $9c, $ff, $00, $9d, $9c, $9c, $ff, $9d, $9d, $9c, $9c, $ff, $00, $00, $00
@@ -3718,6 +3807,8 @@ MinimapFloorHigh::
 	db $9c, $9c, $9d, $9d, $9c, $9c, $ff, $00, $00, $9d, $9d, $9c, $9c, $9d, $9d, $9c
 	db $9c, $9c, $9c, $ff
 
+;@ path: world/minimap
+;@ Low byte of the VRAM address of each extra minimap piece (see MinimapFloorHigh; 68 bytes).
 MinimapFloorLow::
 	db $00, $00, $00, $ff, $00, $00, $00, $ff, $0d, $12, $ff, $00
 	db $0d, $11, $12, $ff, $92, $f2, $ff, $00, $92, $f1, $f2, $ff, $8d, $92, $ed, $f2
@@ -3725,6 +3816,8 @@ MinimapFloorLow::
 	db $00, $00, $8d, $92, $ed, $f2, $91, $92, $f1, $f2, $ff, $00, $00, $8d, $92, $ed
 	db $f2, $91, $92, $ec, $ed, $f1, $f2, $ff
 
+;@ path: world/minimap
+;@ Tile of each extra minimap piece (see MinimapFloorHigh; 68 bytes; tiles $E8-$EC).
 MinimapFloorTile::
 	db $00, $00, $00, $ff, $00, $00, $00, $ff
 	db $e8, $e9, $ff, $00, $e8, $ec, $e8, $ff, $e8, $e9, $ff, $00, $e8, $ec, $e8, $ff
@@ -3732,552 +3825,742 @@ MinimapFloorTile::
 	db $e8, $ff, $00, $00, $00, $00, $e8, $ea, $e9, $eb, $ec, $e8, $ec, $e9, $ff, $00
 	db $00, $e8, $ea, $e9, $eb, $ec, $e8, $ec, $ea, $ec, $e9, $ff
 
+;@ path: world/minimap
+;@ High byte of the VRAM address of the dungeon's level number on the subscreen, indexed by bit 5 of
+;@ wMinimapLayout (2 bytes; with MinimapLevelLow: $9D0A normally, $9CEA when bit 5 is set).
 MinimapLevelHigh::
 	db $9d, $9c
 
+;@ path: world/minimap
+;@ Low byte of the VRAM address of the level number (see MinimapLevelHigh; 2 bytes).
 MinimapLevelLow::
 	db $0a, $ea
+;@ path: world/minimap
+;@ Background draw commands that clear the minimap area of the dungeon subscreen: 10 commands of
+;@ 4 bytes (VRAM address high, low, $49 = 10 times the same tile, tile $7F blank) for the rows at
+;@ $9CE9, $9D09 ... $9E09, then the end byte 0. Copied to $D651 by DrawMinimapFrame.
 MinimapClearCommands::
 	db $9c, $e9, $49, $7f, $9d, $09, $49, $7f, $9d, $29, $49, $7f, $9d, $49, $49, $7f
 	db $9d, $69, $49, $7f, $9d, $89, $49, $7f, $9d, $a9, $49, $7f, $9d, $c9, $49, $7f
 	db $9d, $e9, $49, $7f, $9e, $09, $49, $7f, $00
 
-Call_01_5357::
-	ld hl, $532e
+;@ def DrawMinimapFrame()
+;@ path: world/minimap
+;@ Builds, at $D651, the background draw commands of the dungeon subscreen around the minimap:
+;@ the clearing commands, the frame of the layout chosen by wMinimapLayout, the extra pieces of that
+;@ layout (Eagle's Tower), and the level number (tile $B1 + hMapId) followed by a blank.
+;@ test: skip builds a command list through scratch variables
+DrawMinimapFrame::
+;>@cp copy(0xD651, MinimapClearCommands, 0x29)
+	ld hl, MinimapClearCommands
 	ld de, $d650
 	ld c, $29
-
-jr_001_535f:
+.copy
 	ld a, [hli]
 	inc de
+;=@cp
 	ld [de], a
 	dec c
-	jr nz, jr_001_535f
-
+	jr nz, .copy
+;> out = 0xD679                          # over the end byte
 	push de
+;>@z fill(hMultiPurpose0, 0, 4)         # hMultiPurpose0-3
 	xor a
 	ldh [hMultiPurpose0], a
 	ldh [hMultiPurpose1], a
 	ldh [hMultiPurpose2], a
 	ldh [hMultiPurpose3], a
 	ld c, a
+;=@z
 	ld b, a
 	ld e, a
 	ld d, a
+;>@i i = 4 * ((wMinimapLayout >> 4) & 3)
 	ld a, [wMinimapLayout]
 	swap a
 	and $03
 	ld e, a
 	and a
-	jr z, jr_001_5389
-
-jr_001_537e:
+	jr z, .frame
+;=@i
+.times4
 	ld a, c
 	add $04
 	ld c, a
 	dec e
 	ld a, e
 	and a
-	jr nz, jr_001_537e
-
+;=@i
+	jr nz, .times4
 	ld b, $00
-
-jr_001_5389:
+.frame
 	pop hl
-
-jr_001_538a:
+.frameLoop
+;>@f while True:
 	push hl
-	ld hl, $521e
+;>@g     hMultiPurpose0 = MinimapFrameHigh[i]
+	ld hl, MinimapFrameHigh
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose0], a
-	ld hl, $522e
+;>     hMultiPurpose1 = MinimapFrameLow[i]
+	ld hl, MinimapFrameLow
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose1], a
-	ld hl, $523e
+;>     hMultiPurpose2 = MinimapFrameMode[i]
+	ld hl, MinimapFrameMode
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose2], a
-	ld hl, $524e
+;>     hMultiPurpose3 = MinimapFrameTile[i]
+	ld hl, MinimapFrameTile
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose3], a
+;>     StoreDrawCommand4(out)
 	pop hl
-	call Call_01_5461
+	call StoreDrawCommand4
+;>     i += 1
 	push hl
-	ld hl, $521e
+	ld hl, MinimapFrameHigh
 	inc bc
+;>     out += 4
 	add hl, bc
 	ld a, [hl]
 	pop hl
 	inc hl
+;>     if MinimapFrameHigh[i] == 0xFF:
 	cp $ff
-	jr nz, jr_001_538a
-
+;=@f
+	jr nz, .frameLoop
+;>         break
+;> mem[out] = 0
 	xor a
 	ld [hl], a
+;>@z2 fill(hMultiPurpose0, 0, 4)
 	xor a
 	ldh [hMultiPurpose0], a
 	ldh [hMultiPurpose1], a
 	ldh [hMultiPurpose2], a
 	ldh [hMultiPurpose3], a
 	ld c, a
+;=@z2
 	ld b, a
 	ld e, a
 	ld d, a
+;> layout = (wMinimapLayout >> 4) & 3
 	ld a, [wMinimapLayout]
 	swap a
 	and $03
 	ld e, a
 	and a
-	jr z, jr_001_5430
-
-jr_001_53d2:
+;> if layout:
+	jr z, .level
+;>@j     i = 8 * layout
+.times8
 	ld b, $00
 	ld a, c
 	add $08
 	ld c, a
 	dec e
 	ld a, e
+;=@j
 	and a
-	jr nz, jr_001_53d2
-
+	jr nz, .times8
+;>     if wMinimapLayout & 3:
 	ld a, [wMinimapLayout]
 	and $03
-	jr z, jr_001_5406
-
+	jr z, .pieces
+;>         if wMinimapLayout & 0x30 != 0x30:
 	ld a, [wMinimapLayout]
 	and $30
 	cp $30
-	jr z, jr_001_53f5
-
+	jr z, .layout3
+;>             i += 4
 	ld a, c
 	add $04
 	ld c, a
 	ld b, $00
-	jr jr_001_5406
-
-jr_001_53f5:
+	jr .pieces
+;>         else:
+.layout3
+;>@k             i += 11 * (wMinimapLayout & 3)
 	ld a, [wMinimapLayout]
 	and $03
 	ld e, a
-
-jr_001_53fb:
+.times11
 	ld b, $00
 	ld a, c
 	add $0b
+;=@k
 	ld c, a
 	dec e
 	ld a, e
 	and a
-	jr nz, jr_001_53fb
-
-jr_001_5406:
+	jr nz, .times11
+.pieces
+;>@p     while True:
 	push hl
-	ld hl, $525e
+;>         hMultiPurpose0 = MinimapFloorHigh[i]
+	ld hl, MinimapFloorHigh
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose0], a
-	ld hl, $52a2
+;>         hMultiPurpose1 = MinimapFloorLow[i]
+	ld hl, MinimapFloorLow
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose1], a
+;>         hMultiPurpose2 = 0             # one tile
 	xor a
 	ldh [hMultiPurpose2], a
-	ld hl, $52e6
+;>         hMultiPurpose3 = MinimapFloorTile[i]
+	ld hl, MinimapFloorTile
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose3], a
+;>         StoreDrawCommand4(out)
 	pop hl
-	call Call_01_5461
+	call StoreDrawCommand4
+;>         i += 1
 	push hl
-	ld hl, $525e
+	ld hl, MinimapFloorHigh
 	inc bc
+;>         out += 4
 	add hl, bc
 	ld a, [hl]
 	pop hl
 	inc hl
+;>         if MinimapFloorHigh[i] == 0xFF:
 	cp $ff
-	jr nz, jr_001_5406
-
-jr_001_5430:
+;=@p
+	jr nz, .pieces
+;>             break
+.level
+;>@jj j = 1 if wMinimapLayout & 0x20 else 0
 	xor a
 	ld b, a
 	ld c, a
 	ld a, [wMinimapLayout]
 	bit 5, a
-	jr z, jr_001_543b
-
+	jr z, .number
+;=@jj
 	inc bc
-
-jr_001_543b:
+.number
+;>@lv hMultiPurpose0 = MinimapLevelHigh[j]
 	push hl
-	ld hl, $532a
+	ld hl, MinimapLevelHigh
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose0], a
-	ld hl, $532c
+;> hMultiPurpose1 = MinimapLevelLow[j]
+	ld hl, MinimapLevelLow
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose1], a
+;> hMultiPurpose2 = 1                    # two tiles
 	ld a, $01
 	ldh [hMultiPurpose2], a
+;> hMultiPurpose3 = 0xB1 + hMapId        # the level number
 	ldh a, [hMapId]
 	add $b1
 	ldh [hMultiPurpose3], a
+;> StoreDrawCommand4(out)
 	pop hl
-	call Call_01_5461
+	call StoreDrawCommand4
+;> mem[out + 4] = 0x7F                   # then a blank tile
 	push hl
 	pop hl
 	inc hl
 	ld a, $7f
 	ld [hli], a
+;> mem[out + 5] = 0
 	xor a
 	ld [hl], a
 	ret
 
 
-Call_01_5461::
+;@ def StoreDrawCommand4(out: hl) -> hl
+;@ path: world/minimap
+;@ Stores hMultiPurpose0-3 (a 4-byte draw command: VRAM high, low, mode, tile) at `out`; returns
+;@ the address of its last byte.
+StoreDrawCommand4::
+;> mem[out] = hMultiPurpose0
 	ldh a, [hMultiPurpose0]
 	ld [hli], a
+;> mem[out + 1] = hMultiPurpose1
 	ldh a, [hMultiPurpose1]
 	ld [hli], a
+;> mem[out + 2] = hMultiPurpose2
 	ldh a, [hMultiPurpose2]
 	ld [hli], a
+;> mem[out + 3] = hMultiPurpose3
 	ldh a, [hMultiPurpose3]
 	ld [hl], a
+;> return out + 3
 	ret
 
 
+;@ def GameplayWorldMapHandler()
+;@ path: menu/worldmap
+;@ Game mode 7, the map of Koholint island (opened with Select, or from a library book): resets the
+;@ sprite allocation and runs the current step of WorldMapSteps.
+;@ test: skip jumps through a table
 GameplayWorldMapHandler::
+;> wOAMNextIndex = 0
 	xor a
 	ld [wOAMNextIndex], a
+;> return WorldMapSteps[wGameplaySubtype]()
 	ld a, [wGameplaySubtype]
 	rst $00
 
-JumpTable_01_5476::
-	dw Jump_01_5482
-	dw Jump_01_54FE
-	dw Jump_01_5507
-	dw Jump_01_5510
-	dw Jump_01_5521
-	dw Jump_01_55FD
+;@ path: menu/worldmap
+;@ The steps of the map screen (dw per value of wGameplaySubtype): 0 fade the world out, 1-2 load the
+;@ tiles, 3 fade in, 4 move the cursor and show place names, 5 fade out and return to the world.
+WorldMapSteps::
+	dw WorldMapInit
+	dw WorldMapLoadTiles
+	dw WorldMapLoadTiles2
+	dw WorldMapFadeIn
+	dw WorldMapInput
+	dw ReturnToWorld
 
-Jump_01_5482::
-	call Call_1CCC
+;@ def WorldMapInit()
+;@ path: menu/worldmap
+;@ Step 0: keeps drawing Link and the entities while the world fades out. Then lowers the music volume,
+;@ puts the map cursor on Link's overworld room, decides whether that room's place marker shows (see
+;@ WorldMapRoomPlaces), switches the window off and requests the map screen (layout 8).
+;@ test: skip calls the fade and sprite code
+WorldMapInit::
+;> DrawLinkOAM()                           # draw Link
+	call DrawLinkOAM
+;> UpdateEntitiesBank1()
 	call UpdateEntitiesBank1
+;> FadePalettesToWhite()
 	call FadePalettesToWhite
+;> if wTransitionSequenceCounter != 4:
 	ld a, [wTransitionSequenceCounter]
 	cp $04
-	jr nz, jr_001_54fd
-
+;>     return
+	jr nz, .done
+;> hVolumeRight = 3                      # music quieter
 	ld a, $03
 	ldh [hVolumeRight], a
+;> hVolumeLeft = 0x30
 	ld a, $30
 	ldh [hVolumeLeft], a
+;> IncrementGameplaySubtype()
 	call IncrementGameplaySubtype
+;> wTransitionSequenceCounter = 0
 	xor a
 	ld [wTransitionSequenceCounter], a
+;> wTransitionFrameCounter = 0
 	ld [wTransitionFrameCounter], a
+;> hBaseScrollX = 0
 	ldh [hBaseScrollX], a
+;> wScrollXOffset = 0
 	ld [wScrollXOffset], a
+;> hBaseScrollY = 0
 	ldh [hBaseScrollY], a
+;> wInventoryAppearing = 0
 	ld [wInventoryAppearing], a
-	ld [$c1b2], a
-	ld [$c1b3], a
-	ld a, [$db54]
-	ld [$dbb4], a
+;> wWorldMapMarkerAppearTimer = 0
+	ld [wWorldMapMarkerAppearTimer], a
+;> wWorldMapMarkerHideTimer = 0
+	ld [wWorldMapMarkerHideTimer], a
+;> wWorldMapCursor = wOverworldRoom
+	ld a, [wOverworldRoom]
+	ld [wWorldMapCursor], a
+;>@p place = WorldMapRoomPlaces[wOverworldRoom]
 	ld e, a
 	ld d, $00
-	ld hl, $5707
+	ld hl, WorldMapRoomPlaces
 	add hl, de
 	ld a, [hl]
+;>@k kind = (place >> 4 & 7) + 1 if place else 0         # the marker type
 	and a
-	jr z, jr_001_54e3
-
+	jr z, .marker
 	swap a
 	and $07
 	inc a
+;> if kind == 1:                         # kind 1 only for a visited room (or from the book: never)
 	cp $01
-	jr nz, jr_001_54e3
-
+	jr nz, .marker
+;>@k1     kind = 1 if not wMapScreenFromBook and wRoomStatus[wOverworldRoom] & 0x20 else 0
 	ld a, [wMapScreenFromBook]
 	and a
 	ld a, $00
-	jr nz, jr_001_54e3
-
+	jr nz, .marker
 	ld hl, wRoomStatus
 	add hl, de
+;=@k1
 	ld a, [hl]
 	and $20
 	ld a, $00
-	jr z, jr_001_54e3
-
+	jr z, .marker
 	ld a, $01
-
-jr_001_54e3:
-	ld [$c1b1], a
-	ld a, [$dbb4]
-	ld [$c1b4], a
+.marker
+;> wWorldMapMarkerType = kind
+	ld [wWorldMapMarkerType], a
+;> wWorldMapMarkerRoom = wWorldMapCursor
+	ld a, [wWorldMapCursor]
+	ld [wWorldMapMarkerRoom], a
+;> wLCDControl = rLCDC & ~0x20           # window off
 	ldh a, [rLCDC]
 	and $df
 	ld [wLCDControl], a
+;> rLCDC = wLCDControl
 	ldh [rLCDC], a
-	call Call_01_5636
+;> ClearRoomTransitionState()
+	call ClearRoomTransitionState
+;> wBGMapToLoad = 8
 	ld a, $08
 	ld [wBGMapToLoad], a
-
-jr_001_54fd:
+.done
 	ret
 
 
-Jump_01_54FE::
+;@ def WorldMapLoadTiles()
+;@ path: menu/worldmap
+;@ Step 1: requests tile set $0B.
+WorldMapLoadTiles::
+;> wTileMapToLoad = 0x0B
 	ld a, $0b
 	ld [wTileMapToLoad], a
+;> IncrementGameplaySubtype()
 	call IncrementGameplaySubtype
 	ret
 
 
-Jump_01_5507::
+;@ def WorldMapLoadTiles2()
+;@ path: menu/worldmap
+;@ Step 2: requests tile set $0E.
+WorldMapLoadTiles2::
+;> wTileMapToLoad = 0x0E
 	ld a, $0e
 	ld [wTileMapToLoad], a
+;> IncrementGameplaySubtype()
 	call IncrementGameplaySubtype
 	ret
 
 
-Jump_01_5510::
+;@ def WorldMapFadeIn()
+;@ path: menu/worldmap
+;@ Step 3: fades the map in; when done, moves on with the confirm sound.
+;@ test: skip calls the fade code
+WorldMapFadeIn::
+;> FadePalettesIn()
 	call FadePalettesIn
+;> if wTransitionSequenceCounter == 4:
 	ld a, [wTransitionSequenceCounter]
 	cp $04
-	jr nz, jr_001_5520
-
+	jr nz, .done
+;>     IncrementGameplaySubtype()
 	call IncrementGameplaySubtype
+;>     PlayConfirmSound()
 	call PlayConfirmSound
-
-jr_001_5520:
+.done
 	ret
 
 
-Jump_01_5521::
+;@ def WorldMapInput()
+;@ path: menu/worldmap
+;@ Step 4. A shows the name of the place under the cursor in a dialogue box (at the top when the
+;@ cursor is in the lower part of the island): a marked place if it may be shown, otherwise the name
+;@ of the area (2 x 2 rooms, WorldMapRegionTexts; rooms $24 and $34 have text $76). B or Select
+;@ (only Select with the debug switch) closes the map. With the debug switch (ROM byte $0003, 0 in
+;@ this cartridge) holding B+Select warps Link to the room under the cursor. Then draws Link's
+;@ marker, moves the cursor and draws the place marker.
+;@ test: skip opens dialogues
+WorldMapInput::
+;> if wDialogState:
 	ld a, [wDialogState]
 	and a
-	jp nz, Jump_001_55f0
-
+;>     return WorldMapDraw()
+	jp nz, WorldMapDraw
+;> if hJoypadPressed & 0x10:             # A
 	ldh a, [hJoypadPressed]
 	and $10
-	jr z, jr_001_5594
-
-	ld a, [$dbb4]
+	jr z, .notA
+;>@p     place = WorldMapRoomPlaces[wWorldMapCursor]
+	ld a, [wWorldMapCursor]
 	ld e, a
 	ld d, $00
-	ld hl, $5707
+	ld hl, WorldMapRoomPlaces
 	add hl, de
 	ld a, [hl]
+;>@c     if place and (place & 0xF0 or (not wMapScreenFromBook and wRoomStatus[wWorldMapCursor] & 0x20)):
 	and a
-	jr z, jr_001_555f
-
+	jr z, .region
 	ld e, a
 	and $f0
-	jr nz, jr_001_5556
-
+	jr nz, .named
 	ld a, [wMapScreenFromBook]
+;=@c
 	and a
-	jr nz, jr_001_555f
-
+	jr nz, .region
 	push de
-	ld a, [$dbb4]
+	ld a, [wWorldMapCursor]
 	ld e, a
 	ld hl, wRoomStatus
+;=@c
 	add hl, de
 	pop de
 	ld a, [hl]
 	and $20
-	jr z, jr_001_555f
-
-jr_001_5556:
+	jr z, .region
+.named
+;>@n         text = WorldMapPlaceTexts[place]
 	ld d, $00
-	ld hl, $56b7
+	ld hl, WorldMapPlaceTexts
 	add hl, de
 	ld a, [hl]
-	jr jr_001_5582
-
-jr_001_555f:
-	ld a, [$dbb4]
+	jr .show
+;>     elif wWorldMapCursor == 0x24 or wWorldMapCursor == 0x34:
+.region
+	ld a, [wWorldMapCursor]
 	cp $24
-	jr z, jr_001_556a
-
+	jr z, .special
 	cp $34
-	jr nz, jr_001_556e
-
-jr_001_556a:
+	jr nz, .area
+;>         text = 0x76
+.special
 	ld a, $76
-	jr jr_001_5582
-
-jr_001_556e:
+	jr .show
+;>     else:
+.area
+;>@a         text = WorldMapRegionTexts[(wWorldMapCursor >> 5) * 8 + ((wWorldMapCursor & 0x0F) >> 1)]
 	rra
 	and $07
 	ld e, a
-	ld a, [$dbb4]
+	ld a, [wWorldMapCursor]
 	rra
 	rra
+;=@a
 	and $38
 	or e
 	ld e, a
 	ld d, $00
-	ld hl, $5677
+	ld hl, WorldMapRegionTexts
 	add hl, de
+;=@a
 	ld a, [hl]
-
-jr_001_5582:
+.show
+;>     OpenDialog(text)
 	call OpenDialog
-	ld a, [$dbb4]
+;>@ds     wDialogState = 0x01 if wWorldMapCursor >= 0x70 else 0x81      # box at the top / bottom
+	ld a, [wWorldMapCursor]
 	cp $70
 	ld a, $01
-	jr nc, jr_001_5590
-
+	jr nc, .state
 	ld a, $81
-
-jr_001_5590:
+.state
+;=@ds
 	ld [wDialogState], a
+;>     return
 	ret
-
-
-jr_001_5594:
+.notA
+;> if mem[0x0003] and hJoypadHeld == 0x60:     # debug only: B+Select warps to the cursor
 	ld a, [$0003]
 	and a
-	jr z, jr_001_55d7
-
+	jr z, .close
 	ldh a, [hJoypadHeld]
 	cp $60
-	jr nz, jr_001_55d7
-
+	jr nz, .close
+;>     wGameplayType = 0x0B
 	ld a, $0b
 	ld [wGameplayType], a
+;>     StartWarpFadeOutWithNoise()
 	call StartWarpFadeOutWithNoise
+;>     wWarpType = 0                     # the overworld
 	ld a, $00
 	ld [wWarpType], a
+;>     wWarpMap = 0
 	ld [wWarpMap], a
-	ld a, [$dbb4]
+;>     wWarpRoom = wWorldMapCursor
+	ld a, [wWorldMapCursor]
 	ld [wWarpRoom], a
+;>     wWarpDestX = 0x48
 	ld a, $48
 	ld [wWarpDestX], a
+;>     wWarpDestY = 0x52
 	ld a, $52
 	ld [wWarpDestY], a
+;>@wp     wWarpDestPosition = (hLinkY - 8) & 0xF0 | hLinkX >> 4
 	ldh a, [hLinkX]
 	swap a
 	and $0f
 	ld e, a
 	ldh a, [hLinkY]
 	sub $08
+;=@wp
 	and $f0
 	or e
 	ld [wWarpDestPosition], a
+;>     wGameplaySubtype = 7              # the world's play step
 	ld a, $07
 	ld [wGameplaySubtype], a
+;>     return
 	ret
-
-
-jr_001_55d7:
+.close
+;> keys = 0x40 if mem[0x0003] else 0x60  # Select (debug) / B or Select
 	ld e, $40
 	ld a, [$0003]
 	and a
-	jr nz, jr_001_55e1
-
+	jr nz, .keys
 	ld e, $60
-
-jr_001_55e1:
+.keys
+;> if hJoypadPressed & keys:
 	ldh a, [hJoypadPressed]
 	and e
-	jr z, jr_001_55f0
-
+	jr z, WorldMapDraw
+;>     wTransitionSequenceCounter = 0
 	xor a
 	ld [wTransitionSequenceCounter], a
+;>     wTransitionFrameCounter = 0
 	ld [wTransitionFrameCounter], a
+;>     IncrementGameplaySubtype()
 	call IncrementGameplaySubtype
+;> WorldMapDraw()                        # falls through into it
 
-Jump_001_55f0:
-jr_001_55f0:
-	call Call_01_5656
-	call Call_01_581F
-	call Call_01_59F7
+;@ def WorldMapDraw()
+;@ path: menu/worldmap
+;@ The map screen's sprites for this frame: Link's marker, the cursor (moved by the D-pad) and the
+;@ place marker.
+;@ test: skip draws sprites
+WorldMapDraw::
+;> DrawWorldMapLinkMarker()
+	call DrawWorldMapLinkMarker
+;> WorldMapMoveCursor()
+	call WorldMapMoveCursor
+;> DrawWorldMapPlaceMarker()
+	call DrawWorldMapPlaceMarker
 	ret
 
 
-	db $cd, $50, $67
+;@ def SceneReturnToWorld()
+;@ path: event/scene
+;@ Shared last step of the beach and picture scenes: keeps their sprites drawn (the routine at $6750)
+;@ and falls into ReturnToWorld.
+;@ test: skip calls scene code
+SceneReturnToWorld::
+;> Call_6750()                           # (the scene sprites)
+	call $6750
+;> ReturnToWorld()                       # falls through into it
 
-Jump_01_55FD::
+;@ def ReturnToWorld()
+;@ path: world/load
+;@ Last step of the map screen and the menus: fades out; when done, restores the music volume and
+;@ goes back to game mode $0B at step 2 (reload the room's tiles; tile set 6 indoors, 7 outside), with
+;@ the room transition state cleared and the window reset.
+;@ test: skip calls the fade code
+ReturnToWorld::
+;> FadePalettesToWhite()
 	call FadePalettesToWhite
+;> if wTransitionSequenceCounter != 4:
 	ld a, [wTransitionSequenceCounter]
 	cp $04
-	jr nz, jr_001_5655
-
+;>     return
+	jr nz, ResetWindow.done
+;> mem[0xC50A] = 0
 	xor a
 	ld [$c50a], a
+;> wRoomEntitySetupDone = 0
 	ld [wRoomEntitySetupDone], a
+;> hBaseScrollX = 0
 	ldh [hBaseScrollX], a
+;> hBaseScrollY = 0
 	ldh [hBaseScrollY], a
+;> wLinkFrozen = 0
 	ld [wLinkFrozen], a
+;> hVolumeRight = 7                      # full volume again
 	ld a, $07
 	ldh [hVolumeRight], a
+;> hVolumeLeft = 0x70
 	ld a, $70
 	ldh [hVolumeLeft], a
+;> wGameplayType = 0x0B
 	ld a, $0b
 	ld [wGameplayType], a
+;> hSkipMusicSelection = 0x0B
 	ldh [hSkipMusicSelection], a
+;> wGameplaySubtype = 2
 	ld a, $02
 	ld [wGameplaySubtype], a
+;>@t wTileMapToLoad = 6 if wIsIndoor else 7
 	ld a, [wIsIndoor]
 	and a
 	ld a, $06
-	jr nz, jr_001_5633
-
+	jr nz, .store
 	ld a, $07
-
-jr_001_5633:
+.store
+;=@t
 	ld [wTileMapToLoad], a
+;> ClearRoomTransitionState()            # falls through into it
 
-Call_01_5636::
+;@ def ClearRoomTransitionState()
+;@ path: world/load
+;@ Clears the 12 bytes of room transition state from wRoomTransitionState on, then resets the window
+;@ (falls into ResetWindow).
+ClearRoomTransitionState::
+;>@f fill(wRoomTransitionState, 0, 12)
 	ld hl, wRoomTransitionState
 	ld e, $00
-
-jr_001_563b:
+.clear
 	xor a
 	ld [hli], a
 	inc e
+;=@f
 	ld a, e
 	cp $0c
-	jr nz, jr_001_563b
+	jr nz, .clear
+;> ResetWindow()                         # falls through into it
 
-Call_01_5643::
+;@ def ResetWindow()
+;@ path: world/load
+;@ Puts the window (the status bar) back to its normal place: below the screen at the top ($80) and
+;@ x 6; also sets $C150 to 8 and stops the inventory slide.
+ResetWindow::
+;> wWindowY = 0x80
 	ld a, $80
 	ld [wWindowY], a
+;> rWX = 6
 	ld a, $06
 	ldh [rWX], a
+;> mem[0xC150] = 8
 	ld a, $08
-	ld [$c150], a
+	ld [wInventorySlideSpeed], a
+;> wInventoryAppearing = 0
 	xor a
 	ld [wInventoryAppearing], a
-
-jr_001_5655:
+.done
 	ret
 
 
-Call_01_5656::
-	ld hl, $c09c
-	ld a, [$db54]
+;@ def DrawWorldMapLinkMarker()
+;@ path: menu/worldmap
+;@ Puts the marker of Link's position (tile $3E, OAM entry 39) on his overworld room's square of the
+;@ map (8 pixels per room); it blinks by switching palettes every 8 frames.
+DrawWorldMapLinkMarker::
+;> wOAMBuffer[156] = ((wOverworldRoom >> 1) & 0x78) + 0x18      # y: row * 8
+	ld hl, wOAMBuffer + 156
+	ld a, [wOverworldRoom]
 	rra
 	and $78
 	add $18
 	ld [hli], a
-	ld a, [$db54]
+;>@x wOAMBuffer[157] = ((swap(wOverworldRoom) >> 1) & 0x78) + 0x18     # x: column * 8
+	ld a, [wOverworldRoom]
 	swap a
 	rra
 	and $78
 	add $18
 	ld [hli], a
+;> wOAMBuffer[158] = 0x3E
 	ld [hl], $3e
 	inc hl
+;> wOAMBuffer[159] = (hFrameCounter << 1) & 0x10
 	ldh a, [hFrameCounter]
 	rla
 	and $10
@@ -4285,20 +4568,35 @@ Call_01_5656::
 	ret
 
 
+;@ path: menu/worldmap
+;@ Dialogue shown for each area of the island when the cursor is not on a nameable place: 64 bytes,
+;@ one per area of 2 x 2 rooms (index = (room row / 2) * 8 + room column / 2), each a dialogue number
+;@ (low byte; $62-$7B) for OpenDialog.
+WorldMapRegionTexts::
 	db $6c, $6c, $6c, $6b, $6c, $6c, $6c, $6c, $76, $76, $79, $79, $79, $79, $79, $79
 	db $6a, $6a, $72, $7a, $78, $78, $71, $71, $6a, $6a, $72, $70, $78, $78, $71, $71
 	db $6a, $6e, $69, $69, $69, $69, $77, $71, $6e, $6e, $69, $69, $69, $69, $77, $77
 	db $7b, $7b, $6d, $62, $74, $74, $6f, $68, $73, $73, $73, $74, $74, $74, $75, $68
+;@ path: menu/worldmap
+;@ Dialogue number (low byte, for OpenDialog) of each place of the map, indexed by the place number of
+;@ WorldMapRoomPlaces ($00-$4F, one byte each; 0 = none).
+WorldMapPlaceTexts::
 	db $00, $d9, $c0, $c1, $c2, $c3, $c4, $c5, $c6, $c7, $c8, $c9, $ca, $cb, $cc, $cd
 	db $00, $56, $57, $58, $59, $5a, $5b, $5c, $5d, $00, $00, $00, $00, $00, $00, $00
 	db $00, $7c, $67, $00, $00, $80, $65, $00, $64, $88, $00, $00, $00, $00, $00, $00
 	db $00, $5e, $5f, $7f, $7e, $7d, $82, $84, $85, $86, $87, $81, $66, $83, $5e, $63
 	db $00, $61, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+
+;@ path: menu/worldmap
+;@ The place shown on the map for each of the 256 overworld rooms (16 x 16, index = room number; one
+;@ byte, 0 = no place). Bits 0-3 with bits 4-6 form the place number (index into WorldMapPlaceTexts);
+;@ bits 4-6 + 1 give the kind of marker drawn on the map (WorldMapMarkerIcons 1-5 for $0x-$4x);
+;@ places $01-$0F (kind 1) are shown and named only once the room has been visited (or always when
+;@ the map is opened from the library book).
+WorldMapRoomPlaces::
 	db $00, $00, $00, $00, $00, $00, $3e, $00, $0e, $00, $39, $00, $00, $00, $17, $00
 	db $18, $3d, $00, $00, $00, $00, $06, $0c, $00, $00, $00, $00, $00, $00, $00, $00
 	db $00, $00, $00, $00, $12, $00, $00, $00, $07, $00
-
-Call_01_5731::
 	db $00, $14, $00, $00, $00, $00, $33, $3d, $00, $00, $00, $00, $05, $00, $00, $00
 	db $00, $00, $00, $00, $00, $29, $00, $03, $00, $00, $00, $25, $00, $00, $00, $00
 	db $00, $3d, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
@@ -4314,238 +4612,296 @@ Call_01_5731::
 	db $00, $00, $00, $00, $08, $00, $00, $00, $01, $00, $00, $00, $3f, $00, $00, $00
 	db $00, $00, $00, $00, $00, $00
 
-Call_01_5807::
+;@ def ShowCurrentPlaceName()
+;@ path: menu/worldmap
+;@ Opens the dialogue naming the place of the current room (WorldMapRoomPlaces / WorldMapPlaceTexts).
+;@ test: skip opens a dialogue
+ShowCurrentPlaceName::
+;>@p return OpenDialog(WorldMapPlaceTexts[WorldMapRoomPlaces[hMapRoom]])
 	ldh a, [hMapRoom]
 	ld e, a
 	ld d, $00
-	ld hl, $5707
+	ld hl, WorldMapRoomPlaces
 	add hl, de
 	ld e, [hl]
-	ld hl, $56b7
+;=@p
+	ld hl, WorldMapPlaceTexts
 	add hl, de
 	ld a, [hl]
 	jp OpenDialog
 
 
-	db $00, $01, $ff, $00, $f0, $10
+;@ path: menu/worldmap
+;@ Map cursor step for the Right / Left keys, indexed by hJoypad & 3 (one signed byte: none, +1, -1;
+;@ the column wraps around within the row).
+WorldMapCursorDX::
+	db $00, $01, $ff
 
-Call_01_581F::
-	ld a, [$dbb4]
+;@ path: menu/worldmap
+;@ Map cursor step for the Up / Down keys, indexed by (hJoypad >> 2) & 3 (one byte added to the room:
+;@ none, -$10 one row up, +$10 one row down).
+WorldMapCursorDY::
+	db $00, $f0, $10
+
+;@ def WorldMapMoveCursor()
+;@ path: menu/worldmap
+;@ Moves the map cursor one room with the D-pad (a held direction repeats; left / right wrap within the
+;@ row). A room never visited stops it with an error sound, unless the map came from the library book
+;@ or the debug toggle is on. Entering a room with a place starts its marker popup, leaving one makes
+;@ the marker disappear. Not while a marker animates or a dialogue is open. Then draws the cursor
+;@ frame (OAM entries 32-33) with four blinking arrows around it (entries 34-37).
+;@ test: skip plays sounds and draws sprites
+WorldMapMoveCursor::
+;> old = wWorldMapCursor
+	ld a, [wWorldMapCursor]
 	ldh [hMultiPurpose0], a
-	ld a, [$c1b3]
-	ld hl, $c1b2
+;> if not (wWorldMapMarkerHideTimer or wWorldMapMarkerAppearTimer or wDialogState):
+	ld a, [wWorldMapMarkerHideTimer]
+	ld hl, wWorldMapMarkerAppearTimer
 	or [hl]
 	ld hl, wDialogState
 	or [hl]
-	jp nz, Jump_001_58ed
-
+	jp nz, .draw
+;>@k0     keys = hJoypadPressed
+;>     if not hJoypadHeld & 0x0F:
 	ldh a, [hJoypadHeld]
 	ld c, a
 	ld hl, wDpadRepeatCounter
 	and $0f
-	jr nz, jr_001_5840
-
+	jr nz, .held
+;>         wDpadRepeatCounter = 0
 	xor a
 	ld [hl], a
-	jr jr_001_584b
-
-jr_001_5840:
+	jr .pressed
+;>     else:
+.held
+;>         wDpadRepeatCounter += 1
 	ld a, [hl]
 	inc a
 	ld [hl], a
+;>         if wDpadRepeatCounter == 0x18:
 	cp $18
-	jr nz, jr_001_584b
-
+	jr nz, .pressed
+;>             wDpadRepeatCounter = 0x15
 	ld [hl], $15
-	jr jr_001_584e
-
-jr_001_584b:
+;>             keys = hJoypadHeld         # repeat the held direction (still in c)
+	jr .move
+.pressed
+;=@k0
 	ldh a, [hJoypadPressed]
 	ld c, a
-
-jr_001_584e:
+.move
+;>@x     wWorldMapCursor = wWorldMapCursor & 0xF0 | (wWorldMapCursor + WorldMapCursorDX[keys & 3]) & 0x0F
 	ld a, c
 	and $03
 	ld e, a
 	ld d, $00
-	ld hl, $5819
+	ld hl, WorldMapCursorDX
 	add hl, de
-	ld a, [$dbb4]
+;=@x
+	ld a, [wWorldMapCursor]
 	ld d, a
 	and $f0
 	ld e, a
 	ld a, d
 	add [hl]
+;=@x
 	and $0f
 	or e
-	ld [$dbb4], a
+	ld [wWorldMapCursor], a
+;>@y     wWorldMapCursor = u8(wWorldMapCursor + WorldMapCursorDY[(keys >> 2) & 3])
 	ld a, c
 	rra
 	rra
 	and $03
 	ld e, a
 	ld d, $00
-	ld hl, $581c
+;=@y
+	ld hl, WorldMapCursorDY
 	add hl, de
-	ld a, [$dbb4]
+	ld a, [wWorldMapCursor]
 	add [hl]
 	ld hl, hMultiPurpose0
-	ld [$dbb4], a
+	ld [wWorldMapCursor], a
+;>     if wWorldMapCursor != old:
 	cp [hl]
-	jr z, jr_001_58ed
-
+	jr z, .draw
+;>@v         if not wMapScreenFromBook and wRoomStatus[wWorldMapCursor] == 0 and not wDebugToggle:
 	ld e, a
 	ld d, $00
 	ld hl, wRoomStatus
 	add hl, de
 	ld a, [wMapScreenFromBook]
 	and a
-	jr nz, jr_001_58a3
-
+;=@v
+	jr nz, .visited
 	ld a, [hl]
 	and $ff
-	jr nz, jr_001_58a3
-
+	jr nz, .visited
 	ld a, [wDebugToggle]
 	and a
-	jr nz, jr_001_58a3
-
+;=@v
+	jr nz, .visited
+;>             hJingle = 0x09            # error sound
 	ld a, $09
 	ldh [hJingle], a
+;>             wWorldMapCursor = old
 	ldh a, [hMultiPurpose0]
-	ld [$dbb4], a
-	jr jr_001_58ed
-
-jr_001_58a3:
+	ld [wWorldMapCursor], a
+	jr .draw
+;>         else:
+.visited
+;>             PlayCursorSound()
 	call PlayCursorSound
-	ld hl, $5707
+;>@p             place = WorldMapRoomPlaces[wWorldMapCursor]
+	ld hl, WorldMapRoomPlaces
 	add hl, de
 	ld a, [hl]
+;>             kind = ((place >> 4) & 7) + 1 if place else 0
 	and a
-	jr z, jr_001_58de
-
+	jr z, .noPlace
 	swap a
 	and $07
 	inc a
 	ld c, a
+;>@k             if kind > 1 or (kind == 1 and not wMapScreenFromBook and wRoomStatus[wWorldMapCursor] & 0x20):
 	cp $01
-	jr nz, jr_001_58c7
-
+	jr nz, .place
 	ld a, [wMapScreenFromBook]
 	and a
-	jr nz, jr_001_58de
-
+	jr nz, .noPlace
 	ld hl, wRoomStatus
+;=@k
 	add hl, de
 	ld a, [hl]
 	and $20
-	jr z, jr_001_58de
-
-jr_001_58c7:
-	ld a, [$c1b1]
+	jr z, .noPlace
+.place
+;>                 if wWorldMapMarkerType == 0:
+	ld a, [wWorldMapMarkerType]
 	and a
-	jr nz, jr_001_58d2
-
+	jr nz, .setType
+;>                     wWorldMapMarkerAppearTimer = 0x10
 	ld a, $10
-	ld [$c1b2], a
-
-jr_001_58d2:
+	ld [wWorldMapMarkerAppearTimer], a
+.setType
+;>                 wWorldMapMarkerType = kind
 	ld a, c
-	ld [$c1b1], a
-	ld a, [$dbb4]
-	ld [$c1b4], a
-	jr jr_001_58ed
-
-jr_001_58de:
-	ld a, [$c1b1]
+	ld [wWorldMapMarkerType], a
+;>                 wWorldMapMarkerRoom = wWorldMapCursor
+	ld a, [wWorldMapCursor]
+	ld [wWorldMapMarkerRoom], a
+	jr .draw
+;>             elif wWorldMapMarkerType:
+.noPlace
+	ld a, [wWorldMapMarkerType]
 	and a
-	jr z, jr_001_58ed
-
+	jr z, .draw
+;>                 wWorldMapMarkerType = 0
 	xor a
-	ld [$c1b1], a
+	ld [wWorldMapMarkerType], a
+;>                 wWorldMapMarkerHideTimer = 0x10
 	ld a, $10
-	ld [$c1b3], a
-
-Jump_001_58ed:
-jr_001_58ed:
-	ld hl, $c080
-	ld a, [$dbb4]
+	ld [wWorldMapMarkerHideTimer], a
+.draw
+;>@yy y = ((wWorldMapCursor >> 1) & 0x78) + 0x14
+	ld hl, wOAMBuffer + 128
+	ld a, [wWorldMapCursor]
 	rra
 	and $78
 	add $14
 	ld e, a
-	ld a, [$dbb4]
+;>@xx x = ((swap(wWorldMapCursor) >> 1) & 0x78) + 0x14
+	ld a, [wWorldMapCursor]
 	swap a
 	rra
 	and $78
 	add $14
 	ld d, a
+;>@f1 wOAMBuffer[128:132] = [y, x, 0xF0, 0x00]          # the cursor frame, left half
 	ld a, e
 	ld [hli], a
 	ld a, d
 	ld [hli], a
 	ld [hl], $f0
 	inc hl
+;=@f1
 	ld [hl], $00
 	inc hl
+;>@f2 wOAMBuffer[132:136] = [y, x + 8, 0xF0, 0x20]      # right half, mirrored
 	ld a, e
 	ld [hli], a
 	ld a, d
 	add $08
 	ld [hli], a
 	ld [hl], $f0
+;=@f2
 	inc hl
 	ld [hl], $20
+;> if not hFrameCounter & 0x10:           # the arrows blink
 	ldh a, [hFrameCounter]
 	and $10
-	jr nz, jr_001_595a
-
-	ld hl, $c088
+	jr nz, .done
+;>@a1     wOAMBuffer[136:140] = [y + 4, x - 10, 0xF6, 0x00]    # left arrow
+	ld hl, wOAMBuffer + 136
 	ld a, e
 	add $04
 	ld [hli], a
 	ld a, d
 	add $f6
+;=@a1
 	ld [hli], a
 	ld a, $f6
 	ld [hli], a
 	ld a, $00
 	ld [hli], a
+;>@a2     wOAMBuffer[140:144] = [y + 4, x + 0x13, 0xF6, 0x20]  # right arrow
 	ld a, e
 	add $04
 	ld [hli], a
 	ld a, d
 	add $13
 	ld [hli], a
+;=@a2
 	ld a, $f6
 	ld [hli], a
 	ld a, $20
 	ld [hli], a
+;>@a3     wOAMBuffer[144:148] = [y - 10, x + 4, 0xF8, 0x00]    # up arrow
 	ld a, e
 	add $f6
 	ld [hli], a
 	ld a, d
 	add $04
 	ld [hli], a
+;=@a3
 	ld a, $f8
 	ld [hli], a
 	ld a, $00
 	ld [hli], a
+;>@a4     wOAMBuffer[148:152] = [y + 0x0B, x + 4, 0xF8, 0x40]  # down arrow (flipped)
 	ld a, e
 	add $0b
 	ld [hli], a
 	ld a, d
 	add $04
 	ld [hli], a
+;=@a4
 	ld a, $f8
 	ld [hli], a
 	ld a, $40
 	ld [hli], a
-
-jr_001_595a:
+.done
 	ret
 
 
+;@ path: menu/worldmap
+;@ The place marker popup of the map screen as it grows: 4 frames (wWorldMapMarkerFrame 0-3, frame 0 =
+;@ full size) of 8 sprites, 32 bytes per frame; each sprite 4 bytes: y offset, x offset (signed, from
+;@ the popup's corner), tile ($F2 corner / $F4 edge), attributes (flips $20 / $40 / $60). Drawn by
+;@ DrawWorldMapPlaceMarkerSprites.
+;@ asset: sprites frames=4 count=8
+WorldMapMarkerFrames::
 	db $f8, $f8, $f2, $00, $f8, $00, $f4, $00, $f8, $08, $f4, $20, $f8, $10, $f2, $20
 	db $08, $f8, $f2, $40, $08, $00, $f4, $40, $08, $08, $f4, $60, $08, $10, $f2, $60
 	db $fa, $fa, $f2, $00, $fa, $02, $f4, $00, $fa, $06, $f4, $20, $fa, $0e, $f2, $20
@@ -4554,420 +4910,584 @@ jr_001_595a:
 	db $04, $fc, $f2, $40, $04, $04, $f4, $40, $04, $04, $f4, $60, $04, $0c, $f2, $60
 	db $fe, $fe, $f2, $00, $fe, $04, $f4, $00, $fe, $04, $f4, $20, $fe, $0a, $f2, $20
 	db $02, $fe, $f2, $40, $02, $04, $f4, $40, $02, $04, $f4, $60, $02, $0a, $f2, $60
+;@ path: menu/worldmap
+;@ The icon inside the map's place marker for each marker kind 1-5 (wWorldMapMarkerType - 1): 5
+;@ records of 4 bytes = tile and attributes of the left sprite, tile and attributes of the right one
+;@ (tiles $20-$2E).
+WorldMapMarkerIcons::
 	db $20, $00, $22, $00, $24, $00, $26, $00, $28, $00, $2a, $00, $2c, $00, $2e, $00
-	db $2c, $00, $2e, $00, $28, $78, $28, $78, $28, $28, $78, $78
+	db $2c, $00, $2e, $00
 
-Call_01_59F7::
+;@ path: menu/worldmap
+;@ Sprite x position of the place marker popup for each screen quarter (index = 2 if the marked room
+;@ is in the lower half + 1 if it is in the left half): the popup goes to the opposite side.
+WorldMapPopupX::
+	db $28, $78, $28, $78
+
+;@ path: menu/worldmap
+;@ Sprite y position of the place marker popup for each screen quarter (see WorldMapPopupX).
+WorldMapPopupY::
+	db $28, $28, $78, $78
+
+;@ def DrawWorldMapPlaceMarker()
+;@ path: menu/worldmap
+;@ Draws the place marker popup, keeping entity slot 0's wEntityPhysicsFlags (borrowed by the sprite
+;@ drawing).
+;@ test: skip draws sprites
+DrawWorldMapPlaceMarker::
+;> saved = wEntityPhysicsFlags[0]
 	ld a, [wEntityPhysicsFlags]
 	push af
-	call Call_01_5A03
+;> DrawWorldMapPlaceMarkerSprites()
+	call DrawWorldMapPlaceMarkerSprites
+;> wEntityPhysicsFlags[0] = saved
 	pop af
 	ld [wEntityPhysicsFlags], a
 	ret
 
 
-Call_01_5A03::
-	ld a, [$c1b3]
+;@ def DrawWorldMapPlaceMarkerSprites()
+;@ path: menu/worldmap
+;@ Animates and draws the place marker popup: while wWorldMapMarkerAppearTimer / HideTimer run, the
+;@ frame (timer / 4) grows or shrinks it; at full size the place's icon is drawn inside (OAM entries
+;@ 12-13). The popup sits in the screen quarter opposite to the marked room.
+;@ test: skip draws sprites through the entity sprite routine
+DrawWorldMapPlaceMarkerSprites::
+;> if wWorldMapMarkerHideTimer:
+	ld a, [wWorldMapMarkerHideTimer]
 	and a
-	jr z, jr_001_5a10
-
+	jr z, .notHiding
+;>     wWorldMapMarkerHideTimer -= 1
 	dec a
-	ld [$c1b3], a
+	ld [wWorldMapMarkerHideTimer], a
+;>     frame = (~wWorldMapMarkerHideTimer >> 2) & 3      # growing smaller
 	cpl
-	jr jr_001_5a1a
-
-jr_001_5a10:
-	ld a, [$c1b2]
+	jr .frame
+;> elif wWorldMapMarkerAppearTimer:
+.notHiding
+	ld a, [wWorldMapMarkerAppearTimer]
 	and a
-	jr z, jr_001_5a20
-
+	jr z, .still
+;>     wWorldMapMarkerAppearTimer -= 1
 	dec a
-	ld [$c1b2], a
-
-jr_001_5a1a:
+	ld [wWorldMapMarkerAppearTimer], a
+;>@fr     frame = (wWorldMapMarkerAppearTimer >> 2) & 3
+.frame
 	rra
 	rra
 	and $03
-	jr jr_001_5a29
-
-jr_001_5a20:
-	ld a, [$c1b1]
+	jr .draw
+;> elif wWorldMapMarkerType == 0:
+.still
+	ld a, [wWorldMapMarkerType]
 	and a
-	jp z, Jump_001_5ac1
-
+;>     return
+	jp z, .done
+;> else:
+;>     frame = 0
 	ld a, $00
-
-jr_001_5a29:
-	ld [$c1b0], a
+.draw
+;> wWorldMapMarkerFrame = frame
+	ld [wWorldMapMarkerFrame], a
+;> hActiveEntitySpriteVariant = frame
 	ldh [hActiveEntitySpriteVariant], a
+;> wOAMNextIndex = 0
 	ld a, $00
 	ld [wOAMNextIndex], a
+;> wEntityPhysicsFlags[0] = 8            # 8 sprites
 	ld a, $08
 	ld [wEntityPhysicsFlags], a
+;> wActiveEntitySlot = 0
 	ld a, $00
 	ld [wActiveEntitySlot], a
+;> hActiveEntityFlipAttribute = 0
 	ldh [hActiveEntityFlipAttribute], a
+;>@q quarter = (2 if wWorldMapMarkerRoom >= 0x70 else 0) + (1 if wWorldMapMarkerRoom & 0x0F < 8 else 0)
 	ld e, $00
-	ld a, [$c1b4]
+	ld a, [wWorldMapMarkerRoom]
 	cp $70
-	jr c, jr_001_5a4a
-
+	jr c, .top
 	ld e, $02
-
-jr_001_5a4a:
+.top
+;=@q
 	and $0f
 	cp $08
-	jr nc, jr_001_5a51
-
+	jr nc, .right
 	inc e
-
-jr_001_5a51:
+.right
+;> hActiveEntityX = WorldMapPopupX[quarter]
 	ld d, $00
-	ld hl, $59ef
+	ld hl, WorldMapPopupX
 	add hl, de
 	ld a, [hl]
 	ldh [hActiveEntityX], a
-	ld hl, $59f3
+;> hActiveEntityDrawY = WorldMapPopupY[quarter]
+	ld hl, WorldMapPopupY
 	add hl, de
 	ld a, [hl]
 	ldh [hActiveEntityDrawY], a
-	ld a, [$c1b0]
+;>@s sprites = WorldMapMarkerFrames + wWorldMapMarkerFrame * 32
+	ld a, [wWorldMapMarkerFrame]
 	rla
 	rla
 	rla
 	rla
 	rla
+;=@s
 	and $e0
 	ld e, a
 	ld d, $00
-	ld hl, $595b
+	ld hl, WorldMapMarkerFrames
 	add hl, de
+;> wOAMNextIndex = 8
 	ld a, $08
 	ld [wOAMNextIndex], a
+;> mem[0xFFF5] = 0
 	xor a
-	ldh [$fff5], a
+	ldh [hActiveEntityTileOffset], a
+;> DrawEntitySprites(sprites, 8)                 # draw 8 sprites at the popup position
 	ld c, $08
-	call Call_3D26
-	ld a, [$c1b0]
+	call DrawEntitySprites
+;> if wWorldMapMarkerFrame != 0 or wWorldMapMarkerType - 1 >= 0x80:
+	ld a, [wWorldMapMarkerFrame]
 	cp $00
-	jr nz, jr_001_5ac1
-
-	ld a, [$c1b1]
+	jr nz, .done
+	ld a, [wWorldMapMarkerType]
 	dec a
 	cp $80
-	jr nc, jr_001_5ac1
-
+;>     return
+	jr nc, .done
+;> hActiveEntitySpriteVariant = wWorldMapMarkerType - 1
 	ldh [hActiveEntitySpriteVariant], a
-	ld de, $c030
+;>@i1 wOAMBuffer[48:52] = [hActiveEntityDrawY, hActiveEntityX] + WorldMapMarkerIcons[4 * hActiveEntitySpriteVariant:][:2]
+	ld de, wOAMBuffer + 48
 	ldh a, [hActiveEntityDrawY]
 	ld [de], a
 	inc de
 	ldh a, [hActiveEntityX]
+;=@i1
 	ld [de], a
 	inc de
 	ldh a, [hActiveEntitySpriteVariant]
 	ld c, a
 	ld b, $00
 	sla c
+;=@i1
 	rl b
 	sla c
 	rl b
-	ld hl, $59db
+	ld hl, WorldMapMarkerIcons
 	add hl, bc
 	ld a, [hli]
+;=@i1
 	ld [de], a
 	inc de
 	ld a, [hli]
 	ld [de], a
 	inc de
+;>@i2 wOAMBuffer[52:56] = [hActiveEntityDrawY, hActiveEntityX + 8] + WorldMapMarkerIcons[4 * hActiveEntitySpriteVariant + 2:][:2]
 	ldh a, [hActiveEntityDrawY]
 	ld [de], a
 	inc de
 	ldh a, [hActiveEntityX]
 	add $08
 	ld [de], a
+;=@i2
 	inc de
 	ld a, [hli]
 	ld [de], a
 	inc de
 	ld a, [hl]
 	ld [de], a
-
-Jump_001_5ac1:
-jr_001_5ac1:
+;> return
+.done
 	ret
 
 
+;@ path: menu/fileselect
+;@ Background draw commands for the hearts of each file in the file menus: 3 records of 21 bytes (one
+;@ per file): two commands of 10 bytes = VRAM address (high, low), $06 (7 tiles across), seven blank
+;@ tiles ($7E) for the two rows of up to 7 hearts ($98CB/$98EB, $992B/$994B, $998B/$99AB), then the
+;@ end byte 0. DrawFileHearts copies one and fills in the hearts.
+FileHeartsTemplates::
 	db $98, $cb, $06, $7e, $7e, $7e, $7e, $7e, $7e, $7e, $98, $eb, $06, $7e, $7e, $7e
 	db $7e, $7e, $7e, $7e, $00, $99, $2b, $06, $7e, $7e, $7e, $7e, $7e, $7e, $7e, $99
 	db $4b, $06, $7e, $7e, $7e, $7e, $7e, $7e, $7e, $00, $99, $8b, $06, $7e, $7e, $7e
 	db $7e, $7e, $7e, $7e, $99, $ab, $06, $7e, $7e, $7e, $7e, $7e, $7e, $7e, $00
 
-DrawFileHearts:
+;@ def DrawFileHearts()
+;@ path: menu/fileselect
+;@ Appends the heart rows of file hMultiPurpose4 (0-2) to the draw queue: one heart tile ($AE) per
+;@ heart container (hMultiPurpose3), 7 per row; full, partly full and empty hearts all use the same
+;@ tile here. hMultiPurpose2 is the file's health in eighths of a heart.
+;@ test: skip queues draw commands
+DrawFileHearts::
+;>@c cmd = wDrawCommand + wDrawCommandsSize
 	ld a, [wDrawCommandsSize]
 	ld e, a
 	ld d, $00
+;> wDrawCommandsSize += 0x14
 	add $14
 	ld [wDrawCommandsSize], a
+;=@c
 	ld hl, wDrawCommand
 	add hl, de
 	push de
-	ld bc, $5ac2
+;>@t copy(cmd, FileHeartsTemplates + 21 * hMultiPurpose4, 21)
+	ld bc, FileHeartsTemplates
 	ldh a, [hMultiPurpose4]
 	and a
-	jr z, jr_001_5b23
-
-	ld bc, $5ad7
+	jr z, .copy
+	ld bc, FileHeartsTemplates + 21
 	cp $01
-	jr z, jr_001_5b23
-
-	ld bc, $5aec
-
-jr_001_5b23:
+;=@t
+	jr z, .copy
+	ld bc, FileHeartsTemplates + 42
+.copy
 	ld e, $15
-
-jr_001_5b25:
+.copyLoop
 	ld a, [bc]
 	inc bc
+;=@t
 	ld [hli], a
 	dec e
-	jr nz, jr_001_5b25
-
+	jr nz, .copyLoop
+;> out = cmd + 3                         # the first tile of the first row
 	pop de
-	ld hl, $d604
+	ld hl, wDrawCommand + 3
 	add hl, de
+;> n = 0
 	ld c, $00
+;> health = hMultiPurpose2
 	ldh a, [hMultiPurpose2]
 	and a
-	jr z, jr_001_5b59
-
+	jr z, .rest
+;>@h while True:                         # the full hearts
 	ldh [hMultiPurpose0], a
-
-jr_001_5b39:
+.full
+;>     health -= 8
 	ldh a, [hMultiPurpose0]
 	sub $08
 	ldh [hMultiPurpose0], a
-	jr c, jr_001_5b50
-
+;>     if health < 0:
+;>@b         break
+	jr c, .partial
+;>@w     mem[out] = 0xAE; out += 1; n += 1
 	ld a, $ae
 	ld [hli], a
 	inc c
+;>@w2     if n == 7: out += 3                # skip to the second row's tiles
 	ld a, c
 	cp $07
-	jr nz, jr_001_5b4e
-
+	jr nz, .next
 	ld a, l
 	add $03
 	ld l, a
-
-jr_001_5b4e:
-	jr jr_001_5b39
-
-jr_001_5b50:
+.next
+;=@h
+	jr .full
+.partial
+;> if health + 8:                        # a partly full heart
 	add $08
-	jr z, jr_001_5b59
-
+	jr z, .rest
+;>@pp     mem[out] = 0xAE; out += 1
 	ld a, $ae
 	ld [hli], a
-	jr jr_001_5b61
-
-jr_001_5b59:
+	jr .count
+.rest
+;>@e while n != hMultiPurpose3:           # the remaining (empty) hearts
 	ldh a, [hMultiPurpose3]
 	cp c
-	jr z, jr_001_5b6d
-
+	jr z, .done
+;>     mem[out] = 0xAE; out += 1
 	ld a, $ae
 	ld [hli], a
-
-jr_001_5b61:
+.count
+;>     n += 1
 	inc c
+;>     if n == 7: out += 3
 	ld a, c
 	cp $07
-	jr nz, jr_001_5b6b
-
+	jr nz, .loop
 	ld a, l
 	add $03
 	ld l, a
-
-jr_001_5b6b:
-	jr jr_001_5b59
-
-jr_001_5b6d:
+.loop
+;=@e
+	jr .rest
+.done
 	ret
 
 
+;@ def UpdateSaveFilesExist()
+;@ path: menu/fileselect
+;@ Sets wSaveFilesExist: bit i for each file i whose name has a non-zero character.
 UpdateSaveFilesExist::
+;> wSaveFilesExist = 0
 	xor a
 	ld de, wSaveFilesExist
 	ld [de], a
+;>@l for c in range(15):                    # the 3 names, 5 characters each
 	ld b, $01
 	ld c, $00
 	ld hl, wSaveSlotNames
-
-jr_001_5b7a:
+.loop
+;>     if wSaveSlotNames[c]:
 	ld a, [hli]
 	and a
-	jr z, jr_001_5b81
-
+	jr z, .next
+;>         wSaveFilesExist |= 1 << (c // 5)
 	ld a, [de]
 	or b
 	ld [de], a
-
-jr_001_5b81:
+.next
+;=@l
 	inc c
 	ld a, c
 	cp $05
-	jr nz, jr_001_5b89
-
+	jr nz, .not5
 	ld b, $02
-
-jr_001_5b89:
+.not5
+;=@l
 	cp $0a
-	jr nz, jr_001_5b8f
-
+	jr nz, .not10
 	ld b, $04
-
-jr_001_5b8f:
+.not10
 	cp $0f
-	jr nz, jr_001_5b7a
-
+	jr nz, .loop
 	ret
 
 
+;@ def SaveGame()
+;@ path: save
+;@ Saves the game: refills an empty health bar, stores the current dungeon's item flags, then copies
+;@ the $380 bytes from wRoomStatus on (rooms, inventory, progress) into the file's slot in battery RAM.
+;@ test: skip writes battery RAM
 SaveGame::
-	db $fa, $5a, $db, $a7, $20, $0e, $fa, $5b, $db, $5f, $16, $00, $21, $1b, $51, $19
-	db $7e, $ea, $5a, $db, $cd, $e2, $27, $fa, $a6, $db, $cb, $27, $5f, $16, $00, $21
-	db $3c, $49, $19, $2a, $66, $6f, $01, $00, $d8, $11, $80, $03, $cd, $b5, $27, $0a
-	db $03, $cd, $b5, $27, $22, $1b, $7b, $b2, $20, $f2, $c9
+;> if wHealth == 0:
+	ld a, [wHealth]
+	and a
+	jr nz, .store
+;>@h     wHealth = DefaultHealthByMaxHearts[wMaxHearts]
+	ld a, [wMaxHearts]
+	ld e, a
+	ld d, $00
+	ld hl, DefaultHealthByMaxHearts
+	add hl, de
+	ld a, [hl]
+;=@h
+	ld [wHealth], a
+.store
+;> SaveDungeonItemFlags()                           # StoreDungeonItemFlags in this bank
+	call SaveDungeonItemFlags
+;>@d dest = SaveSlotDataAddresses[wSaveSlot]
+	ld a, [wSaveSlot]
+	sla a
+	ld e, a
+	ld d, $00
+	ld hl, SaveSlotDataAddresses
+	add hl, de
+;=@d
+	ld a, [hli]
+	ld h, [hl]
+	ld l, a
+;>@c copy(dest, wRoomStatus, 0x380)      # (battery RAM switched on for each byte)
+	ld bc, wRoomStatus
+	ld de, $0380
+.copy
+	call EnableSRAM
+	ld a, [bc]
+	inc bc
+;=@c
+	call EnableSRAM
+	ld [hli], a
+	dec de
+	ld a, e
+	or d
+	jr nz, .copy
+;> return
+	ret
 
-Call_01_5BCF::
+;@ def StoreDungeonItemFlags()
+;@ path: save
+;@ Indoors on maps 0-9, copies the current dungeon's five item flags (wDungeonHasMap ...
+;@ wDungeonSmallKeys) back into wDungeonItemFlags. Keeps bc.
+StoreDungeonItemFlags::
+;>@i if wIsIndoor and hMapId < 0x0A:
 	push bc
 	ld a, [wIsIndoor]
 	and a
-	jr z, jr_001_5bf4
-
+	jr z, .done
 	ldh a, [hMapId]
 	cp $0a
-	jr nc, jr_001_5bf4
-
+;=@i
+	jr nc, .done
+;>@d     copy(wDungeonItemFlags + hMapId * 5, wDungeonHasMap, 5)
 	ld e, a
 	sla a
 	sla a
 	add e
 	ld e, a
 	ld d, $00
+;=@d
 	ld hl, wDungeonItemFlags
 	add hl, de
 	ld de, wDungeonHasMap
 	ld c, $05
-
-jr_001_5bee:
+.copy
 	ld a, [de]
 	inc de
+;=@d
 	ld [hli], a
 	dec c
-	jr nz, jr_001_5bee
-
-jr_001_5bf4:
+	jr nz, .copy
+.done
 	pop bc
 	ret
 
 
-	db $a0, $60, $00, $00, $00, $00, $ff, $00, $00, $00, $00, $00, $80, $80, $00, $00
-	db $00, $ff, $00, $00
+;@ path: world/load
+;@ X shift (low byte) for an entity of the next room while the screen scrolls, indexed by
+;@ wRoomTransitionDirection (0 right, 1 left, 2 up, 3 down, 4 none; one byte each). With
+;@ ScrollShiftXHigh this is a signed 16-bit shift: +160 to the right, -160 to the left.
+ScrollShiftXLow::
+	db $a0, $60, $00, $00, $00
 
-Call_01_5C0A::
+;@ path: world/load
+;@ X shift, high byte (see ScrollShiftXLow).
+ScrollShiftXHigh::
+	db $00, $ff, $00, $00, $00
+
+;@ path: world/load
+;@ Y shift (low byte) for an entity of the next room while the screen scrolls, indexed by
+;@ wRoomTransitionDirection; with ScrollShiftYHigh: -128 upwards, +128 downwards.
+ScrollShiftYLow::
+	db $00, $00, $80, $80, $00
+
+;@ path: world/load
+;@ Y shift, high byte (see ScrollShiftYLow).
+ScrollShiftYHigh::
+	db $00, $00, $ff, $00, $00
+
+;@ def PlaceEntityForRoomScroll(slot: de)
+;@ path: world/load
+;@ For an entity loaded while the screen scrolls into a new room: gives it the next load order number
+;@ (hMultiPurposeD) and moves it by the scroll's width (ScrollShift tables), so that it sits in the
+;@ new room as it scrolls in. Keeps bc.
+;@ test: skip 16-bit position arithmetic through the carry
+PlaceEntityForRoomScroll::
+;> wEntityLoadOrder[slot] = hMultiPurposeD
 	ld hl, wEntityLoadOrder
 	add hl, de
 	ldh a, [hMultiPurposeD]
 	ld [hl], a
+;> hMultiPurposeD += 1
 	inc a
 	ldh [hMultiPurposeD], a
+;> dir = wRoomTransitionDirection
 	push bc
 	ld a, [wRoomTransitionDirection]
 	ld c, a
 	ld b, $00
-	ld hl, $5bf6
+;> hMultiPurpose0 = ScrollShiftXLow[dir]
+	ld hl, ScrollShiftXLow
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose0], a
-	ld hl, $5bfb
+;> hMultiPurpose1 = ScrollShiftXHigh[dir]
+	ld hl, ScrollShiftXHigh
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose1], a
-	ld hl, $5c00
+;> hMultiPurpose2 = ScrollShiftYLow[dir]
+	ld hl, ScrollShiftYLow
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose2], a
-	ld hl, $5c05
+;> hMultiPurpose3 = ScrollShiftYHigh[dir]
+	ld hl, ScrollShiftYHigh
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose3], a
+;>@x x = (wEntityPosXHigh[slot] << 8 | wEntityX[slot]) + (hMultiPurpose1 << 8 | hMultiPurpose0)
 	ld hl, wEntityX
 	add hl, de
 	ldh a, [hMultiPurpose0]
 	add [hl]
 	ld [hl], a
 	rr c
+;=@x
 	ld hl, wEntityPosXHigh
 	add hl, de
 	ldh a, [hMultiPurpose1]
 	rl c
 	adc [hl]
 	ld [hl], a
+;>@y y = (wEntityPosYHigh[slot] << 8 | wEntityY[slot]) + (hMultiPurpose3 << 8 | hMultiPurpose2)
 	ld hl, wEntityY
 	add hl, de
 	ldh a, [hMultiPurpose2]
 	add [hl]
 	ld [hl], a
 	rr c
+;=@y
 	ld hl, wEntityPosYHigh
 	add hl, de
 	ldh a, [hMultiPurpose3]
 	rl c
 	adc [hl]
 	ld [hl], a
+;> return
 	pop bc
 	ret
 
 
-Call_01_5C61::
+;@ def RememberRecentRoom()
+;@ path: world/load
+;@ Keeps the list of the last six rooms entered. When the current room is not in it, it replaces the
+;@ oldest entry, and the room that drops out forgets which of its enemies were defeated (they come
+;@ back the next time).
+RememberRecentRoom::
+;>@s if hMapRoom in wRecentRooms:
 	ld c, $06
 	ldh a, [hMapRoom]
-	ld hl, $ce81
-
-jr_001_5c68:
+	ld hl, wRecentRooms
+.search
 	cp [hl]
-	jr z, jr_001_5c8c
-
+	jr z, .done
+;=@s
 	inc hl
 	dec c
-	jr nz, jr_001_5c68
-
-	ld a, [$ce80]
+	jr nz, .search
+;>     return
+;> wRecentRoomsIndex = (wRecentRoomsIndex + 1) % 6
+	ld a, [wRecentRoomsIndex]
 	inc a
 	cp $06
-	jr nz, jr_001_5c78
-
+	jr nz, .store
 	xor a
-
-jr_001_5c78:
-	ld [$ce80], a
+.store
+	ld [wRecentRoomsIndex], a
+;> old = wRecentRooms[wRecentRoomsIndex]
 	ld e, a
 	ld d, $00
-	ld hl, $ce81
+	ld hl, wRecentRooms
 	add hl, de
 	ld e, [hl]
+;> wRecentRooms[wRecentRoomsIndex] = hMapRoom
 	ldh a, [hMapRoom]
 	ld [hl], a
+;> wRoomDefeatedEntityBits[old] = 0
 	ld hl, wRoomDefeatedEntityBits
 	add hl, de
 	ld [hl], $00
-
-jr_001_5c8c:
+.done
 	ret
 
 
+;@ path: unused
+;@ 99 bytes of $FF that nothing uses (free space).
+UnusedFreeSpace5C8D::
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
@@ -4976,490 +5496,582 @@ jr_001_5c8c:
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff
 
-Call_01_5CF0::
+;@ def DisableSRAMAndClearOAM()
+;@ path: system/memory
+;@ Switches battery RAM off (writes $FF to the MBC's RAM enable register) and hides all 40 sprites of
+;@ the OAM buffer (y = 0).
+;@ test: skip writes the MBC register
+DisableSRAMAndClearOAM::
+;> mem[0x0000] = 0xFF                    # battery RAM off
 	ld hl, $0000
 	ld [hl], $ff
+;>@l for i in range(40):
 	ld b, $28
 	xor a
 	ld hl, wOAMBuffer
-
-jr_001_5cfb:
+.loop
+;>     wOAMBuffer[4 * i] = 0
 	ld [hli], a
 	inc hl
 	inc hl
 	inc hl
+;=@l
 	dec b
-	jr nz, jr_001_5cfb
-
+	jr nz, .loop
 	ret
 
 
-Call_01_5D03::
+;@ def HideSpritesUnderWindow()
+;@ path: gfx/oam
+;@ Hides the sprites that the window would show through: while the inventory slides, every sprite
+;@ below the window's top; while a dialogue box is open, the sprites of OAM entries 9-39 inside the box
+;@ (box at the bottom when wDialogState bit 7 is set: y >= $58; otherwise at the top: y < $3E) - except,
+;@ during dialogue $04F, the sprites with tiles $9A-$9F.
+HideSpritesUnderWindow::
+;> if wInventoryAppearing:
 	ld a, [wInventoryAppearing]
 	and a
-	jr z, jr_001_5d22
-
+	jr z, .dialog
+;>@b     for i in range(40):
 	ld hl, wOAMBuffer
 	ld a, [wWindowY]
 	add $08
 	ld d, a
 	ld e, $28
-
-jr_001_5d14:
+.below
+;>         if wOAMBuffer[4 * i] >= wWindowY + 8:
 	ld a, [hl]
 	cp d
-	jr c, jr_001_5d1a
-
+	jr c, .keep
+;>             wOAMBuffer[4 * i] = 0
 	ld [hl], $00
-
-jr_001_5d1a:
+.keep
+;=@b
 	inc hl
 	inc hl
 	inc hl
 	inc hl
 	dec e
-	jr nz, jr_001_5d14
-
+	jr nz, .below
+;>     return
 	ret
-
-
-jr_001_5d22:
+.dialog
+;> if wWindowY == 0 or wDialogState == 0:
 	ld a, [wWindowY]
 	and a
 	ret z
-
 	ld a, [wDialogState]
 	and a
+;>     return
 	ret z
-
+;> limit = 0x58 if wDialogState & 0x80 else 0x3E
 	ld d, $3e
 	ld a, [wDialogState]
 	and $80
-	jr z, jr_001_5d37
-
+	jr z, .limit
 	ld d, $58
-
-jr_001_5d37:
+.limit
+;>@s for i in range(9, 40):
 	ld e, $1f
-	ld hl, $c024
-
-jr_001_5d3c:
+	ld hl, wOAMBuffer + 36
+.sprite
+;>@in     inside = wOAMBuffer[4 * i] >= limit if wDialogState & 0x80 else wOAMBuffer[4 * i] < limit
 	ld a, [hl]
 	cp d
 	ld a, [wDialogState]
 	bit 7, a
-	jr nz, jr_001_5d46
-
+	jr nz, .compared
 	ccf
-
-jr_001_5d46:
-	jr c, jr_001_5d63
-
+.compared
+;>@h     if inside and not (wDialogIndex == 0x4F and wDialogIndexHigh == 0 and 0x9A <= wOAMBuffer[4 * i + 2] < 0xA0):
+	jr c, .next
 	ld a, [wDialogIndex]
 	cp $4f
-	jr nz, jr_001_5d61
-
+	jr nz, .hide
 	ld a, [wDialogIndexHigh]
 	and a
-	jr nz, jr_001_5d61
-
+;=@h
+	jr nz, .hide
 	inc hl
 	inc hl
 	ld a, [hld]
 	dec hl
 	cp $9a
-	jr c, jr_001_5d61
-
+;=@h
+	jr c, .hide
 	cp $a0
-	jr c, jr_001_5d63
-
-jr_001_5d61:
+	jr c, .next
+.hide
+;>         wOAMBuffer[4 * i] = 0
 	ld [hl], $00
-
-jr_001_5d63:
+.next
+;=@s
 	inc hl
 	inc hl
 	inc hl
 	inc hl
 	dec e
-	jr nz, jr_001_5d3c
-
+	jr nz, .sprite
+;> return
 	ret
 
 
-Call_01_5D6B::
+;@ def SpawnFollowers()
+;@ path: npc/followers
+;@ After entering a room, creates the companions that follow Link next to him: the flying rooster
+;@ (entity $D5), the ghost ($D4), Marin ($C1, SpawnMarinFollower) and BowWow ($6D, SpawnBowWowFollower).
+;@ Not in side views, in the eight dungeons, on maps $13, $14 and $16, or in rooms $FD and $B1.
+;@ test: skip spawns entities
+SpawnFollowers::
+;> if wIsIndoor:
 	ld a, [wIsIndoor]
 	and a
-	jr z, jr_001_5d8b
-
+	jr z, .rooster
+;>@n     if hIsSideScrolling or hMapId in (0x16, 0x14, 0x13) or hMapId < 0x0A or hMapRoom in (0xFD, 0xB1):
 	ldh a, [hIsSideScrolling]
 	and a
 	ret nz
-
 	ldh a, [hMapId]
 	cp $16
 	ret z
-
+;=@n
 	cp $14
 	ret z
-
 	cp $13
 	ret z
-
 	cp $0a
 	ret c
-
+;=@n
 	ldh a, [hMapRoom]
 	cp $fd
 	ret z
-
 	cp $b1
+;>         return
 	ret z
-
-jr_001_5d8b:
+.rooster
+;> if wIsRoosterFollowingLink == 1:
 	ld a, [wIsRoosterFollowingLink]
 	cp $01
-	jr nz, jr_001_5dcc
-
+	jr nz, .ghost
+;>@r1     for slot in reversed(range(16)):  # remove a rooster still there
 	ld e, $0f
 	ld d, $00
-
-jr_001_5d96:
+.removeRooster
+;>@r2         if wEntityType[slot] == 0xD5 and wEntityStatus[slot]:
 	ld hl, wEntityType
 	add hl, de
 	ld a, [hl]
 	cp $d5
-	jr nz, jr_001_5da8
-
+	jr nz, .nextRooster
 	ld hl, wEntityStatus
+;=@r2
 	add hl, de
 	ld a, [hl]
 	and a
-	jr z, jr_001_5da8
-
+	jr z, .nextRooster
+;>             wEntityStatus[slot] = 0
 	ld [hl], d
-
-jr_001_5da8:
+.nextRooster
+;=@r1
 	dec e
 	ld a, e
 	cp $ff
-	jr nz, jr_001_5d96
-
+	jr nz, .removeRooster
+;>     slot = SpawnEntity(0xD5)
 	ld a, $d5
-	call Call_3C01
+	call SpawnEntity
+;>     wEntityX[slot] = hLinkX
 	ldh a, [hLinkX]
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
+;>     wEntityZ[slot] = hLinkPositionZ
 	ldh a, [hLinkPositionZ]
 	ld hl, wEntityZ
 	add hl, de
 	ld [hl], a
+;>@ry     wEntityY[slot] = hLinkY + wLinkSpriteDY
 	ldh a, [hLinkY]
 	ld hl, wLinkSpriteDY
 	add [hl]
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
-
-jr_001_5dcc:
+.ghost
+;> if wIsGhostFollowingLink == 1:
+;>@g1     for slot in reversed(range(16)):  # remove a ghost still there
+;>@g2         if wEntityType[slot] == 0xD4 and wEntityStatus[slot]:
+;>@g3             wEntityStatus[slot] = 0
+;>@g4     slot = SpawnEntity(0xD4)
+;>@g5     wEntityX[slot] = hLinkX
+;>@g6     wEntityY[slot] = hLinkY + wLinkSpriteDY
+;>@g7     wEntityPrivate1[slot] += 1
+;>@g8     hJingle = 0x2D
 	ld a, [wIsGhostFollowingLink]
 	cp $01
-	jr z, jr_001_5dfb
-
+	jr z, .spawnGhost
+;>@e elif wIsGhostFollowingLink == 2 and not wIsIndoor and hMapRoom >= 0x40 and mem[0xDB68] & 2:
 	cp $02
-
-Call_01_5DD5::
-	jr nz, jr_001_5e37
-
+	jr nz, SpawnMarinFollower
 	ld a, [wIsIndoor]
 	and a
-	jr nz, jr_001_5e37
-
+	jr nz, SpawnMarinFollower
+;=@e
 	ldh a, [hMapRoom]
 	cp $40
-	jr c, jr_001_5e37
-
+	jr c, SpawnMarinFollower
 	ld a, [$db68]
 	and $02
-	jr z, jr_001_5e37
-
+	jr z, SpawnMarinFollower
+;>@w     wIsGhostFollowingLink = 0 if wPowerBraceletLevel >= 2 else 1
 	ld a, [wPowerBraceletLevel]
 	cp $02
-	jr c, jr_001_5df4
-
+	jr c, .follow
 	xor a
-	jr jr_001_5df6
-
-jr_001_5df4:
+	jr .setGhost
+.follow
 	ld a, $01
-
-jr_001_5df6:
+.setGhost
+;=@w
 	ld [wIsGhostFollowingLink], a
-	jr jr_001_5e37
-
-jr_001_5dfb:
+;> return SpawnMarinFollower()           # (also after spawning the ghost: falls through)
+	jr SpawnMarinFollower
+.spawnGhost
+;=@g1
 	ld e, $0f
 	ld d, $00
-
-jr_001_5dff:
+.removeGhost
+;=@g2
 	ld hl, wEntityType
 	add hl, de
 	ld a, [hl]
 	cp $d4
-	jr nz, jr_001_5e11
-
+	jr nz, .nextGhost
 	ld hl, wEntityStatus
+;=@g2
 	add hl, de
 	ld a, [hl]
 	and a
-	jr z, jr_001_5e11
-
+	jr z, .nextGhost
+;=@g3
 	ld [hl], d
-
-jr_001_5e11:
+.nextGhost
+;=@g1
 	dec e
 	ld a, e
 	cp $ff
-	jr nz, jr_001_5dff
-
+	jr nz, .removeGhost
+;=@g4
 	ld a, $d4
-	call Call_3C01
+	call SpawnEntity
+;=@g5
 	ldh a, [hLinkX]
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
+;=@g6
 	ldh a, [hLinkY]
 	ld hl, wLinkSpriteDY
 	add [hl]
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
+;=@g7
 	ld hl, wEntityPrivate1
 	add hl, de
 	inc [hl]
+;=@g8
 	ld a, $2d
 	ldh [hJingle], a
 
-jr_001_5e37:
+;@ def SpawnMarinFollower()
+;@ path: npc/followers
+;@ The part of SpawnFollowers for Marin (entity $C1): when she walks with Link, removes an old copy,
+;@ creates her at Link's position with her position trail filled with his, and makes her follow. In
+;@ room $A4 of map $11 Link is held for a moment ($79 frames). After the reunion she starts $20 / $10
+;@ pixels off. Without Marin, goes on with BowWow (SpawnBowWowFollower).
+;@ test: skip spawns entities
+SpawnMarinFollower::
+;> if not wIsMarinFollowingLink:
 	ld a, [wIsMarinFollowingLink]
 	and a
-	jp z, Jump_001_5ed7
-
+;>     return SpawnBowWowFollower()
+	jp z, SpawnBowWowFollower
+;>@m1 for slot in reversed(range(16)):
 	ld e, $0f
 	ld d, $00
-
-jr_001_5e42:
+.remove
+;>@m2     if wEntityType[slot] == 0xC1 and wEntityStatus[slot]:
 	ld hl, wEntityType
 	add hl, de
 	ld a, [hl]
 	cp $c1
-	jr nz, jr_001_5e54
-
+	jr nz, .next
 	ld hl, wEntityStatus
+;=@m2
 	add hl, de
 	ld a, [hl]
 	and a
-	jr z, jr_001_5e54
-
+	jr z, .next
+;>         wEntityStatus[slot] = 0
 	ld [hl], d
-
-jr_001_5e54:
+.next
+;=@m1
 	dec e
 	ld a, e
 	cp $ff
-	jr nz, jr_001_5e42
-
+	jr nz, .remove
+;> slot = SpawnEntity(0xC1)
 	ld a, $c1
-	call Call_3C01
+	call SpawnEntity
+;> wEntityX[slot] = hLinkX
 	ldh a, [hLinkX]
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
+;> FillFollowerTrail_01(wFollowerTrailX, hLinkX)
 	ld hl, wFollowerTrailX
-	call Call_01_5ED0
+	call FillFollowerTrail_01
+;>@y wEntityY[slot] = hLinkY + wLinkSpriteDY
 	ldh a, [hLinkY]
 	ld hl, wLinkSpriteDY
 	add [hl]
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
+;> FillFollowerTrail_01(wFollowerTrailY, wEntityY[slot])
 	ld hl, wFollowerTrailY
-	call Call_01_5ED0
+	call FillFollowerTrail_01
+;> wEntityZ[slot] = hLinkPositionZ
 	ldh a, [hLinkPositionZ]
 	ld hl, wEntityZ
 	add hl, de
 	ld [hl], a
+;> FillFollowerTrail_01(wFollowerTrailZ, hLinkPositionZ)
 	ld hl, wFollowerTrailZ
-	call Call_01_5ED0
+	call FillFollowerTrail_01
+;> wEntityPrivate4[slot] = 1
 	ld hl, wEntityPrivate4
 	add hl, de
 	ld [hl], $01
+;> wEntityTimer1[slot] = 0x0C
 	ld hl, wEntityTimer1
 	add hl, de
 	ld [hl], $0c
+;> if hMapRoom == 0xA4 and hMapId == 0x11:
 	ldh a, [hMapRoom]
 	cp $a4
-	jr nz, jr_001_5eaf
-
+	jr nz, .direction
 	ldh a, [hMapId]
 	cp $11
-	jr nz, jr_001_5eaf
-
+	jr nz, .direction
+;>     hJingle = 0x08
 	ld a, $08
 	ldh [hJingle], a
+;>     wLinkFrozen = 0x08
 	ld [wLinkFrozen], a
+;>     wEntityTimer2[slot] = 0x79
 	ld hl, wEntityTimer2
 	add hl, de
 	ld [hl], $79
-
-jr_001_5eaf:
+.direction
+;> FillFollowerTrail_01(wFollowerTrailDir, hLinkDirection)
 	ldh a, [hLinkDirection]
 	ld hl, wFollowerTrailDir
-	call Call_01_5ED0
+	call FillFollowerTrail_01
+;> if wMarinReunion:
 	ld a, [wMarinReunion]
 	and a
-	jr z, jr_001_5ecf
-
+	jr z, .done
+;>     wEntityX[slot] = hLinkX + 0x20
 	ldh a, [hLinkX]
 	ld hl, wEntityX
 	add hl, de
 	add $20
 	ld [hl], a
+;>     wEntityY[slot] = hLinkY + 0x10
 	ldh a, [hLinkY]
 	ld hl, wEntityY
 	add hl, de
 	add $10
 	ld [hl], a
-
-jr_001_5ecf:
+.done
 	ret
 
 
-Call_01_5ED0::
+;@ def FillFollowerTrail_01(table: hl, value: a)
+;@ path: npc/followers
+;@ Writes `value` into the 16 bytes at `table` (one of the follower trail arrays).
+;@ test: hl = 0xD155; a = rand(0, 255)
+FillFollowerTrail_01::
+;> fill(table, value, 16)
 	ld c, $10
-
-jr_001_5ed2:
+.fill
 	ld [hli], a
 	dec c
-	jr nz, jr_001_5ed2
-
+	jr nz, .fill
 	ret
 
 
-Jump_001_5ed7:
+;@ def SpawnBowWowFollower()
+;@ path: npc/followers
+;@ The part of SpawnFollowers for BowWow (entity $6D): when he follows Link (state 1), removes an old
+;@ copy and creates him at Link's position. Not in room $A7.
+;@ test: skip spawns entities
+SpawnBowWowFollower::
+;> if hMapRoom == 0xA7:
 	ldh a, [hMapRoom]
 	cp $a7
+;>     return
 	ret z
-
+;> if wIsBowWowFollowingLink == 1:
 	ld a, [wIsBowWowFollowingLink]
 	cp $01
-	jr nz, jr_001_5f19
-
+	jr nz, .done
+;>@b1     for slot in reversed(range(16)):
 	ld e, $0f
 	ld d, $00
-
-jr_001_5ee7:
+.remove
+;>@b2         if wEntityType[slot] == 0x6D and wEntityStatus[slot]:
 	ld hl, wEntityType
 	add hl, de
 	ld a, [hl]
 	cp $6d
-	jr nz, jr_001_5ef9
-
+	jr nz, .next
 	ld hl, wEntityStatus
+;=@b2
 	add hl, de
 	ld a, [hl]
 	and a
-	jr z, jr_001_5ef9
-
+	jr z, .next
+;>             wEntityStatus[slot] = 0
 	ld [hl], d
-
-jr_001_5ef9:
+.next
+;=@b1
 	dec e
 	ld a, e
 	cp $ff
-	jr nz, jr_001_5ee7
-
+	jr nz, .remove
+;>     slot = SpawnEntity(0x6D)
 	ld a, $6d
-	call Call_3C01
+	call SpawnEntity
+;>     wEntityX[slot] = hLinkX
 	ldh a, [hLinkX]
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
+;>     wEntityY[slot] = hLinkY
 	ldh a, [hLinkY]
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
+;>     wEntityZ[slot] = hLinkPositionZ
 	ldh a, [hLinkPositionZ]
 	ld hl, wEntityZ
 	add hl, de
 	ld [hl], a
-
-jr_001_5f19:
+.done
 	ret
 
 
-StartIntroMode:
+;@ def StartIntroMode()
+;@ path: title
+;@ Goes back to game mode 0, the intro: stops the sound, blacks out all palettes, resets the scroll
+;@ and the raised blocks, and makes Start ignored for $18 frames.
+;@ test: skip resets the sound engine
+StartIntroMode::
+;> ResetSoundEngine()
 	call ResetSoundEngine
+;> wGameplayType = 0
 	xor a
 	ld [wGameplayType], a
+;> wGameplaySubtype = 0
 	ld [wGameplaySubtype], a
+;> wOBJ0Palette = 0
 	ld [wOBJ0Palette], a
+;> wOBJ1Palette = 0
 	ld [wOBJ1Palette], a
+;> wBGPalette = 0
 	ld [wBGPalette], a
+;> rBGP = 0
 	ldh [rBGP], a
+;> rOBP0 = 0
 	ldh [rOBP0], a
+;> rOBP1 = 0
 	ldh [rOBP1], a
+;> hBaseScrollY = 0
 	ldh [hBaseScrollY], a
+;> hBaseScrollX = 0
 	ldh [hBaseScrollX], a
+;> wRaisedBlocksState = 0
 	ld [wRaisedBlocksState], a
+;> wRaisedBlockStep = 0
 	ld [wRaisedBlockStep], a
+;> hStartButtonDelay = 0x18
 	ld a, $18
 	ldh [hStartButtonDelay], a
 	ret
 
 
-	db $00, $57, $10, $57, $20, $57, $30, $57, $40, $57, $50, $57, $60, $57, $70, $57
-	db $80, $57, $90, $57, $00, $58, $10, $58, $20, $58, $30, $58, $40, $58, $50, $58
+;@ path: text/debug
+;@ Address in bank $0F of the tile of each hex digit 0-F (16 dw: $5700, $5710 ... $5790 for 0-9, $5800
+;@ ... $5850 for A-F), used by DrawDebugDialogIndex.
+HexDigitTileAddresses::
+	dw $5700, $5710, $5720, $5730, $5740, $5750, $5760, $5770
+	dw $5780, $5790, $5800, $5810, $5820, $5830, $5840, $5850
 
-Call_01_5F62::
+;@ def DrawDebugDialogIndex()
+;@ path: text/debug
+;@ Animated-tiles routine of the text debugger room: shows wDebugDialogIndex as two hex digits by
+;@ copying the digits' tiles from bank $0F into background tiles $6C and $6D ($96C0 / $96D0) and
+;@ putting those tiles at $9909-$990A.
+;@ test: skip copies from another bank into VRAM
+DrawDebugDialogIndex::
+;>@l copy_from_bank(0x0F, 0x96D0, HexDigitTileAddresses[wDebugDialogIndex & 0x0F], 0x10)   # low digit
 	ld a, [wDebugDialogIndex]
 	and $0f
 	sla a
 	ld e, a
 	ld d, $00
-	ld hl, $5f42
+	ld hl, HexDigitTileAddresses
+;=@l
 	add hl, de
 	ld a, [hli]
 	ld h, [hl]
 	ld l, a
 	ld de, $96d0
 	ld bc, $0010
+;=@l
 	ld a, $0f
 	call CopyDataFromBank
+;>@h copy_from_bank(0x0F, 0x96C0, HexDigitTileAddresses[wDebugDialogIndex >> 4], 0x10)     # high digit
 	ld a, [wDebugDialogIndex]
 	swap a
 	and $0f
 	sla a
 	ld e, a
 	ld d, $00
-	ld hl, $5f42
+;=@h
+	ld hl, HexDigitTileAddresses
 	add hl, de
 	ld a, [hli]
 	ld h, [hl]
 	ld l, a
 	ld de, $96c0
+;=@h
 	ld bc, $0010
 	ld a, $0f
 	call CopyDataFromBank
+;> mem[0x9909] = 0x6C
 	ld a, $6c
 	ld [$9909], a
+;> mem[0x990A] = 0x6D
 	inc a
 	ld [$990a], a
 	ret
 
 
-Call_01_5FA6::
+ShowDungeonNameText::
 	ld a, [wLinkMotionState]
 	cp $00
 	jr nz, jr_001_5fba
@@ -5476,13 +6088,26 @@ jr_001_5fba:
 	ret
 
 
+GameplayMarinBeachHandler::
 	db $fa, $9f, $c1, $a7, $20, $0a, $fa, $c7, $c3, $a7, $28, $04, $3d, $ea, $c7, $c3
-	db $fa, $c4, $c3, $a7, $28, $04, $3d, $ea, $c4, $c3, $fa, $96, $db, $c7, $f5, $5f
+	db $fa, $c4, $c3, $a7, $28, $04, $3d, $ea, $c4, $c3, $fa, $96, $db, $c7
+
+MarinBeachSteps::
+	db $f5, $5f
 	db $17, $60, $23, $60, $5a, $61, $8d, $61, $a8, $61, $c6, $61, $dd, $61, $ef, $61
-	db $06, $62, $18, $62, $46, $62, $5d, $62, $fd, $55, $3e, $01, $ea, $67, $c1, $cd
+	db $06, $62, $18, $62, $46, $62, $5d, $62, $fd, $55
+
+MarinBeachFadeOut::
+	db $3e, $01, $ea, $67, $c1, $cd
 	db $76, $17, $fa, $6b, $c1, $fe, $04, $20, $12, $cd, $45, $44, $af, $ea, $bf, $c1
-	db $cd, $36, $56, $cd, $75, $62, $3e, $0f, $ea, $fe, $d6, $c9, $3e, $13, $ea, $fe
-	db $d6, $af, $ea, $3f, $c1, $c3, $45, $44, $3e, $13, $ea, $ff, $d6, $3e, $ff, $ea
+	db $cd, $36, $56, $cd, $75, $62, $3e, $0f, $ea, $fe, $d6, $c9
+
+MarinBeachLoadTiles::
+	db $3e, $13, $ea, $fe
+	db $d6, $af, $ea, $3f, $c1, $c3, $45, $44
+
+MarinBeachInit::
+	db $3e, $13, $ea, $ff, $d6, $3e, $ff, $ea
 	db $9a, $db, $af, $e0, $96, $ea, $6b, $c1, $ea, $6c, $c1, $3e, $90, $e0, $97, $3e
 	db $40, $ea, $14, $c1, $3e, $a0, $ea, $66, $d4, $3e, $e0, $ea, $40, $c5, $3e, $00
 	db $ea, $30, $c5, $3e, $01, $ea, $10, $c5, $3e, $0c, $ea, $60, $c5, $3e, $08, $ea
@@ -5499,57 +6124,137 @@ jr_001_5fba:
 	db $3e, $02, $ea, $15, $c5, $3e, $00, $ea, $65, $c5, $3e, $00, $ea, $55, $c5, $3e
 	db $00, $ea, $25, $c5, $3e, $00, $ea, $05, $d2, $3e, $44, $ea, $46, $c5, $3e, $68
 	db $ea, $36, $c5, $3e, $02, $ea, $16, $c5, $3e, $00, $ea, $66, $c5, $3e, $00, $ea
-	db $56, $c5, $3e, $00, $ea, $26, $c5, $3e, $00, $ea, $06, $d2, $c3, $45, $44, $00
-	db $00, $00, $00, $40, $40, $40, $40, $94, $94, $94, $94, $e4, $e4, $e4, $e4, $00
-	db $00, $00, $00, $04, $04, $04, $04, $18, $18, $18, $18, $1c, $1c, $1c, $1c, $f0
+	db $56, $c5, $3e, $00, $ea, $26, $c5, $3e, $00, $ea, $06, $d2, $c3, $45, $44
+
+MarinBeachBGPalettes::
+	db $00
+	db $00, $00, $00, $40, $40, $40, $40, $94, $94, $94, $94, $e4, $e4, $e4, $e4
+
+MarinBeachOBJ0Palettes::
+	db $00
+	db $00, $00, $00, $04, $04, $04, $04, $18, $18, $18, $18, $1c, $1c, $1c, $1c
+
+MarinBeachFadeIn::
+	db $f0
 	db $e7, $e6, $07, $20, $0e, $fa, $c5, $c3, $3c, $ea, $c5, $c3, $fe, $0c, $20, $03
 	db $cd, $45, $44, $f0, $e7, $e6, $03, $5f, $fa, $c5, $c3, $83, $5f, $16, $00, $21
 	db $3a, $61, $19, $7e, $ea, $97, $db, $ea, $99, $db, $21, $4a, $61, $19, $7e, $ea
-	db $98, $db, $f0, $e7, $e6, $03, $20, $11, $f0, $97, $3c, $e0, $97, $fe, $00, $20
-	db $08, $3e, $80, $ea, $c7, $c3, $cd, $45, $44, $cd, $8c, $62, $c9, $cd, $8c, $62
+	db $98, $db
+
+MarinBeachScrollDown::
+	db $f0, $e7, $e6, $03, $20, $11, $f0, $97, $3c, $e0, $97, $fe, $00, $20
+	db $08, $3e, $80, $ea, $c7, $c3, $cd, $45, $44, $cd, $8c, $62, $c9
+
+MarinBeachTalk1::
+	db $cd, $8c, $62
 	db $fa, $9f, $c1, $a7, $20, $0f, $fa, $c7, $c3, $a7, $20, $08, $3e, $d8, $cd, $3c
-	db $65, $cd, $45, $44, $c9, $3e, $02, $ea, $c4, $c3, $c9, $cd, $8c, $62, $fa, $9f
+	db $65, $cd, $45, $44, $c9, $3e, $02, $ea, $c4, $c3, $c9
+
+MarinBeachPause1::
+	db $cd, $8c, $62, $fa, $9f
 	db $c1, $a7, $20, $0d, $3e, $80, $ea, $c4, $c3, $3e, $c0, $ea, $c7, $c3, $cd, $45
-	db $44, $c9, $cd, $8c, $62, $fa, $c7, $c3, $a7, $20, $08, $3e, $d9, $cd, $3c, $65
-	db $c3, $45, $44, $c9, $cd, $8c, $62, $fa, $9f, $c1, $a7, $20, $0d, $3e, $80, $ea
-	db $c4, $c3, $3e, $c0, $ea, $c7, $c3, $cd, $45, $44, $c9, $cd, $8c, $62, $fa, $c7
-	db $c3, $a7, $20, $08, $3e, $da, $cd, $3c, $65, $c3, $45, $44, $c9, $cd, $8c, $62
+	db $44, $c9
+
+MarinBeachTalk2::
+	db $cd, $8c, $62, $fa, $c7, $c3, $a7, $20, $08, $3e, $d9, $cd, $3c, $65
+	db $c3, $45, $44, $c9
+
+MarinBeachPause2::
+	db $cd, $8c, $62, $fa, $9f, $c1, $a7, $20, $0d, $3e, $80, $ea
+	db $c4, $c3, $3e, $c0, $ea, $c7, $c3, $cd, $45, $44, $c9
+
+MarinBeachTalk3::
+	db $cd, $8c, $62, $fa, $c7
+	db $c3, $a7, $20, $08, $3e, $da, $cd, $3c, $65, $c3, $45, $44, $c9
+
+MarinBeachCheckAnswer::
+	db $cd, $8c, $62
 	db $fa, $9f, $c1, $a7, $20, $1f, $fa, $77, $c1, $a7, $20, $09, $3e, $db, $cd, $3c
 	db $65, $cd, $45, $44, $c9, $3e, $de, $cd, $3c, $65, $3e, $05, $ea, $96, $db, $3e
-	db $05, $ea, $c7, $c3, $c9, $3e, $02, $ea, $c4, $c3, $c9, $cd, $8c, $62, $fa, $9f
+	db $05, $ea, $c7, $c3, $c9, $3e, $02, $ea, $c4, $c3, $c9
+
+MarinBeachTalk4::
+	db $cd, $8c, $62, $fa, $9f
 	db $c1, $a7, $20, $0d, $3e, $dc, $cd, $3c, $65, $3e, $30, $ea, $c7, $c3, $cd, $45
-	db $44, $c9, $cd, $8c, $62, $3e, $02, $ea, $c4, $c3, $fa, $c7, $c3, $a7, $c0, $cd
-	db $d2, $27, $cd, $0f, $66, $3e, $01, $ea, $73, $db, $1e, $10, $21, $10, $c5, $af
-	db $22, $1d, $20, $fc, $c9, $40, $00, $40, $20, $46, $00, $48, $00, $42, $00, $44
-	db $00, $cd, $0c, $63, $fa, $14, $c1, $3c, $fe, $a0, $20, $05, $3e, $0f, $e0, $f4
+	db $44, $c9
+
+MarinBeachEnd::
+	db $cd, $8c, $62, $3e, $02, $ea, $c4, $c3, $fa, $c7, $c3, $a7, $c0, $cd
+	db $d2, $27, $cd, $0f, $66, $3e, $01, $ea, $73, $db
+
+ClearSceneObjects::
+	db $1e, $10, $21, $10, $c5, $af
+	db $22, $1d, $20, $fc, $c9
+
+MarinBeachSprites::
+	db $40, $00, $40, $20, $46, $00, $48, $00, $42, $00, $44
+	db $00
+
+UpdateMarinBeach::
+	db $cd, $0c, $63, $fa, $14, $c1, $3c, $fe, $a0, $20, $05, $3e, $0f, $e0, $f4
 	db $af, $ea, $14, $c1, $fa, $66, $d4, $a7, $20, $0e, $3e, $21, $e0, $f2, $cd, $ed
 	db $27, $e6, $7f, $c6, $60, $ea, $66, $d4, $3d, $ea, $66, $d4, $f0, $97, $3d, $fe
 	db $c0, $d8, $11, $80, $62, $fa, $c4, $c3, $a7, $28, $07, $fe, $60, $30, $03, $11
 	db $84, $62, $3e, $7c, $e0, $ec, $3e, $58, $e0, $ee, $21, $30, $c0, $cd, $e9, $62
-	db $3e, $48, $e0, $ee, $11, $88, $62, $21, $38, $c0, $cd, $e9, $62, $c9, $c5, $f0
+	db $3e, $48, $e0, $ee, $11, $88, $62, $21, $38, $c0, $cd, $e9, $62, $c9
+
+DrawSceneSpritePair::
+	db $c5, $f0
 	db $97, $4f, $f0, $ec, $91, $e0, $e8, $22, $f0, $ee, $22, $1a, $13, $22, $1a, $13
 	db $22, $f0, $ec, $91, $22, $f0, $ee, $c6, $08, $22, $1a, $13, $22, $1a, $77, $c1
-	db $c9, $0e, $08, $06, $00, $21, $10, $c5, $09, $7e, $a7, $28, $1c, $f5, $21, $30
+	db $c9
+
+UpdateSceneObjects::
+	db $0e, $08, $06, $00, $21, $10, $c5, $09, $7e, $a7, $28, $1c, $f5, $21, $30
 	db $c5, $09, $7e, $e0, $ee, $21, $40, $c5, $09, $7e, $e0, $ec, $21, $20, $c5, $09
 	db $7e, $a7, $28, $01, $35, $f1, $cd, $3b, $63, $0d, $79, $fe, $ff, $20, $d6, $c9
-	db $3d, $c7, $d1, $63, $5b, $64, $4d, $63, $51, $63, $55, $63, $59, $63, $5d, $63
-	db $61, $63, $50, $00, $50, $20, $52, $00, $52, $20, $54, $00, $54, $20, $56, $00
-	db $56, $20, $58, $00, $58, $20, $5a, $00, $5a, $20, $03, $03, $03, $03, $03, $03
+UpdateSceneObject::
+	db $3d, $c7
+
+SceneObjectHandlers::
+	db $d1, $63, $5b, $64
+
+BeachSeagullFramePointers::
+	db $4d, $63, $51, $63, $55, $63, $59, $63, $5d, $63
+	db $61, $63
+
+BeachSeagullFrames::
+	db $50, $00, $50, $20, $52, $00, $52, $20, $54, $00, $54, $20, $56, $00
+	db $56, $20, $58, $00, $58, $20, $5a, $00, $5a, $20
+
+BeachSeagullFrameSequence::
+	db $03, $03, $03, $03, $03, $03
 	db $03, $03, $03, $03, $04, $05, $00, $01, $02, $03, $04, $05, $00, $01, $02, $03
 	db $04, $05, $00, $01, $02, $03, $04, $05, $00, $01, $02, $03, $04, $05, $00, $01
 	db $02, $03, $04, $05, $00, $01, $02, $03, $03, $03, $03, $03, $03, $03, $03, $03
 	db $03, $03, $03, $03, $03, $03, $03, $03, $03, $03, $04, $05, $00, $01, $02, $03
 	db $04, $05, $00, $01, $02, $03, $04, $05, $00, $01, $02, $03, $04, $05, $00, $01
 	db $02, $03, $04, $05, $00, $01, $02, $03, $04, $05, $00, $01, $02, $03, $04, $05
-	db $00, $01, $02, $03, $04, $05, $21, $20, $c5, $09, $7e, $a7, $c0, $21, $10, $d2
+	db $00, $01, $02, $03, $04, $05
+
+UpdateSeagull::
+	db $21, $20, $c5, $09, $7e, $a7, $c0, $21, $10, $d2
 	db $09, $7e, $3c, $77, $fe, $06, $38, $06, $70, $21, $00, $d2, $09, $34, $21, $00
 	db $d2, $09, $5e, $50, $21, $65, $63, $19, $5e, $cb, $23, $50, $21, $41, $63, $19
 	db $2a, $56, $5f, $d5, $21, $40, $c0, $79, $17, $17, $17, $e6, $78, $5f, $50, $19
 	db $d1, $cd, $e9, $62, $cd, $06, $65, $f0, $e7, $e6, $07, $20, $0a, $21, $60, $c5
 	db $09, $7e, $fe, $fb, $28, $01, $35, $f0, $e8, $fe, $f0, $38, $0d, $21, $60, $c5
-	db $09, $7e, $e6, $80, $c8, $21, $10, $c5, $09, $70, $c9, $3e, $64, $42, $64, $46
-	db $64, $4a, $64, $4c, $00, $4c, $20, $4e, $00, $4e, $20, $5c, $00, $5c, $20, $5e
-	db $00, $5e, $20, $01, $ff, $01, $ff, $fe, $02, $01, $ff, $4c, $52, $58, $5c, $60
+	db $09, $7e, $e6, $80, $c8, $21, $10, $c5, $09, $70, $c9
+
+SeaBirdFramePointers::
+	db $3e, $64, $42, $64, $46
+	db $64, $4a, $64
+
+SeaBirdFrames::
+	db $4c, $00, $4c, $20, $4e, $00, $4e, $20, $5c, $00, $5c, $20, $5e
+	db $00, $5e, $20
+
+SeaBirdRandomSpeeds::
+	db $01, $ff, $01, $ff, $fe, $02, $01, $ff
+
+SeaBirdHomeX::
+	db $4c, $52, $58, $5c, $60
+UpdateSeaBird::
 	db $21, $60, $c5, $09, $7e, $1e, $03, $e6, $80, $28, $10, $21, $00, $d2, $09, $f0
 	db $e7, $e6, $07, $20, $05, $7e, $3c, $e6, $03, $77, $5e, $cb, $23, $50, $21, $36
 	db $64, $19, $2a, $56, $5f, $d5, $21, $40, $c0, $79, $17, $17, $17, $e6, $78, $5f
@@ -5560,59 +6265,136 @@ jr_001_5fba:
 	db $7e, $21, $60, $c5, $09, $77, $21, $90, $c5, $09, $7e, $3c, $77, $fe, $13, $38
 	db $29, $70, $21, $54, $64, $09, $56, $21, $30, $c5, $09, $7e, $92, $1e, $01, $e6
 	db $80, $20, $02, $1e, $ff, $7e, $83, $77, $21, $40, $c5, $09, $7e, $d6, $48, $1e
-	db $01, $e6, $80, $20, $02, $1e, $ff, $7e, $83, $77, $c9, $cd, $13, $65, $c5, $79
-	db $c6, $10, $4f, $cd, $13, $65, $c1, $c9, $21, $50, $c5, $09, $7e, $f5, $cb, $37
+	db $01, $e6, $80, $20, $02, $1e, $ff, $7e, $83, $77, $c9
+
+MoveSceneObject::
+	db $cd, $13, $65, $c5, $79
+	db $c6, $10, $4f, $cd, $13, $65, $c1, $c9
+
+MoveSceneObjectAxis::
+	db $21, $50, $c5, $09, $7e, $f5, $cb, $37
 	db $e6, $f0, $21, $70, $c5, $09, $86, $77, $cb, $12, $21, $30, $c5, $09, $f1, $1e
 	db $00, $cb, $7f, $28, $02, $1e, $f0, $cb, $37, $e6, $0f, $b3, $cb, $1a, $8e, $77
-	db $c9, $5f, $f0, $99, $f5, $3e, $60, $e0, $99, $7b, $cd, $85, $21, $f1, $e0, $99
-	db $c9, $fa, $96, $db, $c7, $64, $65, $91, $65, $ae, $65, $e0, $65, $f6, $65, $fd
-	db $55, $1a, $66, $3e, $66, $7b, $66, $fa, $55, $3e, $01, $ea, $67, $c1, $cd, $76
+	db $c9
+
+OpenBeachDialog::
+	db $5f, $f0, $99, $f5, $3e, $60, $e0, $99, $7b, $cd, $85, $21, $f1, $e0, $99
+	db $c9
+
+GameplayPictureHandler::
+	db $fa, $96, $db, $c7
+
+PictureSteps::
+	db $64, $65, $91, $65, $ae, $65, $e0, $65, $f6, $65, $fd
+	db $55, $1a, $66, $3e, $66, $7b, $66, $fa, $55
+
+PictureFadeOut::
+	db $3e, $01, $ea, $67, $c1, $cd, $76
 	db $17, $fa, $6b, $c1, $fe, $04, $20, $1d, $cd, $36, $56, $f0, $f7, $fe, $06, $28
 	db $08, $3e, $03, $e0, $a9, $3e, $30, $e0, $aa, $cd, $45, $44, $af, $ea, $bf, $c1
-	db $3e, $0f, $ea, $fe, $d6, $c9, $1e, $21, $f0, $f7, $fe, $06, $28, $0a, $f0, $f6
+	db $3e, $0f, $ea, $fe, $d6, $c9
+
+PictureLoadTiles::
+	db $1e, $21, $f0, $f7, $fe, $06, $28, $0a, $f0, $f6
 	db $fe, $dd, $1e, $12, $20, $02, $1e, $20, $7b, $ea, $fe, $d6, $af, $ea, $3f, $c1
-	db $c3, $45, $44, $1e, $24, $f0, $f7, $fe, $06, $28, $0a, $f0, $f6, $fe, $dd, $1e
+	db $c3, $45, $44
+
+PictureInit::
+	db $1e, $24, $f0, $f7, $fe, $06, $28, $0a, $f0, $f6, $fe, $dd, $1e
 	db $12, $20, $02, $1e, $23, $7b, $ea, $ff, $d6, $3e, $ff, $ea, $9a, $db, $af, $e0
 	db $96, $e0, $97, $ea, $6b, $c1, $ea, $6c, $c1, $1e, $08, $21, $10, $d2, $22, $1d
-	db $20, $fc, $c3, $45, $44, $cd, $50, $67, $cd, $c3, $17, $fa, $6b, $c1, $fe, $04
-	db $20, $08, $cd, $45, $44, $3e, $80, $ea, $10, $d2, $c9, $f0, $f7, $fe, $06, $20
+	db $20, $fc, $c3, $45, $44
+
+PictureFadeIn::
+	db $cd, $50, $67, $cd, $c3, $17, $fa, $6b, $c1, $fe, $04
+	db $20, $08, $cd, $45, $44, $3e, $80, $ea, $10, $d2, $c9
+
+PictureWaitButton::
+	db $f0, $f7, $fe, $06, $20
 	db $09, $cd, $50, $67, $3e, $06, $ea, $96, $db, $c9, $f0, $cc, $e6, $b0, $28, $0e
-	db $3e, $13, $e0, $f2, $cd, $45, $44, $af, $ea, $6b, $c1, $ea, $6c, $c1, $c9, $cd
+	db $3e, $13, $e0, $f2, $cd, $45, $44, $af, $ea, $6b, $c1, $ea, $6c, $c1, $c9
+
+TowerShake::
+	db $cd
 	db $50, $67, $fa, $10, $d2, $3d, $ea, $10, $d2, $20, $0b, $ea, $56, $c1, $3e, $20
 	db $ea, $10, $d2, $c3, $45, $44, $1e, $00, $e6, $04, $28, $02, $1e, $fe, $7b, $ea
-	db $56, $c1, $c9, $cd, $50, $67, $cd, $91, $66, $fa, $10, $d2, $3d, $ea, $10, $d2
+	db $56, $c1, $c9
+
+TowerSink::
+	db $cd, $50, $67, $cd, $91, $66, $fa, $10, $d2, $3d, $ea, $10, $d2
 	db $20, $2d, $cd, $d7, $08, $3e, $30, $ea, $10, $d2, $3e, $30, $ea, $14, $d2, $3e
 	db $18, $ea, $15, $d2, $fa, $11, $d2, $c6, $08, $ea, $11, $d2, $fa, $13, $d2, $3c
 	db $ea, $13, $d2, $fe, $04, $20, $08, $3e, $80, $ea, $10, $d2, $cd, $45, $44, $c9
+TowerSettle::
 	db $cd, $50, $67, $cd, $91, $66, $21, $10, $d2, $35, $c0, $cd, $45, $44, $af, $ea
-	db $6b, $c1, $ea, $6c, $c1, $c9, $af, $ea, $56, $c1, $fa, $15, $d2, $a7, $28, $10
+	db $6b, $c1, $ea, $6c, $c1, $c9
+
+UpdateTowerDust::
+	db $af, $ea, $56, $c1, $fa, $15, $d2, $a7, $28, $10
 	db $3d, $ea, $15, $d2, $1e, $fe, $e6, $04, $28, $02, $1e, $00, $7b, $ea, $56, $c1
-	db $c9, $14, $14, $10, $10, $0c, $0c, $00, $00, $cc, $10, $00, $08, $ce, $10, $00
+	db $c9
+
+TowerSpriteCounts::
+	db $14, $14, $10, $10, $0c, $0c
+
+TowerSprites::
+	db $00, $00, $cc, $10, $00, $08, $ce, $10, $00
 	db $10, $dc, $10, $00, $18, $cc, $30, $10, $00, $de, $10, $10, $08, $e0, $10, $10
 	db $10, $e2, $10, $10, $18, $de, $30, $20, $00, $e4, $10, $20, $08, $e6, $10, $20
 	db $10, $e8, $10, $20, $18, $e4, $30, $30, $00, $de, $10, $30, $08, $e0, $10, $30
 	db $10, $e0, $30, $30, $18, $de, $30, $40, $00, $de, $10, $40, $08, $e0, $10, $40
-	db $10, $e0, $30, $40, $18, $de, $30, $48, $08, $f0, $00, $48, $10, $f2, $00, $48
+	db $10, $e0, $30, $40, $18, $de, $30
+
+TowerDustSprites::
+	db $48, $08, $f0, $00, $48, $10, $f2, $00, $48
 	db $18, $f4, $00, $48, $20, $f4, $20, $48, $28, $f2, $20, $48, $30, $f0, $20, $48
 	db $08, $f6, $00, $48, $10, $f8, $00, $48, $18, $fa, $00, $48, $20, $fa, $20, $48
 	db $28, $f8, $20, $48, $30, $f6, $20, $48, $08, $fc, $00, $48, $10, $fe, $00, $48
-	db $18, $ee, $00, $48, $20, $ee, $20, $48, $28, $fe, $20, $48, $30, $fc, $20, $02
-	db $67, $1a, $67, $32, $67, $f0, $f7, $fe, $06, $c0, $af, $e0, $f1, $e0, $ed, $e0
+	db $18, $ee, $00, $48, $20, $ee, $20, $48, $28, $fe, $20, $48, $30, $fc, $20
+
+TowerDustFrames::
+	db $02
+	db $67, $1a, $67, $32, $67
+
+DrawTowerSprites::
+	db $f0, $f7, $fe, $06, $c0, $af, $e0, $f1, $e0, $ed, $e0
 	db $f5, $3e, $38, $e0, $ee, $fa, $56, $c1, $5f, $3e, $20, $93, $e0, $ec, $fa, $14
 	db $d2, $a7, $28, $27, $3d, $ea, $14, $d2, $f0, $e7, $e6, $07, $fa, $12, $d2, $20
 	db $06, $3c, $fe, $03, $20, $01, $af, $ea, $12, $d2, $17, $e6, $06, $5f, $50, $21
 	db $4a, $67, $19, $2a, $66, $6f, $0e, $06, $cd, $20, $3d, $3e, $48, $e0, $ee, $fa
 	db $56, $c1, $5f, $fa, $11, $d2, $c6, $20, $93, $e0, $ec, $fa, $13, $d2, $5f, $16
 	db $00, $21, $ac, $66, $19, $4e, $af, $ea, $c0, $c3, $21, $b2, $66, $cd, $26, $3d
-	db $c9, $fa, $96, $db, $c7, $cc, $67, $f3, $67, $0b, $68, $1d, $68, $36, $68, $fd
-	db $55, $3e, $01, $ea, $67, $c1, $cd, $76, $17, $fa, $6b, $c1, $fe, $04, $20, $17
+	db $c9
+
+GameplayMuralHandler::
+	db $fa, $96, $db, $c7
+
+MuralSteps::
+	db $cc, $67, $f3, $67, $0b, $68, $1d, $68, $36, $68, $fd
+	db $55
+
+MuralFadeOut::
+	db $3e, $01, $ea, $67, $c1, $cd, $76, $17, $fa, $6b, $c1, $fe, $04, $20, $17
 	db $cd, $36, $56, $3e, $03, $e0, $a9, $3e, $30, $e0, $aa, $cd, $45, $44, $af, $ea
-	db $bf, $c1, $3e, $14, $ea, $fe, $d6, $c9, $3e, $15, $ea, $ff, $d6, $3e, $ff, $ea
+	db $bf, $c1, $3e, $14, $ea, $fe, $d6, $c9
+
+MuralLoadScreen::
+	db $3e, $15, $ea, $ff, $d6, $3e, $ff, $ea
 	db $9a, $db, $af, $e0, $96, $e0, $97, $ea, $6b, $c1, $ea, $6c, $c1, $c3, $45, $44
+MuralFadeIn::
 	db $cd, $c3, $17, $fa, $6b, $c1, $fe, $04, $20, $07, $cd, $45, $44, $af, $ea, $c4
-	db $c3, $c9, $fa, $9f, $c1, $a7, $c0, $fa, $c4, $c3, $3c, $ea, $c4, $c3, $ca, $45
-	db $44, $fe, $80, $20, $05, $3e, $e7, $cd, $97, $21, $c9, $f0, $cc, $e6, $b0, $28
-	db $07, $3e, $13, $e0, $f2, $cd, $0f, $66, $c9, $00, $00, $00, $00, $00, $00, $00
+	db $c3, $c9
+
+MuralShowText::
+	db $fa, $9f, $c1, $a7, $c0, $fa, $c4, $c3, $3c, $ea, $c4, $c3, $ca, $45
+	db $44, $fe, $80, $20, $05, $3e, $e7, $cd, $97, $21, $c9
+
+MuralWaitButton::
+	db $f0, $cc, $e6, $b0, $28
+	db $07, $3e, $13, $e0, $f2, $cd, $0f, $66, $c9
+
+IntroWaveTables::
+	db $00, $00, $00, $00, $00, $00, $00
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
@@ -6730,7 +7512,7 @@ Call_01_74F0::
 	ld hl, $7490
 	add hl, de
 	ld c, $06
-	call Call_3D26
+	call DrawEntitySprites
 	ld a, [wOAMNextIndex]
 	add $18
 	ld [wOAMNextIndex], a
@@ -6744,7 +7526,7 @@ Jump_001_7524:
 	xor a
 	ld [wEntityPhysicsFlags], a
 	ld de, $7514
-	call Call_3C3B
+	call DrawEntity16x16
 	ld a, [wOAMNextIndex]
 	add $08
 	ld [wOAMNextIndex], a
@@ -6765,14 +7547,14 @@ Jump_01_7546::
 	rra
 	rra
 	and $01
-	call Call_3B87
+	call SetEntitySpriteVariant
 	ldh a, [hActiveEntityX]
 	cp $48
 	jr nc, jr_001_7561
 
 	call GetEntityTimer
 	ld [hl], $40
-	call Call_3B8D
+	call IncrementEntityState
 
 jr_001_7561:
 	ld hl, wEntityPrivateCounter
@@ -6792,11 +7574,11 @@ jr_001_756f:
 Jump_01_7570::
 	call Call_01_7B09
 	ld a, $01
-	call Call_3B87
+	call SetEntitySpriteVariant
 	call GetEntityTimer
 	jr nz, jr_001_7599
 
-	call Call_3B8D
+	call IncrementEntityState
 	ld a, $07
 	ld [$c281], a
 	ld a, $fe
@@ -6832,7 +7614,7 @@ Jump_01_759B::
 
 	call GetEntityTimer
 	ld [hl], $40
-	jp Call_3B8D
+	jp IncrementEntityState
 
 
 jr_001_75bc:
@@ -6854,7 +7636,7 @@ jr_001_75cc:
 	rra
 	rra
 	and $01
-	call Call_3B87
+	call SetEntitySpriteVariant
 	ret
 
 
@@ -6903,7 +7685,7 @@ jr_001_760a:
 	ldh [rIE], a
 	call GetEntityTimer
 	ld [hl], $e0
-	jp Call_3B8D
+	jp IncrementEntityState
 
 
 jr_001_7621:
@@ -6927,7 +7709,7 @@ jr_001_7631:
 	rra
 	rra
 	and $01
-	call Call_3B87
+	call SetEntitySpriteVariant
 	ret
 
 
@@ -6935,7 +7717,7 @@ jr_001_763d:
 	dec [hl]
 	call Call_01_7B09
 	ld a, $01
-	jp Call_3B87
+	jp SetEntitySpriteVariant
 
 
 Jump_01_7646::
@@ -6945,7 +7727,7 @@ Jump_01_7646::
 	jr nz, jr_001_7681
 
 	ld a, $02
-	call Call_3B87
+	call SetEntitySpriteVariant
 	ld a, $00
 	ld [$c3b1], a
 	call GetEntityTimer
@@ -6974,7 +7756,7 @@ jr_001_765f:
 
 jr_001_7677:
 	ld a, $03
-	call Call_3B87
+	call SetEntitySpriteVariant
 	ld a, $01
 	ld [$c3b1], a
 
@@ -7006,7 +7788,7 @@ jr_001_76ae:
 	xor a
 	ld [wEntityPhysicsFlags], a
 	ld de, $7682
-	call Call_3C3B
+	call DrawEntity16x16
 	ld a, [wOAMNextIndex]
 	add $08
 	ld [wOAMNextIndex], a
@@ -7050,7 +7832,7 @@ Jump_001_770c:
 	xor a
 	ld [wEntityPhysicsFlags], a
 	ld de, $7704
-	call Call_3C3B
+	call DrawEntity16x16
 	ld a, [wOAMNextIndex]
 	add $08
 	ld [wOAMNextIndex], a
@@ -7071,7 +7853,7 @@ Jump_01_772F::
 	jr nz, jr_001_773a
 
 	ld [hl], $90
-	call Call_3B8D
+	call IncrementEntityState
 
 jr_001_773a:
 	ret
@@ -7091,7 +7873,7 @@ jr_001_7747:
 
 
 jr_001_7748:
-	jp Call_3B8D
+	jp IncrementEntityState
 
 
 Jump_01_774B::
@@ -7144,7 +7926,7 @@ jr_001_778f:
 
 
 jr_001_7790:
-	call Call_3B8D
+	call IncrementEntityState
 	call GetEntityTimer
 	ld [hl], $17
 	ld a, $07

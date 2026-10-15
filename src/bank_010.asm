@@ -5,6 +5,10 @@
 
 SECTION "ROM Bank $010", ROMX[$4000], BANK[$10]
 
+;@ path: gfx/tiles/title
+;@ Tiles of the storm at sea of the opening: LoadTileset10 (tile set request $10) copies $4000-$4FFF to $8800. 256 tiles.
+;@ asset: tiles bpp=2 length=$1000
+IntroTiles::
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ef, $ef, $f7, $f7
 	db $ff, $ff, $ff, $ff, $fe, $fe, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $5f, $5f, $ab, $ab, $d5, $d5, $fa, $fa, $ff, $ff
@@ -261,6 +265,10 @@ SECTION "ROM Bank $010", ROMX[$4000], BANK[$10]
 	db $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00
 	db $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
+;@ path: gfx/tiles/title
+;@ Tiles at $5000-$53FF that no whole-set loader copies. 64 tiles.
+;@ asset: tiles bpp=2 length=$400
+Tiles105000::
 	db $ff, $00, $ef, $10, $10, $ef, $80, $7f, $00, $f3, $00, $c0, $f0, $00, $3c, $00
 	db $c0, $3f, $07, $f8, $7f, $80, $fe, $01, $3f, $c0, $0f, $f0, $00, $0f, $1f, $00
 	db $7f, $80, $0e, $f1, $f0, $0f, $03, $fc, $9f, $60, $ff, $00, $1f, $e0, $3e, $01
@@ -325,6 +333,10 @@ SECTION "ROM Bank $010", ROMX[$4000], BANK[$10]
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+;@ path: gfx/tiles/title
+;@ Sprite tiles of the opening: LoadTileset10 copies $5400-$59FF to $8000. 64 tiles.
+;@ asset: tiles bpp=2 length=$400
+IntroSpriteTiles::
 	db $00, $00, $01, $00, $06, $01, $08, $07, $38, $07, $20, $1f, $2e, $11, $1e, $05
 	db $2b, $16, $45, $3b, $82, $7d, $87, $78, $79, $06, $11, $0e, $20, $1f, $3f, $00
 	db $00, $00, $f0, $00, $6e, $f0, $05, $fe, $1d, $e2, $3e, $d0, $f8, $10, $f8, $50
@@ -389,6 +401,10 @@ SECTION "ROM Bank $010", ROMX[$4000], BANK[$10]
 	db $1f, $0f, $0f, $01, $01, $00, $01, $00, $01, $00, $00, $00, $00, $00, $00, $00
 	db $00, $00, $00, $00, $00, $00, $80, $00, $c0, $80, $c0, $80, $c0, $80, $f8, $c0
 	db $fc, $f8, $f8, $c0, $c0, $80, $c0, $80, $c0, $80, $80, $00, $00, $00, $00, $00
+;@ path: gfx/tiles/title
+;@ LoadTileset12 (tile set request $12) copies $5800-$5FFF to $9000 (its first $200 bytes are also the end of IntroSpriteTiles). 128 tiles.
+;@ asset: tiles bpp=2 length=$800
+Tiles105800::
 	db $34, $cb, $60, $9f, $54, $ab, $e0, $1f, $a0, $5f, $c8, $37, $a0, $5f, $50, $af
 	db $41, $82, $04, $c1, $00, $e1, $22, $c0, $00, $f0, $00, $f8, $10, $ec, $86, $79
 	db $02, $fd, $03, $fc, $89, $76, $5e, $a1, $55, $aa, $fa, $05, $ec, $13, $f0, $0f
@@ -517,6 +533,10 @@ SECTION "ROM Bank $010", ROMX[$4000], BANK[$10]
 	db $81, $81, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $80, $ff, $ff
 	db $ff, $ff, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01, $81, $81
 	db $81, $81, $81, $81, $81, $81, $81, $81, $81, $81, $81, $81, $81, $81, $81, $81
+;@ path: gfx/tiles/title
+;@ LoadTileset13 (tile set request $13) copies $6000-$65FF to $9000. 112 tiles.
+;@ asset: tiles bpp=2 length=$700
+Tiles106000::
 	db $ff, $00, $2f, $00, $f0, $00, $c3, $00, $1f, $00, $fc, $00, $0f, $00, $07, $00
 	db $ff, $00, $e0, $00, $3f, $00, $f3, $00, $00, $00, $fe, $00, $07, $00, $fc, $00
 	db $00, $00, $02, $00, $f8, $00, $3f, $00, $00, $00, $80, $00, $04, $00, $01, $00
@@ -629,6 +649,10 @@ SECTION "ROM Bank $010", ROMX[$4000], BANK[$10]
 	db $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $70, $0f, $18, $e0, $0e, $f1
 	db $0f, $ff, $e0, $ff, $00, $ff, $00, $ff, $c7, $38, $38, $c7, $c4, $38, $17, $e0
 	db $e0, $ff, $0f, $ff, $00, $ff, $00, $ff, $c1, $3e, $3c, $c3, $67, $18, $c4, $03
+;@ path: gfx/tiles/title
+;@ LoadTileset13 copies $6700-$6AFF to $8400. 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+Tiles106700::
 	db $03, $00, $04, $03, $39, $07, $40, $3f, $40, $3f, $20, $1f, $30, $0f, $20, $1f
 	db $10, $0f, $20, $1f, $20, $1f, $30, $0f, $1c, $03, $13, $0c, $08, $07, $07, $00
 	db $03, $00, $07, $03, $1b, $04, $3d, $13, $39, $17, $38, $17, $29, $17, $18, $07
@@ -645,6 +669,10 @@ SECTION "ROM Bank $010", ROMX[$4000], BANK[$10]
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	db $00, $00, $00, $00, $01, $00, $03, $01, $07, $02, $0e, $04, $0e, $04, $04, $00
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+;@ path: gfx/tiles/ending
+;@ LoadTileset1B (tile set request $1B, the ending) copies $6800-$6FFF to $8000 (LoadTilesetFromBank). 128 tiles.
+;@ asset: tiles bpp=2 length=$800
+Tiles106800::
 	db $00, $00, $00, $00, $38, $00, $7c, $38, $9e, $7c, $9f, $66, $f7, $03, $07, $03
 	db $02, $01, $01, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	db $38, $00, $7c, $38, $be, $7c, $9e, $7c, $9e, $64, $6f, $06, $07, $03, $07, $03
@@ -773,6 +801,10 @@ SECTION "ROM Bank $010", ROMX[$4000], BANK[$10]
 	db $ff, $08, $14, $eb, $14, $00, $ff, $00, $ff, $00, $01, $00, $c0, $00, $10, $00
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $1c, $00, $ff, $10, $29, $d6
 	db $ff, $20, $51, $ae, $51, $00, $ff, $00, $fc, $00, $f0, $00, $1c, $00, $00, $00
+;@ path: gfx/tiles/title
+;@ LoadTileset14 (tile set request $14) copies $7000-$77FF to $9000. 128 tiles.
+;@ asset: tiles bpp=2 length=$800
+Tiles107000::
 	db $ff, $ff, $f7, $ff, $c0, $f0, $e0, $e0, $cb, $e0, $87, $c0, $8e, $c0, $9f, $c0
 	db $ff, $ff, $af, $ff, $d0, $0e, $3b, $00, $c0, $00, $ff, $00, $f9, $06, $fa, $04
 	db $ff, $ff, $c2, $ff, $25, $50, $01, $20, $4f, $00, $fe, $01, $fb, $04, $ef, $00
@@ -901,6 +933,10 @@ SECTION "ROM Bank $010", ROMX[$4000], BANK[$10]
 	db $00, $b5, $00, $7b, $00, $ff, $00, $ff, $3f, $ff, $01, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $fd, $03, $fd, $03, $f9, $07, $f3, $0f, $07, $fe, $1e, $ff, $ff, $ff, $ff, $ff
+;@ path: gfx/tiles/title
+;@ LoadTileset20 (tile set request $20) copies $7800-$7FFF to $9000. 128 tiles.
+;@ asset: tiles bpp=2 length=$800
+Tiles107800::
 	db $7f, $ff, $ff, $c0, $e0, $80, $c1, $80, $c3, $80, $e7, $80, $cf, $80, $c0, $80
 	db $ff, $ff, $ff, $00, $08, $20, $b0, $00, $e0, $04, $c0, $00, $00, $00, $01, $00
 	db $ff, $ff, $ff, $00, $00, $00, $80, $80, $00, $00, $00, $00, $c0, $00, $80, $00

@@ -424,7 +424,7 @@ jr_014_5267:
 	jr nz, jr_014_528c
 
 	ldh a, [hMapRoom]
-	ld [$db54], a
+	ld [wOverworldRoom], a
 	ldh a, [hMapRoom]
 	cp $f0
 	jr c, jr_014_528c
@@ -458,7 +458,7 @@ jr_014_528c:
 	inc a
 
 jr_014_529e:
-	ld [$c5a9], a
+	ld [wHealthIsFull], a
 	ld a, [wNoiseSfxCycle]
 	inc a
 	cp $1a
@@ -554,7 +554,7 @@ jr_014_52fa:
 	or [hl]
 	jr nz, jr_014_535d
 
-	ld a, [$c3cd]
+	ld a, [wRoomDarkness]
 	ldh [hMultiPurpose0], a
 
 jr_014_535d:
@@ -594,7 +594,7 @@ jr_014_5387:
 Call_14_5388::
 	xor a
 	ldh [$ffbe], a
-	ldh [$fff5], a
+	ldh [hActiveEntityTileOffset], a
 	ld a, [wGameplayType]
 	cp $07
 	jr z, jr_014_53e1
@@ -858,7 +858,7 @@ jr_014_582f:
 	jr z, jr_014_583b
 
 	call Call_14_587E
-	jp Call_3DAF
+	jp ClearEntitySpeed
 
 
 jr_014_583b:
@@ -963,7 +963,7 @@ jr_014_5891:
 
 jr_014_58c8:
 	ld [hl], $05
-	call Call_3B8D
+	call IncrementEntityState
 	ld [hl], $02
 	jr jr_014_58e4
 
@@ -972,7 +972,7 @@ jr_014_58d1:
 	jr nz, jr_014_58de
 
 	ld [hl], $05
-	call Call_3B8D
+	call IncrementEntityState
 	ld [hl], $03
 	jr jr_014_58e4
 
@@ -1126,12 +1126,12 @@ jr_014_599f:
 	db $00, $02, $00, $fe, $00, $00, $00, $00, $00, $00, $00, $00, $00, $02, $00, $fe
 
 Call_14_59B0::
-	ld a, [$c178]
+	ld a, [wDashBumpFrames]
 	and a
 	jr z, jr_014_59ba
 
 	dec a
-	ld [$c178], a
+	ld [wDashBumpFrames], a
 
 jr_014_59ba:
 	ld a, [wBumpShakeTimer]

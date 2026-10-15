@@ -31,7 +31,7 @@ def build(ctx):
     world = _la.World(rom)
     big = [bytearray(16 * 160) for _ in range(16 * 128)]
     marks, cards = [], []
-    rows = []
+    rows, chests = [], []
     for r in range(256):
         world.load(False, 0, r)
         m = world.m
@@ -71,6 +71,14 @@ def build(ctx):
                                      (('north', r - 16), ('south', r + 16), ('west', r - 1), ('east', r + 1))
                                      if 0 <= rr < 256 and (n in ('north', 'south') or rr >> 4 == r >> 4))],
         ]}]
+        found = _la.find_chests(grid)
+        if found:
+            c = _la.chest_content(rom, 'ow', r)
+            sections[0]['fields'].append(['Chest', '{} (content ${:02X}) at {}'.format(
+                _la.chest_content_name(c), c, ', '.join('({}, {})'.format(x, y) for x, y in found))])
+            chests.append([{'asset': 'ow-room-{:02x}'.format(r), 'text': '${:02X}'.format(r)},
+                           ', '.join('({}, {})'.format(x, y) for x, y in found), '${:02X}'.format(c),
+                           _la.chest_content_name(c)])
         if ents:
             sections.append({'title': 'Entities', 'columns': ['x', 'y', 'type'],
                              'rows': [[x * 16, y * 16, names.entity_cell(t)] for x, y, t in ents]})
@@ -103,7 +111,7 @@ def build(ctx):
                        'OverworldEntityPointers as they appear a few frames after entering. Room $00 is the top '
                        'left corner, room $FF the bottom right. The rooms show their first layout, the one of a new '
                        'game; Link is left out. Click a room for its sheet.'],
-                  users=['Call_2ED7', 'Call_09AA', 'OverworldRoomPointers', 'OverworldEntityPointers',
+                  users=['LoadRoom', 'LoadRoomTilesets', 'OverworldRoomPointers', 'OverworldEntityPointers',
                          'OverworldTilesetIds', 'OverworldObjectTiles'])]
     out.append({'name': 'overworld-rooms', 'type': 'table', 'title': 'Overworld rooms', 'unit': 'OverworldRoomPointers',
                 'subtitle': '256 rooms', 'columns': ['room', 'data', 'tile set', 'entity gfx', 'anim', 'floor',
@@ -114,4 +122,11 @@ def build(ctx):
                         'bytes of its data), the number of object entries, its entities '
                         '(OverworldEntityPointers) and its warps (doors and stairs into houses, caves and '
                         'dungeons).']})
+    out.append({'name': 'overworld-chests', 'type': 'table', 'title': 'Chests on the overworld',
+                'subtitle': '{} rooms'.format(len(chests)), 'columns': ['room', 'chest at (x, y)', 'content', 'item'],
+                'rows': chests,
+                'doc': ['The overworld rooms with a closed chest (object $A0) in their built object grid and the '
+                        'chest\'s content: the room\'s byte in the room table of bank $14 at $4500 (see the indoor '
+                        'chests for the codes).'],
+                'users': ['CheckLiftAndRead', 'EntityInit_ChestItem']})
     return out + cards

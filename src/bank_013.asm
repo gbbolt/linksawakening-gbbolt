@@ -5,6 +5,10 @@
 
 SECTION "ROM Bank $013", ROMX[$4000], BANK[$13]
 
+;@ path: gfx/tiles/ending
+;@ Tiles of the ending: LoadTileset15 (tile set request $15) copies $4000-$57FF to $8000; LoadTileset18 copies $4000-$47FF to $8000. 128 tiles.
+;@ asset: tiles bpp=2 length=$800
+EndingTiles4000::
 	db $00, $00, $39, $39, $25, $25, $25, $25, $39, $39, $21, $21, $21, $21, $00, $00
 	db $00, $00, $0c, $0c, $12, $12, $12, $12, $1e, $1e, $12, $12, $d2, $d2, $00, $00
 	db $00, $00, $8b, $8b, $8a, $8a, $53, $53, $22, $22, $22, $22, $23, $23, $00, $00
@@ -133,6 +137,10 @@ SECTION "ROM Bank $013", ROMX[$4000], BANK[$13]
 	db $3e, $19, $7d, $38, $78, $30, $f8, $70, $88, $70, $88, $70, $48, $30, $38, $00
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $fc, $00, $fe, $fc, $02, $fc
 	db $fe, $00, $fc, $00, $00, $00, $c0, $00, $00, $00, $00, $00, $00, $00, $00, $00
+;@ path: gfx/tiles/ending
+;@ LoadTileset17 and LoadTileset19 copy $4800-$4FFF to $8000 (ending scenes). 128 tiles.
+;@ asset: tiles bpp=2 length=$800
+EndingTiles4800::
 	db $ff, $7f, $ff, $77, $ff, $36, $ff, $06, $ff, $04, $ff, $04, $bf, $40, $bf, $40
 	db $ff, $1f, $ff, $b7, $ff, $b3, $ff, $a2, $ff, $22, $ff, $02, $ff, $00, $ff, $00
 	db $09, $07, $08, $07, $0c, $03, $04, $03, $07, $00, $03, $00, $01, $00, $00, $00
@@ -261,6 +269,10 @@ SECTION "ROM Bank $013", ROMX[$4000], BANK[$13]
 	db $f0, $ff, $01, $fe, $1f, $e0, $ff, $00, $ff, $01, $ff, $ff, $ff, $ff, $fc, $fc
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	db $00, $00, $18, $00, $3c, $00, $7e, $00, $ff, $00, $3c, $00, $3c, $00, $00, $00
+;@ path: gfx/tiles/ending
+;@ Part of LoadTileset15's copy ($9000-$97FF). 128 tiles.
+;@ asset: tiles bpp=2 length=$800
+EndingTiles5000::
 	db $ff, $0f, $ff, $0f, $7f, $0f, $7f, $0f, $3f, $30, $1f, $10, $0f, $00, $03, $00
 	db $ff, $0f, $ff, $0f, $fe, $0e, $fe, $0e, $fc, $f0, $f8, $f0, $f0, $f0, $c0, $c0
 	db $03, $03, $0f, $0f, $1f, $1f, $3f, $2f, $7f, $70, $7f, $70, $ff, $f0, $ff, $f0
@@ -389,6 +401,10 @@ SECTION "ROM Bank $013", ROMX[$4000], BANK[$13]
 	db $fc, $1e, $f0, $fc, $9c, $e2, $fc, $fe, $f8, $7c, $80, $f8, $e0, $f0, $00, $e0
 	db $ff, $ff, $ff, $ff, $7f, $ff, $7f, $ff, $1f, $7f, $0f, $3f, $01, $0f, $00, $01
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+;@ path: gfx/tiles/ending
+;@ LoadTileset16, 17 and 18 copy $5800-$67FF to $8800 (ending scenes). 128 tiles.
+;@ asset: tiles bpp=2 length=$800
+EndingTiles5800::
 	db $e0, $e0, $f0, $f0, $78, $f8, $38, $f8, $0f, $ff, $c7, $ff, $47, $ff, $7f, $ff
 	db $00, $00, $00, $00, $00, $00, $00, $00, $e0, $e0, $f8, $f8, $64, $fc, $86, $fe
 	db $ff, $ff, $55, $ff, $a2, $ff, $81, $ff, $08, $bf, $01, $9f, $20, $72, $00, $9c
@@ -517,6 +533,10 @@ SECTION "ROM Bank $013", ROMX[$4000], BANK[$13]
 	db $40, $e8, $40, $e8, $40, $e0, $00, $c2, $00, $c2, $00, $24, $00, $40, $00, $80
 	db $00, $00, $00, $08, $00, $04, $00, $20, $00, $10, $00, $08, $00, $00, $00, $00
 	db $00, $3f, $00, $99, $00, $67, $00, $00, $00, $03, $00, $40, $00, $30, $00, $01
+;@ path: gfx/tiles/ending
+;@ LoadTileset16 copies $6000-$67FF to $8000. 128 tiles.
+;@ asset: tiles bpp=2 length=$800
+EndingTiles6000::
 	db $00, $00, $00, $00, $01, $00, $03, $00, $05, $02, $09, $06, $08, $07, $08, $03
 	db $00, $00, $00, $00, $00, $00, $01, $00, $07, $01, $0e, $06, $bf, $0f, $70, $9f
 	db $07, $00, $18, $00, $20, $00, $fe, $00, $ff, $fe, $0f, $1f, $f7, $ff, $3f, $ff
@@ -645,6 +665,10 @@ SECTION "ROM Bank $013", ROMX[$4000], BANK[$13]
 	db $fc, $00, $ff, $00, $ff, $00, $ff, $00, $fd, $00, $80, $00, $00, $00, $00, $00
 	db $7f, $00, $ff, $00, $ff, $00, $9e, $00, $ff, $00, $0f, $00, $00, $00, $00, $00
 	db $ff, $00, $e7, $00, $ff, $00, $f9, $00, $fc, $00, $f0, $00, $00, $00, $00, $00
+;@ path: gfx/tiles/ending
+;@ LoadTilesetFromBank and LoadTileset1E copy $6800-$6FFF to $9000, LoadTileset21 copies $6800-$6BFF there. 128 tiles.
+;@ asset: tiles bpp=2 length=$800
+EndingTiles6800::
 	db $e0, $ff, $f0, $ff, $7c, $ff, $7f, $ff, $1f, $ff, $7f, $ff, $9c, $ff, $ce, $ff
 	db $00, $ff, $00, $ff, $00, $ff, $c0, $ff, $e0, $ff, $e0, $ff, $e0, $ff, $40, $ff
 	db $00, $ff, $00, $ff, $00, $ff, $01, $ff, $07, $ff, $0f, $ff, $1f, $ff, $1c, $ff
@@ -773,6 +797,10 @@ SECTION "ROM Bank $013", ROMX[$4000], BANK[$13]
 	db $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+;@ path: gfx/tiles/ending
+;@ LoadTilesetFromBank and LoadTileset1E copy $7000-$77FF to $8800. 96 tiles.
+;@ asset: tiles bpp=2 length=$600
+EndingTiles7000::
 	db $e0, $e0, $f0, $f0, $78, $f8, $38, $f8, $0f, $ff, $c7, $ff, $47, $ff, $7f, $ff
 	db $00, $00, $00, $00, $00, $00, $00, $00, $e0, $e0, $f8, $f8, $64, $fc, $86, $fe
 	db $ff, $ff, $55, $ff, $a2, $ff, $81, $ff, $08, $bf, $01, $9f, $20, $72, $00, $9c
@@ -869,6 +897,10 @@ SECTION "ROM Bank $013", ROMX[$4000], BANK[$13]
 	db $4f, $30, $4c, $30, $2a, $14, $39, $06, $69, $16, $81, $7e, $81, $7e, $81, $7c
 	db $07, $00, $78, $07, $80, $7f, $c3, $3c, $ff, $c2, $ff, $fc, $ff, $ff, $f8, $ff
 	db $f0, $af, $f1, $6e, $f6, $68, $f8, $60, $f0, $e0, $e0, $c0, $e0, $80, $80, $00
+;@ path: gfx/tiles/ending
+;@ LoadTileset1F copies $7600-$76FF to $8400. 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+EndingTiles7600::
 	db $7c, $7c, $ff, $ff, $ff, $ff, $ef, $ff, $00, $ff, $00, $ff, $03, $ff, $00, $ff
 	db $e0, $e0, $f0, $f0, $7f, $ff, $7f, $ff, $19, $ff, $7f, $ff, $9f, $ff, $cf, $ff
 	db $00, $00, $00, $00, $00, $00, $c0, $c0, $e0, $e0, $e0, $e0, $f0, $f0, $f0, $f0
@@ -901,6 +933,10 @@ SECTION "ROM Bank $013", ROMX[$4000], BANK[$13]
 	db $40, $e8, $40, $e8, $40, $e0, $00, $c2, $00, $c2, $00, $24, $00, $40, $00, $80
 	db $00, $00, $00, $08, $00, $04, $00, $20, $00, $10, $00, $08, $00, $00, $00, $00
 	db $00, $3f, $00, $99, $00, $67, $00, $00, $00, $03, $00, $40, $00, $30, $00, $01
+;@ path: gfx/tiles/ending
+;@ LoadTileset1A (tile set requests $1A and $1C) copies $7800-$7FFF to $8000. 64 tiles.
+;@ asset: tiles bpp=2 length=$400
+EndingTiles7800::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $01, $00, $02, $01, $07, $00, $0e, $01
 	db $18, $07, $10, $0f, $20, $1f, $20, $1f, $40, $3f, $40, $3f, $80, $7f, $80, $77
 	db $00, $00, $07, $00, $38, $07, $60, $1f, $80, $7f, $70, $8f, $80, $7f, $00, $ff
@@ -965,6 +1001,10 @@ SECTION "ROM Bank $013", ROMX[$4000], BANK[$13]
 	db $7c, $00, $7e, $00, $fe, $00, $ff, $00, $ff, $00, $ff, $00, $07, $00, $01, $00
 	db $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $7f, $00, $7f, $00, $7f
 	db $00, $3f, $00, $3f, $00, $1f, $00, $0f, $00, $07, $80, $03, $c0, $00, $c0, $00
+;@ path: gfx/tiles/ending
+;@ LoadTileset21 copies $7C00-$7FFF to $8C00. 64 tiles.
+;@ asset: tiles bpp=2 length=$400
+EndingTiles7C00::
 	db $80, $00, $80, $00, $40, $80, $40, $80, $20, $c0, $20, $c0, $10, $e0, $10, $e0
 	db $08, $f0, $08, $f0, $04, $f8, $04, $f8, $02, $fc, $02, $fc, $03, $7c, $01, $7e
 	db $c0, $3f, $40, $3c, $81, $78, $83, $70, $87, $60, $87, $61, $86, $43, $4d, $02

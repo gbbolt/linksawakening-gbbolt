@@ -17,8 +17,8 @@ STEPS = {                           # steps of the intro mode (wGameplaySubtype 
     7: 'Beach and mountain',
     8: 'Title screen',
 }
-STILLS = [(3, 400, 'storm', 'The storm'), (4, 60, 'mast', 'Link at the mast'),
-          (7, 80, 'beach', 'The beach'), (7, 1700, 'egg', 'The egg on the mountain')]
+STILLS = [(3, 250, 'storm', 'The storm'), (4, 60, 'mast', 'Link at the mast'),
+          (7, 420, 'beach', 'The beach'), (7, 1700, 'egg', 'The egg on the mountain')]
 
 
 def build(ctx):

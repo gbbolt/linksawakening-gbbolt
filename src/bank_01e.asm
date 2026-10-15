@@ -5,87 +5,164 @@
 
 SECTION "ROM Bank $01e", ROMX[$4000], BANK[$1e]
 
+;@ def MusicEntryPoints_1E()
+;@ path: sound/music/engine
+;@ The bank's three fixed entry points: $4000 InitMusic_1E, $4003 SilenceMusicAndNoise_1E and $4006
+;@ UpdateMusic_1E. UpdateSound calls $4006 once a frame; the other two are not used (bank $1F sets the
+;@ sound hardware up and stops the sound).
+;@ test: skip three separate jump instructions
 MusicEntryPoints_1E::
-	db $c3, $09, $40, $c3, $fa, $4c
-
+;> return InitMusic_1E()                    # $4000
+	jp InitMusic_1E
+;> # $4003: jp SilenceMusicAndNoise_1E; $4006: jp UpdateMusic_1E
+	jp SilenceMusicAndNoise_1E
 	jp UpdateMusic_1E
 
 
+;@ def InitMusic_1E()
+;@ path: sound/music/engine
+;@ Clears the sound RAM $D300-$D3FF and switches the sound hardware on: master volume 7 on both sides,
+;@ every channel to both speakers.
 InitMusic_1E::
-	db $21, $00, $d3, $36, $00, $2c, $20, $fb, $3e, $80, $e0, $26, $3e, $77, $e0, $24
-	db $3e, $ff, $e0, $25, $c9
+;> fill(0xD300, 0, 0x100)                   # all of the sound RAM
+	ld hl, wMusicTranspose
+.clear
+	ld [hl], $00
+	inc l
+	jr nz, .clear
+;> rNR52 = 0x80                              # sound on
+	ld a, $80
+	ldh [rNR52], a
+;> rNR50 = 0x77                              # full volume left and right
+	ld a, $77
+	ldh [rNR50], a
+;> rNR51 = 0xFF                              # all channels on both sides
+	ld a, $ff
+	ldh [rNR51], a
+	ret
 
+;@ def UpdateMusic_1E()
+;@ path: sound/music/engine
+;@ Bank $1E's music engine for one frame (entry $4006, called by UpdateSound after bank $1B's). A request
+;@ in wMusicTrackToPlay is started unless bank $1B has taken it (StartMusicRequest_1E); without a request
+;@ the music's two-step drum moves on. Then the song plays one frame if it is this bank's, and all sound
+;@ requests of the frame are cleared.
+;@ test: skip runs the whole music engine
 UpdateMusic_1E::
+;> request = wMusicTrackToPlay
 	ld hl, wMusicTrackToPlay
 	ld a, [hli]
+;> if request:
 	and a
-	jr nz, jr_01e_4039
+	jr nz, ClearSoundRequests_1E.request
 
+;>     wActiveMusicTrack = request; StartMusicRequest_1E(request)    # (ClearSoundRequests_1E.request)
+;> else:
+;>     UpdateDrumFF_1E()
 	call UpdateDrumFF_1E
 
-jr_01e_4028:
+;> UpdateMusicChannels_1E()
+.play
 	call UpdateMusicChannels_1E
+;> return ClearSoundRequests_1E()               # falls through
 
-ClearSoundRequests_1E:
+;@ def ClearSoundRequests_1E()
+;@ path: sound/music/engine
+;@ The end of every sound engine frame: the music request and the three sound effect requests are done
+;@ (bank $1F has started the effects by now).
+ClearSoundRequests_1E::
+;> wJingleToPlay = 0
 	xor a
 	ld [wJingleToPlay], a
+;> wMusicTrackToPlay = 0
 	ld [wMusicTrackToPlay], a
+;> wWaveSfxToPlay = 0
 	ld [wWaveSfxToPlay], a
+;> wNoiseSfxToPlay = 0
 	ld [wNoiseSfxToPlay], a
 	ret
 
 
-jr_01e_4039:
+;> # (.request: the request branch of UpdateMusic_1E - wActiveMusicTrack = request, StartMusicRequest_1E,
+;> # then on at UpdateMusic_1E.play)
+.request
 	ld [hl], a
 	call StartMusicRequest_1E
-	jr jr_01e_4028
+	jr UpdateMusic_1E.play
 
+;@ def UpdateDrumFF_1E()
+;@ path: sound/music/engine
+;@ The two-step drum that the music's noise channel plays for note $FF (NoiseNote_1E requests it as
+;@ noise effect 1): first NR41-NR44 = $3B, $80, $07, $C0 for 2 frames, then $00, $42, $02, $C0, which
+;@ ends the effect after 4 more frames.
+;@ test: wNoiseSfxToPlay = rng.choice([0, 1, 2]); wActiveNoiseSfx = rng.choice([0, 1, 1, 3]); wNoiseSfxTimer = rand(1, 3)
 UpdateDrumFF_1E::
+;> if wNoiseSfxToPlay == 1:
 	ld de, wNoiseSfxTimer
 	ld hl, wNoiseSfxToPlay
 	ld a, [hli]
 	cp $01
-	jr z, jr_01e_4050
+	jr z, .start
 
+;>@st1     wActiveNoiseSfx = 1
+;>@st2     regs = [0x3B, 0x80, 0x07, 0xC0, 2]           # .hit
+;> elif wActiveNoiseSfx == 1:
 	ld a, [hl]
 	cp $01
-	jr z, jr_01e_405b
+	jr z, .running
 
+;>@dec     wNoiseSfxTimer -= 1
+;>@ret     if wNoiseSfxTimer: return
+;>@clr     wActiveNoiseSfx = 0
+;>@dk     regs = [0x00, 0x42, 0x02, 0xC0, 4]           # .decay
+;> else:
+;>     return
 	ret
 
 
-jr_01e_4050:
+;=@st1
+.start
 	ld a, $01
 	ld [wActiveNoiseSfx], a
-	ld hl, $4068
-	jp Jump_01e_4072
+;=@st2
+	ld hl, .hit
+	jp .write
 
 
-jr_01e_405b:
+;=@dec
+.running
 	ld a, [de]
 	dec a
 	ld [de], a
+;=@ret
 	ret nz
 
+;=@clr
 	xor a
 	ld [wActiveNoiseSfx], a
-	ld hl, $406d
-	jr jr_01e_4072
+;=@dk
+	ld hl, .decay
+	jr .write
 
-	db $3b, $80, $07, $c0, $02, $00, $42, $02, $c0, $04
+.hit
+	db $3b, $80, $07, $c0, $02
+.decay
+	db $00, $42, $02, $c0, $04
 
-Jump_01e_4072:
-jr_01e_4072:
+;> n = 4
+.write
 	ld b, $04
-	ld c, $20
+	ld c, LOW(rNR41)
 
-jr_01e_4076:
+;> for i in range(n): mem[0xFF20 + i] = regs[i]     # NR41-NR44
+.copy
 	ld a, [hli]
 	ldh [c], a
 	inc c
 	dec b
-	jr nz, jr_01e_4076
+	jr nz, .copy
 
+;> wNoiseSfxTimer = regs[4]                  # frames to the next step
 	ld a, [hl]
 	ld [de], a
 	ret
@@ -103,129 +180,192 @@ SongTable_1E::
 	dw Music13, Music14, Music53, Music54, Music55, Music56, Music57, Music58
 	dw Music59, Music5A, Music5B, Music5C, Music5D, Music5E, Music5F, Music60
 
+;@ def GetSongHeader_1E(index: a, table: hl) -> hl
+;@ path: sound/music/engine
+;@ Entry `index` (1-based) of a word table: the song's header address (its high byte is also left in
+;@ a, and e goes up by one).
+;@ test: index = rand(1, 64); table = 0x407F
 GetSongHeader_1E::
+;>@ret return mem16[table + 2 * (index - 1)]
 	inc e
 	dec a
 	sla a
 	ld c, a
 	ld b, $00
 	add hl, bc
+;=@ret
 	ld c, [hl]
 	inc hl
 	ld b, [hl]
+;=@ret
 	ld l, c
 	ld h, b
 	ld a, h
 	ret
 
 
+;@ def LoadWaveRAM_1E(src: hl)
+;@ path: sound/music/engine
+;@ Copies a 16-byte wave pattern into wave RAM ($FF30-$FF3F).
+;@ test: src = rand(0x4000, 0x7FF0)
 LoadWaveRAM_1E::
+;> n = 16
 	push bc
 	ld c, $30
 
-jr_01e_4111:
+;> copy(0xFF30, src, n)
+.copy
 	ld a, [hli]
 	ldh [c], a
 	inc c
 	ld a, c
 	cp $40
-	jr nz, jr_01e_4111
+	jr nz, .copy
 
+;> return
 	pop bc
 	ret
 
 
+;@ def SilenceNoiseSfx_1E()
+;@ path: sound/music/engine
+;@ Ends whatever noise effect plays and silences the noise channel (envelope 0, restarted).
 SilenceNoiseSfx_1E::
+;> wActiveNoiseSfx = 0
 	xor a
 	ld [wActiveNoiseSfx], a
-	ld [$d34f], a
+;> wMusicChannel4[0x0F] = 0                    # the music gets the channel back
+	ld [wMusicChannel4 + $0F], a
+;> wNoiseSfxStep = 0
 	ld [wNoiseSfxStep], a
+;> wNoiseSfxTimer = 0
 	ld [wNoiseSfxTimer], a
+;> wNoiseSfxLocked = 0
 	ld [wNoiseSfxLocked], a
-	ld [$d3a3], a
+;> mem[0xD3A3] = 0
+	ld [wSoundUnusedA3], a
+;> rNR42 = 0x08                              # volume 0
 	ld a, $08
 	ldh [rNR42], a
+;> rNR44 = 0x80                              # restart: silent
 	ld a, $80
 	ldh [rNR44], a
 	ret
 
 
+;@ def StopMusic_1E()
+;@ path: sound/music/engine
+;@ Stops the music (EndMusic_1E). A noise effect that plays on by itself (effects $05, $0C, $1A, $24,
+;@ $2A, $2E and $3F) is left running; any other is silenced first.
+;@ test: skip ends in EndMusic_1E, which resets the whole music state
 StopMusic_1E::
+;>@if if wActiveNoiseSfx not in (0x05, 0x0C, 0x1A, 0x24, 0x2A, 0x2E, 0x3F):
 	ld a, [wActiveNoiseSfx]
 	cp $05
 	jp z, EndMusic_1E
 
+;=@if
 	cp $0c
 	jp z, EndMusic_1E
 
+;=@if
 	cp $1a
 	jp z, EndMusic_1E
 
+;=@if
 	cp $24
 	jp z, EndMusic_1E
 
+;=@if
 	cp $2a
 	jp z, EndMusic_1E
 
+;=@if
 	cp $2e
 	jp z, EndMusic_1E
 
+;=@if
 	cp $3f
 	jp z, EndMusic_1E
 
+;>     SilenceNoiseSfx_1E()
 	call SilenceNoiseSfx_1E
+;> return EndMusic_1E()
 	jp EndMusic_1E
 
 
+;@ def StartMusicRequest_1E(request: a, track: hl)
+;@ path: sound/music/engine
+;@ A music request (track points at wActiveMusicTrack): nothing to do if bank $1B took it
+;@ (wMusicFromBank1B); $FF stops the music. Tracks $11-$30 and $41-$60 are this bank's: they become songs
+;@ 1-64 of SongTable_1E ($11-$30 -> 1-$20, $41-$60 -> $21-$40) and start with their panning; the others
+;@ are bank $1B's. The requests are cleared in every case but a song start.
+;@ test: skip starts a whole song
 StartMusicRequest_1E::
+;> if wMusicFromBank1B: return ClearSoundRequests_1E()    # bank $1B plays it
 	ld b, a
 	ld a, [wMusicFromBank1B]
 	and a
 	jp nz, ClearSoundRequests_1E
 
+;> if request == 0xFF: return StopMusic_1E()
 	ld a, b
 	cp $ff
 	jr z, StopMusic_1E
 
+;> if request < 0x11: return ClearSoundRequests_1E()      # bank $1B's
 	cp $11
-	jr nc, jr_01e_4177
+	jr nc, .high
 
 	jp ClearSoundRequests_1E
 
 
-jr_01e_4177:
+;> if request < 0x21:
+.high
 	cp $21
-	jr nc, jr_01e_417f
+	jr nc, .not11
 
+;>     song = request - 0x10                     # $11-$20 -> 1-$10
 	add $f0
-	jr jr_01e_418e
+	jr .mine
 
-jr_01e_417f:
+;> elif request < 0x31:
+.not11
 	cp $31
-	jr nc, jr_01e_4187
+	jr nc, .not21
 
+;>     song = request - 0x10                     # $21-$30 -> $11-$20
 	add $f0
-	jr jr_01e_418e
+	jr .mine
 
-jr_01e_4187:
+;> elif request < 0x41: return ClearSoundRequests_1E()    # $31-$40: bank $1B's
+.not21
 	cp $41
 	jp c, ClearSoundRequests_1E
 
+;> else:
+;>     song = request - 0x20                     # $41 and up -> $21 and up
 	add $e0
 
-jr_01e_418e:
+;> wMusicTrackToPlay = song
+.mine
 	dec hl
 	ld [hli], a
+;> wActiveMusicTrack = song
 	ld [hld], a
+;> wMusicTrackStartedBefore = wMusicTrackStarted
 	ld a, [wMusicTrackStarted]
 	ld [wMusicTrackStartedBefore], a
+;> wMusicTrackStarted = song                     # (here the bank's own song number)
 	ld a, [hli]
 	ld [wMusicTrackStarted], a
+;> StartSong_1E(GetSongHeader_1E(song & 0x7F, SongTable_1E))
 	ld b, a
-	ld hl, $407f
+	ld hl, SongTable_1E
 	and $7f
 	call GetSongHeader_1E
 	call StartSong_1E
+;> return SetSongPanning_1E()
 	jp SetSongPanning_1E
 
 
@@ -297,1022 +437,1525 @@ SongPanning_1E::
 	db $01, $00, $ff, $ff, $00, $00 ; track $5F
 	db $01, $00, $ff, $ff, $00, $00 ; track $60
 
+;@ def RestoreWaveRAM_1E()
+;@ path: sound/music/engine
+;@ Part of WriteNote_1E for the wave channel: after a wave-channel effect (wWaveRamDirty set) the song's
+;@ wave pattern goes back into wave RAM. Then the note's registers are written (WriteNoteRegisters_1E,
+;@ inside WriteNote_1E).
+;@ test: skip jumps back into the middle of WriteNote_1E
 RestoreWaveRAM_1E::
+;> if wWaveRamDirty:
 	ld a, [wWaveRamDirty]
 	and a
 	jp z, WriteNoteRegisters_1E
 
+;>     rNR30 = 0                              # wave DAC off while wave RAM is written
 	xor a
 	ldh [rNR30], a
+;>     wWaveRamDirty = 0
 	ld [wWaveRamDirty], a
+;>     src = mem16[wMusicChannel3 + 6]        # the song's wave pattern
 	push hl
-	ld a, [$d336]
+	ld a, [wMusicChannel3 + $06]
 	ld l, a
-	ld a, [$d337]
+	ld a, [wMusicChannel3 + $07]
 	ld h, a
 	push bc
+;>     n = 16
 	ld c, $30
 
-jr_01e_4343:
+;>     copy(0xFF30, src, n)
+.copy
 	ld a, [hli]
 	ldh [c], a
 	inc c
 	ld a, c
 	cp $40
-	jr nz, jr_01e_4343
+	jr nz, .copy
 
+;>     rNR30 = 0x80
 	ld a, $80
 	ldh [rNR30], a
 	pop bc
 	pop hl
+;> return                                    # WriteNoteRegisters_1E goes on with the registers
 	jp WriteNoteRegisters_1E
 
 
+;@ def SetSongPanning_1E()
+;@ path: sound/music/engine
+;@ Copies the song's 6 panning bytes from SongPanning_1E into wMusicPanMode..wMusicPanValues (with the
+;@ timer and step at 0) and sets NR51 to the first value.
+;@ test: wActiveMusicTrack = rand(1, 64)
 SetSongPanning_1E::
+;> p = SongPanning_1E
 	ld a, [wActiveMusicTrack]
-	ld hl, $41aa
+	ld hl, SongPanning_1E
 
-jr_01e_435a:
+;> for _ in range(wActiveMusicTrack - 1):
+.find
 	dec a
-	jr z, jr_01e_4365
+	jr z, .found
 
+;>@six     p += 6
 	inc hl
 	inc hl
 	inc hl
+;=@six
 	inc hl
 	inc hl
 	inc hl
-	jr jr_01e_435a
+	jr .find
 
-jr_01e_4365:
+;> wMusicPanMode = mem[p]
+.found
 	ld bc, wMusicPanMode
 	ld a, [hli]
 	ld [bc], a
+;> wMusicPanTimer = 0
 	inc c
 	xor a
 	ld [bc], a
+;> wMusicPanPeriod = mem[p + 1]
 	inc c
 	ld a, [hli]
 	ld [bc], a
+;> wMusicPanStep = 0
 	inc c
 	xor a
 	ld [bc], a
+;> wMusicPanValues[0] = mem[p + 2]
 	inc c
 	ld a, [hli]
 	ld [bc], a
+;> rNR51 = mem[p + 2]
 	ldh [rNR51], a
+;> wMusicPanValues[1] = mem[p + 3]
 	inc c
 	ld a, [hli]
 	ld [bc], a
+;> wMusicPanValues[2] = mem[p + 4]
 	inc c
 	ld a, [hli]
 	ld [bc], a
+;> wMusicPanValues[3] = mem[p + 5]
 	inc c
 	ld a, [hli]
 	ld [bc], a
 	ret
 
 
+;@ def UpdatePanning_1E()
+;@ path: sound/music/engine
+;@ Songs with moving panning (wMusicPanMode other than 1): every wMusicPanPeriod frames NR51 steps on to
+;@ the next of the four wMusicPanValues.
+;@ test: wMusicPanMode = rng.choice([1, 0, 3]); wMusicPanPeriod = rand(1, 4); wMusicPanTimer = rand(0, 3)
 UpdatePanning_1E::
+;> if wMusicPanMode == 1: return
 	ld hl, wMusicPanMode
 	ld a, [hli]
 	cp $01
 	ret z
 
+;> wMusicPanTimer += 1
 	inc [hl]
+;> if wMusicPanTimer != wMusicPanPeriod: return
 	ld a, [hli]
 	cp [hl]
 	ret nz
 
+;> wMusicPanTimer = 0
 	dec l
 	ld [hl], $00
+;> wMusicPanStep += 1
 	inc l
 	inc l
 	inc [hl]
+;>@w rNR51 = wMusicPanValues[wMusicPanStep & 3]
 	ld a, [hli]
 	and $03
 	ld c, l
 	ld b, h
 	and a
-	jr z, jr_01e_43a6
+	jr z, .write
 
+;=@w
 	inc c
 	cp $01
-	jr z, jr_01e_43a6
+	jr z, .write
 
+;=@w
 	inc c
 	cp $02
-	jr z, jr_01e_43a6
+	jr z, .write
 
+;=@w
 	inc c
 
-jr_01e_43a6:
+.write
 	ld a, [bc]
 	ldh [rNR51], a
 	ret
 
 
+;@ def CopyIndirectWord_1E(src: hl, dest: de) -> a
+;@ path: sound/music/engine
+;@ Copies the word that the pointer at src points to into dest (dest stays inside its 256-byte page) and
+;@ returns its high byte.
+;@ test: src = rng.choice([0xD310, 0xD320, 0xD330, 0xD340]); w = rand(0x4000, 0x7F00); mem[src] = w & 0xFF; mem[src + 1] = w >> 8
+;@ test: dest = src + 4
 CopyIndirectWord_1E::
+;> p = mem16[src]
 	ld a, [hli]
 	ld c, a
 	ld a, [hl]
 	ld b, a
+;> mem[dest] = mem[p]
 	ld a, [bc]
 	ld [de], a
+;> mem[(dest & 0xFF00) | lo(dest + 1)] = mem[u16(p + 1)]
 	inc e
 	inc bc
 	ld a, [bc]
 	ld [de], a
+;> return mem[u16(p + 1)]
 	ret
 
 
+;@ def CopyWord_1E(src: hl, dest: de) -> hl
+;@ path: sound/music/engine
+;@ Copies two bytes from src to dest (dest stays inside its page) and returns src moved past them.
+;@ test: src = rand(0x4000, 0x7F00)
+;@ test: dest = rng.choice([0xD301, 0xD310, 0xD320, 0xD330, 0xD340])
 CopyWord_1E::
+;> mem[dest] = mem[src]
 	ld a, [hli]
 	ld [de], a
+;> mem[(dest & 0xFF00) | lo(dest + 1)] = mem[src + 1]
 	inc e
 	ld a, [hli]
 	ld [de], a
+;> return src + 2
 	ret
 
 
+;@ def StartSong_1E(header: hl)
+;@ path: sound/music/engine
+;@ Sets up a song from its 11-byte header: transpose, note length table and the pattern list of each
+;@ channel. Every channel starts at the first pattern of its list with its note timer at 1, so the next
+;@ update plays the first notes. The noise channel is silenced first unless one of the self-running noise
+;@ effects plays (see StopMusic_1E).
+;@ test: t = 0x407F + 2 * rand(0, 63); header = mem[t] | mem[t + 1] << 8
 StartSong_1E::
+;>@if if wActiveNoiseSfx not in (0x05, 0x0C, 0x1A, 0x24, 0x2A, 0x2E, 0x3F):
 	ld a, [wActiveNoiseSfx]
 	cp $05
-	jr z, jr_01e_43dd
+	jr z, .reset
 
+;=@if
 	cp $0c
-	jr z, jr_01e_43dd
+	jr z, .reset
 
+;=@if
 	cp $1a
-	jr z, jr_01e_43dd
+	jr z, .reset
 
+;=@if
 	cp $24
-	jr z, jr_01e_43dd
+	jr z, .reset
 
+;=@if
 	cp $2a
-	jr z, jr_01e_43dd
+	jr z, .reset
 
+;=@if
 	cp $2e
-	jr z, jr_01e_43dd
+	jr z, .reset
 
+;=@if
 	cp $3f
-	jr z, jr_01e_43dd
+	jr z, .reset
 
+;>     SilenceNoiseSfx_1E()
 	call SilenceNoiseSfx_1E
 
-jr_01e_43dd:
+;> ResetMusicState_1E()
+.reset
 	call ResetMusicState_1E
+;> wMusicTranspose = mem[header]
 	ld de, wMusicTranspose
 	ld b, $00
 	ld a, [hli]
 	ld [de], a
+;> wMusicNoteLengths = mem16[header + 1]
 	inc e
 	call CopyWord_1E
+;> mem16[wMusicChannel1] = mem16[header + 3]             # pattern lists
 	ld de, wMusicChannel1
 	call CopyWord_1E
+;> mem16[wMusicChannel2] = mem16[header + 5]
 	ld de, wMusicChannel2
 	call CopyWord_1E
+;> mem16[wMusicChannel3] = mem16[header + 7]
 	ld de, wMusicChannel3
 	call CopyWord_1E
+;> mem16[wMusicChannel4] = mem16[header + 9]
 	ld de, wMusicChannel4
 	call CopyWord_1E
+;> mem16[wMusicChannel1 + 4] = mem16[mem16[wMusicChannel1]]     # pattern pointer: the first pattern
 	ld hl, wMusicChannel1
-	ld de, $d314
+	ld de, wMusicChannel1 + $04
 	call CopyIndirectWord_1E
+;> mem16[wMusicChannel2 + 4] = mem16[mem16[wMusicChannel2]]
 	ld hl, wMusicChannel2
-	ld de, $d324
+	ld de, wMusicChannel2 + $04
 	call CopyIndirectWord_1E
+;> mem16[wMusicChannel3 + 4] = mem16[mem16[wMusicChannel3]]
 	ld hl, wMusicChannel3
-	ld de, $d334
+	ld de, wMusicChannel3 + $04
 	call CopyIndirectWord_1E
+;> mem16[wMusicChannel4 + 4] = mem16[mem16[wMusicChannel4]]
 	ld hl, wMusicChannel4
-	ld de, $d344
+	ld de, wMusicChannel4 + $04
 	call CopyIndirectWord_1E
+;>@timers for ch in [wMusicChannel1, wMusicChannel2, wMusicChannel3, wMusicChannel4]:
 	ld bc, $0410
-	ld hl, $d312
+	ld hl, wMusicChannel1 + $02
 
-jr_01e_442d:
+;>     mem[ch + 2] = 1                                      # note timer
+.timers
 	ld [hl], $01
+;=@timers
 	ld a, c
 	add l
 	ld l, a
 	dec b
-	jr nz, jr_01e_442d
+	jr nz, .timers
 
+;> wMusicChannel1[0x0E] = 0                                 # frames since the note started
 	xor a
-	ld [$d31e], a
-	ld [$d32e], a
-	ld [$d33e], a
+	ld [wMusicChannel1 + $0E], a
+;> wMusicChannel2[0x0E] = 0
+	ld [wMusicChannel2 + $0E], a
+;> wMusicChannel3[0x0E] = 0
+	ld [wMusicChannel3 + $0E], a
 	ret
 
 
-jr_01e_4440:
+;> # (InstrumentLoadWave_1E: the wave branch of InstrumentCommand_1E - unless a wave effect plays, the
+;> # wave pattern goes into wave RAM right away; then back there)
+InstrumentLoadWave_1E:
 	push hl
 	ld a, [wActiveWaveSfx]
 	and a
-	jr nz, jr_01e_444f
+	jr nz, .keep
 
 	xor a
 	ldh [rNR30], a
+;> #
 	ld l, e
 	ld h, d
 	call LoadWaveRAM_1E
 
-jr_01e_444f:
+.keep
 	pop hl
-	jr jr_01e_447c
+	jr InstrumentCommand_1E.next
 
+;@ def InstrumentCommand_1E(ptr: hl)
+;@ path: sound/music/engine
+;@ Pattern command $9D: the next 3 bytes become the channel's instrument (+6..+8). On the square and noise
+;@ channels: envelope (NRx2), release (high nibble: when the release envelope comes - $80 at 1/2 of the
+;@ note, $40 at 1/4, else 3/4; low nibble: which one, ReleaseEnvelopes_1E) and NRx1 duty with the effect
+;@ type in the low nibble (1 vibrato, other values a fixed detune). On the wave channel:
+;@ the address of a wave pattern, loaded into wave RAM right away, and the NR32 output level (bit 7: drop
+;@ to half level 6 frames before the note ends). Then the pattern goes on.
+;@ test: n = rand(1, 4); wMusicChannel = n; ch = 0xD300 + 0x10 * n; ptr = ch + 4
+;@ test: p = rand_ram(8); mem[ptr] = p & 0xFF; mem[ptr + 1] = p >> 8; wActiveWaveSfx = rng.choice([0, 1])
+;@ test: for c in range(ch + 0x10, 0xD350, 0x10): mem[c + 1] = 0
 InstrumentCommand_1E::
+;> AdvancePointer_1E(ptr)
 	call AdvancePointer_1E
+;> b0 = ReadPointer_1E(ptr)
 	call ReadPointer_1E
 	ld e, a
+;> AdvancePointer_1E(ptr)
 	call AdvancePointer_1E
+;> b1 = ReadPointer_1E(ptr)
 	call ReadPointer_1E
 	ld d, a
+;> AdvancePointer_1E(ptr)
 	call AdvancePointer_1E
+;> b2 = ReadPointer_1E(ptr)
 	call ReadPointer_1E
 	ld c, a
+;> mem[ptr + 2] = b0
 	inc l
 	inc l
 	ld [hl], e
+;> mem[ptr + 3] = b1
 	inc l
 	ld [hl], d
+;> mem[ptr + 4] = b2
 	inc l
 	ld [hl], c
 	dec l
 	dec l
 	dec l
 	dec l
+;> if wMusicChannel == 3:
 	push hl
 	ld hl, wMusicChannel
 	ld a, [hl]
 	pop hl
 	cp $03
-	jr z, jr_01e_4440
+	jr z, InstrumentLoadWave_1E
 
-jr_01e_447c:
+;>     if not wActiveWaveSfx: rNR30 = 0; LoadWaveRAM_1E(b0 | b1 << 8)    # (InstrumentLoadWave_1E, after StartSong_1E)
+;> AdvancePointer_1E(ptr)
+.next
 	call AdvancePointer_1E
+;> return ReadPattern_1E(ptr)
 	jp ReadPattern_1E
 
 
+;@ def AdvancePointer_1E(ptr: hl)
+;@ path: sound/music/engine
+;@ Adds 1 to the word at ptr.
+;@ test: ptr = rand_ram(2)
 AdvancePointer_1E::
+;> p = mem16[ptr]
 	push de
 	ld a, [hli]
 	ld e, a
 	ld a, [hld]
 	ld d, a
+;> p = u16(p + 1)
 	inc de
 
-jr_01e_4488:
+;> mem[ptr] = lo(p)
+.store
 	ld a, e
 	ld [hli], a
+;> mem[ptr + 1] = hi(p)
 	ld a, d
 	ld [hld], a
 	pop de
 	ret
 
 
+;@ def AdvancePointer2_1E(ptr: hl)
+;@ path: sound/music/engine
+;@ Adds 2 to the word at ptr.
+;@ test: ptr = rand_ram(2)
 AdvancePointer2_1E::
+;> p = mem16[ptr]
 	push de
 	ld a, [hli]
 	ld e, a
 	ld a, [hld]
 	ld d, a
+;> p = u16(p + 2)
 	inc de
 	inc de
-	jr jr_01e_4488
+;> mem16[ptr] = p                                  # AdvancePointer_1E.store
+	jr AdvancePointer_1E.store
 
+;@ def ReadPointer_1E(ptr: hl) -> a
+;@ path: sound/music/engine
+;@ Reads the byte that the pointer at ptr points to (also left in b).
+;@ test: ptr = rand_ram(2)
 ReadPointer_1E::
+;> p = mem16[ptr]
 	ld a, [hli]
 	ld c, a
 	ld a, [hld]
 	ld b, a
+;> return mem[p]
 	ld a, [bc]
 	ld b, a
 	ret
 
 
-jr_01e_449e:
+;> # (SustainNoteSkip_1E: SustainNote_1E's way out for rests and channels an effect holds)
+SustainNoteSkip_1E:
 	pop hl
-	jr jr_01e_44d2
+	jr SkipChannel_1E
 
+;@ def SustainNote_1E(timer: hl)
+;@ path: sound/music/engine
+;@ A frame in the middle of a note: wave notes whose level byte has bit 7 set drop to half level 6 frames
+;@ before the end; then, unless the note is a rest or an effect holds the channel, the note's effects
+;@ (UpdateNoteEffects_1E) and the release envelopes of the square channels.
+;@ test: n = rand(1, 4); wMusicChannel = n; ch = 0xD300 + 0x10 * n; timer = ch + 2
+;@ test: mem[timer] = rng.choice([6, rand(1, 10)]); mem[ch + 0x0B] = rng.choice([0, 0, 1])
+;@ test: mem[ch + 0x0F] = rng.choice([0, 0, 0x80]); mem[ch + 8] = rand(0, 255)
+;@ test: for c in range(ch + 0x10, 0xD350, 0x10): mem[c + 1] = 0
 SustainNote_1E::
+;> if wMusicChannel == 3:
 	ld a, [wMusicChannel]
 	cp $03
-	jr nz, jr_01e_44b8
+	jr nz, .effects
 
-	ld a, [$d338]
+;>     if wMusicChannel3[8] & 0x80:
+	ld a, [wMusicChannel3 + $08]
 	bit 7, a
-	jr z, jr_01e_44b8
+	jr z, .effects
 
+;>         if mem[timer] == 6:
 	ld a, [hl]
 	cp $06
-	jr nz, jr_01e_44b8
+	jr nz, .effects
 
+;>             rNR32 = 0x40                         # half level
 	ld a, $40
 	ldh [rNR32], a
 
-jr_01e_44b8:
+;> ch = timer - 2
+.effects
 	push hl
+;> if mem[ch + 0x0B] == 0:                          # not a rest
 	ld a, l
 	add $09
 	ld l, a
 	ld a, [hl]
 	and a
-	jr nz, jr_01e_449e
+	jr nz, SustainNoteSkip_1E
 
+;>     if not mem[ch + 0x0F] & 0x80:                # no effect holds the channel
 	ld a, l
 	add $04
 	ld l, a
 	bit 7, [hl]
-	jr nz, jr_01e_449e
+	jr nz, SustainNoteSkip_1E
 
+;>         UpdateNoteEffects_1E(timer)
 	pop hl
 	call UpdateNoteEffects_1E
+;>         UpdateReleaseEnvelopes_1E()
 	push hl
 	call UpdateReleaseEnvelopes_1E
 	pop hl
 
+;> return SkipChannel_1E(timer)                     # falls through (SustainNoteSkip_1E also goes there)
+
+;@ def SkipChannel_1E(timer: hl)
+;@ path: sound/music/engine
+;@ Nothing more to do for this channel this frame.
+;@ test: skip runs the remaining channels
 SkipChannel_1E::
-jr_01e_44d2:
+;> return NextChannel_1E(timer - 2)
 	dec l
 	dec l
 	jp NextChannel_1E
 
 
+;@ def NextPattern_1E(ptr: hl)
+;@ path: sound/music/engine
+;@ Pattern byte $00: on to the next pattern of the channel's list. A list word with high byte $00 ends
+;@ the song: the fanfare track $25 starts hLastMusicTrack again, anything else stops the
+;@ music. A word with high byte $FF is followed by the address where the list goes on (the loop).
+;@ test: skip runs the rest of the music frame
 NextPattern_1E::
+;> ch = ptr - 4
 	dec l
 	dec l
 	dec l
 	dec l
+;> AdvancePointer2_1E(ch)                              # next word of the pattern list
 	call AdvancePointer2_1E
 
-jr_01e_44de:
+;>@loop while True:
+;>     hi_ = CopyIndirectWord_1E(ch, ch + 4)        # pattern pointer = the list word
+.entry
 	ld a, l
 	add $04
 	ld e, a
 	ld d, h
 	call CopyIndirectWord_1E
+;>     if hi_ == 0:                                 # end of the song
 	cp $00
-	jr z, jr_01e_4509
+	jr z, .end
 
+;>@end1         if wMusicTrackStarted == 0x15: return ResumeMusicAfterFanfare_1E()   # track $25 (song $15 here)
+;>@end2         wActiveMusicTrack = 0
+;>@end3         StopMusic_1E()
+;>@end4         return
+;>     if hi_ != 0xFF:
 	cp $ff
-	jr z, jr_01e_44f2
+	jr z, .loop
 
+;>         return NextNote_1E(ch + 2)
 	inc l
 	jp NextNote_1E
 
 
-jr_01e_44f2:
+;>     AdvancePointer2_1E(ch)                       # $FFxx: the list goes on at the next word
+.loop
 	dec l
 	push hl
 	call AdvancePointer2_1E
+;>     lo_ = ReadPointer_1E(ch)
 	call ReadPointer_1E
 	ld e, a
+;>     AdvancePointer_1E(ch)
 	call AdvancePointer_1E
+;>     hi2 = ReadPointer_1E(ch)
 	call ReadPointer_1E
 	ld d, a
 	pop hl
+;>     mem[ch] = lo_
 	ld a, e
 	ld [hli], a
+;>     mem[ch + 1] = hi2
 	ld a, d
 	ld [hld], a
-	jr jr_01e_44de
+;=@loop
+	jr .entry
 
-jr_01e_4509:
+;=@end1
+.end
 	ld a, [wMusicTrackStarted]
 	cp $15
 	jp z, ResumeMusicAfterFanfare_1E
 
+;=@end2
 	ld hl, wActiveMusicTrack
 	ld [hl], $00
+;=@end3
 	call StopMusic_1E
+;=@end4
 	ret
 
 
+;@ def LengthTableCommand_1E(ptr: hl)
+;@ path: sound/music/engine
+;@ Pattern command $9E: the next 2 bytes are the address of a new note length table.
+;@ test: skip goes on reading the pattern
 LengthTableCommand_1E::
+;> AdvancePointer_1E(ptr)
 	call AdvancePointer_1E
+;> mem[0xD301] = ReadPointer_1E(ptr)                 # wMusicNoteLengths, low byte
 	call ReadPointer_1E
 	ld [wMusicNoteLengths], a
+;> AdvancePointer_1E(ptr)
 	call AdvancePointer_1E
+;> mem[0xD302] = ReadPointer_1E(ptr)                 # high byte
 	call ReadPointer_1E
-	ld [$d302], a
+	ld [wMusicNoteLengths + 1], a
+;> return NextCommand_1E(ptr)
 	jr NextCommand_1E
 
+;@ def TransposeCommand_1E(ptr: hl)
+;@ path: sound/music/engine
+;@ Pattern command $9F: the next byte becomes wMusicTranspose (added to every following note byte of all
+;@ channels).
+;@ test: skip goes on reading the pattern
 TransposeCommand_1E::
+;> AdvancePointer_1E(ptr)
 	call AdvancePointer_1E
+;> wMusicTranspose = ReadPointer_1E(ptr)
 	call ReadPointer_1E
 	ld [wMusicTranspose], a
+;> return NextCommand_1E(ptr)                       # falls through
 
+;@ def NextCommand_1E(ptr: hl)
+;@ path: sound/music/engine
+;@ Moves past the last byte of a command and reads on.
+;@ test: skip goes on reading the pattern
 NextCommand_1E::
+;> AdvancePointer_1E(ptr)
 	call AdvancePointer_1E
-	jr jr_01e_45a0
+;> return ReadPattern_1E(ptr)
+	jr ReadPattern_1E
 
+;@ def LoopStartCommand_1E(ptr: hl)
+;@ path: sound/music/engine
+;@ Pattern command $9B n: the bytes up to the next $9C are played n times. The count goes into bits 0-6 of
+;@ the channel's +F, the address after it into +C/+D (one loop at a time).
+;@ test: skip goes on reading the pattern
 LoopStartCommand_1E::
+;> AdvancePointer_1E(ptr)
 	call AdvancePointer_1E
+;> count = ReadPointer_1E(ptr)
 	call ReadPointer_1E
+;> flags = ptr + 0x0B                                # the channel's +F
 	push hl
 	ld a, l
 	add $0b
 	ld l, a
+;> mem[flags] |= count
 	ld c, [hl]
 	ld a, b
 	or c
 	ld [hl], a
+;> start = flags - 2                                 # +D
 	ld b, h
 	ld c, l
 	dec c
 	dec c
 	pop hl
+;> p = u16(mem16[ptr] + 1)
 	ld a, [hli]
 	ld e, a
 	ld a, [hld]
 	ld d, a
 	inc de
+;> mem16[ptr] = p                                   # past the count
 	ld a, e
 	ld [hli], a
 	ld a, d
 	ld [hld], a
+;> mem[start] = hi(p)                                # loop start = p
 	ld a, d
 	ld [bc], a
+;> mem[start - 1] = lo(p)
 	dec c
 	ld a, e
 	ld [bc], a
-	jr jr_01e_45a0
+;> return ReadPattern_1E(ptr)
+	jr ReadPattern_1E
 
+;@ def LoopEndCommand_1E(ptr: hl)
+;@ path: sound/music/engine
+;@ Pattern command $9C: one pass of the loop is done; while passes are left the pattern goes back to the
+;@ loop start, else on past the $9C.
+;@ test: skip goes on reading the pattern
 LoopEndCommand_1E::
+;> flags = ptr + 0x0B
 	push hl
 	ld a, l
 	add $0b
 	ld l, a
+;> mem[flags] = u8(mem[flags] - 1)
 	ld a, [hl]
 	dec [hl]
+;> if mem[flags] & 0x7F:
 	ld a, [hl]
 	and $7f
-	jr z, jr_01e_4579
+	jr z, .done
 
+;>     start = ptr + 8                              # +C/+D
 	ld b, h
 	ld c, l
 	dec c
 	dec c
 	dec c
 	pop hl
+;>     mem[ptr] = mem[start]
 	ld a, [bc]
 	ld [hli], a
+;>     mem[ptr + 1] = mem[start + 1]
 	inc c
 	ld a, [bc]
 	ld [hld], a
-	jr jr_01e_45a0
+;>     return ReadPattern_1E(ptr)
+	jr ReadPattern_1E
 
-jr_01e_4579:
+;> return NextCommand_1E(ptr)
+.done
 	pop hl
 	jr NextCommand_1E
 
+;@ def UpdateMusicChannels_1E()
+;@ path: sound/music/engine
+;@ One frame of bank $1E's song, if one plays: the panning, then each of the 4 channels in turn. A song
+;@ of bank $1B ends here with the requests cleared.
+;@ test: skip runs the whole song frame
 UpdateMusicChannels_1E::
+;> if wActiveMusicTrack == 0: return
 	ld hl, wActiveMusicTrack
 	ld a, [hl]
 	and a
 	ret z
 
+;> if wMusicFromBank1B: return ClearSoundRequests_1E()   # the song is bank $1B's
 	ld a, [wMusicFromBank1B]
 	and a
 	jp nz, ClearSoundRequests_1E
 
+;> UpdatePanning_1E()
 	call UpdatePanning_1E
+;> wMusicChannel = 1
 	ld a, $01
 	ld [wMusicChannel], a
+;> return UpdateChannel_1E(wMusicChannel1)          # falls through
 	ld hl, wMusicChannel1
 
+;@ def UpdateChannel_1E(ch: hl)
+;@ path: sound/music/engine
+;@ A channel without a pattern list is skipped. Otherwise its note timer counts down; at 0 the next note
+;@ is read.
+;@ test: skip runs the rest of the music frame
 UpdateChannel_1E::
+;> timer = ch + 2
+;> if mem[ch + 1] == 0: return SkipChannel_1E(timer)
 	inc l
 	ld a, [hli]
 	and a
 	jp z, SkipChannel_1E
 
+;> mem[timer] = u8(mem[timer] - 1)
 	dec [hl]
+;> if mem[timer]: return SustainNote_1E(timer)
+;> return NextNote_1E(timer)                        # falls through
 	jp nz, SustainNote_1E
 
+;@ def NextNote_1E(timer: hl)
+;@ path: sound/music/engine
+;@ The note is over: read the pattern on.
+;@ test: skip runs the rest of the music frame
 NextNote_1E::
+;> return ReadPattern_1E(timer + 2)                 # falls through
 	inc l
 	inc l
 
+;@ def ReadPattern_1E(ptr: hl)
+;@ path: sound/music/engine
+;@ Reads the channel's pattern at ptr (the channel's +4) - the music data format:
+;@ $00 ends the pattern (NextPattern_1E); $9D a b c sets the instrument (InstrumentCommand_1E); $9E lo hi
+;@ a new note length table; $9F t the transpose; $9B n ... $9C plays the bytes between n times; $99 / $9A
+;@ wave decay on / off (off also ends the swell), $94 wave swell, $97 / $98 pitch drop on / off, $96 / $95 block / allow wave-channel
+;@ effects. $A0-$AF sets the note length (the low nibble indexes the song's note length table) for this and
+;@ the following notes and works out the release frame of the square channels. Then comes the note: $01 is
+;@ a rest, even values $02-$90 index NoteFrequencies_1E (after the transpose is added: 2 per semitone,
+;@ $02 = C2); on the noise channel the byte picks a drum of DrumSounds_1E ($FF: the two-step drum).
+;@ test: skip runs the rest of the music frame
 ReadPattern_1E::
-jr_01e_45a0:
+;> ch = ptr - 4
+;> b = ReadPointer_1E(ptr)
 	call ReadPointer_1E
+;> if b == 0x00: return NextPattern_1E(ptr)
 	cp $00
 	jp z, NextPattern_1E
 
+;> if b == 0x9D: return InstrumentCommand_1E(ptr)
 	cp $9d
 	jp z, InstrumentCommand_1E
 
+;> if b == 0x9E: return LengthTableCommand_1E(ptr)
 	cp $9e
 	jp z, LengthTableCommand_1E
 
+;> if b == 0x9F: return TransposeCommand_1E(ptr)
 	cp $9f
 	jp z, TransposeCommand_1E
 
+;> if b == 0x9B: return LoopStartCommand_1E(ptr)
 	cp $9b
 	jp z, LoopStartCommand_1E
 
+;> if b == 0x9C: return LoopEndCommand_1E(ptr)
 	cp $9c
 	jp z, LoopEndCommand_1E
 
+;> if b == 0x99: return WaveDecayOnCommand_1E(ptr)
 	cp $99
 	jp z, WaveDecayOnCommand_1E
 
+;> if b == 0x9A: return WaveEffectsOffCommand_1E(ptr)
 	cp $9a
 	jp z, WaveEffectsOffCommand_1E
 
+;> if b == 0x94: return WaveSwellCommand_1E(ptr)
 	cp $94
 	jp z, WaveSwellCommand_1E
 
+;> if b == 0x97: return PitchDropOnCommand_1E(ptr)
 	cp $97
 	jp z, PitchDropOnCommand_1E
 
+;> if b == 0x98: return PitchDropOffCommand_1E(ptr)
 	cp $98
 	jp z, PitchDropOffCommand_1E
 
+;> if b == 0x96: return BlockWaveSfxCommand_1E(ptr)
 	cp $96
 	jp z, BlockWaveSfxCommand_1E
 
+;> if b == 0x95: return AllowWaveSfxCommand_1E(ptr)
 	cp $95
 	jp z, AllowWaveSfxCommand_1E
 
+;> if (b & 0xF0) == 0xA0:                             # a note length
 	and $f0
 	cp $a0
-	jr nz, jr_01e_4637
+	jr nz, .note
 
+;>     idx = b & 0x0F
 	ld a, b
 	and $0f
 	ld c, a
 	ld b, $00
 	push hl
+;>     table = wMusicNoteLengths
 	ld de, wMusicNoteLengths
 	ld a, [de]
 	ld l, a
 	inc e
 	ld a, [de]
 	ld h, a
+;>     length = mem[u16(table + idx)]
 	add hl, bc
 	ld a, [hl]
 	pop hl
 	push hl
 	ld d, a
+;>     rel = mem[ch + 7] & 0xF0                     # instrument byte 2: when the release comes
+;>     if rel:
+;>@r1         if rel & 0x80: frame = length >> 1    # at 1/2 of the note
+;>@r2         elif rel & 0x40: frame = length >> 2  # at 1/4
+;>@r3         else: frame = (length >> 2) + (length >> 1)    # at 3/4
+;>@r4         if frame == 0: frame = 2
+;>@r5         wMusicReleaseFrame[wMusicChannel - 1] = frame
 	inc l
 	inc l
 	inc l
 	ld a, [hl]
 	and $f0
-	jr nz, jr_01e_4609
+	jr nz, .release
 
+;>     else:
+;>         pass                                     # the release frame stays
 	ld a, d
-	jr jr_01e_462e
+	jr .store
 
-jr_01e_4609:
+;=@r1
+.release
 	ld e, a
 	ld a, d
 	push af
 	srl a
 	sla e
-	jr c, jr_01e_461a
+	jr c, .frame
 
+;=@r2
 	ld d, a
 	srl a
 	sla e
-	jr c, jr_01e_461a
+	jr c, .frame
 
+;=@r3
 	add d
 
-jr_01e_461a:
+;=@r4
+.frame
 	ld c, a
 	and a
-	jr nz, jr_01e_4620
+	jr nz, .save
 
 	ld c, $02
 
-jr_01e_4620:
+;=@r5
+.save
 	ld de, wMusicChannel
 	ld a, [de]
 	dec a
 	ld e, a
 	ld d, $00
+;=@r5
 	ld hl, wMusicReleaseFrame
 	add hl, de
 	ld [hl], c
 	pop af
 
-jr_01e_462e:
+;>     mem[ch + 3] = length                         # note length (also for the following notes)
+.store
 	pop hl
 	dec l
 	ld [hli], a
+;>     AdvancePointer_1E(ptr)
 	call AdvancePointer_1E
+;>     b = ReadPointer_1E(ptr)
 	call ReadPointer_1E
 
-jr_01e_4637:
+;> note = b
+;> if wMusicChannel != 4:
+.note
 	ld a, [wMusicChannel]
 	cp $04
-	jr z, jr_01e_4676
+	jr z, .notNoise
 
+;>     wMusicVibrato[2 * (wMusicChannel - 1)] = 0   # the effects start again with the note
 	push de
 	ld de, wMusicVibrato
 	call ChannelPairOffset_1E
 	xor a
 	ld [de], a
+;>     wMusicVibrato[2 * (wMusicChannel - 1) + 1] = 0
 	inc e
 	ld [de], a
+;>     wMusicPitchDrop[2 * (wMusicChannel - 1) + 1] = 0
 	ld de, wMusicPitchDrop
 	call ChannelPairOffset_1E
 	inc e
 	xor a
 	ld [de], a
+;>     if wMusicChannel == 3:
 	ld a, [wMusicChannel]
 	cp $03
-	jr nz, jr_01e_4675
+	jr nz, .noWave
 
+;>         if wMusicWaveDecay:
 	ld de, wMusicWaveDecay
 	ld a, [de]
 	and a
-	jr z, jr_01e_4667
+	jr z, .noDecay
 
+;>             wMusicWaveDecay = 1
 	ld a, $01
 	ld [de], a
+;>             wMusicWaveDecayFrame = 0
 	xor a
 	ld [wMusicWaveDecayFrame], a
 
-jr_01e_4667:
+;>         if wMusicWaveSwell:
+.noDecay
 	ld de, wMusicWaveSwell
 	ld a, [de]
 	and a
-	jr z, jr_01e_4675
+	jr z, .noWave
 
+;>             wMusicWaveSwell = 1
 	ld a, $01
 	ld [de], a
+;>             wMusicWaveSwellFrame = 0
 	xor a
 	ld [wMusicWaveSwellFrame], a
 
-jr_01e_4675:
+.noWave
 	pop de
 
-jr_01e_4676:
+;> AdvancePointer_1E(ptr)
+.notNoise
 	ld c, b
 	ld b, $00
 	call AdvancePointer_1E
+;> if wMusicChannel == 4: return NoiseNote_1E(note, ptr)
 	ld a, [wMusicChannel]
 	cp $04
 	jp z, NoiseNote_1E
 
+;> freq = ch + 9                                    # frequency (+9, +A)
 	push hl
 	ld a, l
 	add $05
 	ld l, a
 	ld e, l
 	ld d, h
+;> rest = ch + 0x0B
 	inc l
 	inc l
+;> if note == 1:                                    # a rest
 	ld a, c
 	cp $01
-	jr z, jr_01e_46b3
+	jr z, .rest
 
+;>@rest     mem[rest] = 1
+;>@restplay     return PlayNote_1E(ptr)
+;> mem[rest] = 0
 	ld [hl], $00
+;> if wMusicTranspose:
 	ld a, [wMusicTranspose]
 	and a
-	jr z, jr_01e_46a6
+	jr z, .freq
 
+;>     t = wMusicTranspose - 0x100 if wMusicTranspose & 0x80 else wMusicTranspose
 	ld l, a
 	ld h, $00
 	bit 7, l
-	jr z, jr_01e_46a3
+	jr z, .add
 
 	ld h, $ff
 
-jr_01e_46a3:
+;>     note = u16(note + t)
+.add
 	add hl, bc
 	ld b, h
 	ld c, l
 
-jr_01e_46a6:
-	ld hl, $49ba
+;> src = NoteFrequencies_1E + note
+.freq
+	ld hl, NoteFrequencies_1E
 	add hl, bc
+;> mem[freq] = mem[src]
 	ld a, [hli]
 	ld [de], a
+;> mem[freq + 1] = mem[src + 1]
 	inc e
 	ld a, [hl]
 	ld [de], a
+;> return PlayNote_1E(ptr)
 	pop hl
 	jp PlayNote_1E
 
 
-jr_01e_46b3:
+;=@rest
+.rest
 	ld [hl], $01
+;=@restplay
 	pop hl
-	jr jr_01e_46e9
+	jr PlayNote_1E
 
+;@ def NoiseNote_1E(note: bc, ptr: hl)
+;@ path: sound/music/engine
+;@ The noise channel: note $FF plays the two-step drum (noise effect 1, UpdateDrumFF_1E) unless an effect
+;@ holds the channel; any other note copies its 5-byte drum from DrumSounds_1E to the channel's +6..+A
+;@ and plays it.
+;@ test: skip the note timer reload pops the pointer pushed here
 NoiseNote_1E::
+;> if note == 0xFF:
 	push hl
 	ld a, c
 	cp $ff
-	jr z, jr_01e_46d6
+	jr z, .drumFF
 
-	ld de, $d346
-	ld hl, $4a4c
+;>@ff1     if not wMusicChannel4[0x0F] & 0x80:
+;>@ff2         wNoiseSfxToPlay = 1
+;>@ff3         UpdateDrumFF_1E()
+;>@ff4     return ReloadNoteTimer_1E(ptr)
+;> dest = wMusicChannel4 + 6
+	ld de, wMusicChannel4 + $06
+;> src = DrumSounds_1E + note
+	ld hl, DrumSounds_1E
 	add hl, bc
 
-jr_01e_46c5:
+;>@copy for i in range(5):
+;>     mem[dest + i] = mem[src + i]
+.copy
 	ld a, [hli]
 	ld [de], a
+;=@copy
 	inc e
 	ld a, e
 	cp $4b
-	jr nz, jr_01e_46c5
+	jr nz, .copy
 
-	ld c, $20
-	ld hl, $d344
+;> return InstrumentNote_1E(0x20, wMusicChannel4 + 4)   # NR41-NR44
+	ld c, LOW(rNR41)
+	ld hl, wMusicChannel4 + $04
 	ld b, $00
 	jr InstrumentNote_1E
 
-jr_01e_46d6:
-	ld a, [$d34f]
+;=@ff1
+.drumFF
+	ld a, [wMusicChannel4 + $0F]
 	bit 7, a
 	jp nz, ReloadNoteTimer_1E
 
+;=@ff2
 	ld a, $01
 	ld [wNoiseSfxToPlay], a
+;=@ff3
 	call UpdateDrumFF_1E
+;=@ff4
 	jp ReloadNoteTimer_1E
 
 
+;@ def PlayNote_1E(ptr: hl)
+;@ path: sound/music/engine
+;@ Starts the note on the channel's sound registers. The wave channel first restarts its DAC (unless an
+;@ effect holds the channel) and uses its level byte (+8) with length 0.
+;@ test: skip the note timer reload pops the pointer pushed here
 PlayNote_1E::
-jr_01e_46e9:
+;> if wMusicChannel == 1:
 	push hl
 	ld b, $00
 	ld a, [wMusicChannel]
 	cp $01
-	jr z, jr_01e_4714
+	jr z, .square1
 
+;>@sq1     return InstrumentNote_1E(0x11, ptr)    # NR11-NR14
+;> if wMusicChannel == 2:
 	cp $02
-	jr z, jr_01e_4710
+	jr z, .square2
 
-	ld c, $1a
-	ld a, [$d33f]
+;>@sq2     return InstrumentNote_1E(0x16, ptr)    # NR21-NR24
+;> if not wMusicChannel3[0x0F] & 0x80:             # the wave channel, unless an effect holds it
+	ld c, LOW(rNR30)
+	ld a, [wMusicChannel3 + $0F]
 	bit 7, a
-	jr nz, jr_01e_4705
+	jr nz, .taken
 
+;>     rNR30 = 0                                    # restart the wave DAC
 	xor a
 	ldh [c], a
+;>     rNR30 = 0x80
 	ld a, $80
 	ldh [c], a
 
-jr_01e_4705:
+;> reg = 0x1B                                       # NR31-NR34
+.taken
 	inc c
+;> level = mem[ptr + 4]                             # +8: the NR32 level
 	inc l
 	inc l
 	inc l
 	inc l
 	ld a, [hli]
 	ld e, a
+;> return WriteNote_1E(reg, ptr + 5, 0, level)
 	ld d, $00
 	jr WriteNote_1E
 
-jr_01e_4710:
-	ld c, $16
+;=@sq2
+.square2
+	ld c, LOW(rNR21)
 	jr InstrumentNote_1E
 
-jr_01e_4714:
-	ld c, $10
+;=@sq1
+.square1
+	ld c, LOW(rNR10)
 	inc c
 
+;@ def InstrumentNote_1E(reg: c, ptr: hl)
+;@ path: sound/music/engine
+;@ Square and noise channels: the duty / length byte from instrument byte +8 and the envelope from +6.
+;@ test: skip the note timer reload pops the pointer pushed by the caller
 InstrumentNote_1E::
+;> env = mem[ptr + 2]                               # +6
 	inc l
 	inc l
 	ld a, [hli]
 	ld e, a
+;> duty = mem[ptr + 4]                              # +8
 	inc l
 	ld a, [hli]
 	ld d, a
+;> return WriteNote_1E(reg, ptr + 5, duty, env)     # falls through
 
+;@ def WriteNote_1E(reg: c, freq: hl, duty: d, env: e)
+;@ path: sound/music/engine
+;@ Writes the 4 registers of the note (a rest gets envelope $08: volume 0) unless an effect holds the
+;@ channel; the wave channel first gets its wave pattern back after an effect (RestoreWaveRAM_1E). The
+;@ note's frame count restarts and the note timer is loaded (ReloadNoteTimer_1E).
+;@ test: skip the note timer reload pops the pointer pushed by the caller
 WriteNote_1E::
+;> ch = freq - 9
+;> rest = mem[ch + 0x0B]
 	push hl
 	inc l
 	inc l
 	ld a, [hli]
+;> if rest: env = 8
 	and a
-	jr z, jr_01e_4727
+	jr z, .sound
 
 	ld e, $08
 
-jr_01e_4727:
+;> mem[ch + 0x0E] = 0                               # frames since the note started
+.sound
 	inc l
 	inc l
 	ld [hl], $00
+;> flags = mem[ch + 0x0F]
 	inc l
 	ld a, [hl]
 	pop hl
+;> if not flags & 0x80:                             # no effect holds the channel
 	bit 7, a
-	jr nz, jr_01e_4748
+	jr nz, ReloadNoteTimer_1E
 
+;>     if wMusicChannel == 3: RestoreWaveRAM_1E()     # (it jumps there and comes back)
 	ld a, [wMusicChannel]
 	cp $03
 	jp z, RestoreWaveRAM_1E
 
+;>     mem[0xFF00 + reg] = duty                     # (b is 0)
 WriteNoteRegisters_1E:
 	ld a, d
 	or b
 	ldh [c], a
+;>     mem[0xFF00 + reg + 1] = env
 	inc c
 	ld a, e
 	ldh [c], a
+;>     mem[0xFF00 + reg + 2] = mem[freq]
 	inc c
 	ld a, [hli]
 	ldh [c], a
+;>     mem[0xFF00 + reg + 3] = mem[freq + 1] | 0x80   # start the note
 	inc c
 	ld a, [hl]
 	or $80
 	ldh [c], a
+;> return ReloadNoteTimer_1E(freq - 5)              # falls through
 
+;@ def ReloadNoteTimer_1E(ptr: stack)
+;@ path: sound/music/engine
+;@ The note is set up: the timer is loaded from the note length and the next channel follows. ptr (the
+;@ channel's +4) is the value PlayNote_1E / NoiseNote_1E pushed.
+;@ test: skip pops the pattern pointer its caller pushed
 ReloadNoteTimer_1E::
-jr_01e_4748:
+;> mem[ptr - 2] = mem[ptr - 1]                      # note timer = note length
 	pop hl
 	dec l
 	ld a, [hld]
 	ld [hld], a
+;> return NextChannel_1E(ptr - 4)                   # falls through
 	dec l
 
+;@ def NextChannel_1E(ch: hl)
+;@ path: sound/music/engine
+;@ On to the next channel; after channel 4 the frame counts of channels 1-3 go up.
+;@ test: skip runs the rest of the music frame
 NextChannel_1E::
+;> if wMusicChannel == 4:
 	ld de, wMusicChannel
 	ld a, [de]
 	cp $04
-	jr z, jr_01e_475e
+	jr z, .done
 
+;>@d1     wMusicChannel1[0x0E] += 1
+;>@d2     wMusicChannel2[0x0E] += 1
+;>@d3     wMusicChannel3[0x0E] += 1
+;>@dret     return
+;> wMusicChannel += 1
 	inc a
 	ld [de], a
+;> return UpdateChannel_1E(u16(ch + 0x10))
 	ld a, $10
 	add l
 	ld l, a
 	jp UpdateChannel_1E
 
 
-jr_01e_475e:
-	ld hl, $d31e
+;=@d1
+.done
+	ld hl, wMusicChannel1 + $0E
 	inc [hl]
-	ld hl, $d32e
+;=@d2
+	ld hl, wMusicChannel2 + $0E
 	inc [hl]
-	ld hl, $d33e
+;=@d3
+	ld hl, wMusicChannel3 + $0E
 	inc [hl]
+;=@dret
 	ret
 
 
+;> # (PopHLReturn_1E: the common exit of the note effects - pop hl and return)
 PopHLReturn_1E:
 	pop hl
 	ret
 
 
+;@ def UpdateNoteEffects_1E(timer: hl)
+;@ path: sound/music/engine
+;@ The per-frame effects of a sounding note. Square and wave channels with an effect type (low nibble of
+;@ instrument byte +8) get their frequency changed (ApplyFrequencyEffect_1E); then the pitch drop and
+;@ the wave level effects (UpdateDropAndWaveEffects_1E). timer is pushed here and popped by the exit.
+;@ test: skip the exit pops what the entry pushed, across several routines
 UpdateNoteEffects_1E::
+;> ch = timer - 2
+;> kind = mem[ch + 8] & 0x0F
 	push hl
 	ld a, l
 	add $06
 	ld l, a
 	ld a, [hl]
 	and $0f
-	jr z, jr_01e_478f
+;> if kind:
+	jr z, UpdateDropAndWaveEffects_1E
 
+;>     wMusicEffect = kind
 	ld [wMusicEffect], a
+;>     if wMusicChannel == 1: return ApplyFrequencyEffect_1E(ch + 8, 0x13)   # NR13/NR14
 	ld a, [wMusicChannel]
 	ld c, $13
 	cp $01
 	jr z, ApplyFrequencyEffect_1E
 
+;>     if wMusicChannel == 2: return ApplyFrequencyEffect_1E(ch + 8, 0x18)   # NR23/NR24
 	ld c, $18
 	cp $02
 	jr z, ApplyFrequencyEffect_1E
 
+;>     if wMusicChannel == 3: return ApplyFrequencyEffect_1E(ch + 8, 0x1D)   # NR33/NR34
 	ld c, $1d
 	cp $03
 	jr z, ApplyFrequencyEffect_1E
 
+;> return UpdateDropAndWaveEffects_1E(timer)        # falls through
+
+;@ def UpdateDropAndWaveEffects_1E(timer: stack)
+;@ path: sound/music/engine
+;@ Square and wave channels with the pitch drop on (command $97) slide down (UpdatePitchDrop_1E); else the
+;@ wave channel runs its decay or swell of the level. Ends by popping the timer UpdateNoteEffects_1E
+;@ pushed (PopHLReturn_1E).
+;@ test: skip pops what UpdateNoteEffects_1E pushed
 UpdateDropAndWaveEffects_1E::
-jr_01e_478f:
+;> if wMusicChannel == 4: return
 	ld a, [wMusicChannel]
 	cp $04
 	jp z, PopHLReturn_1E
 
+;> drop = wMusicPitchDrop + 2 * (wMusicChannel - 1)
 	ld de, wMusicPitchDrop
 	call ChannelPairOffset_1E
+;> if mem[drop]:
 	ld a, [de]
 	and a
-	jp z, Jump_01e_47b8
+	jp z, .waveEffects
 
+;>     if wMusicChannel == 1: return UpdatePitchDrop_1E(drop, 0x13)
 	ld a, [wMusicChannel]
 	ld c, $13
 	cp $01
 	jp z, UpdatePitchDrop_1E
 
+;>     if wMusicChannel == 2: return UpdatePitchDrop_1E(drop, 0x18)
 	ld c, $18
 	cp $02
 	jp z, UpdatePitchDrop_1E
 
+;>     return UpdatePitchDrop_1E(drop, 0x1D)
 	ld c, $1d
 	jp UpdatePitchDrop_1E
 
 
-Jump_01e_47b8:
+;> if wMusicChannel != 3: return
+.waveEffects
 	ld a, [wMusicChannel]
 	cp $03
 	jp nz, PopHLReturn_1E
 
+;> if wMusicWaveDecay: return UpdateWaveDecay_1E(wMusicWaveDecay)
 	ld a, [wMusicWaveDecay]
 	and a
 	jp nz, UpdateWaveDecay_1E
 
+;> if wMusicWaveSwell: return UpdateWaveSwell_1E(wMusicWaveSwell)
 	ld a, [wMusicWaveSwell]
 	and a
 	jp nz, UpdateWaveSwell_1E
 
+;> return
 	jp PopHLReturn_1E
 
 
+;@ def ApplyFrequencyEffect_1E(p: hl, reg: c)
+;@ path: sound/music/engine
+;@ The frequency effect of the note (p = the channel's +8): type 1 is the vibrato; any other type plays the
+;@ note one frequency step lower (a slight detune), rewritten every frame without restarting the note.
+;@ (Bank $1B's wide vibrato, type 5, is a detune here.)
+;@ test: skip pops what UpdateNoteEffects_1E pushed
 ApplyFrequencyEffect_1E::
+;> freq = (mem[p + 1] | mem[p + 2] << 8) & 0x0FFF  # the note's frequency (+9, +A)
 	inc l
 	ld a, [hli]
 	ld e, a
 	ld a, [hl]
 	and $0f
 	ld d, a
+;> frames = mem[p + 6]                              # +E: frames since the note started
 	push de
 	ld a, l
 	add $04
 	ld l, a
 	ld b, [hl]
+;> if wMusicEffect == 1: return UpdateVibrato_1E()
 	ld a, [wMusicEffect]
 	cp $01
 	jp z, UpdateVibrato_1E
 
-	ld hl, $ffff
+;> WriteEffectFrequency_1E(u16(freq - 1), reg)
+	ld hl, -1
 	pop de
 	add hl, de
 	call WriteEffectFrequency_1E
+;> return UpdateDropAndWaveEffects_1E()
 	jp UpdateDropAndWaveEffects_1E
 
 
+;@ def UpdateReleaseEnvelopes_1E()
+;@ path: sound/music/engine
+;@ The release of the square channels: when a note (not a rest) with a release in instrument byte +7
+;@ reaches its release frame, its envelope is switched to ReleaseEnvelopes_1E entry (+7 low nibble - 1)
+;@ and the note restarted on the same frequency. Not while an effect holds the channel.
+;@ test: wMusicChannel1[0x0B] = rng.choice([0, 0, 1]); wMusicChannel1[7] = rng.choice([0, 0x21, 0x83, 0x45])
+;@ test: wMusicChannel1[0x0E] = rand(0, 4); wMusicReleaseFrame[0] = rand(0, 4); wMusicChannel1[0x0F] = rng.choice([0, 0x80])
+;@ test: wMusicChannel2[0x0B] = rng.choice([0, 0, 1]); wMusicChannel2[7] = rng.choice([0, 0x21, 0x83, 0x45])
+;@ test: wMusicChannel2[0x0E] = rand(0, 4); wMusicReleaseFrame[1] = rand(0, 4); wMusicChannel2[0x0F] = rng.choice([0, 0x80])
 UpdateReleaseEnvelopes_1E::
-	ld a, [$d31b]
+;> if not wMusicChannel1[0x0B] and wMusicChannel1[7]:     # channel 1: no rest, a release
+	ld a, [wMusicChannel1 + $0B]
 	and a
-	jr nz, jr_01e_4818
+	jr nz, .channel2
 
-	ld a, [$d317]
+	ld a, [wMusicChannel1 + $07]
 	and a
-	jr z, jr_01e_4818
+	jr z, .channel2
 
+;>     env = wMusicChannel1[7] & 0x0F
 	and $0f
 	ld b, a
+;>@if1     if wMusicChannel1[0x0E] == wMusicReleaseFrame[0] and not wMusicChannel1[0x0F] & 0x80:
 	ld hl, wMusicReleaseFrame
-	ld a, [$d31e]
+	ld a, [wMusicChannel1 + $0E]
 	cp [hl]
-	jr nz, jr_01e_4818
+	jr nz, .channel2
 
+;=@if1
 	ld c, $12
-	ld de, $d31a
-	ld a, [$d31f]
+	ld de, wMusicChannel1 + $0A
+	ld a, [wMusicChannel1 + $0F]
 	bit 7, a
-	jr nz, jr_01e_4818
+	jr nz, .channel2
 
+;>         SetReleaseEnvelope_1E(env, 0x12, wMusicChannel1 + 0x0A)   # NR12, NR14
 	call SetReleaseEnvelope_1E
 
-jr_01e_4818:
-	ld a, [$d32b]
+;> if wMusicChannel2[0x0B]: return                  # channel 2 the same way
+.channel2
+	ld a, [wMusicChannel2 + $0B]
 	and a
 	ret nz
 
-	ld a, [$d327]
+;> if not wMusicChannel2[7]: return
+	ld a, [wMusicChannel2 + $07]
 	and a
 	ret z
 
+;> env = wMusicChannel2[7] & 0x0F
 	and $0f
 	ld b, a
-	ld hl, $d308
-	ld a, [$d32e]
+;> if wMusicChannel2[0x0E] != wMusicReleaseFrame[1]: return
+	ld hl, wMusicReleaseFrame + 1
+	ld a, [wMusicChannel2 + $0E]
 	cp [hl]
 	ret nz
 
-	ld a, [$d32f]
+;> if wMusicChannel2[0x0F] & 0x80: return
+	ld a, [wMusicChannel2 + $0F]
 	bit 7, a
 	ret nz
 
+;> SetReleaseEnvelope_1E(env, 0x17, wMusicChannel2 + 0x0A)       # NR22, NR24
 	ld c, $17
-	ld de, $d32a
+	ld de, wMusicChannel2 + $0A
 	call SetReleaseEnvelope_1E
 	ret
 
 
+;@ def SetReleaseEnvelope_1E(env: b, reg: c, hi: de)
+;@ path: sound/music/engine
+;@ Writes release envelope env (1-7) of ReleaseEnvelopes_1E to NRx2 (reg) and restarts the note with the
+;@ frequency high byte at hi (NRx4 = reg + 2). (An env of 0 would read the byte 255 bytes
+;@ after the table start.)
+;@ test: env = rand(1, 7); reg = rng.choice([0x12, 0x17]); hi = rng.choice([0xD31A, 0xD32A])
 SetReleaseEnvelope_1E::
+;>@env mem[0xFF00 + reg] = mem[ReleaseEnvelopes_1E + u8(env - 1)]
 	push bc
 	dec b
 	ld c, b
 	ld b, $00
-	ld hl, $4b10
+	ld hl, ReleaseEnvelopes_1E
 	add hl, bc
+;=@env
 	ld a, [hl]
 	pop bc
 	ldh [c], a
+;> mem[0xFF00 + reg + 2] = mem[hi] | 0x80             # restart the note
 	inc c
 	inc c
 	ld a, [de]
@@ -1321,183 +1964,310 @@ SetReleaseEnvelope_1E::
 	ret
 
 
+;@ def ResumeMusicAfterFanfare_1E()
+;@ path: sound/music/engine
+;@ The fanfare track $25 is over: the track in hLastMusicTrack is requested again and the
+;@ music update starts over with it.
+;@ test: skip restarts the whole music update
 ResumeMusicAfterFanfare_1E::
+;> wMusicFromBank1B = 0
 	xor a
 	ld [wMusicFromBank1B], a
+;> wMusicTrackToPlay = hLastMusicTrack
 	ldh a, [hLastMusicTrack]
 	ld [wMusicTrackToPlay], a
+;> return UpdateMusic_1E()
 	jp UpdateMusic_1E
 
 
+;@ def BlockWaveSfxCommand_1E(ptr: hl)
+;@ path: sound/music/engine
+;@ Pattern command $96: wave-channel sound effects are not played until command $95.
+;@ test: skip goes on reading the pattern
 BlockWaveSfxCommand_1E::
+;> wMusicBlocksWaveSfx = 1
 	ld a, $01
 
-jr_01e_485d:
+.store
 	ld [wMusicBlocksWaveSfx], a
+;> AdvancePointer_1E(ptr)
 	call AdvancePointer_1E
+;> return ReadPattern_1E(ptr)
 	jp ReadPattern_1E
 
 
+;@ def AllowWaveSfxCommand_1E(ptr: hl)
+;@ path: sound/music/engine
+;@ Pattern command $95: wave-channel sound effects play again.
+;@ test: skip goes on reading the pattern
 AllowWaveSfxCommand_1E::
+;> wMusicBlocksWaveSfx = 0; AdvancePointer_1E(ptr); return ReadPattern_1E(ptr)   # (BlockWaveSfxCommand_1E.store)
 	xor a
-	jr jr_01e_485d
+	jr BlockWaveSfxCommand_1E.store
 
+;@ def WaveDecayOnCommand_1E(ptr: hl)
+;@ path: sound/music/engine
+;@ Pattern command $99: from the next note on, every wave note decays (UpdateWaveDecay_1E).
+;@ test: skip goes on reading the pattern
 WaveDecayOnCommand_1E::
+;> wMusicWaveDecay = 1
 	ld a, $01
 
-jr_01e_486b:
+.store
 	ld [wMusicWaveDecay], a
+;> AdvancePointer_1E(ptr)
 	call AdvancePointer_1E
+;> return ReadPattern_1E(ptr)
 	jp ReadPattern_1E
 
 
+;@ def WaveEffectsOffCommand_1E(ptr: hl)
+;@ path: sound/music/engine
+;@ Pattern command $9A: the wave notes keep their level again; here it ends the swell ($94) as well as the
+;@ decay.
+;@ test: skip goes on reading the pattern
 WaveEffectsOffCommand_1E::
+;> wMusicWaveSwell = 0
 	xor a
 	ld [wMusicWaveSwell], a
+;> wMusicWaveSwellFrame = 0
 	ld [wMusicWaveSwellFrame], a
-	jr jr_01e_486b
+;> wMusicWaveDecay = 0; AdvancePointer_1E(ptr); return ReadPattern_1E(ptr)   # (WaveDecayOnCommand_1E.store)
+	jr WaveDecayOnCommand_1E.store
 
+;@ def UpdateWaveDecay_1E(state: a)
+;@ path: sound/music/engine
+;@ The decay of a wave note: NR32 goes to half level at frame 3, a quarter at 5, off at 7, a quarter at 10
+;@ (an echo) and off for good at 13, where the decay is done (state 2) until the next note.
+;@ test: skip pops what UpdateNoteEffects_1E pushed
 UpdateWaveDecay_1E::
+;> if state == 2: return
 	cp $02
 	jp z, PopHLReturn_1E
 
+;> wMusicWaveDecayFrame += 1; frame = wMusicWaveDecayFrame   # (IncrementByte_1E)
 	ld bc, wMusicWaveDecayFrame
 	call IncrementByte_1E
+;> if frame == 3: level = 0x40                      # half
 	ld c, $1c
 	ld b, $40
 	cp $03
-	jr z, jr_01e_48aa
+	jr z, WriteWaveLevel_1E
 
+;>@q elif frame in (5, 0x0A): level = 0x60            # a quarter
 	ld b, $60
 	cp $05
-	jr z, jr_01e_48aa
+	jr z, WriteWaveLevel_1E
 
+;=@q
 	cp $0a
-	jr z, jr_01e_48aa
+	jr z, WriteWaveLevel_1E
 
+;> elif frame == 7: level = 0
 	ld b, $00
 	cp $07
-	jr z, jr_01e_48aa
+	jr z, WriteWaveLevel_1E
 
+;> elif frame == 0x0D:
 	cp $0d
 	jp nz, PopHLReturn_1E
 
+;>     level = 0
+;>     wMusicWaveDecay = 2
 	ld a, $02
 	ld [wMusicWaveDecay], a
 
+;> else: return
+;> rNR32 = level
 WriteWaveLevel_1E:
-jr_01e_48aa:
 	ld a, b
 	ldh [c], a
+;> return
 	jp PopHLReturn_1E
 
 
+;@ def IncrementByte_1E(p: bc) -> a
+;@ path: sound/music/engine
+;@ Adds 1 to the byte at p and returns it.
+;@ test: p = rand_ram(1)
 IncrementByte_1E::
+;> mem[p] = u8(mem[p] + 1)
 	ld a, [bc]
 	inc a
 	ld [bc], a
+;> return mem[p]
 	ret
 
 
+;@ def WaveSwellCommand_1E(ptr: hl)
+;@ path: sound/music/engine
+;@ Pattern command $94: from the next note on, every wave note swells in (UpdateWaveSwell_1E).
+;@ test: skip goes on reading the pattern
 WaveSwellCommand_1E::
+;> wMusicWaveSwell = 1
 	ld a, $01
 	ld [wMusicWaveSwell], a
+;> AdvancePointer_1E(ptr)
 	call AdvancePointer_1E
+;> return ReadPattern_1E(ptr)
 	jp ReadPattern_1E
 
 
+;@ def UpdateWaveSwell_1E(state: a)
+;@ path: sound/music/engine
+;@ The swell of a wave note: NR32 goes to a quarter at frame 3, half at 5 and full at 6, where the swell
+;@ is done (state 2) until the next note.
+;@ test: skip pops what UpdateNoteEffects_1E pushed
 UpdateWaveSwell_1E::
+;> if state == 2: return
 	cp $02
 	jp z, PopHLReturn_1E
 
+;> wMusicWaveSwellFrame += 1; frame = wMusicWaveSwellFrame     # (IncrementByte_1E)
 	ld bc, wMusicWaveSwellFrame
 	call IncrementByte_1E
+;> if frame == 3: return WriteWaveLevel_1E(0x60)   # a quarter
 	ld c, $1c
 	ld b, $60
 	cp $03
 	jp z, WriteWaveLevel_1E
 
+;> if frame == 5: return WriteWaveLevel_1E(0x40)   # half
 	ld b, $40
 	cp $05
 	jp z, WriteWaveLevel_1E
 
+;> if frame != 6: return
 	ld b, $20
 	cp $06
 	jp nz, PopHLReturn_1E
 
+;> wMusicWaveSwell = 2
 	ld a, $02
 	ld [wMusicWaveSwell], a
+;> return WriteWaveLevel_1E(0x20)                  # full
 	jp WriteWaveLevel_1E
 
 
+;@ def PitchDropOnCommand_1E(ptr: hl)
+;@ path: sound/music/engine
+;@ Pattern command $97: from now on the channel's notes slide down quickly (UpdatePitchDrop_1E), until
+;@ command $98.
+;@ test: skip goes on reading the pattern
 PitchDropOnCommand_1E::
+;> drop = wMusicPitchDrop + 2 * (wMusicChannel - 1)
 	ld de, wMusicPitchDrop
 	call ChannelPairOffset_1E
+;> mem[drop] = 1
 	ld a, $01
 
-jr_01e_48f0:
+.store
 	ld [de], a
+;> AdvancePointer_1E(ptr)
 	call AdvancePointer_1E
+;> return ReadPattern_1E(ptr)
 	jp ReadPattern_1E
 
 
+;@ def PitchDropOffCommand_1E(ptr: hl)
+;@ path: sound/music/engine
+;@ Pattern command $98: the pitch drop is off again.
+;@ test: skip goes on reading the pattern
 PitchDropOffCommand_1E::
+;> drop = wMusicPitchDrop + 2 * (wMusicChannel - 1)
 	ld de, wMusicPitchDrop
 	call ChannelPairOffset_1E
+;> mem[drop] = 0; AdvancePointer_1E(ptr); return ReadPattern_1E(ptr)   # (PitchDropOnCommand_1E.store)
 	xor a
-	jr jr_01e_48f0
+	jr PitchDropOnCommand_1E.store
 
+;@ def UpdatePitchDrop_1E(drop: de, reg: c)
+;@ path: sound/music/engine
+;@ The pitch drop: in the first frame the note's own frequency, after that the one written last, goes
+;@ down by 100 every frame (written without restarting the note).
+;@ test: skip pops what UpdateNoteEffects_1E pushed
 UpdatePitchDrop_1E::
+;> if not mem[drop + 1]:                            # first frame of the note
 	inc e
 	ld a, [de]
 	and a
-	jr nz, jr_01e_4916
+	jr nz, .continue
 
+;>     mem[drop + 1] = 1
 	inc a
 	ld [de], a
+;>     f = GetNoteFrequency_1E(timer)
 	pop hl
 	push hl
 	call GetNoteFrequency_1E
 
-jr_01e_490c:
-	ld hl, hLinkMotionStep
+;>@else else:
+;>@cont     f = GetEffectFrequency_1E()
+;> WriteEffectFrequency_1E(u16(f - 100), reg)
+.drop
+	ld hl, -100
 	add hl, de
 	call WriteEffectFrequency_1E
+;> return
 	jp PopHLReturn_1E
 
 
-jr_01e_4916:
+;=@else
+;=@cont
+.continue
 	call GetEffectFrequency_1E
-	jr jr_01e_490c
+	jr .drop
 
+;@ def GetNoteFrequency_1E(timer: hl) -> de
+;@ path: sound/music/engine
+;@ The frequency of the channel's note (+9, +A; 11 bits).
+;@ test: n = rand(1, 3); timer = 0xD302 + 0x10 * n
 GetNoteFrequency_1E::
+;>@r return (mem[timer + 7] | mem[timer + 8] << 8) & 0x0FFF
 	ld a, $07
 	add l
 	ld l, a
 	ld a, [hli]
 	ld e, a
 	ld a, [hl]
+;=@r
 	and $0f
 	ld d, a
 	ret
 
 
+;@ def WriteEffectFrequency_1E(f: hl, reg: c)
+;@ path: sound/music/engine
+;@ Writes a changed frequency to NRx3 / NRx4 (reg, reg + 1) without restarting the note, and keeps it in
+;@ wMusicEffectFreq for the channel.
+;@ test: wMusicChannel = rand(1, 3); f = rand(0, 0xFFFF); reg = rng.choice([0x13, 0x18, 0x1D])
 WriteEffectFrequency_1E::
+;> keep = wMusicEffectFreq + 2 * (wMusicChannel - 1)
 	ld de, wMusicEffectFreq
 	call ChannelPairOffset_1E
+;> mem[0xFF00 + reg] = lo(f)
 	ld a, l
 	ldh [c], a
+;> mem[keep] = lo(f)
 	ld [de], a
+;> mem[0xFF00 + reg + 1] = hi(f) & 0x0F
 	inc c
 	inc e
 	ld a, h
 	and $0f
 	ldh [c], a
+;> mem[keep + 1] = hi(f) & 0x0F
 	ld [de], a
 	ret
 
 
+;@ def ChannelPairOffset_1E(base: de) -> de
+;@ path: sound/music/engine
+;@ base + 2 * (wMusicChannel - 1): the channel's pair of bytes in a table with 2 bytes per channel (the
+;@ table stays inside its 256-byte page).
+;@ test: wMusicChannel = rand(1, 3); base = rng.choice([0xD3A4, 0xD3B0, 0xD3B6, 0xD3D0])
 ChannelPairOffset_1E::
+;> return (base & 0xFF00) | lo(base + 2 * (wMusicChannel - 1))
 	ld a, [wMusicChannel]
 	dec a
 	sla a
@@ -1506,72 +2276,97 @@ ChannelPairOffset_1E::
 	ret
 
 
+;@ def GetEffectFrequency_1E() -> de
+;@ path: sound/music/engine
+;@ The frequency the channel's pitch effect wrote last (wMusicEffectFreq).
+;@ test: wMusicChannel = rand(1, 3)
 GetEffectFrequency_1E::
+;> keep = wMusicEffectFreq + 2 * (wMusicChannel - 1)
 	ld de, wMusicEffectFreq
 	call ChannelPairOffset_1E
+;>@k return mem[keep] | mem[keep + 1] << 8
 	ld a, [de]
 	ld l, a
 	inc e
+;=@k
 	ld a, [de]
 	ld d, a
 	ld e, l
 	ret
 
 
+;@ def UpdateVibrato_1E(timer: stack, reg: c)
+;@ path: sound/music/engine
+;@ The vibrato (effect 1): it starts 24 frames into the note; from then on the note's frequency gets the
+;@ offsets of VibratoOffsets_1E, one per frame, over and over (20 frames).
+;@ test: skip pops what UpdateNoteEffects_1E pushed
 UpdateVibrato_1E::
+;> v = wMusicVibrato + 2 * (wMusicChannel - 1)     # frame counter, running flag
 	pop de
 	ld de, wMusicVibrato
 	call ChannelPairOffset_1E
+;> mem[v] += 1
 	ld a, [de]
 	inc a
 	ld [de], a
+;> if mem[v] == 0x19: mem[v + 1] = 1               # 25th frame: it starts
 	inc e
 	cp $19
-	jr z, jr_01e_498d
+	jr z, .start
 
+;> elif mem[v] == 0x2D: mem[v] = 0x19              # after 20 frames: again from the top
 	cp $2d
-	jr z, jr_01e_4986
+	jr z, .wrap
 
+;> elif not mem[v + 1]: return UpdateDropAndWaveEffects_1E()
 	ld a, [de]
 	and a
 	jp z, UpdateDropAndWaveEffects_1E
 
-jr_01e_4965:
+;> idx = mem[v] - 0x19
+.apply
 	dec e
 	ld a, [de]
 	sub $19
+;> o = VibratoOffsets_1E + 2 * idx
 	sla a
 	ld l, a
 	ld h, $00
-	ld de, $4992
+	ld de, VibratoOffsets_1E
 	add hl, de
+;> offset = mem[o] << 8 | mem[o + 1]               # high byte first
 	ld a, [hli]
 	ld d, a
 	ld a, [hl]
 	ld e, a
+;> f = GetNoteFrequency_1E(timer)
 	pop hl
 	push hl
 	push de
 	call GetNoteFrequency_1E
+;> WriteEffectFrequency_1E(u16(f + offset), reg)
 	ld h, d
 	ld l, e
 	pop de
 	add hl, de
 	call WriteEffectFrequency_1E
+;> return UpdateDropAndWaveEffects_1E()
 	jp UpdateDropAndWaveEffects_1E
 
 
-jr_01e_4986:
+;> # (.wrap: mem[v] = $19; .start: mem[v + 1] = 1 - then .apply)
+.wrap
 	dec e
 	ld a, $19
 	ld [de], a
 	inc e
-	jr jr_01e_4965
+	jr .apply
 
-jr_01e_498d:
+;> #
+.start
 	ld a, $01
 	ld [de], a
-	jr jr_01e_4965
+	jr .apply
 
 ;@ path: sound/music/data
 ;@ Vibrato (effect 1): 20 frequency offsets, one per frame, stored high byte first (UpdateVibrato_1E). Values 0, 0, 1, 1, 2, 2, 0, 0, -1, -1, -2, -2, 0, 1, 2, 1, 0, -1, -2, -1.
@@ -1788,65 +2583,140 @@ Music50::
 .pat9:
 	db $9b, $02, $a1, $1a, $1a, $1a, $a6, $1a, $9c, $a1, $1a, $15, $15, $15, $00
 
+;@ def SilenceMusicAndNoise_1E()
+;@ path: sound/music/engine
+;@ Entry $4003 (not used by the game): ends any noise effect, silences the noise channel and stops the
+;@ music (EndMusic_1E).
+;@ test: skip resets the whole music state
 SilenceMusicAndNoise_1E::
-	db $af, $ea, $79, $d3, $ea, $4f, $d3, $ea
-	db $98, $d3, $ea, $93, $d3, $ea, $c9, $d3, $ea, $a3, $d3, $ea, $e5, $d3, $3e, $08
-	db $e0, $21, $3e, $80, $e0, $23
+;> wActiveNoiseSfx = 0
+	xor a
+	ld [wActiveNoiseSfx], a
+;> wMusicChannel4[0x0F] = 0
+	ld [wMusicChannel4 + $0F], a
+;> wNoiseSfxStep = 0
+	ld [wNoiseSfxStep], a
+;> wNoiseSfxTimer = 0
+	ld [wNoiseSfxTimer], a
+;> wNoiseSfxLocked = 0
+	ld [wNoiseSfxLocked], a
+;> mem[0xD3A3] = 0
+	ld [wSoundUnusedA3], a
+;> mem[0xD3E5] = 0
+	ld [wSoundUnusedE5], a
+;> rNR42 = 0x08                              # volume 0
+	ld a, $08
+	ldh [rNR42], a
+;> rNR44 = 0x80
+	ld a, $80
+	ldh [rNR44], a
+;> return EndMusic_1E()                      # falls through
 
+;@ def EndMusic_1E()
+;@ path: sound/music/engine
+;@ The music is over: all channels on both sides again, no song playing, and the music state reset.
+;@ test: skip resets the whole music state
 EndMusic_1E::
+;> rNR51 = 0xFF
 	ld a, $ff
 	ldh [rNR51], a
+;> wMusicPanMode = 3
 	ld a, $03
 	ld [wMusicPanMode], a
+;> wActiveMusicTrack = 0
 	xor a
 	ld [wActiveMusicTrack], a
+;> return ResetMusicState_1E()               # falls through
 
+;@ def ResetMusicState_1E()
+;@ path: sound/music/engine
+;@ Clears the effect flags of the music channels and the state of the square- and wave-channel sound
+;@ effects (they stop too), the wave and pitch effects, and silences square channels 1-2, the sweep and
+;@ the wave channel. The noise channel is left alone.
 ResetMusicState_1E::
+;> wActiveJingle = 0
 	xor a
 	ld [wActiveJingle], a
+;> wActiveWaveSfx = 0
 	ld [wActiveWaveSfx], a
-	ld [$d31f], a
-	ld [$d32f], a
-	ld [$d33f], a
+;> wMusicChannel1[0x0F] = 0                     # the channels belong to the music again
+	ld [wMusicChannel1 + $0F], a
+;> wMusicChannel2[0x0F] = 0
+	ld [wMusicChannel2 + $0F], a
+;> wMusicChannel3[0x0F] = 0
+	ld [wMusicChannel3 + $0F], a
+;> wMusicWaveDecay = 0
 	ld [wMusicWaveDecay], a
+;> wMusicWaveDecayFrame = 0
 	ld [wMusicWaveDecayFrame], a
+;> wMusicWaveSwell = 0
 	ld [wMusicWaveSwell], a
+;> wMusicWaveSwellFrame = 0
 	ld [wMusicWaveSwellFrame], a
+;>@pd for i in range(6): wMusicPitchDrop[i] = 0
 	ld [wMusicPitchDrop], a
-	ld [$d3b7], a
-	ld [$d3b8], a
-	ld [$d3b9], a
-	ld [$d3ba], a
-	ld [$d3bb], a
+	ld [wMusicPitchDrop + 1], a
+	ld [wMusicPitchDrop + 2], a
+;=@pd
+	ld [wMusicPitchDrop + 3], a
+	ld [wMusicPitchDrop + 4], a
+	ld [wMusicPitchDrop + 5], a
+;> wJingleStep = 0
 	ld [wJingleStep], a
-	ld [$d395], a
+;> mem[0xD395] = 0
+	ld [wUnusedSfxStep], a
+;> wWaveSfxStep = 0
 	ld [wWaveSfxStep], a
+;> wJingleTimer = 0
 	ld [wJingleTimer], a
-	ld [$d391], a
+;> mem[0xD391] = 0
+	ld [wUnusedSfxTimer], a
+;> wWaveSfxTimer = 0
 	ld [wWaveSfxTimer], a
+;> wJingleLocked = 0
 	ld [wJingleLocked], a
-	ld [$d3c7], a
+;> mem[0xD3C7] = 0
+	ld [wUnusedSfxLocked], a
+;> wWaveSfxLocked = 0
 	ld [wWaveSfxLocked], a
-	ld [$d3a0], a
-	ld [$d3a1], a
-	ld [$d3a2], a
+;> mem[0xD3A0] = 0
+	ld [wSoundUnusedA0], a
+;> mem[0xD3A1] = 0
+	ld [wSoundUnusedA1], a
+;> mem[0xD3A2] = 0
+	ld [wSoundUnusedA2], a
+;> wMusicBlocksWaveSfx = 0
 	ld [wMusicBlocksWaveSfx], a
-	ld [$d3d6], a
-	ld [$d3d7], a
-	ld [$d3d8], a
-	ld [$d3dc], a
+;> mem[0xD3D6] = 0
+	ld [wSfxFastVariant], a
+;> mem[0xD3D7] = 0
+	ld [wJingle22Count], a
+;> mem[0xD3D8] = 0
+	ld [wSoundUnusedD8], a
+;> mem[0xD3DC] = 0
+	ld [wWaveSfx1ECount], a
+;> wWaveRamDirty = 0
 	ld [wWaveRamDirty], a
-	ld [$d3e2], a
-	ld [$d3e3], a
-	ld [$d3e4], a
+;> mem[0xD3E2] = 0
+	ld [wJingleSubStep], a
+;> mem[0xD3E3] = 0
+	ld [wSoundUnusedE3], a
+;> mem[0xD3E4] = 0
+	ld [wSoundUnusedE4], a
+;> rNR12 = 0x08                              # square channels: volume 0
 	ld a, $08
 	ldh [rNR12], a
+;> rNR22 = 0x08
 	ldh [rNR22], a
+;> rNR14 = 0x80                              # restarted: silent
 	ld a, $80
 	ldh [rNR14], a
+;> rNR24 = 0x80
 	ldh [rNR24], a
+;> rNR10 = 0                                 # no sweep
 	xor a
 	ldh [rNR10], a
+;> rNR30 = 0                                 # wave DAC off
 	ldh [rNR30], a
 	ret
 

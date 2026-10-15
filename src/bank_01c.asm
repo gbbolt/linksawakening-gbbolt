@@ -5,182 +5,272 @@
 
 SECTION "ROM Bank $01c", ROMX[$4000], BANK[$1c]
 
+;@ path: text/dialog
+;@ A single byte ($01) in front of DialogPointers; nothing reads it as part of a table.
 DialogTablesStart::
 	db $01
 
+;@ path: text/dialog
+;@ The address of each of the 640 dialogs ($000-$27F; OpenDialog opens $000-$0FF, OpenDialogTable1 $100-$1FF, OpenDialogTable2 $200-$27F), one word per dialog; the bank comes from DialogBanks. Read by DialogStateDrawChar. Addresses without a label lie in bank $14; $0000 marks an unused number. Text format: one byte per character, mostly ASCII (^ is the apostrophe, # types the next letter of the player's name, other codes are symbols and item pictures of the font, see DialogCharGlyphs); the box shows 16 characters per line, 2 lines at a time, so the texts are padded with spaces; $FF ends a text, $FE ends it with a choice of two answers.
 DialogPointers::
-	db $00, $5c, $59, $5c, $1a, $5d, $b9, $5d, $45, $5e, $93, $5e, $da, $5e, $86
-	db $5f, $c5, $5f, $12, $60, $72, $60, $17, $61, $64, $61, $ac, $61, $fa, $61, $84
-	db $62, $ee, $62, $3e, $63, $6f, $63, $15, $64, $71, $64, $d7, $64, $11, $65, $7d
-	db $65, $da, $65, $19, $66, $58, $66, $01, $67, $37, $67, $62, $67, $bc, $67, $f6
-	db $67, $1e, $68, $27, $68, $68, $68, $81, $68, $9a, $68, $f3, $68, $4f, $69, $ab
-	db $69, $29, $6a, $80, $6a, $e1, $6a, $2c, $6b, $2c, $6b, $5c, $6b, $8b, $6b, $ca
-	db $6b, $f7, $6b, $38, $6c, $67, $6c, $96, $6c, $c5, $6c, $14, $6d, $34, $6d, $6e
-	db $6d, $6e, $6d, $b6, $6d, $06, $6e, $06, $6e, $32, $6e, $9d, $6e, $cc, $6e, $e8
-	db $6e, $f3, $6e, $23, $6f, $6b, $6f, $ac, $6f, $0b, $70, $57, $70, $b8, $70, $e7
-	db $70, $67, $71, $a8, $71, $e9, $71, $4a, $72, $96, $72, $c7, $72, $33, $73, $a1
-	db $73, $c2, $73, $13, $74, $49, $74, $84, $74, $cb, $74, $88, $75, $38, $76, $57
-	db $76, $78, $76, $99, $76, $ba, $76, $db, $76, $fc, $76, $1d, $77, $3e, $77, $4f
-	db $77, $4f, $77, $60, $77, $7c, $77, $8a, $77, $a7, $77, $b6, $77, $c7, $77, $e8
-	db $77, $f7, $77, $06, $78, $16, $78, $27, $78, $38, $78, $59, $78, $6a, $78, $7b
-	db $78, $8c, $78, $9d, $78, $ae, $78, $bf, $78, $cf, $78, $de, $78, $ee, $78, $fe
-	db $78, $0e, $79, $1e, $79, $2e, $79, $3f, $79, $5b, $79, $6c, $79, $9c, $79, $bd
-	db $79, $00, $57, $1d, $57, $39, $57, $4a, $57, $5b, $57, $6c, $57, $7d, $57, $8e
-	db $57, $9f, $57, $b0, $57, $c1, $57, $0f, $58, $59, $58, $9a, $58, $f8, $58, $36
-	db $59, $57, $59, $9f, $59, $e0, $59, $a1, $5a, $e9, $5a, $3a, $5b, $84, $5b, $c5
-	db $5b, $12, $5c, $4e, $5c, $99, $5c, $99, $5c, $e9, $5c, $4a, $5d, $a2, $5d, $a2
-	db $5d, $e8, $5d, $e8, $5d, $28, $5e, $71, $5e, $8d, $5e, $a7, $5e, $c1, $5e, $00
-	db $5f, $c1, $5f, $17, $60, $6d, $60, $a3, $60, $ce, $60, $fd, $60, $2d, $61, $5e
-	db $61, $ab, $61, $cc, $61, $fc, $61, $3c, $62, $9d, $62, $d7, $62, $55, $63, $b3
-	db $63, $2f, $64, $2f, $64, $ae, $64, $05, $65, $05, $65, $62, $65, $12, $66, $12
-	db $66, $12, $66, $c3, $67, $54, $68, $b2, $69, $21, $6a, $f2, $6a, $32, $6c, $d3
-	db $6c, $81, $6d, $02, $6f, $fe, $6f, $ce, $70, $bd, $71, $fd, $72, $49, $73, $49
-	db $73, $5a, $75, $88, $77, $88, $77, $c7, $77, $c7, $77, $c7, $77, $d8, $77, $d8
-	db $77, $24, $78, $6e, $78, $cc, $79, $f8, $79, $78, $7a, $77, $7b, $a6, $7b, $dc
-	db $7b, $4d, $7c, $99, $7c, $17, $7d, $65, $7d, $b3, $7d, $01, $7e, $70, $7e, $d0
-	db $7e, $00, $67, $50, $67, $ac, $67, $ac, $67, $ac, $67, $fa, $67, $58, $68, $a6
-	db $68, $0e, $69, $4e, $69, $7f, $69, $9a, $69, $b5, $69, $d5, $69, $13, $6b, $84
-	db $6b, $c4, $6b, $02, $6c, $73, $6c, $7c, $6c, $85, $6c, $bb, $6c, $f2, $6c, $51
-	db $6d, $00, $4a, $21, $4a, $3d, $4a, $5e, $4a, $79, $4a, $97, $4a, $b7, $4a, $e7
-	db $4a, $05, $4b, $31, $4b, $73, $4b, $a1, $4b, $cf, $4b, $fb, $4b, $29, $4c, $57
-	db $4c, $9c, $4c, $fb, $4c, $4b, $4d, $8b, $4d, $b7, $4d, $0e, $4e, $1f, $4e, $57
-	db $4e, $57, $4e, $d7, $4e, $6e, $4f, $e6, $4f, $5b, $50, $ab, $50, $17, $51, $96
-	db $51, $2c, $52, $90, $52, $f0, $52, $85, $53, $ba, $53, $ba, $53, $ba, $53, $ba
-	db $53, $d5, $53, $2d, $54, $7d, $54, $2d, $55, $69, $55, $aa, $55, $34, $56, $34
-	db $56, $0f, $57, $4e, $57, $d7, $57, $77, $58, $15, $59, $73, $59, $22, $5a, $70
-	db $5a, $b0, $5a, $df, $5a, $0e, $5b, $8e, $5c, $34, $5d, $92, $5d, $0a, $5e, $47
-	db $5e, $a7, $5e, $24, $5f, $a1, $5f, $62, $60, $22, $61, $10, $62, $8e, $62, $26
-	db $63, $e7, $63, $6f, $64, $f7, $64, $d4, $65, $61, $66, $df, $66, $6f, $67, $80
-	db $68, $0e, $69, $3f, $69, $7f, $69, $b0, $69, $e1, $69, $12, $6a, $51, $6a, $82
-	db $6a, $b2, $6a, $b2, $6a, $ce, $6a, $ee, $6a, $2d, $6b, $79, $6b, $d9, $6b, $26
-	db $6c, $46, $6c, $75, $6c, $b6, $6c, $f7, $6c, $24, $6d, $61, $6d, $9e, $6d, $7a
-	db $6e, $06, $6f, $76, $6f, $b3, $6f, $e2, $6f, $70, $70, $a0, $70, $00, $00, $00
-	db $00, $da, $70, $58, $71, $72, $71, $c0, $71, $11, $72, $2c, $72, $59, $72, $77
-	db $72, $f6, $72, $60, $73, $60, $73, $60, $73, $60, $73, $60, $73, $60, $73, $60
-	db $73, $00, $40, $61, $40, $0e, $41, $3d, $41, $65, $41, $95, $41, $e1, $41, $02
-	db $42, $2f, $42, $78, $42, $05, $43, $35, $43, $c2, $43, $49, $44, $83, $44, $a3
-	db $44, $a3, $44, $f2, $44, $71, $45, $20, $46, $50, $46, $f1, $46, $86, $47, $c7
-	db $47, $52, $48, $b3, $48, $da, $48, $1b, $49, $d3, $49, $1e, $4a, $2f, $4a, $50
-	db $4a, $50, $4a, $91, $4a, $ef, $4a, $30, $4b, $41, $4b, $62, $4b, $8b, $4b, $d4
-	db $4b, $e5, $4b, $15, $4c, $23, $4c, $31, $4c, $3f, $4c, $4d, $4c, $6a, $4c, $99
-	db $4c, $b7, $4c, $d6, $4c, $f5, $4c, $16, $4d, $37, $4d, $47, $4d, $68, $4d, $99
-	db $4d, $c8, $4d, $f6, $4d, $24, $4e, $45, $4e, $76, $4e, $a2, $4e, $da, $4e, $23
-	db $4f, $23, $4f, $82, $4f, $cf, $4f, $e9, $4f, $2a, $50, $2a, $50, $b4, $50, $80
-	db $51, $0f, $52, $2f, $52, $8e, $52, $fe, $52, $39, $53, $59, $53, $ca, $53, $2a
-	db $54, $96, $54, $d7, $54, $21, $55, $3e, $56, $77, $56, $d0, $56, $3f, $57, $6e
-	db $57, $88, $57, $93, $58, $73, $59, $c2, $59, $ff, $59, $5d, $5a, $a4, $5a, $f3
-	db $5a, $f3, $5a, $14, $5b, $73, $5b, $aa, $5b, $eb, $5b, $3c, $5c, $7b, $5c, $a6
-	db $5c, $46, $5d, $f2, $5d, $31, $5e, $6f, $5e, $a0, $5e, $cb, $5e, $f7, $5e, $f7
-	db $5e, $f7, $5e, $98, $5f, $be, $5f, $2c, $60, $4b, $60, $6b, $60, $c9, $60, $c9
-	db $60, $45, $61, $45, $61, $56, $61, $72, $61, $8b, $61, $a6, $61, $40, $62, $bc
-	db $62, $78, $63, $c7, $63, $97, $64, $e6, $64, $a6, $65, $e5, $65, $f5, $66, $34
-	db $67, $32, $68, $71, $68, $7e, $69, $ad, $69, $59, $6a, $e8, $6a, $46, $6b, $af
-	db $6b, $af, $6b, $de, $6b, $1f, $6c, $3f, $6c, $6f, $6c, $9e, $6c, $de, $6c, $2e
-	db $6d, $9c, $6d, $0a, $6e, $78, $6e, $e6, $6e, $17, $6f, $51, $6f, $77, $6f, $d6
-	db $6f, $d6, $6f, $85, $71, $01, $72, $52, $72, $72, $72, $b0, $72, $11, $73, $4c
-	db $73, $88, $73, $88, $73, $88, $73, $88, $73, $88, $73, $88, $73, $88, $73, $88
-	db $73, $88, $73, $b7, $73, $e7, $73, $18, $74, $47, $74, $76, $74, $86, $74, $e3
-	db $74, $0e, $75, $3f, $75, $6e, $75, $af, $75, $c0, $75, $c0, $75, $c0, $75, $c0
-	db $75, $c0, $75, $68, $76, $15, $77, $a3, $77, $74, $78, $f5, $78, $d3, $79, $b1
-	db $7a, $60, $7b, $ce, $7b, $ce, $7b, $5a, $7c, $9b, $7c, $b6, $7d, $30, $7e, $a8
-	db $7e, $f7, $7e, $47, $7f, $98, $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7
-	db $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7
-	db $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7
-	db $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7
-	db $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7, $7f, $b7, $7f, $00, $7d, $60
-	db $7d, $ae, $7d, $e7, $7d, $23, $7e, $3d, $7e, $64, $7e, $6d, $7e, $99, $7e, $c3
-	db $7e
+	dw $5c00, $5c59, $5d1a, $5db9  ; dialog $000-$003
+	dw $5e45, $5e93, $5eda, $5f86  ; dialog $004-$007
+	dw $5fc5, $6012, $6072, $6117  ; dialog $008-$00B
+	dw $6164, $61ac, $61fa, $6284  ; dialog $00C-$00F
+	dw $62ee, $633e, $636f, $6415  ; dialog $010-$013
+	dw $6471, $64d7, $6511, $657d  ; dialog $014-$017
+	dw $65da, $6619, $6658, $6701  ; dialog $018-$01B
+	dw $6737, $6762, $67bc, $67f6  ; dialog $01C-$01F
+	dw $681e, $6827, $6868, $6881  ; dialog $020-$023
+	dw $689a, $68f3, $694f, $69ab  ; dialog $024-$027
+	dw $6a29, $6a80, $6ae1, $6b2c  ; dialog $028-$02B
+	dw $6b2c, $6b5c, $6b8b, $6bca  ; dialog $02C-$02F
+	dw $6bf7, $6c38, $6c67, $6c96  ; dialog $030-$033
+	dw $6cc5, $6d14, $6d34, $6d6e  ; dialog $034-$037
+	dw $6d6e, $6db6, $6e06, $6e06  ; dialog $038-$03B
+	dw $6e32, $6e9d, $6ecc, $6ee8  ; dialog $03C-$03F
+	dw $6ef3, $6f23, $6f6b, $6fac  ; dialog $040-$043
+	dw $700b, $7057, $70b8, $70e7  ; dialog $044-$047
+	dw $7167, $71a8, $71e9, $724a  ; dialog $048-$04B
+	dw $7296, $72c7, $7333, $73a1  ; dialog $04C-$04F
+	dw $73c2, $7413, $7449, $7484  ; dialog $050-$053
+	dw $74cb, $7588, $7638, $7657  ; dialog $054-$057
+	dw $7678, $7699, $76ba, $76db  ; dialog $058-$05B
+	dw $76fc, $771d, $773e, $774f  ; dialog $05C-$05F
+	dw $774f, $7760, $777c, $778a  ; dialog $060-$063
+	dw $77a7, $77b6, $77c7, $77e8  ; dialog $064-$067
+	dw $77f7, $7806, $7816, $7827  ; dialog $068-$06B
+	dw $7838, $7859, $786a, $787b  ; dialog $06C-$06F
+	dw $788c, $789d, $78ae, $78bf  ; dialog $070-$073
+	dw $78cf, $78de, $78ee, $78fe  ; dialog $074-$077
+	dw $790e, $791e, $792e, $793f  ; dialog $078-$07B
+	dw $795b, $796c, $799c, $79bd  ; dialog $07C-$07F
+	dw Dialog080, Dialog081, Dialog082, Dialog083  ; dialog $080-$083
+	dw Dialog084, Dialog085, Dialog086, Dialog087  ; dialog $084-$087
+	dw Dialog088, Dialog089, Dialog08A, Dialog08B  ; dialog $088-$08B
+	dw Dialog08C, Dialog08D, Dialog08E, Dialog08F  ; dialog $08C-$08F
+	dw Dialog090, Dialog091, Dialog092, Dialog093  ; dialog $090-$093
+	dw Dialog094, Dialog095, Dialog096, Dialog097  ; dialog $094-$097
+	dw Dialog098, Dialog099, Dialog09A, Dialog09A  ; dialog $098-$09B
+	dw Dialog09C, Dialog09D, Dialog09E, Dialog09E  ; dialog $09C-$09F
+	dw Dialog0A0, Dialog0A0, Dialog0A2, Dialog0A3  ; dialog $0A0-$0A3
+	dw Dialog0A4, Dialog0A5, Dialog0A6, Dialog0A7  ; dialog $0A4-$0A7
+	dw Dialog0A8, Dialog0A9, Dialog0AA, Dialog0AB  ; dialog $0A8-$0AB
+	dw Dialog0AC, Dialog0AD, Dialog0AE, Dialog0AF  ; dialog $0AC-$0AF
+	dw Dialog0B0, Dialog0B1, Dialog0B2, Dialog0B3  ; dialog $0B0-$0B3
+	dw Dialog0B4, Dialog0B5, Dialog0B6, Dialog0B7  ; dialog $0B4-$0B7
+	dw Dialog0B8, Dialog0B8, Dialog0BA, Dialog0BB  ; dialog $0B8-$0BB
+	dw Dialog0BB, Dialog0BD, Dialog0BE, Dialog0BE  ; dialog $0BC-$0BF
+	dw Dialog0BE, Dialog0C1, Dialog0C2, Dialog0C3  ; dialog $0C0-$0C3
+	dw Dialog0C4, Dialog0C5, Dialog0C6, Dialog0C7  ; dialog $0C4-$0C7
+	dw Dialog0C8, Dialog0C9, Dialog0CA, Dialog0CB  ; dialog $0C8-$0CB
+	dw Dialog0CC, Dialog0CD, Dialog0CE, Dialog0CE  ; dialog $0CC-$0CF
+	dw Dialog0D0, Dialog0D1, Dialog0D1, Dialog0D3  ; dialog $0D0-$0D3
+	dw Dialog0D3, Dialog0D3, Dialog0D6, Dialog0D6  ; dialog $0D4-$0D7
+	dw Dialog0D8, Dialog0D9, Dialog0DA, Dialog0DB  ; dialog $0D8-$0DB
+	dw Dialog0DC, Dialog0DD, Dialog0DE, Dialog0DF  ; dialog $0DC-$0DF
+	dw Dialog0E0, Dialog0E1, Dialog0E2, Dialog0E3  ; dialog $0E0-$0E3
+	dw Dialog0E4, Dialog0E5, Dialog0E6, Dialog0E7  ; dialog $0E4-$0E7
+	dw Dialog0E8, Dialog0E9, Dialog0EA, Dialog0EA  ; dialog $0E8-$0EB
+	dw Dialog0EA, Dialog0ED, Dialog0EE, Dialog0EF  ; dialog $0EC-$0EF
+	dw Dialog0F0, Dialog0F1, Dialog0F2, Dialog0F3  ; dialog $0F0-$0F3
+	dw Dialog0F4, Dialog0F5, Dialog0F6, Dialog0F7  ; dialog $0F4-$0F7
+	dw Dialog0F8, Dialog0F9, Dialog0FA, Dialog0FB  ; dialog $0F8-$0FB
+	dw Dialog0FC, Dialog0FD, Dialog0FE, Dialog0FF  ; dialog $0FC-$0FF
+	dw Dialog100, Dialog101, Dialog102, Dialog103  ; dialog $100-$103
+	dw Dialog104, Dialog105, Dialog106, Dialog107  ; dialog $104-$107
+	dw Dialog108, Dialog109, Dialog10A, Dialog10B  ; dialog $108-$10B
+	dw Dialog10C, Dialog10D, Dialog10E, Dialog10F  ; dialog $10C-$10F
+	dw Dialog110, Dialog111, Dialog112, Dialog113  ; dialog $110-$113
+	dw Dialog114, Dialog115, Dialog116, Dialog117  ; dialog $114-$117
+	dw Dialog117, Dialog119, Dialog11A, Dialog11B  ; dialog $118-$11B
+	dw Dialog11C, Dialog11D, Dialog11E, Dialog11F  ; dialog $11C-$11F
+	dw Dialog120, Dialog121, Dialog122, Dialog123  ; dialog $120-$123
+	dw Dialog124, Dialog124, Dialog124, Dialog124  ; dialog $124-$127
+	dw Dialog128, Dialog129, Dialog12A, Dialog12B  ; dialog $128-$12B
+	dw Dialog12C, Dialog12D, Dialog12E, Dialog12E  ; dialog $12C-$12F
+	dw Dialog130, Dialog131, Dialog132, Dialog133  ; dialog $130-$133
+	dw Dialog134, Dialog135, Dialog136, Dialog137  ; dialog $134-$137
+	dw Dialog138, Dialog139, Dialog13A, Dialog13B  ; dialog $138-$13B
+	dw Dialog13C, Dialog13D, Dialog13E, Dialog13F  ; dialog $13C-$13F
+	dw Dialog140, Dialog141, Dialog142, Dialog143  ; dialog $140-$143
+	dw Dialog144, Dialog145, Dialog146, Dialog147  ; dialog $144-$147
+	dw Dialog148, Dialog149, Dialog14A, Dialog14B  ; dialog $148-$14B
+	dw Dialog14C, Dialog14D, Dialog14E, Dialog14F  ; dialog $14C-$14F
+	dw Dialog150, Dialog151, Dialog152, Dialog153  ; dialog $150-$153
+	dw Dialog154, Dialog155, Dialog156, Dialog157  ; dialog $154-$157
+	dw Dialog158, Dialog158, Dialog15A, Dialog15B  ; dialog $158-$15B
+	dw Dialog15C, Dialog15D, Dialog15E, Dialog15F  ; dialog $15C-$15F
+	dw Dialog160, Dialog161, Dialog162, Dialog163  ; dialog $160-$163
+	dw Dialog164, Dialog165, Dialog166, Dialog167  ; dialog $164-$167
+	dw Dialog168, Dialog169, Dialog16A, Dialog16B  ; dialog $168-$16B
+	dw Dialog16C, Dialog16D, $0000, $0000  ; dialog $16C-$16F
+	dw Dialog170, Dialog171, Dialog172, Dialog173  ; dialog $170-$173
+	dw Dialog174, Dialog175, Dialog176, Dialog177  ; dialog $174-$177
+	dw Dialog178, Dialog179, Dialog179, Dialog179  ; dialog $178-$17B
+	dw Dialog179, Dialog179, Dialog179, Dialog179  ; dialog $17C-$17F
+	dw Dialog180, Dialog181, Dialog182, Dialog183  ; dialog $180-$183
+	dw Dialog184, Dialog185, Dialog186, Dialog187  ; dialog $184-$187
+	dw Dialog188, Dialog189, Dialog18A, Dialog18B  ; dialog $188-$18B
+	dw Dialog18C, Dialog18D, Dialog18E, Dialog18F  ; dialog $18C-$18F
+	dw Dialog18F, Dialog191, Dialog192, Dialog193  ; dialog $190-$193
+	dw Dialog194, Dialog195, Dialog196, Dialog197  ; dialog $194-$197
+	dw Dialog198, Dialog199, Dialog19A, Dialog19B  ; dialog $198-$19B
+	dw Dialog19C, Dialog19D, Dialog19E, Dialog19F  ; dialog $19C-$19F
+	dw Dialog19F, Dialog1A1, Dialog1A2, Dialog1A3  ; dialog $1A0-$1A3
+	dw Dialog1A4, Dialog1A5, Dialog1A6, Dialog1A7  ; dialog $1A4-$1A7
+	dw Dialog1A8, Dialog1A9, Dialog1AA, Dialog1AB  ; dialog $1A8-$1AB
+	dw Dialog1AC, Dialog1AD, Dialog1AE, Dialog1AF  ; dialog $1AC-$1AF
+	dw Dialog1B0, Dialog1B1, Dialog1B2, Dialog1B3  ; dialog $1B0-$1B3
+	dw Dialog1B4, Dialog1B5, Dialog1B6, Dialog1B7  ; dialog $1B4-$1B7
+	dw Dialog1B8, Dialog1B9, Dialog1BA, Dialog1BB  ; dialog $1B8-$1BB
+	dw Dialog1BC, Dialog1BD, Dialog1BE, Dialog1BF  ; dialog $1BC-$1BF
+	dw Dialog1BF, Dialog1C1, Dialog1C2, Dialog1C3  ; dialog $1C0-$1C3
+	dw Dialog1C4, Dialog1C4, Dialog1C6, Dialog1C7  ; dialog $1C4-$1C7
+	dw Dialog1C8, Dialog1C9, Dialog1CA, Dialog1CB  ; dialog $1C8-$1CB
+	dw Dialog1CC, Dialog1CD, Dialog1CE, Dialog1CF  ; dialog $1CC-$1CF
+	dw Dialog1D0, Dialog1D1, Dialog1D2, Dialog1D3  ; dialog $1D0-$1D3
+	dw Dialog1D4, Dialog1D5, Dialog1D6, Dialog1D7  ; dialog $1D4-$1D7
+	dw Dialog1D8, Dialog1D9, Dialog1DA, Dialog1DB  ; dialog $1D8-$1DB
+	dw Dialog1DC, Dialog1DD, Dialog1DE, Dialog1DF  ; dialog $1DC-$1DF
+	dw Dialog1DF, Dialog1E1, Dialog1E2, Dialog1E3  ; dialog $1E0-$1E3
+	dw Dialog1E4, Dialog1E5, Dialog1E6, Dialog1E7  ; dialog $1E4-$1E7
+	dw Dialog1E8, Dialog1E9, Dialog1EA, Dialog1EB  ; dialog $1E8-$1EB
+	dw Dialog1EC, Dialog1ED, Dialog1EE, Dialog1EE  ; dialog $1EC-$1EF
+	dw Dialog1EE, Dialog1F1, Dialog1F2, Dialog1F3  ; dialog $1F0-$1F3
+	dw Dialog1F4, Dialog1F5, Dialog1F6, Dialog1F6  ; dialog $1F4-$1F7
+	dw Dialog1F8, Dialog1F8, Dialog1FA, Dialog1FB  ; dialog $1F8-$1FB
+	dw Dialog1FC, Dialog1FD, Dialog1FE, Dialog1FF  ; dialog $1FC-$1FF
+	dw Dialog200, Dialog201, Dialog202, Dialog203  ; dialog $200-$203
+	dw Dialog204, Dialog205, Dialog206, Dialog207  ; dialog $204-$207
+	dw Dialog208, Dialog209, Dialog20A, Dialog20B  ; dialog $208-$20B
+	dw Dialog20C, Dialog20D, Dialog20E, Dialog20F  ; dialog $20C-$20F
+	dw Dialog20F, Dialog211, Dialog212, Dialog213  ; dialog $210-$213
+	dw Dialog214, Dialog215, Dialog216, Dialog217  ; dialog $214-$217
+	dw Dialog218, Dialog219, Dialog21A, Dialog21B  ; dialog $218-$21B
+	dw Dialog21C, Dialog21D, Dialog21E, Dialog21F  ; dialog $21C-$21F
+	dw Dialog21F, Dialog221, Dialog222, Dialog223  ; dialog $220-$223
+	dw Dialog224, Dialog225, Dialog226, Dialog227  ; dialog $224-$227
+	dw Dialog228, Dialog228, Dialog228, Dialog228  ; dialog $228-$22B
+	dw Dialog228, Dialog228, Dialog228, Dialog228  ; dialog $22C-$22F
+	dw Dialog228, Dialog231, Dialog232, Dialog233  ; dialog $230-$233
+	dw Dialog234, Dialog235, Dialog236, Dialog237  ; dialog $234-$237
+	dw Dialog238, Dialog239, Dialog23A, Dialog23B  ; dialog $238-$23B
+	dw Dialog23C, Dialog23C, Dialog23C, Dialog23C  ; dialog $23C-$23F
+	dw Dialog23C, Dialog241, Dialog242, Dialog243  ; dialog $240-$243
+	dw Dialog244, Dialog245, Dialog246, Dialog247  ; dialog $244-$247
+	dw Dialog248, Dialog249, Dialog249, Dialog24B  ; dialog $248-$24B
+	dw Dialog24C, Dialog24D, Dialog24E, Dialog24F  ; dialog $24C-$24F
+	dw Dialog250, Dialog251, Dialog252, Dialog253  ; dialog $250-$253
+	dw Dialog253, Dialog253, Dialog253, Dialog253  ; dialog $254-$257
+	dw Dialog253, Dialog253, Dialog253, Dialog253  ; dialog $258-$25B
+	dw Dialog253, Dialog253, Dialog253, Dialog253  ; dialog $25C-$25F
+	dw Dialog253, Dialog253, Dialog253, Dialog253  ; dialog $260-$263
+	dw Dialog253, Dialog253, Dialog253, Dialog253  ; dialog $264-$267
+	dw Dialog253, Dialog253, Dialog253, Dialog253  ; dialog $268-$26B
+	dw Dialog253, Dialog253, Dialog253, Dialog253  ; dialog $26C-$26F
+	dw Dialog253, Dialog253, Dialog253, Dialog253  ; dialog $270-$273
+	dw Dialog253, Dialog253, Dialog276, Dialog277  ; dialog $274-$277
+	dw Dialog278, Dialog279, Dialog27A, Dialog27B  ; dialog $278-$27B
+	dw Dialog27C, Dialog27D, Dialog27E, Dialog27F  ; dialog $27C-$27F
 
+;@ path: text/dialog
+;@ Low byte of the VRAM address of the text tile of each of the 32 character places of the dialog box (where DialogStateDrawChar copies the glyph).
 DialogCharTileLow::
-	db $00, $10, $20, $30, $40, $50, $60, $70, $80, $90, $a0, $b0, $c0, $d0, $e0
-	db $f0, $00, $10, $20, $30, $40, $50, $60, $70, $80, $90, $a0, $b0, $c0, $d0, $e0
-	db $f0
+	db $00, $10, $20, $30, $40, $50, $60, $70, $80, $90, $a0, $b0, $c0, $d0, $e0, $f0
+	db $00, $10, $20, $30, $40, $50, $60, $70, $80, $90, $a0, $b0, $c0, $d0, $e0, $f0
 
+;@ path: text/dialog
+;@ High byte of the VRAM address of the text tile of each of the 32 character places (with DialogCharTileLow).
 DialogCharTileHigh::
-	db $8d, $8d, $8d, $8d, $8d, $8d, $8d, $8d, $8d, $8d, $8d, $8d, $8d, $8d, $8d
-	db $8d, $8e, $8e, $8e, $8e, $8e, $8e, $8e, $8e, $8e, $8e, $8e, $8e, $8e, $8e, $8e
-	db $8e
+	db $8d, $8d, $8d, $8d, $8d, $8d, $8d, $8d, $8d, $8d, $8d, $8d, $8d, $8d, $8d, $8d
+	db $8e, $8e, $8e, $8e, $8e, $8e, $8e, $8e, $8e, $8e, $8e, $8e, $8e, $8e, $8e, $8e
 
+;@ path: text/dialog
+;@ The tile number of each of the 32 character places (the tile DialogStatePlaceChar puts into the BG map).
 DialogCharTileNumbers::
-	db $d0, $d1, $d2, $d3, $d4, $d5, $d6, $d7, $d8, $d9, $da, $db, $dc, $dd, $de
-	db $df, $e0, $e1, $e2, $e3, $e4, $e5, $e6, $e7, $e8, $e9, $ea, $eb, $ec, $ed, $ee
-	db $ef
+	db $d0, $d1, $d2, $d3, $d4, $d5, $d6, $d7, $d8, $d9, $da, $db, $dc, $dd, $de, $df
+	db $e0, $e1, $e2, $e3, $e4, $e5, $e6, $e7, $e8, $e9, $ea, $eb, $ec, $ed, $ee, $ef
 
+;@ path: text/dialog
+;@ High byte of the BG map offset of each character place: 32 for the box at the top of the screen, then 32 for the box at the bottom (added to wBGOriginHigh).
 DialogCharBGHigh::
-	db $98, $98, $98, $98, $98, $98, $98, $98, $98, $98, $98, $98, $98, $98, $98
 	db $98, $98, $98, $98, $98, $98, $98, $98, $98, $98, $98, $98, $98, $98, $98, $98
-	db $98, $99, $99, $99, $99, $99, $99, $99, $99, $99, $99, $99, $99, $99, $99, $99
+	db $98, $98, $98, $98, $98, $98, $98, $98, $98, $98, $98, $98, $98, $98, $98, $98
 	db $99, $99, $99, $99, $99, $99, $99, $99, $99, $99, $99, $99, $99, $99, $99, $99
-	db $99
+	db $99, $99, $99, $99, $99, $99, $99, $99, $99, $99, $99, $99, $99, $99, $99, $99
 
+;@ path: text/dialog
+;@ Low byte of the BG map offset of each character place, top box then bottom box (added to wBGOriginLow, wrapping within the BG map row).
 DialogCharBGLow::
-	db $42, $43, $44, $45, $46, $47, $48, $49, $4a, $4b, $4c, $4d, $4e, $4f, $50
-	db $51, $82, $83, $84, $85, $86, $87, $88, $89, $8a, $8b, $8c, $8d, $8e, $8f, $90
-	db $91, $62, $63, $64, $65, $66, $67, $68, $69, $6a, $6b, $6c, $6d, $6e, $6f, $70
-	db $71, $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $aa, $ab, $ac, $ad, $ae, $af, $b0
-	db $b1
+	db $42, $43, $44, $45, $46, $47, $48, $49, $4a, $4b, $4c, $4d, $4e, $4f, $50, $51
+	db $82, $83, $84, $85, $86, $87, $88, $89, $8a, $8b, $8c, $8d, $8e, $8f, $90, $91
+	db $62, $63, $64, $65, $66, $67, $68, $69, $6a, $6b, $6c, $6d, $6e, $6f, $70, $71
+	db $a2, $a3, $a4, $a5, $a6, $a7, $a8, $a9, $aa, $ab, $ac, $ad, $ae, $af, $b0, $b1
 
+;@ path: text/dialog
+;@ The glyph of each character code: the number of its 16-byte tile in the font at $5000 (DialogTypeChar); 0 = the blank glyph. Codes $41-$5A are A-Z, $61-$7A a-z, $30-$39 the digits; codes from $80 on are symbols and the pictures of the trading items.
 DialogCharGlyphs::
-	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-	db $00, $7e, $3d, $41, $00, $8a, $8b, $44, $40, $45, $46, $8c, $8d, $3a, $3f, $3b
-	db $00, $70, $71, $72, $73, $74, $75, $76, $77, $78, $79, $42, $43, $8e, $00, $8f
-	db $3c, $00, $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $0a, $0b, $0c, $0d
-	db $0e, $0f, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $00, $00, $00, $40
-	db $00, $00, $1a, $1b, $1c, $1d, $1e, $1f, $20, $21, $22, $23, $24, $25, $26, $27
-	db $28, $29, $2a, $2b, $2c, $2d, $2e, $2f, $30, $31, $32, $3e, $00, $00, $00, $00
-	db $00, $47, $48, $49, $4a, $4b, $4c, $4d, $4e, $4f, $50, $51, $52, $53, $59, $5a
-	db $5b, $5c, $5d, $59, $5a, $5b, $5c, $5d, $32, $6f, $6d, $6e, $00, $00, $00, $00
-	db $00, $3d, $3c, $3f, $7e, $39, $3a, $3b, $7a, $7b, $00, $00, $00, $00, $00, $00
-	db $00, $70, $71, $72, $73, $74, $75, $76, $77, $78, $79, $9b, $9c, $9d, $9e, $9f
-	db $38, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-	db $00, $80, $81, $82, $83, $84, $85, $86, $87, $88, $89, $8a, $8b, $8c, $8d, $8e
-	db $8f, $88, $90, $91, $92, $93, $94, $95, $89, $96, $97, $98, $99, $9a, $87, $86
-	db $00, $34, $35, $36, $37, $00, $00, $00, $00, $00, $00, $00, $00, $00, $7e, $00
-	db $00
+	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00  ; codes $00-$0F
+	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00  ; codes $10-$1F
+	db $7e, $3d, $41, $00, $8a, $8b, $44, $40, $45, $46, $8c, $8d, $3a, $3f, $3b, $00  ; codes $20-$2F
+	db $70, $71, $72, $73, $74, $75, $76, $77, $78, $79, $42, $43, $8e, $00, $8f, $3c  ; codes $30-$3F
+	db $00, $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $0a, $0b, $0c, $0d, $0e  ; codes $40-$4F
+	db $0f, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $00, $00, $00, $40, $00  ; codes $50-$5F
+	db $00, $1a, $1b, $1c, $1d, $1e, $1f, $20, $21, $22, $23, $24, $25, $26, $27, $28  ; codes $60-$6F
+	db $29, $2a, $2b, $2c, $2d, $2e, $2f, $30, $31, $32, $3e, $00, $00, $00, $00, $00  ; codes $70-$7F
+	db $47, $48, $49, $4a, $4b, $4c, $4d, $4e, $4f, $50, $51, $52, $53, $59, $5a, $5b  ; codes $80-$8F
+	db $5c, $5d, $59, $5a, $5b, $5c, $5d, $32, $6f, $6d, $6e, $00, $00, $00, $00, $00  ; codes $90-$9F
+	db $3d, $3c, $3f, $7e, $39, $3a, $3b, $7a, $7b, $00, $00, $00, $00, $00, $00, $00  ; codes $A0-$AF
+	db $70, $71, $72, $73, $74, $75, $76, $77, $78, $79, $9b, $9c, $9d, $9e, $9f, $38  ; codes $B0-$BF
+	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00  ; codes $C0-$CF
+	db $80, $81, $82, $83, $84, $85, $86, $87, $88, $89, $8a, $8b, $8c, $8d, $8e, $8f  ; codes $D0-$DF
+	db $88, $90, $91, $92, $93, $94, $95, $89, $96, $97, $98, $99, $9a, $87, $86, $00  ; codes $E0-$EF
+	db $34, $35, $36, $37, $00, $00, $00, $00, $00, $00, $00, $00, $00, $7e, $00, $00  ; codes $F0-$FF
 
+;@ path: text/dialog
+;@ The ROM bank of each dialog's text (bits 0-4: $09, $14, $16, $1C or $1D), one byte per dialog; bit 7 set means the B button does not hurry the text along.
 DialogBanks::
-	db $14, $94, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14
-	db $94, $14, $14, $14, $94, $14, $14, $94, $14, $14, $14, $14, $14, $14, $14, $14
-	db $14, $14, $14, $14, $14, $14, $14, $94, $14, $14, $14, $14, $14, $14, $14, $14
-	db $14, $14, $14, $14, $14, $14, $14, $94, $14, $94, $14, $14, $14, $14, $14, $14
-	db $14, $14, $14, $14, $14, $14, $94, $94, $94, $94, $94, $94, $94, $94, $94, $94
-	db $94, $94, $94, $94, $94, $94, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14
-	db $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14
-	db $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14
-	db $14, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16
-	db $16, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96
-	db $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96
-	db $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96
-	db $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96
-	db $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $16, $16, $16, $16, $16
-	db $16, $16, $96, $96, $96, $96, $96, $16, $16, $09, $89, $09, $09, $09, $09, $09
-	db $09, $09, $09, $09, $09, $09, $89, $89, $89, $09, $09, $09, $09, $09, $09, $89
-	db $09, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $9c, $9c, $9c, $9c, $9c, $9c, $9c
-	db $9c, $9c, $9c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c
-	db $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c
-	db $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c
-	db $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c
-	db $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c
-	db $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $9c, $1c, $1c, $1c, $1c, $1c, $1c, $1c
-	db $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c
-	db $1c, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d
-	db $1d, $1d, $9d, $1d, $1d, $9d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d
-	db $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d
-	db $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d
-	db $1d, $1d, $9d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d
-	db $1d, $1d, $1d, $1d, $1d, $1d, $9d, $1d, $1d, $9d, $9d, $1d, $1d, $1d, $1d, $1d
-	db $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $9d, $1d, $1d, $1d
-	db $1d, $1d, $1d, $1d, $1d, $1d, $9d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $9d
-	db $9d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d
-	db $1d, $9d, $9d, $1d, $9d, $9d, $9d, $9d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d
-	db $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d
-	db $1d, $1d, $1d, $1d, $1d, $1d, $9d, $9d, $9d, $9d, $9d, $9d, $9d, $1d, $1d, $1d
-	db $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d
-	db $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d
-	db $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d
-	db $1d, $1d, $1d, $1d, $1d, $1d, $1d, $09, $09, $09, $09, $09, $09, $09, $09, $09
-	db $09
+	db $14, $94, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $94  ; dialog $000-$00F
+	db $14, $14, $14, $94, $14, $14, $94, $14, $14, $14, $14, $14, $14, $14, $14, $14  ; dialog $010-$01F
+	db $14, $14, $14, $14, $14, $14, $94, $14, $14, $14, $14, $14, $14, $14, $14, $14  ; dialog $020-$02F
+	db $14, $14, $14, $14, $14, $14, $94, $14, $94, $14, $14, $14, $14, $14, $14, $14  ; dialog $030-$03F
+	db $14, $14, $14, $14, $14, $94, $94, $94, $94, $94, $94, $94, $94, $94, $94, $94  ; dialog $040-$04F
+	db $94, $94, $94, $94, $94, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14  ; dialog $050-$05F
+	db $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14  ; dialog $060-$06F
+	db $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14, $14  ; dialog $070-$07F
+	db $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16, $16  ; dialog $080-$08F
+	db $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96  ; dialog $090-$09F
+	db $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96  ; dialog $0A0-$0AF
+	db $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96  ; dialog $0B0-$0BF
+	db $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $96  ; dialog $0C0-$0CF
+	db $96, $96, $96, $96, $96, $96, $96, $96, $96, $96, $16, $16, $16, $16, $16, $16  ; dialog $0D0-$0DF
+	db $16, $96, $96, $96, $96, $96, $16, $16, $09, $89, $09, $09, $09, $09, $09, $09  ; dialog $0E0-$0EF
+	db $09, $09, $09, $09, $09, $89, $89, $89, $09, $09, $09, $09, $09, $09, $89, $09  ; dialog $0F0-$0FF
+	db $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $9c, $9c, $9c, $9c, $9c, $9c, $9c, $9c  ; dialog $100-$10F
+	db $9c, $9c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c  ; dialog $110-$11F
+	db $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c  ; dialog $120-$12F
+	db $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c  ; dialog $130-$13F
+	db $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c  ; dialog $140-$14F
+	db $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c  ; dialog $150-$15F
+	db $1c, $1c, $1c, $1c, $1c, $1c, $1c, $9c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c  ; dialog $160-$16F
+	db $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c, $1c  ; dialog $170-$17F
+	db $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d  ; dialog $180-$18F
+	db $1d, $9d, $1d, $1d, $9d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d  ; dialog $190-$19F
+	db $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d  ; dialog $1A0-$1AF
+	db $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d  ; dialog $1B0-$1BF
+	db $1d, $9d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d  ; dialog $1C0-$1CF
+	db $1d, $1d, $1d, $1d, $1d, $9d, $1d, $1d, $9d, $9d, $1d, $1d, $1d, $1d, $1d, $1d  ; dialog $1D0-$1DF
+	db $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $9d, $1d, $1d, $1d, $1d  ; dialog $1E0-$1EF
+	db $1d, $1d, $1d, $1d, $1d, $9d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $9d, $9d  ; dialog $1F0-$1FF
+	db $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d  ; dialog $200-$20F
+	db $9d, $9d, $1d, $9d, $9d, $9d, $9d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d  ; dialog $210-$21F
+	db $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d  ; dialog $220-$22F
+	db $1d, $1d, $1d, $1d, $1d, $9d, $9d, $9d, $9d, $9d, $9d, $9d, $1d, $1d, $1d, $1d  ; dialog $230-$23F
+	db $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d  ; dialog $240-$24F
+	db $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d  ; dialog $250-$25F
+	db $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d, $1d  ; dialog $260-$26F
+	db $1d, $1d, $1d, $1d, $1d, $1d, $09, $09, $09, $09, $09, $09, $09, $09, $09, $09  ; dialog $270-$27F
 
 ;@ path: unused
 ;@ Free space at the end of the bank's data, filled with $FF.

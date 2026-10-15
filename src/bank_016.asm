@@ -7,7 +7,7 @@ SECTION "ROM Bank $016", ROMX[$4000], BANK[$16]
 
 ;@ path: world/overworld/entities
 ;@ The address of each overworld room's entity list, one word per room (room = row * 16 + column).
-;@ Entity list format: pairs of position YX (Y = row 0-7 in the high nibble, X = column 0-9 in the low nibble, in 16-pixel cells) and entity type (the handler number of JumpTable_3953), up to the end byte $FF. When a room is entered the loader (around $3738) spawns the entries in order; entries 0-7 are skipped while their bit in the room's byte at $CF00 is set (the enemies already beaten there).
+;@ Entity list format: pairs of position YX (Y = row 0-7 in the high nibble, X = column 0-9 in the low nibble, in 16-pixel cells) and entity type (the handler number of EntityHandlers), up to the end byte $FF. When a room is entered the loader (around $3738) spawns the entries in order; entries 0-7 are skipped while their bit in the room's byte at $CF00 is set (the enemies already beaten there).
 OverworldEntityPointers::
 	dw OverworldEntities00, OverworldEntities01, OverworldEntities02, OverworldEntities03  ; room $00-$03
 	dw OverworldEntities04, OverworldEntities05, OverworldEntities06, OverworldEntities07  ; room $04-$07
@@ -5668,926 +5668,1128 @@ Bank16FreeSpace1::
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
+;@ path: text/dialogs
+;@ Dialog $080: "Crazy Tracy's Health Spa"
 Dialog080::
-	db $20, $43, $72, $61, $7a, $79, $20, $54, $72, $61, $63, $79, $5e, $73, $20, $20
-	db $20, $20, $48, $65, $61, $6c, $74, $68, $20, $53, $70, $61, $ff
+	db " Crazy Tracy^s  "
+	db "  Health Spa"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $081: "Quadruplet's House"
 Dialog081::
-	db $51, $75, $61
-	db $64, $72, $75, $70, $6c, $65, $74, $5e, $73, $20, $20, $20, $20, $20, $20, $20
-	db $20, $20, $20, $48, $6f, $75, $73, $65, $ff
+	db "Quadruplet^s    "
+	db "      House"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $082: "Dream Shrine"
 Dialog082::
-	db $20, $20, $44, $72, $65, $61, $6d
-	db $20, $53, $68, $72, $69, $6e, $65, $20, $20, $ff
+	db "  Dream Shrine  "
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $083: "Telephone Booth"
 Dialog083::
-	db $54, $65, $6c, $65, $70, $68
-	db $6f, $6e, $65, $20, $42, $6f, $6f, $74, $68, $20, $ff
+	db "Telephone Booth "
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $084: "Seashell Mansion"
 Dialog084::
-	db $53, $65, $61, $73, $68
-	db $65, $6c, $6c, $20, $4d, $61, $6e, $73, $69, $6f, $6e, $ff
+	db "Seashell Mansion"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $085: "Richard's Villa"
 Dialog085::
-	db $52, $69, $63, $68
-	db $61, $72, $64, $5e, $73, $20, $56, $69, $6c, $6c, $61, $20, $ff
+	db "Richard^s Villa "
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $086: "Hen House"
 Dialog086::
-	db $20, $20, $20
-	db $20, $20, $48, $65, $6e, $20, $48, $6f, $75, $73, $65, $20, $20, $ff
+	db "     Hen House  "
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $087: "Village Library"
 Dialog087::
-	db $56, $69
-	db $6c, $6c, $61, $67, $65, $20, $4c, $69, $62, $72, $61, $72, $79, $20, $ff
+	db "Village Library "
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $088: "Raft Shop"
 Dialog088::
-	db $20
-	db $20, $20, $20, $52, $61, $66, $74, $20, $53, $68, $6f, $70, $20, $20, $20, $ff
+	db "    Raft Shop   "
+	db $ff  ; end
+;@ path: text/dialogs
+;@ Dialog $089: "Warp Hole"
 Dialog089::
-	db $20, $20, $20, $20, $57, $61, $72, $70, $20, $48, $6f, $6c, $65, $20, $20, $20
-	db $ff
+	db "    Warp Hole   "
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $08A: "This rock has many cracks... There must be some way to shatter it..."
 Dialog08A::
-	db $54, $68, $69, $73, $20, $72, $6f, $63, $6b, $20, $68, $61, $73, $20, $20
-	db $20, $6d, $61, $6e, $79, $20, $63, $72, $61, $63, $6b, $73, $2e, $2e, $2e, $20
-	db $20, $54, $68, $65, $72, $65, $20, $6d, $75, $73, $74, $20, $62, $65, $20, $20
-	db $20, $73, $6f, $6d, $65, $20, $77, $61, $79, $20, $74, $6f, $20, $20, $20, $20
-	db $20, $73, $68, $61, $74, $74, $65, $72, $20, $69, $74, $2e, $2e, $2e, $ff
+	db "This rock has   "
+	db "many cracks...  "
+	db "There must be   "
+	db "some way to     "
+	db "shatter it..."
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $08B: "Oh? What a weird object! There must be some way to tackle this obst..."
 Dialog08B::
-	db $4f
-	db $68, $3f, $20, $57, $68, $61, $74, $20, $61, $20, $77, $65, $69, $72, $64, $6f
-	db $62, $6a, $65, $63, $74, $21, $20, $20, $54, $68, $65, $72, $65, $20, $20, $6d
-	db $75, $73, $74, $20, $62, $65, $20, $73, $6f, $6d, $65, $20, $77, $61, $79, $74
-	db $6f, $20, $74, $61, $63, $6b, $6c, $65, $20, $74, $68, $69, $73, $20, $20, $6f
-	db $62, $73, $74, $61, $63, $6c, $65, $2e, $ff
+	db "Oh? What a weird"
+	db "object!  There  "
+	db "must be some way"
+	db "to tackle this  "
+	db "obstacle."
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $08C: "Hunh? This rock has a key hole! You should come back with a key!"
 Dialog08C::
-	db $48, $75, $6e, $68, $3f, $20, $20
-	db $54, $68, $69, $73, $20, $72, $6f, $63, $6b, $68, $61, $73, $20, $61, $20, $6b
-	db $65, $79, $20, $68, $6f, $6c, $65, $21, $20, $59, $6f, $75, $20, $73, $68, $6f
-	db $75, $6c, $64, $20, $63, $6f, $6d, $65, $20, $62, $61, $63, $6b, $20, $77, $69
-	db $74, $68, $20, $61, $20, $6b, $65, $79, $21, $ff
+	db "Hunh?  This rock"
+	db "has a key hole! "
+	db "You should come "
+	db "back with a key!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $08D: "Wow! This looks pretty heavy! You won't be able to lift it with jus..."
 Dialog08D::
-	db $57, $6f, $77, $21, $20, $20
-	db $54, $68, $69, $73, $20, $6c, $6f, $6f, $6b, $73, $70, $72, $65, $74, $74, $79
-	db $20, $68, $65, $61, $76, $79, $21, $20, $20, $20, $59, $6f, $75, $20, $77, $6f
-	db $6e, $5e, $74, $20, $62, $65, $20, $20, $20, $20, $61, $62, $6c, $65, $20, $74
-	db $6f, $20, $6c, $69, $66, $74, $20, $69, $74, $20, $77, $69, $74, $68, $20, $6a
-	db $75, $73, $74, $20, $79, $6f, $75, $72, $20, $20, $62, $61, $72, $65, $20, $68
-	db $61, $6e, $64, $73, $2e, $2e, $2e, $ff
+	db "Wow!  This looks"
+	db "pretty heavy!   "
+	db "You won^t be    "
+	db "able to lift it "
+	db "with just your  "
+	db "bare hands..."
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $08E: "Well, it's an Ocarina, but you don't know how to play it..."
 Dialog08E::
-	db $57, $65, $6c, $6c, $2c, $20, $69, $74
-	db $5e, $73, $20, $61, $6e, $20, $20, $20, $4f, $63, $61, $72, $69, $6e, $61, $2c
-	db $20, $62, $75, $74, $20, $79, $6f, $75, $64, $6f, $6e, $5e, $74, $20, $6b, $6e
-	db $6f, $77, $20, $68, $6f, $77, $20, $20, $74, $6f, $20, $70, $6c, $61, $79, $20
-	db $69, $74, $2e, $2e, $2e, $ff
+	db "Well, it^s an   "
+	db "Ocarina, but you"
+	db "don^t know how  "
+	db "to play it..."
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $08F: "No! No! Poor hen! Stop that!"
 Dialog08F::
-	db $4e, $6f, $21, $20, $20, $4e, $6f, $21, $20, $20
-	db $50, $6f, $6f, $72, $20, $20, $68, $65, $6e, $21, $20, $20, $53, $74, $6f, $70
-	db $20, $74, $68, $61, $74, $21, $ff
+	db "No!  No!  Poor  "
+	db "hen!  Stop that!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $090: "You found the Power Bracelet! At last, you can pick up pots and sto..." (B does not hurry it)
 Dialog090::
-	db $59, $6f, $75, $20, $66, $6f, $75, $6e, $64
-	db $20, $74, $68, $65, $20, $20, $20, $50, $6f, $77, $65, $72, $20, $42, $72, $61
-	db $63, $65, $6c, $65, $74, $21, $20, $41, $74, $20, $6c, $61, $73, $74, $2c, $20
-	db $79, $6f, $75, $20, $63, $61, $6e, $70, $69, $63, $6b, $20, $75, $70, $20, $70
-	db $6f, $74, $73, $20, $61, $6e, $64, $73, $74, $6f, $6e, $65, $73, $21, $ff
+	db "You found the   "
+	db "Power Bracelet! "
+	db "At last, you can"
+	db "pick up pots and"
+	db "stones!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $091: "You got your Shield back! You can use it to flip enemies!" (B does not hurry it)
 Dialog091::
-	db $59
-	db $6f, $75, $20, $67, $6f, $74, $20, $79, $6f, $75, $72, $20, $20, $20, $20, $53
-	db $68, $69, $65, $6c, $64, $20, $62, $61, $63, $6b, $21, $20, $20, $20, $20, $59
-	db $6f, $75, $20, $63, $61, $6e, $20, $75, $73, $65, $20, $69, $74, $20, $20, $74
-	db $6f, $20, $66, $6c, $69, $70, $20, $65, $6e, $65, $6d, $69, $65, $73, $21, $ff
+	db "You got your    "
+	db "Shield back!    "
+	db "You can use it  "
+	db "to flip enemies!"
+	db $ff  ; end
+;@ path: text/dialogs
+;@ Dialog $092: "Ahhh... Yess... That dust was so refreshing... For that, I'll tell ..." (B does not hurry it)
 Dialog092::
-	db $41, $68, $68, $68, $2e, $2e, $2e, $20, $59, $65, $73, $73, $2e, $2e, $2e, $20
-	db $54, $68, $61, $74, $20, $64, $75, $73, $74, $20, $77, $61, $73, $20, $73, $6f
-	db $72, $65, $66, $72, $65, $73, $68, $69, $6e, $67, $2e, $2e, $2e, $20, $20, $20
-	db $46, $6f, $72, $20, $74, $68, $61, $74, $2c, $20, $49, $5e, $6c, $6c, $20, $20
-	db $74, $65, $6c, $6c, $20, $79, $6f, $75, $20, $61, $20, $68, $69, $6e, $74, $21
-	db $55, $73, $65, $20, $61, $20, $42, $6f, $6d, $62, $20, $69, $6e, $20, $61, $20
-	db $70, $6c, $61, $63, $65, $20, $77, $68, $65, $72, $65, $20, $74, $68, $65, $20
-	db $73, $61, $6e, $64, $20, $73, $77, $61, $6c, $6c, $6f, $77, $73, $20, $20, $20
-	db $79, $6f, $75, $2e, $2e, $2e, $20, $54, $68, $65, $72, $65, $20, $69, $73, $20
-	db $61, $20, $74, $72, $65, $61, $74, $20, $6f, $6e, $20, $74, $68, $65, $20, $20
-	db $6f, $74, $68, $65, $72, $20, $73, $69, $64, $65, $20, $6f, $66, $20, $20, $20
-	db $74, $68, $65, $20, $77, $61, $6c, $6c, $2e, $2e, $2e, $20, $42, $79, $65, $21
-	db $ff
+	db "Ahhh... Yess... "
+	db "That dust was so"
+	db "refreshing...   "
+	db "For that, I^ll  "
+	db "tell you a hint!"
+	db "Use a Bomb in a "
+	db "place where the "
+	db "sand swallows   "
+	db "you... There is "
+	db "a treat on the  "
+	db "other side of   "
+	db "the wall... Bye!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $093: "You've got the Hook Shot! Its chain stretches long when you use it!" (B does not hurry it)
 Dialog093::
-	db $59, $6f, $75, $5e, $76, $65, $20, $67, $6f, $74, $20, $74, $68, $65, $20
-	db $20, $48, $6f, $6f, $6b, $20, $53, $68, $6f, $74, $21, $20, $20, $49, $74, $73
-	db $20, $63, $68, $61, $69, $6e, $20, $73, $74, $72, $65, $74, $63, $68, $65, $73
-	db $20, $6c, $6f, $6e, $67, $20, $77, $68, $65, $6e, $20, $79, $6f, $75, $20, $20
-	db $20, $75, $73, $65, $20, $69, $74, $21, $ff
+	db "You^ve got the  "
+	db "Hook Shot!  Its "
+	db "chain stretches "
+	db "long when you   "
+	db "use it!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $094: "You've got the Magic Rod! Now you can burn things! Burn it! Burn, b..." (B does not hurry it)
 Dialog094::
-	db $59, $6f, $75, $5e, $76, $65, $20
-	db $67, $6f, $74, $20, $74, $68, $65, $20, $20, $4d, $61, $67, $69, $63, $20, $52
-	db $6f, $64, $21, $20, $20, $4e, $6f, $77, $20, $79, $6f, $75, $20, $63, $61, $6e
-	db $20, $62, $75, $72, $6e, $20, $20, $20, $20, $74, $68, $69, $6e, $67, $73, $21
-	db $20, $42, $75, $72, $6e, $20, $69, $74, $21, $42, $75, $72, $6e, $2c, $20, $62
-	db $61, $62, $79, $20, $62, $75, $72, $6e, $21, $ff
+	db "You^ve got the  "
+	db "Magic Rod!  Now "
+	db "you can burn    "
+	db "things! Burn it!"
+	db "Burn, baby burn!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $095: "You've got the Pegasus Boots! If you hold down the Button, you can ..." (B does not hurry it)
 Dialog095::
-	db $59, $6f, $75, $5e, $76, $65
-	db $20, $67, $6f, $74, $20, $74, $68, $65, $20, $20, $50, $65, $67, $61, $73, $75
-	db $73, $20, $42, $6f, $6f, $74, $73, $21, $20, $20, $49, $66, $20, $79, $6f, $75
-	db $20, $68, $6f, $6c, $64, $20, $64, $6f, $77, $6e, $74, $68, $65, $20, $42, $75
-	db $74, $74, $6f, $6e, $2c, $20, $79, $6f, $75, $20, $63, $61, $6e, $20, $64, $61
-	db $73, $68, $21, $ff
+	db "You^ve got the  "
+	db "Pegasus Boots!  "
+	db "If you hold down"
+	db "the Button, you "
+	db "can dash!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $096: "You've got the Ocarina! You should learn to play many songs!" (B does not hurry it)
 Dialog096::
-	db $59, $6f, $75, $5e, $76, $65, $20, $67, $6f, $74, $20, $74
-	db $68, $65, $20, $20, $4f, $63, $61, $72, $69, $6e, $61, $21, $20, $20, $59, $6f
-	db $75, $20, $20, $20, $73, $68, $6f, $75, $6c, $64, $20, $6c, $65, $61, $72, $6e
-	db $20, $74, $6f, $20, $70, $6c, $61, $79, $20, $6d, $61, $6e, $79, $20, $73, $6f
-	db $6e, $67, $73, $21, $ff
+	db "You^ve got the  "
+	db "Ocarina!  You   "
+	db "should learn to "
+	db "play many songs!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $097: "You've got the Roc's Feather! It feels like your body is a lot ligh..." (B does not hurry it)
 Dialog097::
-	db $59, $6f, $75, $5e, $76, $65, $20, $67, $6f, $74, $20
-	db $74, $68, $65, $20, $20, $52, $6f, $63, $5e, $73, $20, $46, $65, $61, $74, $68
-	db $65, $72, $21, $20, $20, $49, $74, $20, $66, $65, $65, $6c, $73, $20, $6c, $69
-	db $6b, $65, $20, $20, $20, $79, $6f, $75, $72, $20, $62, $6f, $64, $79, $20, $69
-	db $73, $20, $61, $20, $20, $6c, $6f, $74, $20, $6c, $69, $67, $68, $74, $65, $72
-	db $21, $ff
+	db "You^ve got the  "
+	db "Roc^s Feather!  "
+	db "It feels like   "
+	db "your body is a  "
+	db "lot lighter!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $098: "You've got a Shovel! Now you can feel the joy of digging!" (B does not hurry it)
 Dialog098::
-	db $59, $6f, $75, $5e, $76, $65, $20, $67, $6f, $74, $20, $61, $20, $20
-	db $20, $20, $53, $68, $6f, $76, $65, $6c, $21, $20, $20, $4e, $6f, $77, $20, $79
-	db $6f, $75, $63, $61, $6e, $20, $66, $65, $65, $6c, $20, $74, $68, $65, $20, $6a
-	db $6f, $79, $6f, $66, $20, $64, $69, $67, $67, $69, $6e, $67, $21, $ff
+	db "You^ve got a    "
+	db "Shovel!  Now you"
+	db "can feel the joy"
+	db "of digging!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $099: "You've got some Magic Powder! Try sprinkling it on a variety of thi..." (B does not hurry it)
 Dialog099::
-	db $59, $6f
-	db $75, $5e, $76, $65, $20, $67, $6f, $74, $20, $73, $6f, $6d, $65, $20, $4d, $61
-	db $67, $69, $63, $20, $50, $6f, $77, $64, $65, $72, $21, $20, $20, $20, $54, $72
-	db $79, $20, $73, $70, $72, $69, $6e, $6b, $6c, $69, $6e, $67, $20, $20, $69, $74
-	db $20, $6f, $6e, $20, $61, $20, $76, $61, $72, $69, $65, $74, $79, $20, $6f, $66
-	db $20, $74, $68, $69, $6e, $67, $73, $21, $ff
+	db "You^ve got some "
+	db "Magic Powder!   "
+	db "Try sprinkling  "
+	db "it on a variety "
+	db "of things!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialogs $09A, $09B: "You found your Sword! It must be yours because it has your name eng..." (B does not hurry it)
 Dialog09A::
-	db $59, $6f, $75, $20, $66, $6f, $75
-	db $6e, $64, $20, $79, $6f, $75, $72, $20, $20, $53, $77, $6f, $72, $64, $21, $20
-	db $20, $49, $74, $20, $6d, $75, $73, $74, $20, $62, $65, $20, $79, $6f, $75, $72
-	db $73, $20, $62, $65, $63, $61, $75, $73, $65, $69, $74, $20, $68, $61, $73, $20
-	db $79, $6f, $75, $72, $20, $6e, $61, $6d, $65, $65, $6e, $67, $72, $61, $76, $65
-	db $64, $20, $6f, $6e, $20, $69, $74, $21, $ff
+	db "You found your  "
+	db "Sword!  It must "
+	db "be yours because"
+	db "it has your name"
+	db "engraved on it!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $09C: "You've got the Flippers! If you press the B Button while you swim, ..." (B does not hurry it)
 Dialog09C::
-	db $59, $6f, $75, $5e, $76, $65, $20
-	db $67, $6f, $74, $20, $74, $68, $65, $20, $20, $46, $6c, $69, $70, $70, $65, $72
-	db $73, $21, $20, $49, $66, $20, $79, $6f, $75, $70, $72, $65, $73, $73, $20, $74
-	db $68, $65, $20, $42, $20, $20, $20, $20, $20, $42, $75, $74, $74, $6f, $6e, $20
-	db $77, $68, $69, $6c, $65, $20, $79, $6f, $75, $73, $77, $69, $6d, $2c, $20, $79
-	db $6f, $75, $20, $63, $61, $6e, $20, $20, $20, $64, $69, $76, $65, $20, $75, $6e
-	db $64, $65, $72, $77, $61, $74, $65, $72, $21, $ff
+	db "You^ve got the  "
+	db "Flippers! If you"
+	db "press the B     "
+	db "Button while you"
+	db "swim, you can   "
+	db "dive underwater!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $09D: "You've got the Magnifying Lens! This will reveal many things you co..." (B does not hurry it)
 Dialog09D::
-	db $59, $6f, $75, $5e, $76, $65
-	db $20, $67, $6f, $74, $20, $74, $68, $65, $20, $20, $4d, $61, $67, $6e, $69, $66
-	db $79, $69, $6e, $67, $20, $4c, $65, $6e, $73, $21, $54, $68, $69, $73, $20, $77
-	db $69, $6c, $6c, $20, $72, $65, $76, $65, $61, $6c, $6d, $61, $6e, $79, $20, $74
-	db $68, $69, $6e, $67, $73, $20, $79, $6f, $75, $20, $63, $6f, $75, $6c, $64, $6e
-	db $5e, $74, $20, $73, $65, $65, $20, $20, $20, $20, $62, $65, $66, $6f, $72, $65
-	db $21, $ff
+	db "You^ve got the  "
+	db "Magnifying Lens!"
+	db "This will reveal"
+	db "many things you "
+	db "couldn^t see    "
+	db "before!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialogs $09E, $09F: "You've got a new Sword! You should put your name on it right away!" (B does not hurry it)
 Dialog09E::
-	db $59, $6f, $75, $5e, $76, $65, $20, $67, $6f, $74, $20, $61, $20, $20
-	db $20, $20, $6e, $65, $77, $20, $53, $77, $6f, $72, $64, $21, $20, $20, $59, $6f
-	db $75, $20, $73, $68, $6f, $75, $6c, $64, $20, $70, $75, $74, $20, $79, $6f, $75
-	db $72, $20, $6e, $61, $6d, $65, $20, $6f, $6e, $20, $69, $74, $20, $72, $69, $67
-	db $68, $74, $61, $77, $61, $79, $21, $ff
+	db "You^ve got a    "
+	db "new Sword!  You "
+	db "should put your "
+	db "name on it right"
+	db "away!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialogs $0A0, $0A1: "You've got the Tail Key! Now you can open the Tail Cave gate!" (B does not hurry it)
 Dialog0A0::
-	db $59, $6f, $75, $5e, $76, $65, $20, $67
-	db $6f, $74, $20, $74, $68, $65, $20, $20, $54, $61, $69, $6c, $20, $4b, $65, $79
-	db $21, $20, $20, $4e, $6f, $77, $20, $20, $79, $6f, $75, $20, $63, $61, $6e, $20
-	db $6f, $70, $65, $6e, $20, $74, $68, $65, $54, $61, $69, $6c, $20, $43, $61, $76
-	db $65, $20, $67, $61, $74, $65, $21, $ff
+	db "You^ve got the  "
+	db "Tail Key!  Now  "
+	db "you can open the"
+	db "Tail Cave gate!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0A2: "You've got the Slime Key! Now you can open the gate in Ukuku Prairie!" (B does not hurry it)
 Dialog0A2::
-	db $59, $6f, $75, $5e, $76, $65, $20, $67
-	db $6f, $74, $20, $74, $68, $65, $20, $20, $53, $6c, $69, $6d, $65, $20, $4b, $65
-	db $79, $21, $20, $20, $4e, $6f, $77, $20, $79, $6f, $75, $20, $63, $61, $6e, $20
-	db $6f, $70, $65, $6e, $20, $74, $68, $65, $67, $61, $74, $65, $20, $69, $6e, $20
-	db $55, $6b, $75, $6b, $75, $20, $20, $20, $50, $72, $61, $69, $72, $69, $65, $21
-	db $ff
+	db "You^ve got the  "
+	db "Slime Key!  Now "
+	db "you can open the"
+	db "gate in Ukuku   "
+	db "Prairie!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0A3: "You've got the Angler Key!" (B does not hurry it)
 Dialog0A3::
-	db $59, $6f, $75, $5e, $76, $65, $20, $67, $6f, $74, $20, $74, $68, $65, $20
-	db $20, $41, $6e, $67, $6c, $65, $72, $20, $4b, $65, $79, $21, $ff
+	db "You^ve got the  "
+	db "Angler Key!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0A4: "You've got the Face Key!" (B does not hurry it)
 Dialog0A4::
-	db $59, $6f, $75
-	db $5e, $76, $65, $20, $67, $6f, $74, $20, $74, $68, $65, $20, $20, $46, $61, $63
-	db $65, $20, $4b, $65, $79, $21, $ff
+	db "You^ve got the  "
+	db "Face Key!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0A5: "You've got the Bird Key!" (B does not hurry it)
 Dialog0A5::
-	db $59, $6f, $75, $5e, $76, $65, $20, $67, $6f
-	db $74, $20, $74, $68, $65, $20, $20, $42, $69, $72, $64, $20, $4b, $65, $79, $21
-	db $ff
+	db "You^ve got the  "
+	db "Bird Key!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0A6: "At last, you got a Map! Press the START Button to look at it!" (B does not hurry it)
 Dialog0A6::
-	db $41, $74, $20, $6c, $61, $73, $74, $2c, $20, $79, $6f, $75, $20, $67, $6f
-	db $74, $61, $20, $4d, $61, $70, $21, $20, $20, $50, $72, $65, $73, $73, $20, $20
-	db $20, $74, $68, $65, $20, $53, $54, $41, $52, $54, $20, $42, $75, $74, $74, $6f
-	db $6e, $74, $6f, $20, $6c, $6f, $6f, $6b, $20, $61, $74, $20, $69, $74, $21, $ff
+	db "At last, you got"
+	db "a Map!  Press   "
+	db "the START Button"
+	db "to look at it!"
+	db $ff  ; end
+;@ path: text/dialogs
+;@ Dialog $0A7: "You've got the Compass! Now, you can see where the chests and Night..." (B does not hurry it)
 Dialog0A7::
-	db $59, $6f, $75, $5e, $76, $65, $20, $67, $6f, $74, $20, $74, $68, $65, $20, $20
-	db $43, $6f, $6d, $70, $61, $73, $73, $21, $20, $20, $4e, $6f, $77, $2c, $20, $20
-	db $79, $6f, $75, $20, $63, $61, $6e, $20, $73, $65, $65, $20, $20, $20, $20, $20
-	db $77, $68, $65, $72, $65, $20, $74, $68, $65, $20, $63, $68, $65, $73, $74, $73
-	db $61, $6e, $64, $20, $4e, $69, $67, $68, $74, $6d, $61, $72, $65, $20, $20, $20
-	db $61, $72, $65, $20, $68, $69, $64, $64, $65, $6e, $21, $20, $54, $68, $69, $73
-	db $43, $6f, $6d, $70, $61, $73, $73, $20, $68, $61, $73, $20, $61, $20, $20, $20
-	db $6e, $65, $77, $20, $66, $65, $61, $74, $75, $72, $65, $2d, $2d, $20, $61, $20
-	db $74, $6f, $6e, $65, $20, $77, $69, $6c, $6c, $20, $74, $65, $6c, $6c, $20, $20
-	db $79, $6f, $75, $20, $69, $66, $20, $61, $20, $6b, $65, $79, $20, $69, $73, $20
-	db $68, $69, $64, $64, $65, $6e, $20, $69, $6e, $20, $61, $20, $72, $6f, $6f, $6d
-	db $77, $68, $65, $6e, $20, $79, $6f, $75, $20, $65, $6e, $74, $65, $72, $21, $20
-	db $ff
+	db "You^ve got the  "
+	db "Compass!  Now,  "
+	db "you can see     "
+	db "where the chests"
+	db "and Nightmare   "
+	db "are hidden! This"
+	db "Compass has a   "
+	db "new feature-- a "
+	db "tone will tell  "
+	db "you if a key is "
+	db "hidden in a room"
+	db "when you enter! "
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0A8: "You found a fragment of a Stone Slab! Now you can read the message ..." (B does not hurry it)
 Dialog0A8::
-	db $59, $6f, $75, $20, $66, $6f, $75, $6e, $64, $20, $61, $20, $20, $20, $20
-	db $20, $66, $72, $61, $67, $6d, $65, $6e, $74, $20, $6f, $66, $20, $61, $20, $20
-	db $20, $53, $74, $6f, $6e, $65, $20, $53, $6c, $61, $62, $21, $20, $20, $4e, $6f
-	db $77, $79, $6f, $75, $20, $63, $61, $6e, $20, $72, $65, $61, $64, $20, $74, $68
-	db $65, $6d, $65, $73, $73, $61, $67, $65, $20, $6f, $6e, $20, $74, $68, $65, $20
-	db $20, $77, $61, $6c, $6c, $21, $ff
+	db "You found a     "
+	db "fragment of a   "
+	db "Stone Slab!  Now"
+	db "you can read the"
+	db "message on the  "
+	db "wall!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0A9: "You've got the Nightmare's Key! Now you can open the door to the Ni..." (B does not hurry it)
 Dialog0A9::
-	db $59, $6f, $75, $5e, $76, $65, $20, $67, $6f
-	db $74, $20, $74, $68, $65, $20, $20, $4e, $69, $67, $68, $74, $6d, $61, $72, $65
-	db $5e, $73, $20, $4b, $65, $79, $21, $4e, $6f, $77, $20, $79, $6f, $75, $20, $63
-	db $61, $6e, $20, $6f, $70, $65, $6e, $74, $68, $65, $20, $64, $6f, $6f, $72, $20
-	db $74, $6f, $20, $74, $68, $65, $20, $4e, $69, $67, $68, $74, $6d, $61, $72, $65
-	db $5e, $73, $20, $20, $20, $20, $20, $4c, $61, $69, $72, $21, $ff
+	db "You^ve got the  "
+	db "Nightmare^s Key!"
+	db "Now you can open"
+	db "the door to the "
+	db "Nightmare^s     "
+	db "Lair!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0AA: "You got a Small Key! You can open a locked door." (B does not hurry it)
 Dialog0AA::
-	db $59, $6f, $75
-	db $20, $67, $6f, $74, $20, $61, $20, $53, $6d, $61, $6c, $6c, $20, $4b, $65, $79
-	db $21, $20, $20, $59, $6f, $75, $20, $63, $61, $6e, $20, $20, $20, $6f, $70, $65
-	db $6e, $20, $61, $20, $6c, $6f, $63, $6b, $65, $64, $20, $20, $20, $64, $6f, $6f
-	db $72, $2e, $ff
+	db "You got a Small "
+	db "Key!  You can   "
+	db "open a locked   "
+	db "door."
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0AB: "You got 20 Rupees! JOY!" (B does not hurry it)
 Dialog0AB::
-	db $20, $20, $20, $59, $6f, $75, $20, $67, $6f, $74, $20, $32, $30
-	db $20, $20, $20, $20, $20, $20, $20, $20, $52, $75, $70, $65, $65, $73, $21, $20
-	db $20, $20, $20, $20, $20, $20, $20, $20, $20, $4a, $4f, $59, $21, $ff
+	db "   You got 20   "
+	db "     Rupees!    "
+	db "      JOY!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0AC: "You got 50 Rupees! Very Nice!" (B does not hurry it)
 Dialog0AC::
-	db $20, $20
-	db $20, $20, $59, $6f, $75, $20, $67, $6f, $74, $20, $35, $30, $20, $20, $20, $20
-	db $20, $20, $20, $20, $52, $75, $70, $65, $65, $73, $21, $20, $20, $20, $20, $20
-	db $20, $20, $56, $65, $72, $79, $20, $4e, $69, $63, $65, $21, $ff
+	db "    You got 50  "
+	db "      Rupees!   "
+	db "    Very Nice!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0AD: "You got 100 Rupees! You're Happy!" (B does not hurry it)
 Dialog0AD::
-	db $20, $20, $20
-	db $59, $6f, $75, $20, $67, $6f, $74, $20, $31, $30, $30, $20, $20, $20, $20, $20
-	db $20, $20, $52, $75, $70, $65, $65, $73, $21, $20, $20, $20, $20, $20, $20, $59
-	db $6f, $75, $5e, $72, $65, $20, $48, $61, $70, $70, $79, $21, $ff
+	db "   You got 100  "
+	db "     Rupees!    "
+	db "  You^re Happy!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0AE: "You got 200 Rupees! You're Ecstatic!" (B does not hurry it)
 Dialog0AE::
-	db $20, $20, $20
-	db $59, $6f, $75, $20, $67, $6f, $74, $20, $32, $30, $30, $20, $20, $20, $20, $20
-	db $20, $20, $52, $75, $70, $65, $65, $73, $21, $20, $20, $20, $20, $59, $6f, $75
-	db $5e, $72, $65, $20, $45, $63, $73, $74, $61, $74, $69, $63, $21, $ff
+	db "   You got 200  "
+	db "     Rupees!    "
+	db "You^re Ecstatic!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0AF: "Leave me alone! I'm trying to sit still so Schule can paint my port..." (B does not hurry it)
 Dialog0AF::
-	db $4c, $65
-	db $61, $76, $65, $20, $6d, $65, $20, $61, $6c, $6f, $6e, $65, $21, $20, $49, $5e
-	db $6d, $20, $74, $72, $79, $69, $6e, $67, $20, $74, $6f, $20, $20, $20, $73, $69
-	db $74, $20, $73, $74, $69, $6c, $6c, $20, $73, $6f, $20, $20, $20, $20, $53, $63
-	db $68, $75, $6c, $65, $20, $63, $61, $6e, $20, $70, $61, $69, $6e, $74, $6d, $79
-	db $20, $70, $6f, $72, $74, $72, $61, $69, $74, $21, $ff
+	db "Leave me alone! "
+	db "I^m trying to   "
+	db "sit still so    "
+	db "Schule can paint"
+	db "my portrait!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0B0: "BUZZZZZ! BUZZZZ! OUTZZZIDER!" (B does not hurry it)
 Dialog0B0::
-	db $42, $55, $5a, $5a, $5a
-	db $5a, $5a, $21, $20, $42, $55, $5a, $5a, $5a, $5a, $21, $20, $20, $20, $4f, $55
-	db $54, $5a, $5a, $5a, $49, $44, $45, $52, $21, $20, $20, $ff
+	db "BUZZZZZ! BUZZZZ!"
+	db "   OUTZZZIDER!  "
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0B1: "NEENER NEENER! You can't find me! NYAH NYAH!" (B does not hurry it)
 Dialog0B1::
-	db $4e, $45, $45, $4e
-	db $45, $52, $20, $4e, $45, $45, $4e, $45, $52, $21, $20, $20, $59, $6f, $75, $20
-	db $63, $61, $6e, $5e, $74, $20, $66, $69, $6e, $64, $20, $20, $6d, $65, $21, $20
-	db $20, $4e, $59, $41, $48, $20, $4e, $59, $41, $48, $21, $ff
+	db "NEENER NEENER!  "
+	db "You can^t find  "
+	db "me!  NYAH NYAH!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0B2: "BLOOOP! BLOOOP! GLUB! GLUB! OGGGH! FOOOOD! BLOOOOP! GLUB!" (B does not hurry it)
 Dialog0B2::
-	db $42, $4c, $4f, $4f
-	db $4f, $50, $21, $20, $42, $4c, $4f, $4f, $4f, $50, $21, $20, $20, $20, $47, $4c
-	db $55, $42, $21, $20, $20, $47, $4c, $55, $42, $21, $20, $20, $4f, $47, $47, $47
-	db $48, $21, $20, $20, $46, $4f, $4f, $4f, $4f, $44, $21, $20, $42, $4c, $4f, $4f
-	db $4f, $4f, $50, $21, $20, $20, $47, $4c, $55, $42, $21, $ff
+	db "BLOOOP! BLOOOP! "
+	db "  GLUB!  GLUB!  "
+	db "OGGGH!  FOOOOD! "
+	db "BLOOOOP!  GLUB!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0B3: "Ssso...you are the outsssider, come to wake the Wind Fisssh... KEEE..." (B does not hurry it)
 Dialog0B3::
-	db $53, $73, $73, $6f
-	db $2e, $2e, $2e, $79, $6f, $75, $20, $61, $72, $65, $20, $20, $74, $68, $65, $20
-	db $6f, $75, $74, $73, $73, $73, $69, $64, $65, $72, $2c, $20, $63, $6f, $6d, $65
-	db $20, $74, $6f, $20, $77, $61, $6b, $65, $20, $74, $68, $65, $57, $69, $6e, $64
-	db $20, $46, $69, $73, $73, $73, $68, $2e, $2e, $2e, $20, $20, $4b, $45, $45, $45
-	db $2d, $48, $45, $45, $2d, $48, $45, $45, $45, $48, $21, $20, $49, $20, $73, $68
-	db $61, $6c, $6c, $20, $65, $61, $74, $20, $79, $6f, $75, $21, $ff
+	db "Ssso...you are  "
+	db "the outsssider, "
+	db "come to wake the"
+	db "Wind Fisssh...  "
+	db "KEEE-HEE-HEEEH! "
+	db "I shall eat you!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0B4: "HO HO HO! I'm your bad guy this time!! HO HO HO!" (B does not hurry it)
 Dialog0B4::
-	db $48, $4f, $20
-	db $48, $4f, $20, $48, $4f, $21, $20, $20, $20, $20, $20, $20, $20, $49, $5e, $6d
-	db $20, $79, $6f, $75, $72, $20, $62, $61, $64, $20, $67, $75, $79, $74, $68, $69
-	db $73, $20, $74, $69, $6d, $65, $21, $21, $20, $20, $20, $20, $20, $48, $4f, $20
-	db $48, $4f, $20, $48, $4f, $21, $ff
+	db "HO HO HO!       "
+	db "I^m your bad guy"
+	db "this time!!     "
+	db "HO HO HO!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0B5: "TSSSK, TSSSK! You don't ssseem to know what kind of island thisss i..." (B does not hurry it)
 Dialog0B5::
-	db $54, $53, $53, $53, $4b, $2c, $20, $54, $53
-	db $53, $53, $4b, $21, $20, $20, $20, $59, $6f, $75, $20, $64, $6f, $6e, $5e, $74
-	db $20, $73, $73, $73, $65, $65, $6d, $74, $6f, $20, $6b, $6e, $6f, $77, $20, $77
-	db $68, $61, $74, $20, $20, $20, $20, $6b, $69, $6e, $64, $20, $6f, $66, $20, $69
-	db $73, $6c, $61, $6e, $64, $20, $20, $74, $68, $69, $73, $73, $73, $20, $69, $73
-	db $73, $2e, $2e, $2e, $20, $20, $20, $4b, $45, $45, $45, $2d, $48, $45, $45, $45
-	db $2d, $48, $45, $45, $45, $21, $20, $57, $68, $61, $74, $20, $61, $20, $66, $6f
-	db $6f, $6c, $2e, $2e, $2e, $20, $20, $4b, $45, $45, $2d, $48, $45, $45, $2d, $48
-	db $45, $48, $21, $21, $ff
+	db "TSSSK, TSSSK!   "
+	db "You don^t ssseem"
+	db "to know what    "
+	db "kind of island  "
+	db "thisss iss...   "
+	db "KEEE-HEEE-HEEE! "
+	db "What a fool...  "
+	db "KEE-HEE-HEH!!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0B6: "Hey dummy! Need a hint? My weak point is... !! Whoops! There I go, ..." (B does not hurry it)
 Dialog0B6::
-	db $48, $65, $79, $20, $64, $75, $6d, $6d, $79, $21, $20
-	db $4e, $65, $65, $64, $20, $61, $20, $68, $69, $6e, $74, $3f, $20, $20, $4d, $79
-	db $20, $77, $65, $61, $6b, $70, $6f, $69, $6e, $74, $20, $69, $73, $2e, $2e, $2e
-	db $20, $21, $21, $20, $20, $57, $68, $6f, $6f, $70, $73, $21, $20, $20, $54, $68
-	db $65, $72, $65, $20, $49, $67, $6f, $2c, $20, $74, $61, $6c, $6b, $69, $6e, $67
-	db $20, $74, $6f, $6f, $20, $6d, $75, $63, $68, $20, $61, $67, $61, $69, $6e, $2e
-	db $2e, $2e, $ff
+	db "Hey dummy! Need "
+	db "a hint?  My weak"
+	db "point is... !!  "
+	db "Whoops!  There I"
+	db "go, talking too "
+	db "much again..."
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0B7: "Okay, listen up! If the Wind Fish wakes up, every- thing on this is..." (B does not hurry it)
 Dialog0B7::
-	db $4f, $6b, $61, $79, $2c, $20, $6c, $69, $73, $74, $65, $6e, $20
-	db $75, $70, $21, $49, $66, $20, $74, $68, $65, $20, $57, $69, $6e, $64, $20, $46
-	db $69, $73, $68, $77, $61, $6b, $65, $73, $20, $75, $70, $2c, $20, $65, $76, $65
-	db $72, $79, $2d, $74, $68, $69, $6e, $67, $20, $6f, $6e, $20, $74, $68, $69, $73
-	db $20, $20, $20, $69, $73, $6c, $61, $6e, $64, $20, $77, $69, $6c, $6c, $20, $62
-	db $65, $20, $20, $67, $6f, $6e, $65, $20, $66, $6f, $72, $65, $76, $65, $72, $21
-	db $20, $20, $20, $41, $6e, $64, $20, $49, $20, $64, $6f, $20, $6d, $65, $61, $6e
-	db $2e, $2e, $2e, $45, $56, $45, $52, $59, $54, $48, $49, $4e, $47, $21, $ff
+	db "Okay, listen up!"
+	db "If the Wind Fish"
+	db "wakes up, every-"
+	db "thing on this   "
+	db "island will be  "
+	db "gone forever!   "
+	db "And I do mean..."
+	db "EVERYTHING!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialogs $0B8, $0B9: "My energy... gone...I...lost! But you will be lost too, if the Wind..." (B does not hurry it)
 Dialog0B8::
-	db $4d
-	db $79, $20, $65, $6e, $65, $72, $67, $79, $2e, $2e, $2e, $20, $20, $20, $20, $67
-	db $6f, $6e, $65, $2e, $2e, $2e, $49, $2e, $2e, $2e, $6c, $6f, $73, $74, $21, $42
-	db $75, $74, $20, $79, $6f, $75, $20, $77, $69, $6c, $6c, $20, $62, $65, $20, $6c
-	db $6f, $73, $74, $20, $74, $6f, $6f, $2c, $20, $69, $66, $20, $74, $68, $65, $57
-	db $69, $6e, $64, $20, $46, $69, $73, $68, $20, $77, $61, $6b, $65, $73, $21, $53
-	db $61, $6d, $65, $20, $61, $73, $20, $6d, $65, $2e, $2e, $2e, $79, $6f, $75, $2e
-	db $2e, $2e, $61, $72, $65, $2e, $2e, $2e, $69, $6e, $2e, $2e, $2e, $20, $20, $68
-	db $69, $73, $2e, $2e, $2e, $64, $72, $65, $61, $6d, $2e, $2e, $2e, $ff
+	db "My energy...    "
+	db "gone...I...lost!"
+	db "But you will be "
+	db "lost too, if the"
+	db "Wind Fish wakes!"
+	db "Same as me...you"
+	db "...are...in...  "
+	db "his...dream..."
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0BA: "BAH! I'm not going to hold back! I'm going to make you wish you wer..." (B does not hurry it)
 Dialog0BA::
-	db $42, $41
-	db $48, $21, $20, $20, $49, $5e, $6d, $20, $6e, $6f, $74, $20, $20, $20, $67, $6f
-	db $69, $6e, $67, $20, $74, $6f, $20, $68, $6f, $6c, $64, $20, $20, $20, $62, $61
-	db $63, $6b, $21, $20, $20, $49, $5e, $6d, $20, $67, $6f, $69, $6e, $67, $74, $6f
-	db $20, $6d, $61, $6b, $65, $20, $79, $6f, $75, $20, $77, $69, $73, $68, $79, $6f
-	db $75, $20, $77, $65, $72, $65, $20, $6e, $65, $76, $65, $72, $20, $20, $62, $6f
-	db $72, $6e, $21, $21, $ff
+	db "BAH!  I^m not   "
+	db "going to hold   "
+	db "back!  I^m going"
+	db "to make you wish"
+	db "you were never  "
+	db "born!!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialogs $0BB, $0BC: "CRACKLE-FWOOOSH! You're finished! I will never let you play the Ins..." (B does not hurry it)
 Dialog0BB::
-	db $43, $52, $41, $43, $4b, $4c, $45, $2d, $46, $57, $4f
-	db $4f, $4f, $53, $48, $21, $59, $6f, $75, $5e, $72, $65, $20, $66, $69, $6e, $69
-	db $73, $68, $65, $64, $21, $49, $20, $77, $69, $6c, $6c, $20, $6e, $65, $76, $65
-	db $72, $20, $6c, $65, $74, $79, $6f, $75, $20, $70, $6c, $61, $79, $20, $74, $68
-	db $65, $20, $20, $20, $20, $49, $6e, $73, $74, $72, $75, $6d, $65, $6e, $74, $73
-	db $20, $6f, $66, $20, $20, $74, $68, $65, $20, $53, $69, $72, $65, $6e, $73, $21
-	db $21, $ff
+	db "CRACKLE-FWOOOSH!"
+	db "You^re finished!"
+	db "I will never let"
+	db "you play the    "
+	db "Instruments of  "
+	db "the Sirens!!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0BD: "C-C-CRACKLE! Why did you come here? If it weren't for you, nothing ..." (B does not hurry it)
 Dialog0BD::
-	db $43, $2d, $43, $2d, $43, $52, $41, $43, $4b, $4c, $45, $21, $20, $20
-	db $20, $20, $57, $68, $79, $20, $64, $69, $64, $20, $79, $6f, $75, $20, $63, $6f
-	db $6d, $65, $68, $65, $72, $65, $3f, $20, $20, $49, $66, $20, $69, $74, $20, $20
-	db $20, $20, $77, $65, $72, $65, $6e, $5e, $74, $20, $66, $6f, $72, $20, $79, $6f
-	db $75, $2c, $6e, $6f, $74, $68, $69, $6e, $67, $20, $77, $6f, $75, $6c, $64, $20
-	db $20, $20, $68, $61, $76, $65, $20, $74, $6f, $20, $63, $68, $61, $6e, $67, $65
-	db $21, $20, $59, $6f, $75, $20, $63, $61, $6e, $6e, $6f, $74, $20, $77, $61, $6b
-	db $65, $20, $74, $68, $65, $20, $57, $69, $6e, $64, $20, $46, $69, $73, $68, $21
-	db $20, $20, $52, $65, $6d, $65, $6d, $62, $65, $72, $2c, $20, $79, $6f, $75, $2e
-	db $2e, $2e, $74, $6f, $6f, $2e, $2e, $2e, $61, $72, $65, $20, $69, $6e, $2e, $2e
-	db $2e, $20, $2e, $2e, $2e, $74, $68, $65, $20, $64, $72, $65, $61, $6d, $2e, $2e
-	db $2e, $ff
+	db "C-C-CRACKLE!    "
+	db "Why did you come"
+	db "here?  If it    "
+	db "weren^t for you,"
+	db "nothing would   "
+	db "have to change! "
+	db "You cannot wake "
+	db "the Wind Fish!  "
+	db "Remember, you..."
+	db "too...are in... "
+	db "...the dream..."
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialogs $0BE, $0BF, $0C0: "Hoot! Ho, brave lad, on your quest to wake the dreamer! Welcome to ..." (B does not hurry it)
 Dialog0BE::
-	db $48, $6f, $6f, $74, $21, $20, $20, $48, $6f, $2c, $20, $62, $72, $61
-	db $76, $65, $6c, $61, $64, $2c, $20, $6f, $6e, $20, $79, $6f, $75, $72, $20, $20
-	db $20, $20, $71, $75, $65, $73, $74, $20, $74, $6f, $20, $77, $61, $6b, $65, $20
-	db $20, $20, $74, $68, $65, $20, $64, $72, $65, $61, $6d, $65, $72, $21, $20, $20
-	db $20, $20, $57, $65, $6c, $63, $6f, $6d, $65, $20, $74, $6f, $20, $74, $68, $65
-	db $20, $20, $4d, $79, $73, $74, $65, $72, $69, $6f, $75, $73, $20, $57, $6f, $6f
-	db $64, $21, $4d, $75, $63, $68, $20, $6f, $66, $20, $6d, $79, $73, $74, $65, $72
-	db $79, $20, $79, $6f, $75, $20, $77, $69, $6c, $6c, $20, $66, $69, $6e, $64, $20
-	db $6f, $6e, $74, $68, $69, $73, $20, $75, $6e, $63, $68, $61, $72, $74, $65, $64
-	db $20, $20, $4b, $6f, $68, $6f, $6c, $69, $6e, $74, $20, $69, $73, $6c, $61, $6e
-	db $64, $21, $49, $5e, $6d, $20, $61, $66, $72, $61, $69, $64, $20, $79, $6f, $75
-	db $20, $20, $6d, $61, $79, $20, $66, $69, $6e, $64, $20, $69, $74, $20, $61, $20
-	db $20, $20, $74, $72, $69, $66, $6c, $65, $20, $64, $69, $66, $66, $69, $63, $75
-	db $6c, $74, $74, $6f, $20, $6c, $65, $61, $76, $65, $20, $74, $68, $65, $20, $20
-	db $20, $20, $69, $73, $6c, $61, $6e, $64, $20, $77, $68, $69, $6c, $65, $20, $74
-	db $68, $65, $57, $69, $6e, $64, $20, $46, $69, $73, $68, $20, $6e, $61, $70, $73
-	db $2e, $20, $2e, $2e, $2e, $42, $79, $20, $74, $68, $65, $20, $62, $79, $2c, $20
-	db $20, $20, $68, $61, $76, $65, $20, $79, $6f, $75, $20, $65, $76, $65, $72, $20
-	db $20, $20, $76, $69, $73, $69, $74, $65, $64, $20, $74, $68, $65, $20, $54, $61
-	db $69, $6c, $43, $61, $76, $65, $2c, $20, $77, $68, $69, $63, $68, $20, $69, $73
-	db $20, $20, $73, $6f, $75, $74, $68, $20, $6f, $66, $20, $74, $68, $65, $20, $20
-	db $20, $20, $76, $69, $6c, $6c, $61, $67, $65, $3f, $20, $20, $47, $6f, $20, $20
-	db $20, $20, $74, $68, $65, $72, $65, $20, $77, $69, $74, $68, $20, $74, $68, $65
-	db $20, $20, $6b, $65, $79, $20, $79, $6f, $75, $20, $66, $69, $6e, $64, $20, $69
-	db $6e, $20, $74, $68, $69, $73, $20, $66, $6f, $72, $65, $73, $74, $2e, $2e, $2e
-	db $20, $20, $54, $68, $65, $20, $57, $69, $6e, $64, $20, $46, $69, $73, $68, $20
-	db $69, $73, $77, $61, $74, $63, $68, $69, $6e, $67, $2e, $2e, $2e, $48, $6f, $6f
-	db $74, $21, $ff
+	db "Hoot!  Ho, brave"
+	db "lad, on your    "
+	db "quest to wake   "
+	db "the dreamer!    "
+	db "Welcome to the  "
+	db "Mysterious Wood!"
+	db "Much of mystery "
+	db "you will find on"
+	db "this uncharted  "
+	db "Koholint island!"
+	db "I^m afraid you  "
+	db "may find it a   "
+	db "trifle difficult"
+	db "to leave the    "
+	db "island while the"
+	db "Wind Fish naps. "
+	db "...By the by,   "
+	db "have you ever   "
+	db "visited the Tail"
+	db "Cave, which is  "
+	db "south of the    "
+	db "village?  Go    "
+	db "there with the  "
+	db "key you find in "
+	db "this forest...  "
+	db "The Wind Fish is"
+	db "watching...Hoot!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0C1: "Hoot! Take the key and go to the Tail Cave. Retrieve the Instrument..." (B does not hurry it)
 Dialog0C1::
-	db $48, $6f, $6f, $74, $21, $20, $20, $54, $61, $6b, $65, $20, $74
-	db $68, $65, $20, $6b, $65, $79, $20, $61, $6e, $64, $20, $67, $6f, $20, $74, $6f
-	db $20, $20, $20, $74, $68, $65, $20, $54, $61, $69, $6c, $20, $43, $61, $76, $65
-	db $2e, $20, $20, $52, $65, $74, $72, $69, $65, $76, $65, $20, $74, $68, $65, $20
-	db $20, $20, $20, $49, $6e, $73, $74, $72, $75, $6d, $65, $6e, $74, $20, $74, $68
-	db $61, $74, $20, $69, $73, $20, $68, $69, $64, $64, $65, $6e, $20, $74, $68, $65
-	db $72, $65, $21, $47, $6f, $20, $6e, $6f, $77, $21, $20, $20, $54, $68, $65, $20
-	db $20, $20, $20, $57, $69, $6e, $64, $20, $46, $69, $73, $68, $20, $69, $73, $20
-	db $20, $20, $20, $77, $61, $69, $74, $69, $6e, $67, $21, $20, $20, $48, $6f, $6f
-	db $6f, $74, $21, $ff
+	db "Hoot!  Take the "
+	db "key and go to   "
+	db "the Tail Cave.  "
+	db "Retrieve the    "
+	db "Instrument that "
+	db "is hidden there!"
+	db "Go now!  The    "
+	db "Wind Fish is    "
+	db "waiting!  Hooot!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0C2: "Hoooot! That is an 'Instrument of the Sirens!' I have to admit, at ..." (B does not hurry it)
 Dialog0C2::
-	db $48, $6f, $6f, $6f, $6f, $74, $21, $20, $20, $54, $68, $61
-	db $74, $20, $69, $73, $61, $6e, $20, $5e, $49, $6e, $73, $74, $72, $75, $6d, $65
-	db $6e, $74, $20, $20, $6f, $66, $20, $74, $68, $65, $20, $53, $69, $72, $65, $6e
-	db $73, $21, $5e, $20, $49, $20, $68, $61, $76, $65, $20, $74, $6f, $20, $61, $64
-	db $6d, $69, $74, $2c, $61, $74, $20, $66, $69, $72, $73, $74, $20, $49, $20, $64
-	db $69, $64, $20, $20, $6e, $6f, $74, $20, $62, $65, $6c, $69, $65, $76, $65, $20
-	db $79, $6f, $75, $20, $77, $65, $72, $65, $20, $72, $65, $61, $6c, $2e, $2e, $2e
-	db $20, $20, $20, $20, $54, $68, $61, $74, $20, $49, $6e, $73, $74, $72, $75, $6d
-	db $65, $6e, $74, $2c, $61, $6c, $6f, $6e, $67, $20, $77, $69, $74, $68, $20, $74
-	db $68, $65, $20, $20, $73, $65, $76, $65, $6e, $20, $6f, $74, $68, $65, $72, $73
-	db $20, $69, $6e, $20, $74, $68, $65, $20, $73, $65, $74, $2c, $20, $68, $61, $73
-	db $20, $74, $68, $65, $70, $6f, $77, $65, $72, $20, $74, $6f, $20, $77, $61, $6b
-	db $65, $20, $20, $20, $74, $68, $65, $20, $57, $69, $6e, $64, $20, $46, $69, $73
-	db $68, $21, $20, $20, $59, $6f, $75, $20, $6d, $75, $73, $74, $20, $63, $6f, $6c
-	db $6c, $65, $63, $74, $74, $68, $65, $6d, $20, $61, $6c, $6c, $21, $20, $20, $49
-	db $20, $77, $61, $73, $69, $6e, $73, $74, $72, $75, $63, $74, $65, $64, $20, $74
-	db $6f, $20, $20, $20, $67, $69, $76, $65, $20, $79, $6f, $75, $20, $64, $69, $72
-	db $65, $63, $2d, $20, $74, $69, $6f, $6e, $73, $2e, $2e, $2e, $20, $20, $59, $6f
-	db $75, $72, $20, $20, $6e, $65, $78, $74, $20, $67, $6f, $61, $6c, $20, $69, $73
-	db $20, $20, $20, $20, $6e, $6f, $72, $74, $68, $2c, $20, $69, $6e, $20, $20, $20
-	db $20, $20, $20, $20, $47, $6f, $70, $6f, $6e, $67, $61, $20, $53, $77, $61, $6d
-	db $70, $21, $21, $20, $48, $6f, $6f, $74, $2c, $20, $69, $6e, $64, $65, $65, $64
-	db $21, $ff
+	db "Hoooot!  That is"
+	db "an ^Instrument  "
+	db "of the Sirens!^ "
+	db "I have to admit,"
+	db "at first I did  "
+	db "not believe you "
+	db "were real...    "
+	db "That Instrument,"
+	db "along with the  "
+	db "seven others in "
+	db "the set, has the"
+	db "power to wake   "
+	db "the Wind Fish!  "
+	db "You must collect"
+	db "them all!  I was"
+	db "instructed to   "
+	db "give you direc- "
+	db "tions...  Your  "
+	db "next goal is    "
+	db "north, in       "
+	db "Goponga Swamp!! "
+	db "Hoot, indeed!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0C3: "Hoot! That is a fearsome looking animal you have there! Do not forg..." (B does not hurry it)
 Dialog0C3::
-	db $48, $6f, $6f, $74, $21, $20, $20, $54, $68, $61, $74, $20, $69, $73
-	db $20, $61, $66, $65, $61, $72, $73, $6f, $6d, $65, $20, $6c, $6f, $6f, $6b, $69
-	db $6e, $67, $61, $6e, $69, $6d, $61, $6c, $20, $79, $6f, $75, $20, $68, $61, $76
-	db $65, $20, $74, $68, $65, $72, $65, $21, $20, $20, $44, $6f, $20, $6e, $6f, $74
-	db $20, $20, $66, $6f, $72, $67, $65, $74, $2c, $20, $74, $68, $65, $20, $6e, $65
-	db $78, $74, $49, $6e, $73, $74, $72, $75, $6d, $65, $6e, $74, $20, $69, $73, $20
-	db $69, $6e, $47, $6f, $70, $6f, $6e, $67, $61, $20, $53, $77, $61, $6d, $70, $21
-	db $ff
+	db "Hoot!  That is a"
+	db "fearsome looking"
+	db "animal you have "
+	db "there!  Do not  "
+	db "forget, the next"
+	db "Instrument is in"
+	db "Goponga Swamp!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0C4: "Hoooot! The Wind Fish sleeps long and dreamily in the Egg above... ..." (B does not hurry it)
 Dialog0C4::
-	db $48, $6f, $6f, $6f, $6f, $74, $21, $20, $54, $68, $65, $20, $57, $69, $6e
-	db $64, $46, $69, $73, $68, $20, $73, $6c, $65, $65, $70, $73, $20, $6c, $6f, $6e
-	db $67, $61, $6e, $64, $20, $64, $72, $65, $61, $6d, $69, $6c, $79, $20, $69, $6e
-	db $20, $74, $68, $65, $20, $45, $67, $67, $20, $61, $62, $6f, $76, $65, $2e, $2e
-	db $2e, $57, $68, $65, $6e, $20, $79, $6f, $75, $20, $70, $6c, $61, $79, $20, $20
-	db $20, $74, $68, $65, $20, $65, $69, $67, $68, $74, $20, $53, $69, $72, $65, $6e
-	db $20, $49, $6e, $73, $74, $72, $75, $6d, $65, $6e, $74, $73, $20, $69, $6e, $20
-	db $20, $66, $72, $6f, $6e, $74, $20, $6f, $66, $20, $74, $68, $65, $20, $45, $67
-	db $67, $68, $65, $20, $77, $69, $6c, $6c, $20, $61, $77, $61, $6b, $65, $6e, $2e
-	db $20, $54, $68, $69, $73, $2c, $20, $6d, $79, $20, $66, $72, $69, $65, $6e, $64
-	db $2c, $69, $73, $20, $74, $68, $65, $20, $6f, $6e, $6c, $79, $20, $77, $61, $79
-	db $20, $66, $6f, $72, $20, $79, $6f, $75, $20, $74, $6f, $20, $6c, $65, $61, $76
-	db $65, $74, $68, $65, $20, $69, $73, $6c, $61, $6e, $64, $21, $20, $48, $6f, $6f
-	db $21, $ff
+	db "Hoooot! The Wind"
+	db "Fish sleeps long"
+	db "and dreamily in "
+	db "the Egg above..."
+	db "When you play   "
+	db "the eight Siren "
+	db "Instruments in  "
+	db "front of the Egg"
+	db "he will awaken. "
+	db "This, my friend,"
+	db "is the only way "
+	db "for you to leave"
+	db "the island! Hoo!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0C5: "Hoot! How many Instruments have you gotten so far? When you play th..." (B does not hurry it)
 Dialog0C5::
-	db $48, $6f, $6f, $74, $21, $20, $20, $48, $6f, $77, $20, $6d, $61, $6e
-	db $79, $20, $49, $6e, $73, $74, $72, $75, $6d, $65, $6e, $74, $73, $20, $20, $20
-	db $20, $20, $68, $61, $76, $65, $20, $79, $6f, $75, $20, $67, $6f, $74, $74, $65
-	db $6e, $20, $73, $6f, $20, $66, $61, $72, $3f, $20, $20, $57, $68, $65, $6e, $20
-	db $20, $20, $79, $6f, $75, $20, $70, $6c, $61, $79, $20, $74, $68, $65, $20, $20
-	db $20, $20, $49, $6e, $73, $74, $72, $75, $6d, $65, $6e, $74, $73, $20, $69, $6e
-	db $20, $20, $66, $72, $6f, $6e, $74, $20, $6f, $66, $20, $74, $68, $65, $20, $20
-	db $20, $20, $45, $67, $67, $2c, $20, $74, $68, $65, $20, $57, $69, $6e, $64, $20
-	db $20, $20, $46, $69, $73, $68, $20, $77, $69, $6c, $6c, $20, $77, $61, $6b, $65
-	db $20, $20, $61, $6e, $64, $20, $79, $6f, $75, $20, $77, $69, $6c, $6c, $20, $20
-	db $20, $20, $6c, $65, $61, $76, $65, $20, $74, $68, $69, $73, $20, $20, $20, $20
-	db $20, $20, $69, $73, $6c, $61, $6e, $64, $2e, $20, $20, $4e, $6f, $77, $2c, $20
-	db $20, $20, $79, $6f, $75, $20, $6d, $75, $73, $74, $20, $68, $61, $73, $74, $65
-	db $6e, $20, $74, $6f, $20, $74, $68, $65, $20, $59, $61, $72, $6e, $61, $20, $20
-	db $20, $20, $44, $65, $73, $65, $72, $74, $21, $20, $20, $54, $68, $65, $20, $20
-	db $20, $20, $64, $61, $72, $6b, $2c, $20, $6d, $6f, $6e, $73, $74, $72, $6f, $75
-	db $73, $20, $69, $6e, $68, $61, $62, $69, $74, $61, $6e, $74, $73, $20, $6f, $66
-	db $20, $20, $74, $68, $65, $20, $73, $61, $6e, $64, $20, $77, $69, $6c, $6c, $20
-	db $20, $20, $73, $68, $6f, $77, $20, $79, $6f, $75, $20, $74, $68, $65, $20, $20
-	db $20, $20, $77, $61, $79, $21, $20, $48, $6f, $6f, $74, $20, $48, $6f, $6f, $74
-	db $21, $ff
+	db "Hoot!  How many "
+	db "Instruments     "
+	db "have you gotten "
+	db "so far?  When   "
+	db "you play the    "
+	db "Instruments in  "
+	db "front of the    "
+	db "Egg, the Wind   "
+	db "Fish will wake  "
+	db "and you will    "
+	db "leave this      "
+	db "island.  Now,   "
+	db "you must hasten "
+	db "to the Yarna    "
+	db "Desert!  The    "
+	db "dark, monstrous "
+	db "inhabitants of  "
+	db "the sand will   "
+	db "show you the    "
+	db "way! Hoot Hoot!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0C6: "Hoot! The shape of the key shows a fish, swimming up a cascade of w..." (B does not hurry it)
 Dialog0C6::
-	db $48, $6f, $6f, $74, $21, $20, $20, $54, $68, $65, $20, $73, $68, $61
-	db $70, $65, $6f, $66, $20, $74, $68, $65, $20, $6b, $65, $79, $20, $73, $68, $6f
-	db $77, $73, $61, $20, $66, $69, $73, $68, $2c, $20, $73, $77, $69, $6d, $6d, $69
-	db $6e, $67, $75, $70, $20, $61, $20, $63, $61, $73, $63, $61, $64, $65, $20, $6f
-	db $66, $20, $77, $61, $74, $65, $72, $21, $20, $20, $47, $6f, $20, $6e, $6f, $77
-	db $20, $20, $74, $6f, $20, $74, $68, $65, $20, $6d, $6f, $75, $6e, $74, $61, $69
-	db $6e, $20, $77, $61, $74, $65, $72, $66, $61, $6c, $6c, $21, $20, $20, $41, $20
-	db $20, $20, $6c, $65, $61, $70, $20, $66, $72, $6f, $6d, $20, $74, $68, $65, $20
-	db $20, $20, $74, $6f, $70, $20, $61, $6e, $64, $20, $79, $6f, $75, $20, $77, $69
-	db $6c, $6c, $72, $65, $61, $63, $68, $20, $79, $6f, $75, $72, $20, $67, $6f, $61
-	db $6c, $21, $ff
+	db "Hoot!  The shape"
+	db "of the key shows"
+	db "a fish, swimming"
+	db "up a cascade of "
+	db "water!  Go now  "
+	db "to the mountain "
+	db "waterfall!  A   "
+	db "leap from the   "
+	db "top and you will"
+	db "reach your goal!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0C7: "Hoot! There are two shrines, one to the north, the other to the sou..." (B does not hurry it)
 Dialog0C7::
-	db $48, $6f, $6f, $74, $21, $20, $20, $54, $68, $65, $72, $65, $20
-	db $61, $72, $65, $74, $77, $6f, $20, $73, $68, $72, $69, $6e, $65, $73, $2c, $20
-	db $6f, $6e, $65, $74, $6f, $20, $74, $68, $65, $20, $6e, $6f, $72, $74, $68, $2c
-	db $20, $20, $20, $74, $68, $65, $20, $6f, $74, $68, $65, $72, $20, $74, $6f, $20
-	db $74, $68, $65, $73, $6f, $75, $74, $68, $2e, $20, $20, $46, $69, $72, $73, $74
-	db $2c, $20, $20, $68, $65, $61, $64, $20, $73, $6f, $75, $74, $68, $2c, $20, $20
-	db $20, $20, $20, $77, $68, $65, $72, $65, $20, $61, $6e, $63, $69, $65, $6e, $74
-	db $20, $20, $20, $72, $75, $69, $6e, $73, $20, $73, $70, $65, $61, $6b, $20, $6f
-	db $66, $20, $20, $74, $68, $65, $20, $57, $69, $6e, $64, $20, $46, $69, $73, $68
-	db $2e, $2e, $2e, $59, $6f, $75, $20, $77, $69, $6c, $6c, $20, $6c, $65, $61, $72
-	db $6e, $20, $20, $6d, $75, $63, $68, $20, $74, $68, $65, $72, $65, $2e, $2e, $2e
-	db $ff
+	db "Hoot!  There are"
+	db "two shrines, one"
+	db "to the north,   "
+	db "the other to the"
+	db "south.  First,  "
+	db "head south,     "
+	db "where ancient   "
+	db "ruins speak of  "
+	db "the Wind Fish..."
+	db "You will learn  "
+	db "much there..."
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0C8: "Hoot! I see you have read the relief... While it does say the islan..." (B does not hurry it)
 Dialog0C8::
-	db $48, $6f, $6f, $74, $21, $20, $20, $49, $20, $73, $65, $65, $20, $79, $6f
-	db $75, $68, $61, $76, $65, $20, $72, $65, $61, $64, $20, $74, $68, $65, $20, $20
-	db $20, $72, $65, $6c, $69, $65, $66, $2e, $2e, $2e, $20, $20, $57, $68, $69, $6c
-	db $65, $69, $74, $20, $64, $6f, $65, $73, $20, $73, $61, $79, $20, $74, $68, $65
-	db $20, $69, $73, $6c, $61, $6e, $64, $20, $69, $73, $20, $62, $75, $74, $20, $61
-	db $20, $64, $72, $65, $61, $6d, $20, $6f, $66, $20, $74, $68, $65, $20, $20, $20
-	db $20, $57, $69, $6e, $64, $20, $46, $69, $73, $68, $2c, $20, $6e, $6f, $20, $20
-	db $20, $6f, $6e, $65, $20, $69, $73, $20, $72, $65, $61, $6c, $6c, $79, $20, $20
-	db $20, $73, $75, $72, $65, $2e, $2e, $2e, $20, $20, $4a, $75, $73, $74, $20, $61
-	db $73, $79, $6f, $75, $20, $63, $61, $6e, $6e, $6f, $74, $20, $6b, $6e, $6f, $77
-	db $20, $69, $66, $20, $61, $20, $63, $68, $65, $73, $74, $20, $68, $6f, $6c, $64
-	db $73, $74, $72, $65, $61, $73, $75, $72, $65, $20, $75, $6e, $74, $69, $6c, $20
-	db $20, $79, $6f, $75, $20, $6f, $70, $65, $6e, $20, $69, $74, $2c, $20, $73, $6f
-	db $20, $79, $6f, $75, $20, $63, $61, $6e, $6e, $6f, $74, $20, $74, $65, $6c, $6c
-	db $20, $69, $66, $20, $74, $68, $69, $73, $20, $69, $73, $20, $61, $20, $20, $20
-	db $20, $64, $72, $65, $61, $6d, $20, $75, $6e, $74, $69, $6c, $20, $79, $6f, $75
-	db $20, $61, $77, $61, $6b, $65, $6e, $2e, $2e, $2e, $20, $20, $54, $68, $65, $20
-	db $20, $6f, $6e, $6c, $79, $20, $6f, $6e, $65, $20, $77, $68, $6f, $20, $20, $20
-	db $20, $6b, $6e, $6f, $77, $73, $20, $66, $6f, $72, $20, $73, $75, $72, $65, $20
-	db $20, $69, $73, $20, $74, $68, $65, $20, $57, $69, $6e, $64, $20, $20, $20, $20
-	db $20, $46, $69, $73, $68, $2e, $2e, $2e, $20, $20, $54, $72, $75, $73, $74, $20
-	db $20, $79, $6f, $75, $72, $20, $66, $65, $65, $6c, $69, $6e, $67, $73, $2e, $2e
-	db $2e, $53, $6f, $6d, $65, $64, $61, $79, $20, $79, $6f, $75, $20, $77, $69, $6c
-	db $6c, $6b, $6e, $6f, $77, $20, $66, $6f, $72, $20, $73, $75, $72, $65, $2e, $2e
-	db $2e, $ff
+	db "Hoot!  I see you"
+	db "have read the   "
+	db "relief...  While"
+	db "it does say the "
+	db "island is but a "
+	db "dream of the    "
+	db "Wind Fish, no   "
+	db "one is really   "
+	db "sure...  Just as"
+	db "you cannot know "
+	db "if a chest holds"
+	db "treasure until  "
+	db "you open it, so "
+	db "you cannot tell "
+	db "if this is a    "
+	db "dream until you "
+	db "awaken...  The  "
+	db "only one who    "
+	db "knows for sure  "
+	db "is the Wind     "
+	db "Fish...  Trust  "
+	db "your feelings..."
+	db "Someday you will"
+	db "know for sure..."
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0C9: "Hoot! The many monsters of this island fear that the Wind Fish is a..." (B does not hurry it)
 Dialog0C9::
-	db $48, $6f, $6f, $74, $21, $20, $20, $54, $68, $65, $20, $6d, $61, $6e
-	db $79, $20, $6d, $6f, $6e, $73, $74, $65, $72, $73, $20, $6f, $66, $20, $74, $68
-	db $69, $73, $69, $73, $6c, $61, $6e, $64, $20, $66, $65, $61, $72, $20, $74, $68
-	db $61, $74, $74, $68, $65, $20, $57, $69, $6e, $64, $20, $46, $69, $73, $68, $20
-	db $69, $73, $61, $62, $6f, $75, $74, $20, $74, $6f, $20, $61, $77, $61, $6b, $65
-	db $6e, $21, $54, $68, $65, $20, $6d, $6f, $6e, $73, $74, $65, $72, $73, $5e, $20
-	db $20, $20, $70, $6f, $77, $65, $72, $20, $69, $73, $20, $72, $65, $61, $6c, $21
-	db $20, $20, $54, $68, $65, $79, $20, $6d, $61, $79, $20, $63, $6f, $6e, $71, $75
-	db $65, $72, $74, $68, $65, $20, $69, $73, $6c, $61, $6e, $64, $20, $61, $6e, $64
-	db $20, $20, $64, $65, $73, $74, $72, $6f, $79, $20, $74, $68, $65, $69, $72, $20
-	db $20, $20, $66, $6f, $65, $73, $21, $20, $20, $54, $68, $61, $74, $20, $64, $61
-	db $79, $20, $6d, $61, $79, $20, $63, $6f, $6d, $65, $20, $73, $6f, $6f, $6e, $21
-	db $20, $20, $4e, $6f, $77, $2c, $20, $67, $6f, $20, $74, $6f, $20, $74, $68, $65
-	db $20, $20, $6d, $6f, $75, $6e, $74, $61, $69, $6e, $20, $74, $6f, $77, $65, $72
-	db $21, $20, $46, $6c, $79, $20, $6c, $69, $6b, $65, $20, $61, $20, $62, $69, $72
-	db $64, $21, $48, $6f, $6f, $74, $21, $20, $48, $6f, $6f, $74, $21, $ff
+	db "Hoot!  The many "
+	db "monsters of this"
+	db "island fear that"
+	db "the Wind Fish is"
+	db "about to awaken!"
+	db "The monsters^   "
+	db "power is real!  "
+	db "They may conquer"
+	db "the island and  "
+	db "destroy their   "
+	db "foes!  That day "
+	db "may come soon!  "
+	db "Now, go to the  "
+	db "mountain tower! "
+	db "Fly like a bird!"
+	db "Hoot! Hoot!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0CA: "The going is much more trying from this point! You have only two mo..." (B does not hurry it)
 Dialog0CA::
-	db $54, $68
-	db $65, $20, $67, $6f, $69, $6e, $67, $20, $69, $73, $20, $20, $20, $20, $6d, $75
-	db $63, $68, $20, $6d, $6f, $72, $65, $20, $74, $72, $79, $69, $6e, $67, $66, $72
-	db $6f, $6d, $20, $74, $68, $69, $73, $20, $70, $6f, $69, $6e, $74, $21, $59, $6f
-	db $75, $20, $68, $61, $76, $65, $20, $6f, $6e, $6c, $79, $20, $20, $20, $74, $77
-	db $6f, $20, $6d, $6f, $72, $65, $20, $74, $61, $73, $6b, $73, $20, $20, $74, $6f
-	db $20, $61, $63, $63, $6f, $6d, $70, $6c, $69, $73, $68, $21, $20, $20, $54, $68
-	db $65, $20, $66, $69, $72, $73, $74, $20, $69, $73, $20, $69, $6e, $20, $74, $68
-	db $65, $20, $65, $61, $73, $74, $20, $70, $61, $72, $74, $20, $6f, $66, $74, $68
-	db $65, $20, $6d, $6f, $75, $6e, $74, $61, $69, $6e, $73, $2c, $20, $20, $74, $68
-	db $65, $20, $73, $65, $63, $6f, $6e, $64, $20, $69, $6e, $20, $20, $20, $74, $68
-	db $65, $20, $77, $65, $73, $74, $2e, $20, $20, $47, $6f, $21, $20, $20, $54, $68
-	db $65, $20, $57, $69, $6e, $64, $20, $46, $69, $73, $68, $20, $20, $20, $67, $72
-	db $6f, $77, $73, $20, $72, $65, $73, $74, $6c, $65, $73, $73, $21, $ff
+	db "The going is    "
+	db "much more trying"
+	db "from this point!"
+	db "You have only   "
+	db "two more tasks  "
+	db "to accomplish!  "
+	db "The first is in "
+	db "the east part of"
+	db "the mountains,  "
+	db "the second in   "
+	db "the west.  Go!  "
+	db "The Wind Fish   "
+	db "grows restless!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0CB: "Hoot! It has been some time since our paths crossed, lad. You must ..." (B does not hurry it)
 Dialog0CB::
-	db $48, $6f
-	db $6f, $74, $21, $20, $20, $49, $74, $20, $68, $61, $73, $20, $20, $20, $62, $65
-	db $65, $6e, $20, $73, $6f, $6d, $65, $20, $74, $69, $6d, $65, $20, $20, $73, $69
-	db $6e, $63, $65, $20, $6f, $75, $72, $20, $70, $61, $74, $68, $73, $20, $63, $72
-	db $6f, $73, $73, $65, $64, $2c, $20, $6c, $61, $64, $2e, $20, $20, $20, $59, $6f
-	db $75, $20, $6d, $75, $73, $74, $20, $64, $69, $76, $65, $20, $20, $20, $69, $6e
-	db $74, $6f, $20, $74, $68, $65, $20, $77, $61, $74, $65, $72, $73, $20, $6f, $66
-	db $20, $4d, $61, $72, $74, $68, $61, $5e, $73, $20, $42, $61, $79, $20, $74, $6f
-	db $20, $65, $6e, $74, $65, $72, $20, $74, $68, $65, $20, $20, $20, $20, $43, $61
-	db $74, $66, $69, $73, $68, $5e, $73, $20, $4d, $61, $77, $2e, $2e, $2e, $54, $68
-	db $65, $20, $63, $6c, $6f, $73, $65, $72, $20, $79, $6f, $75, $20, $20, $67, $65
-	db $74, $20, $74, $6f, $20, $74, $68, $65, $20, $57, $69, $6e, $64, $20, $46, $69
-	db $73, $68, $2c, $20, $74, $68, $65, $20, $6d, $6f, $72, $65, $20, $20, $72, $65
-	db $73, $74, $6c, $65, $73, $73, $20, $68, $65, $20, $20, $20, $20, $20, $73, $6c
-	db $65, $65, $70, $73, $2e, $20, $20, $43, $61, $72, $72, $79, $20, $20, $6f, $6e
-	db $77, $61, $72, $64, $21, $20, $20, $48, $6f, $6f, $74, $21, $ff
+	db "Hoot!  It has   "
+	db "been some time  "
+	db "since our paths "
+	db "crossed, lad.   "
+	db "You must dive   "
+	db "into the waters "
+	db "of Martha^s Bay "
+	db "to enter the    "
+	db "Catfish^s Maw..."
+	db "The closer you  "
+	db "get to the Wind "
+	db "Fish, the more  "
+	db "restless he     "
+	db "sleeps.  Carry  "
+	db "onward!  Hoot!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0CC: "Hoot! That girl sang her song in front of the Egg! Her 'Ballad of t..." (B does not hurry it)
 Dialog0CC::
-	db $48, $6f, $6f
-	db $74, $21, $20, $20, $54, $68, $61, $74, $20, $67, $69, $72, $6c, $73, $61, $6e
-	db $67, $20, $68, $65, $72, $20, $73, $6f, $6e, $67, $20, $69, $6e, $66, $72, $6f
-	db $6e, $74, $20, $6f, $66, $20, $74, $68, $65, $20, $20, $20, $20, $45, $67, $67
-	db $21, $20, $48, $65, $72, $20, $5e, $42, $61, $6c, $6c, $61, $64, $6f, $66, $20
-	db $74, $68, $65, $20, $57, $69, $6e, $64, $20, $20, $20, $20, $20, $46, $69, $73
-	db $68, $5e, $20, $69, $73, $20, $61, $20, $73, $6f, $6e, $67, $20, $6f, $66, $20
-	db $61, $77, $61, $6b, $65, $6e, $69, $6e, $67, $21, $20, $20, $20, $44, $69, $64
-	db $20, $73, $68, $65, $20, $61, $63, $74, $75, $61, $6c, $6c, $79, $69, $6e, $74
-	db $65, $6e, $64, $20, $74, $6f, $20, $77, $61, $6b, $65, $20, $20, $74, $68, $65
-	db $20, $57, $69, $6e, $64, $20, $46, $69, $73, $68, $3f, $21, $20, $54, $68, $65
-	db $20, $6e, $65, $78, $74, $20, $53, $69, $72, $65, $6e, $73, $5e, $49, $6e, $73
-	db $74, $72, $75, $6d, $65, $6e, $74, $20, $69, $73, $20, $69, $6e, $74, $68, $65
-	db $20, $77, $65, $73, $74, $2e, $20, $20, $50, $6c, $61, $79, $20, $79, $6f, $75
-	db $72, $20, $6d, $65, $6c, $6f, $64, $69, $65, $73, $20, $73, $6f, $74, $68, $65
-	db $20, $75, $6e, $6c, $69, $76, $69, $6e, $67, $20, $20, $20, $20, $73, $74, $6f
-	db $6e, $65, $73, $20, $6d, $69, $67, $68, $74, $20, $20, $20, $20, $68, $65, $61
-	db $72, $21, $20, $20, $53, $68, $6f, $77, $20, $79, $6f, $75, $72, $63, $6f, $75
-	db $72, $61, $67, $65, $21, $20, $20, $54, $68, $65, $20, $20, $20, $57, $69, $6e
-	db $64, $20, $46, $69, $73, $68, $20, $77, $61, $69, $74, $73, $20, $66, $6f, $72
-	db $20, $79, $6f, $75, $21, $20, $20, $48, $6f, $6f, $74, $21, $ff
+	db "Hoot!  That girl"
+	db "sang her song in"
+	db "front of the    "
+	db "Egg! Her ^Ballad"
+	db "of the Wind     "
+	db "Fish^ is a song "
+	db "of awakening!   "
+	db "Did she actually"
+	db "intend to wake  "
+	db "the Wind Fish?! "
+	db "The next Sirens^"
+	db "Instrument is in"
+	db "the west.  Play "
+	db "your melodies so"
+	db "the unliving    "
+	db "stones might    "
+	db "hear!  Show your"
+	db "courage!  The   "
+	db "Wind Fish waits "
+	db "for you!  Hoot!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0CD: "The time has come... The Wind Fish awaits... Enter the Egg... Hoot!..." (B does not hurry it)
 Dialog0CD::
-	db $54, $68, $65
-	db $20, $74, $69, $6d, $65, $20, $68, $61, $73, $20, $20, $20, $20, $63, $6f, $6d
-	db $65, $2e, $2e, $2e, $20, $54, $68, $65, $20, $57, $69, $6e, $64, $46, $69, $73
-	db $68, $20, $61, $77, $61, $69, $74, $73, $2e, $2e, $2e, $20, $20, $45, $6e, $74
-	db $65, $72, $20, $74, $68, $65, $20, $45, $67, $67, $2e, $2e, $2e, $48, $6f, $6f
-	db $74, $21, $20, $48, $6f, $6f, $74, $21, $ff
+	db "The time has    "
+	db "come... The Wind"
+	db "Fish awaits...  "
+	db "Enter the Egg..."
+	db "Hoot! Hoot!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialogs $0CE, $0CF: "Hoot! Young lad, I mean... [NAME], the hero! You have defeated the ..." (B does not hurry it)
 Dialog0CE::
-	db $48, $6f, $6f, $74, $21, $20, $59
-	db $6f, $75, $6e, $67, $20, $6c, $61, $64, $2c, $49, $20, $6d, $65, $61, $6e, $2e
-	db $2e, $2e, $20, $23, $23, $23, $23, $23, $2c, $74, $68, $65, $20, $68, $65, $72
-	db $6f, $21, $20, $20, $59, $6f, $75, $20, $20, $68, $61, $76, $65, $20, $64, $65
-	db $66, $65, $61, $74, $65, $64, $20, $20, $20, $74, $68, $65, $20, $4e, $69, $67
-	db $68, $74, $6d, $61, $72, $65, $73, $21, $20, $59, $6f, $75, $20, $68, $61, $76
-	db $65, $20, $70, $72, $6f, $76, $65, $6e, $20, $79, $6f, $75, $72, $20, $77, $69
-	db $73, $64, $6f, $6d, $2c, $20, $20, $20, $20, $63, $6f, $75, $72, $61, $67, $65
-	db $20, $61, $6e, $64, $20, $20, $20, $20, $20, $70, $6f, $77, $65, $72, $21, $20
-	db $20, $20, $20, $20, $20, $20, $20, $20, $20, $2e, $2e, $2e, $20, $2e, $2e, $2e
-	db $20, $2e, $2e, $2e, $20, $2e, $2e, $2e, $20, $41, $73, $20, $70, $61, $72, $74
-	db $20, $6f, $66, $20, $74, $68, $65, $20, $20, $57, $69, $6e, $64, $20, $46, $69
-	db $73, $68, $5e, $73, $20, $20, $20, $20, $20, $73, $70, $69, $72, $69, $74, $2c
-	db $20, $49, $20, $61, $6d, $20, $74, $68, $65, $67, $75, $61, $72, $64, $69, $61
-	db $6e, $20, $6f, $66, $20, $68, $69, $73, $20, $64, $72, $65, $61, $6d, $20, $77
-	db $6f, $72, $6c, $64, $2e, $2e, $2e, $20, $20, $42, $75, $74, $20, $6f, $6e, $65
-	db $20, $64, $61, $79, $2c, $20, $74, $68, $65, $4e, $69, $67, $68, $74, $6d, $61
-	db $72, $65, $73, $20, $20, $20, $20, $20, $20, $65, $6e, $74, $65, $72, $65, $64
-	db $20, $74, $68, $65, $20, $20, $20, $20, $20, $64, $72, $65, $61, $6d, $20, $61
-	db $6e, $64, $20, $62, $65, $67, $61, $6e, $20, $77, $72, $65, $61, $6b, $69, $6e
-	db $67, $20, $68, $61, $76, $6f, $63, $2e, $20, $54, $68, $65, $6e, $20, $79, $6f
-	db $75, $2c, $20, $23, $23, $23, $23, $23, $2c, $63, $61, $6d, $65, $20, $74, $6f
-	db $20, $72, $65, $73, $63, $75, $65, $20, $20, $74, $68, $65, $20, $69, $73, $6c
-	db $61, $6e, $64, $2e, $2e, $2e, $20, $20, $20, $49, $20, $68, $61, $76, $65, $20
-	db $61, $6c, $77, $61, $79, $73, $20, $20, $20, $74, $72, $75, $73, $74, $65, $64
-	db $20, $69, $6e, $20, $79, $6f, $75, $72, $20, $63, $6f, $75, $72, $61, $67, $65
-	db $20, $74, $6f, $20, $74, $75, $72, $6e, $20, $62, $61, $63, $6b, $20, $74, $68
-	db $65, $20, $4e, $69, $67, $68, $74, $2d, $20, $6d, $61, $72, $65, $73, $2e, $20
-	db $20, $54, $68, $61, $6e, $6b, $20, $20, $20, $79, $6f, $75, $2c, $20, $23, $23
-	db $23, $23, $23, $2e, $2e, $2e, $20, $4d, $79, $77, $6f, $72, $6b, $20, $69, $73
-	db $20, $64, $6f, $6e, $65, $2e, $2e, $2e, $20, $54, $68, $65, $20, $57, $69, $6e
-	db $64, $20, $46, $69, $73, $68, $20, $20, $20, $77, $69, $6c, $6c, $20, $77, $61
-	db $6b, $65, $20, $73, $6f, $6f, $6e, $2e, $20, $47, $6f, $6f, $64, $20, $62, $79
-	db $65, $2e, $2e, $2e, $48, $6f, $6f, $74, $21, $ff
+	db "Hoot! Young lad,"
+	db "I mean... #####,"
+	db "the hero!  You  "
+	db "have defeated   "
+	db "the Nightmares! "
+	db "You have proven "
+	db "your wisdom,    "
+	db "courage and     "
+	db "power!          "
+	db "... ... ... ... "
+	db "As part of the  "
+	db "Wind Fish^s     "
+	db "spirit, I am the"
+	db "guardian of his "
+	db "dream world...  "
+	db "But one day, the"
+	db "Nightmares      "
+	db "entered the     "
+	db "dream and began "
+	db "wreaking havoc. "
+	db "Then you, #####,"
+	db "came to rescue  "
+	db "the island...   "
+	db "I have always   "
+	db "trusted in your "
+	db "courage to turn "
+	db "back the Night- "
+	db "mares.  Thank   "
+	db "you, #####... My"
+	db "work is done... "
+	db "The Wind Fish   "
+	db "will wake soon. "
+	db "Good bye...Hoot!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0D0: "... ... ... ... ... ... ... ... I AM THE WIND FISH... LONG HAS BEEN..." (B does not hurry it)
 Dialog0D0::
-	db $2e, $2e, $2e, $20, $2e, $2e
-	db $2e, $20, $2e, $2e, $2e, $20, $2e, $2e, $2e, $20, $20, $2e, $2e, $2e, $20, $2e
-	db $2e, $2e, $20, $2e, $2e, $2e, $20, $2e, $2e, $2e, $20, $49, $20, $41, $4d, $20
-	db $54, $48, $45, $20, $57, $49, $4e, $44, $20, $20, $20, $20, $20, $20, $20, $20
-	db $46, $49, $53, $48, $2e, $2e, $2e, $20, $20, $20, $20, $4c, $4f, $4e, $47, $20
-	db $48, $41, $53, $20, $42, $45, $45, $4e, $20, $20, $20, $20, $4d, $59, $20, $53
-	db $4c, $55, $4d, $42, $45, $52, $2e, $2e, $2e, $20, $20, $49, $4e, $20, $4d, $59
-	db $20, $44, $52, $45, $41, $4d, $53, $2e, $2e, $2e, $20, $41, $4e, $20, $45, $47
-	db $47, $20, $41, $50, $50, $45, $41, $52, $45, $44, $20, $20, $20, $20, $20, $41
-	db $4e, $44, $20, $57, $41, $53, $20, $20, $20, $20, $53, $55, $52, $52, $4f, $55
-	db $4e, $44, $45, $44, $20, $42, $59, $20, $41, $4e, $20, $20, $49, $53, $4c, $41
-	db $4e, $44, $2c, $20, $57, $49, $54, $48, $20, $20, $50, $45, $4f, $50, $4c, $45
-	db $2c, $20, $41, $4e, $49, $4d, $41, $4c, $53, $2c, $41, $4e, $20, $45, $4e, $54
-	db $49, $52, $45, $20, $57, $4f, $52, $4c, $44, $21, $2e, $2e, $2e, $20, $2e, $2e
-	db $2e, $20, $2e, $2e, $2e, $20, $2e, $2e, $2e, $20, $20, $20, $42, $55, $54, $2c
-	db $20, $56, $45, $52, $49, $4c, $59, $2c, $20, $20, $49, $54, $20, $42, $45, $20
-	db $54, $48, $45, $20, $4e, $41, $54, $55, $52, $45, $20, $20, $4f, $46, $20, $44
-	db $52, $45, $41, $4d, $53, $20, $54, $4f, $20, $20, $45, $4e, $44, $21, $20, $57
-	db $48, $45, $4e, $20, $49, $20, $44, $4f, $53, $54, $41, $57, $41, $4b, $45, $4e
-	db $2c, $20, $4b, $4f, $48, $4f, $4c, $49, $4e, $54, $20, $57, $49, $4c, $4c, $20
-	db $42, $45, $20, $47, $4f, $4e, $45, $2e, $2e, $2e, $4f, $4e, $4c, $59, $20, $54
-	db $48, $45, $20, $4d, $45, $4d, $4f, $52, $59, $20, $20, $4f, $46, $20, $54, $48
-	db $49, $53, $20, $44, $52, $45, $41, $4d, $20, $20, $4c, $41, $4e, $44, $20, $57
-	db $49, $4c, $4c, $20, $45, $58, $49, $53, $54, $20, $20, $20, $49, $4e, $20, $54
-	db $48, $45, $20, $57, $41, $4b, $49, $4e, $47, $20, $20, $20, $20, $20, $20, $20
-	db $57, $4f, $52, $4c, $44, $2e, $2e, $2e, $20, $20, $20, $53, $4f, $4d, $45, $44
-	db $41, $59, $2c, $20, $54, $48, $4f, $55, $20, $20, $4d, $41, $59, $20, $52, $45
-	db $43, $41, $4c, $4c, $20, $54, $48, $49, $53, $20, $20, $49, $53, $4c, $41, $4e
-	db $44, $2e, $2e, $2e, $20, $20, $54, $48, $41, $54, $20, $4d, $45, $4d, $4f, $52
-	db $59, $20, $4d, $55, $53, $54, $20, $42, $45, $20, $20, $54, $48, $45, $20, $52
-	db $45, $41, $4c, $20, $44, $52, $45, $41, $4d, $20, $20, $20, $20, $20, $20, $57
-	db $4f, $52, $4c, $44, $2e, $2e, $2e, $20, $20, $20, $2e, $2e, $2e, $20, $2e, $2e
-	db $2e, $20, $2e, $2e, $2e, $20, $2e, $2e, $2e, $20, $20, $43, $4f, $4d, $45, $2c
-	db $20, $23, $23, $23, $23, $23, $2e, $2e, $2e, $20, $4c, $45, $54, $20, $55, $53
-	db $20, $41, $57, $41, $4b, $45, $4e, $2e, $2e, $2e, $20, $20, $20, $54, $4f, $47
-	db $45, $54, $48, $45, $52, $21, $21, $ff
+	db "... ... ... ... "
+	db " ... ... ... ..."
+	db " I AM THE WIND  "
+	db "      FISH...   "
+	db " LONG HAS BEEN  "
+	db "  MY SLUMBER... "
+	db " IN MY DREAMS..."
+	db " AN EGG APPEARED"
+	db "     AND WAS    "
+	db "SURROUNDED BY AN"
+	db "  ISLAND, WITH  "
+	db "PEOPLE, ANIMALS,"
+	db "AN ENTIRE WORLD!"
+	db "... ... ... ... "
+	db "  BUT, VERILY,  "
+	db "IT BE THE NATURE"
+	db "  OF DREAMS TO  "
+	db "END! WHEN I DOST"
+	db "AWAKEN, KOHOLINT"
+	db " WILL BE GONE..."
+	db "ONLY THE MEMORY "
+	db " OF THIS DREAM  "
+	db "LAND WILL EXIST "
+	db "  IN THE WAKING "
+	db "      WORLD...  "
+	db " SOMEDAY, THOU  "
+	db "MAY RECALL THIS "
+	db " ISLAND...  THAT"
+	db " MEMORY MUST BE "
+	db " THE REAL DREAM "
+	db "     WORLD...   "
+	db "... ... ... ... "
+	db " COME, #####... "
+	db "LET US AWAKEN..."
+	db "   TOGETHER!!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialogs $0D1, $0D2: "PLAY THE EIGHT INSTRUMENTS! PLAY THE SONG OF AWAKENING!!" (B does not hurry it)
 Dialog0D1::
-	db $20, $50, $4c, $41, $59, $20, $54, $48
-	db $45, $20, $45, $49, $47, $48, $54, $20, $20, $20, $49, $4e, $53, $54, $52, $55
-	db $4d, $45, $4e, $54, $53, $21, $20, $20, $50, $4c, $41, $59, $20, $54, $48, $45
-	db $20, $53, $4f, $4e, $47, $20, $4f, $46, $20, $20, $20, $41, $57, $41, $4b, $45
-	db $4e, $49, $4e, $47, $21, $21, $ff
+	db " PLAY THE EIGHT "
+	db "  INSTRUMENTS!  "
+	db "PLAY THE SONG OF"
+	db "   AWAKENING!!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialogs $0D3, $0D4, $0D5: "Mermaid Statue" (B does not hurry it)
 Dialog0D3::
-	db $4d, $65, $72, $6d, $61, $69, $64, $20, $53
-	db $74, $61, $74, $75, $65, $20, $20, $ff
+	db "Mermaid Statue  "
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialogs $0D6, $0D7: "...[NAME], you have beaten all the Nightmares! Climb the stairs bef..." (B does not hurry it)
 Dialog0D6::
-	db $2e, $2e, $2e, $23, $23, $23, $23, $23
-	db $2c, $20, $79, $6f, $75, $20, $20, $20, $68, $61, $76, $65, $20, $62, $65, $61
-	db $74, $65, $6e, $20, $61, $6c, $6c, $20, $74, $68, $65, $20, $4e, $69, $67, $68
-	db $74, $6d, $61, $72, $65, $73, $21, $20, $43, $6c, $69, $6d, $62, $20, $74, $68
-	db $65, $20, $73, $74, $61, $69, $72, $73, $62, $65, $66, $6f, $72, $65, $20, $79
-	db $6f, $75, $21, $ff
+	db "...#####, you   "
+	db "have beaten all "
+	db "the Nightmares! "
+	db "Climb the stairs"
+	db "before you!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0D8: "Ach! Vat are you looking at vith zat magnifying lens? Stop it at vo..." (B does not hurry it)
 Dialog0D8::
-	db $41, $63, $68, $21, $20, $56, $61, $74, $20, $61, $72, $65
-	db $20, $79, $6f, $75, $6c, $6f, $6f, $6b, $69, $6e, $67, $20, $61, $74, $20, $76
-	db $69, $74, $68, $20, $7a, $61, $74, $20, $6d, $61, $67, $6e, $69, $66, $79, $69
-	db $6e, $67, $20, $20, $6c, $65, $6e, $73, $3f, $20, $20, $53, $74, $6f, $70, $20
-	db $69, $74, $20, $20, $61, $74, $20, $76, $6f, $6e, $63, $65, $21, $ff
+	db "Ach! Vat are you"
+	db "looking at vith "
+	db "zat magnifying  "
+	db "lens?  Stop it  "
+	db "at vonce!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0D9: "Hoot! Hoot! So you are the lad who owns the sword... Now I understa..." (B does not hurry it)
 Dialog0D9::
-	db $20, $20
-	db $48, $6f, $6f, $74, $21, $20, $20, $48, $6f, $6f, $74, $21, $20, $20, $53, $6f
-	db $20, $79, $6f, $75, $20, $61, $72, $65, $20, $74, $68, $65, $20, $20, $6c, $61
-	db $64, $20, $77, $68, $6f, $20, $6f, $77, $6e, $73, $20, $74, $68, $65, $73, $77
-	db $6f, $72, $64, $2e, $2e, $2e, $20, $20, $4e, $6f, $77, $20, $49, $20, $75, $6e
-	db $64, $65, $72, $73, $74, $61, $6e, $64, $20, $77, $68, $79, $20, $20, $74, $68
-	db $65, $20, $6d, $6f, $6e, $73, $74, $65, $72, $73, $20, $61, $72, $65, $73, $74
-	db $61, $72, $74, $69, $6e, $67, $20, $74, $6f, $20, $61, $63, $74, $20, $73, $6f
-	db $20, $76, $69, $6f, $6c, $65, $6e, $74, $6c, $79, $2e, $2e, $2e, $20, $41, $20
-	db $63, $6f, $75, $72, $61, $67, $65, $6f, $75, $73, $20, $6c, $61, $64, $68, $61
-	db $73, $20, $63, $6f, $6d, $65, $20, $74, $6f, $20, $77, $61, $6b, $65, $74, $68
-	db $65, $20, $57, $69, $6e, $64, $20, $46, $69, $73, $68, $2e, $2e, $2e, $49, $74
-	db $20, $69, $73, $20, $73, $61, $69, $64, $20, $74, $68, $61, $74, $20, $79, $6f
-	db $75, $20, $63, $61, $6e, $6e, $6f, $74, $20, $6c, $65, $61, $76, $65, $74, $68
-	db $65, $20, $69, $73, $6c, $61, $6e, $64, $20, $20, $20, $20, $20, $20, $75, $6e
-	db $6c, $65, $73, $73, $20, $79, $6f, $75, $20, $77, $61, $6b, $65, $20, $74, $68
-	db $65, $20, $57, $69, $6e, $64, $20, $46, $69, $73, $68, $2e, $2e, $2e, $59, $6f
-	db $75, $20, $73, $68, $6f, $75, $6c, $64, $20, $6e, $6f, $77, $20, $20, $67, $6f
-	db $20, $6e, $6f, $72, $74, $68, $2c, $20, $74, $6f, $20, $74, $68, $65, $4d, $79
-	db $73, $74, $65, $72, $69, $6f, $75, $73, $20, $20, $20, $20, $20, $20, $46, $6f
-	db $72, $65, $73, $74, $2e, $20, $20, $49, $20, $77, $69, $6c, $6c, $20, $77, $61
-	db $69, $74, $20, $66, $6f, $72, $20, $79, $6f, $75, $20, $20, $20, $20, $74, $68
-	db $65, $72, $65, $21, $20, $20, $48, $6f, $6f, $74, $21, $ff
+	db "  Hoot!  Hoot!  "
+	db "So you are the  "
+	db "lad who owns the"
+	db "sword...  Now I "
+	db "understand why  "
+	db "the monsters are"
+	db "starting to act "
+	db "so violently... "
+	db "A courageous lad"
+	db "has come to wake"
+	db "the Wind Fish..."
+	db "It is said that "
+	db "you cannot leave"
+	db "the island      "
+	db "unless you wake "
+	db "the Wind Fish..."
+	db "You should now  "
+	db "go north, to the"
+	db "Mysterious      "
+	db "Forest.  I will "
+	db "wait for you    "
+	db "there!  Hoot!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0DA: "Annoyance! You are only getting in the way!"
 Dialog0DA::
-	db $41, $6e, $6e, $6f
-	db $79, $61, $6e, $63, $65, $21, $20, $20, $59, $6f, $75, $20, $61, $72, $65, $20
-	db $6f, $6e, $6c, $79, $20, $67, $65, $74, $74, $69, $6e, $67, $69, $6e, $20, $74
-	db $68, $65, $20, $77, $61, $79, $21, $ff
+	db "Annoyance!  You "
+	db "are only getting"
+	db "in the way!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0DB: "Ribbit! Ribbit! Hey, man, I'm Mamu, on vocals! Brother, you look li..."
 Dialog0DB::
-	db $52, $69, $62, $62, $69, $74, $21, $20
-	db $20, $52, $69, $62, $62, $69, $74, $21, $48, $65, $79, $2c, $20, $6d, $61, $6e
-	db $2c, $20, $49, $5e, $6d, $20, $20, $20, $4d, $61, $6d, $75, $2c, $20, $6f, $6e
-	db $20, $76, $6f, $63, $61, $6c, $73, $21, $42, $72, $6f, $74, $68, $65, $72, $2c
-	db $20, $79, $6f, $75, $20, $20, $20, $20, $6c, $6f, $6f, $6b, $20, $6c, $69, $6b
-	db $65, $20, $79, $6f, $75, $20, $20, $20, $64, $6f, $6e, $5e, $74, $20, $6b, $6e
-	db $6f, $77, $20, $20, $20, $20, $20, $20, $73, $71, $75, $61, $74, $20, $61, $62
-	db $6f, $75, $74, $20, $20, $20, $20, $20, $6d, $75, $73, $69, $63, $21, $20, $20
-	db $52, $69, $62, $62, $69, $74, $21, $ff
+	db "Ribbit!  Ribbit!"
+	db "Hey, man, I^m   "
+	db "Mamu, on vocals!"
+	db "Brother, you    "
+	db "look like you   "
+	db "don^t know      "
+	db "squat about     "
+	db "music!  Ribbit!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0DC: "Ribbit! Ribbit! I'm Mamu, on vocals! But I don't need to tell you t..."
 Dialog0DC::
-	db $52, $69, $62, $62, $69, $74, $21, $20
-	db $20, $52, $69, $62, $62, $69, $74, $21, $49, $5e, $6d, $20, $4d, $61, $6d, $75
-	db $2c, $20, $6f, $6e, $20, $20, $20, $20, $76, $6f, $63, $61, $6c, $73, $21, $20
-	db $20, $42, $75, $74, $20, $49, $20, $20, $64, $6f, $6e, $5e, $74, $20, $6e, $65
-	db $65, $64, $20, $74, $6f, $20, $20, $20, $74, $65, $6c, $6c, $20, $79, $6f, $75
-	db $20, $74, $68, $61, $74, $2c, $20, $20, $64, $6f, $20, $49, $3f, $20, $20, $45
-	db $76, $65, $72, $79, $62, $6f, $64, $79, $6b, $6e, $6f, $77, $73, $20, $6d, $65
-	db $21, $20, $20, $57, $61, $6e, $74, $20, $74, $6f, $20, $68, $61, $6e, $67, $20
-	db $6f, $75, $74, $20, $61, $6e, $64, $20, $6c, $69, $73, $74, $65, $6e, $20, $74
-	db $6f, $20, $75, $73, $20, $20, $20, $20, $6a, $61, $6d, $3f, $20, $20, $46, $6f
-	db $72, $20, $33, $30, $30, $20, $20, $20, $52, $75, $70, $65, $65, $73, $2c, $20
-	db $77, $65, $5e, $6c, $6c, $20, $20, $20, $6c, $65, $74, $20, $79, $6f, $75, $20
-	db $6c, $69, $73, $74, $65, $6e, $20, $20, $74, $6f, $20, $61, $20, $70, $72, $65
-	db $76, $69, $6f, $75, $73, $6c, $79, $20, $75, $6e, $72, $65, $6c, $65, $61, $73
-	db $65, $64, $20, $63, $75, $74, $21, $20, $57, $68, $61, $74, $20, $64, $6f, $20
-	db $79, $6f, $75, $20, $64, $6f, $3f, $20, $20, $20, $20, $20, $50, $61, $79, $20
-	db $20, $4c, $65, $61, $76, $65, $fe
+	db "Ribbit!  Ribbit!"
+	db "I^m Mamu, on    "
+	db "vocals!  But I  "
+	db "don^t need to   "
+	db "tell you that,  "
+	db "do I?  Everybody"
+	db "knows me!  Want "
+	db "to hang out and "
+	db "listen to us    "
+	db "jam?  For 300   "
+	db "Rupees, we^ll   "
+	db "let you listen  "
+	db "to a previously "
+	db "unreleased cut! "
+	db "What do you do? "
+	db "    Pay  Leave"
+	db $fe  ; end, then a choice of two answers
 
+;@ path: text/dialogs
+;@ Dialog $0DD: "Thank you... Thank you very much... Croak!"
 Dialog0DD::
-	db $54, $68, $61, $6e, $6b, $20, $79, $6f, $75
-	db $2e, $2e, $2e, $20, $20, $20, $20, $54, $68, $61, $6e, $6b, $20, $79, $6f, $75
-	db $20, $76, $65, $72, $79, $20, $20, $6d, $75, $63, $68, $2e, $2e, $2e, $20, $43
-	db $72, $6f, $61, $6b, $21, $ff
+	db "Thank you...    "
+	db "Thank you very  "
+	db "much... Croak!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0DE: "Well, that's a shame, but we don't play for free!"
 Dialog0DE::
-	db $57, $65, $6c, $6c, $2c, $20, $74, $68, $61, $74
-	db $5e, $73, $20, $61, $20, $20, $73, $68, $61, $6d, $65, $2c, $20, $62, $75, $74
-	db $20, $77, $65, $20, $20, $20, $64, $6f, $6e, $5e, $74, $20, $70, $6c, $61, $79
-	db $20, $66, $6f, $72, $20, $20, $66, $72, $65, $65, $21, $ff
+	db "Well, that^s a  "
+	db "shame, but we   "
+	db "don^t play for  "
+	db "free!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0DF: "You've learned The Frog's Song of Soul! It's a very moving tune... ..."
 Dialog0DF::
-	db $59, $6f, $75, $5e
-	db $76, $65, $20, $6c, $65, $61, $72, $6e, $65, $64, $20, $20, $54, $68, $65, $20
-	db $46, $72, $6f, $67, $5e, $73, $20, $53, $6f, $6e, $67, $20, $6f, $66, $20, $53
-	db $6f, $75, $6c, $21, $20, $20, $49, $74, $5e, $73, $20, $61, $76, $65, $72, $79
-	db $20, $6d, $6f, $76, $69, $6e, $67, $20, $20, $20, $20, $20, $74, $75, $6e, $65
-	db $2e, $2e, $2e, $20, $49, $74, $20, $63, $61, $6e, $20, $20, $65, $76, $65, $6e
-	db $20, $6c, $69, $76, $65, $6e, $20, $75, $70, $20, $20, $20, $75, $6e, $6c, $69
-	db $76, $69, $6e, $67, $20, $74, $68, $69, $6e, $67, $73, $21, $ff
+	db "You^ve learned  "
+	db "The Frog^s Song "
+	db "of Soul!  It^s a"
+	db "very moving     "
+	db "tune... It can  "
+	db "even liven up   "
+	db "unliving things!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0E0: "If you play this song, you'll make everything around you feel more ..."
 Dialog0E0::
-	db $49, $66, $20
-	db $79, $6f, $75, $20, $70, $6c, $61, $79, $20, $74, $68, $69, $73, $73, $6f, $6e
-	db $67, $2c, $20, $79, $6f, $75, $5e, $6c, $6c, $20, $20, $20, $20, $6d, $61, $6b
-	db $65, $20, $65, $76, $65, $72, $79, $74, $68, $69, $6e, $67, $20, $61, $72, $6f
-	db $75, $6e, $64, $20, $79, $6f, $75, $20, $66, $65, $65, $6c, $20, $6d, $6f, $72
-	db $65, $20, $61, $6c, $69, $76, $65, $21, $ff
+	db "If you play this"
+	db "song, you^ll    "
+	db "make everything "
+	db "around you feel "
+	db "more alive!"
+	db $ff  ; end
 
+;@ path: text/dialogs
+;@ Dialog $0E1: "Hey, Kid! You woke me up from a fine nap!! ...Thanks a lot! But now..." (B does not hurry it)
 Dialog0E1::
-	db $48, $65, $79, $2c, $20, $4b, $69
-	db $64, $21, $20, $20, $59, $6f, $75, $20, $20, $77, $6f, $6b, $65, $20, $6d, $65
-	db $20, $75, $70, $20, $66, $72, $6f, $6d, $20, $61, $20, $66, $69, $6e, $65, $20
-	db $6e, $61, $70, $21, $21, $20, $20, $20, $20, $2e, $2e, $2e, $54, $68, $61, $6e
-	db $6b, $73, $20, $61, $20, $6c, $6f, $74, $21, $42, $75, $74, $20, $6e, $6f, $77
-	db $2c, $20, $49, $5e, $6c, $6c, $20, $20, $20, $67, $65, $74, $20, $6d, $79, $20
-	db $72, $65, $76, $65, $6e, $67, $65, $21, $20, $41, $72, $65, $20, $79, $6f, $75
-	db $20, $72, $65, $61, $64, $79, $3f, $21, $20, $20, $20, $20, $20, $59, $65, $73
-	db $20, $20, $4e, $2d, $4e, $6f, $fe
+	db "Hey, Kid!  You  "
+	db "woke me up from "
+	db "a fine nap!!    "
+	db "...Thanks a lot!"
+	db "But now, I^ll   "
+	db "get my revenge! "
+	db "Are you ready?! "
+	db "    Yes  N-No"
+	db $fe  ; end, then a choice of two answers
 
+;@ path: text/dialogs
+;@ Dialog $0E2: "I'll let you carry more Magic Powder! He He! Are you ready?! Yes N-No" (B does not hurry it)
 Dialog0E2::
-	db $49, $5e, $6c, $6c, $20, $6c, $65, $74, $20
-	db $79, $6f, $75, $20, $20, $20, $20, $63, $61, $72, $72, $79, $20, $6d, $6f, $72
-	db $65, $20, $4d, $61, $67, $69, $63, $50, $6f, $77, $64, $65, $72, $21, $20, $20
-	db $48, $65, $20, $48, $65, $21, $20, $41, $72, $65, $20, $79, $6f, $75, $20, $72
-	db $65, $61, $64, $79, $3f, $21, $20, $20, $20, $20, $20, $59, $65, $73, $20, $20
-	db $4e, $2d, $4e, $6f, $fe
+	db "I^ll let you    "
+	db "carry more Magic"
+	db "Powder!  He He! "
+	db "Are you ready?! "
+	db "    Yes  N-No"
+	db $fe  ; end, then a choice of two answers
 
+;@ path: text/dialogs
+;@ Dialog $0E3: "Okay, I'll let you carry more Bombs! He He He! Are you ready?! Yes ..." (B does not hurry it)
 Dialog0E3::
-	db $4f, $6b, $61, $79, $2c, $20, $49, $5e, $6c, $6c, $20
-	db $6c, $65, $74, $20, $20, $79, $6f, $75, $20, $63, $61, $72, $72, $79, $20, $6d
-	db $6f, $72, $65, $20, $20, $42, $6f, $6d, $62, $73, $21, $20, $48, $65, $20, $48
-	db $65, $20, $48, $65, $21, $41, $72, $65, $20, $79, $6f, $75, $20, $72, $65, $61
-	db $64, $79, $3f, $21, $20, $20, $20, $20, $20, $59, $65, $73, $20, $20, $4e, $2d
-	db $4e, $6f, $fe
+	db "Okay, I^ll let  "
+	db "you carry more  "
+	db "Bombs! He He He!"
+	db "Are you ready?! "
+	db "    Yes  N-No"
+	db $fe  ; end, then a choice of two answers
 
+;@ path: text/dialogs
+;@ Dialog $0E4: "Fine, I'll let you have more arrows! Heh Heh! Are you ready?! Yes N..." (B does not hurry it)
 Dialog0E4::
-	db $46, $69, $6e, $65, $2c, $20, $49, $5e, $6c, $6c, $20, $6c, $65
-	db $74, $20, $20, $79, $6f, $75, $20, $68, $61, $76, $65, $20, $6d, $6f, $72, $65
-	db $20, $20, $20, $61, $72, $72, $6f, $77, $73, $21, $20, $48, $65, $68, $20, $48
-	db $65, $68, $21, $41, $72, $65, $20, $79, $6f, $75, $20, $72, $65, $61, $64, $79
-	db $3f, $21, $20, $20, $20, $20, $20, $59, $65, $73, $20, $20, $4e, $2d, $4e, $6f
-	db $fe
+	db "Fine, I^ll let  "
+	db "you have more   "
+	db "arrows! Heh Heh!"
+	db "Are you ready?! "
+	db "    Yes  N-No"
+	db $fe  ; end, then a choice of two answers
 
+;@ path: text/dialogs
+;@ Dialog $0E5: "Heh Heh Heh! You deserve it! Now look at all that junk you have to ..." (B does not hurry it)
 Dialog0E5::
-	db $48, $65, $68, $20, $48, $65, $68, $20, $48, $65, $68, $21, $20, $20, $20
-	db $20, $59, $6f, $75, $20, $64, $65, $73, $65, $72, $76, $65, $20, $69, $74, $21
-	db $20, $4e, $6f, $77, $20, $6c, $6f, $6f, $6b, $20, $61, $74, $20, $61, $6c, $6c
-	db $20, $74, $68, $61, $74, $20, $6a, $75, $6e, $6b, $20, $79, $6f, $75, $20, $20
-	db $20, $68, $61, $76, $65, $20, $74, $6f, $20, $63, $61, $72, $72, $79, $21, $20
-	db $20, $48, $61, $68, $21, $20, $20, $54, $61, $6b, $65, $20, $63, $61, $72, $65
-	db $21, $53, $65, $65, $20, $79, $6f, $75, $20, $61, $67, $61, $69, $6e, $21, $ff
+	db "Heh Heh Heh!    "
+	db "You deserve it! "
+	db "Now look at all "
+	db "that junk you   "
+	db "have to carry!  "
+	db "Hah!  Take care!"
+	db "See you again!"
+	db $ff  ; end
+;@ path: text/dialogs
+;@ Dialog $0E6: "?? There is a picture carved on the wall, but you can't see it beca..."
 Dialog0E6::
-	db $3f, $3f, $20, $20, $54, $68, $65, $72, $65, $20, $69, $73, $20, $61, $20, $20
-	db $70, $69, $63, $74, $75, $72, $65, $20, $63, $61, $72, $76, $65, $64, $20, $20
-	db $6f, $6e, $20, $74, $68, $65, $20, $77, $61, $6c, $6c, $2c, $20, $62, $75, $74
-	db $79, $6f, $75, $20, $63, $61, $6e, $5e, $74, $20, $73, $65, $65, $20, $69, $74
-	db $62, $65, $63, $61, $75, $73, $65, $20, $69, $74, $5e, $73, $20, $74, $6f, $6f
-	db $64, $61, $72, $6b, $20, $69, $6e, $20, $68, $65, $72, $65, $2e, $2e, $2e, $ff
+	db "??  There is a  "
+	db "picture carved  "
+	db "on the wall, but"
+	db "you can^t see it"
+	db "because it^s too"
+	db "dark in here..."
+	db $ff  ; end
+;@ path: text/dialogs
+;@ Dialog $0E7: "TO THE FINDER... THE ISLE OF KOHOLINT, IS BUT AN ILLUSION... HUMAN,..."
 Dialog0E7::
-	db $54, $4f, $20, $54, $48, $45, $20, $46, $49, $4e, $44, $45, $52, $2e, $2e, $2e
-	db $20, $20, $54, $48, $45, $20, $49, $53, $4c, $45, $20, $4f, $46, $20, $20, $20
-	db $4b, $4f, $48, $4f, $4c, $49, $4e, $54, $2c, $20, $49, $53, $20, $42, $55, $54
-	db $20, $20, $41, $4e, $20, $49, $4c, $4c, $55, $53, $49, $4f, $4e, $2e, $2e, $2e
-	db $20, $48, $55, $4d, $41, $4e, $2c, $20, $4d, $4f, $4e, $53, $54, $45, $52, $2c
-	db $20, $53, $45, $41, $2c, $20, $53, $4b, $59, $2e, $2e, $2e, $20, $41, $20, $20
-	db $53, $43, $45, $4e, $45, $20, $4f, $4e, $20, $54, $48, $45, $20, $4c, $49, $44
-	db $20, $4f, $46, $20, $41, $20, $53, $4c, $45, $45, $50, $45, $52, $5e, $53, $20
-	db $20, $20, $45, $59, $45, $2e, $2e, $2e, $20, $20, $41, $57, $41, $4b, $45, $20
-	db $54, $48, $45, $20, $44, $52, $45, $41, $4d, $45, $52, $2c, $20, $41, $4e, $44
-	db $20, $20, $4b, $4f, $48, $4f, $4c, $49, $4e, $54, $20, $57, $49, $4c, $4c, $20
-	db $56, $41, $4e, $49, $53, $48, $20, $4d, $55, $43, $48, $20, $4c, $49, $4b, $45
-	db $20, $20, $41, $20, $42, $55, $42, $42, $4c, $45, $20, $4f, $4e, $20, $41, $20
-	db $4e, $45, $45, $44, $4c, $45, $2e, $2e, $2e, $20, $43, $41, $53, $54, $2d, $20
-	db $41, $57, $41, $59, $2c, $20, $59, $4f, $55, $20, $53, $48, $4f, $55, $4c, $44
-	db $4b, $4e, $4f, $57, $20, $54, $48, $45, $20, $54, $52, $55, $54, $48, $21, $20
-	db $2e, $2e, $2e, $20, $2e, $2e, $2e, $20, $2e, $2e, $2e, $20, $2e, $2e, $2e, $20
-	db $57, $68, $61, $74, $3f, $20, $20, $49, $6c, $6c, $75, $73, $69, $6f, $6e, $3f
+	db "TO THE FINDER..."
+	db "  THE ISLE OF   "
+	db "KOHOLINT, IS BUT"
+	db "  AN ILLUSION..."
+	db " HUMAN, MONSTER,"
+	db " SEA, SKY... A  "
+	db "SCENE ON THE LID"
+	db " OF A SLEEPER^S "
+	db "  EYE...  AWAKE "
+	db "THE DREAMER, AND"
+	db "  KOHOLINT WILL "
+	db "VANISH MUCH LIKE"
+	db "  A BUBBLE ON A "
+	db "NEEDLE... CAST- "
+	db "AWAY, YOU SHOULD"
+	db "KNOW THE TRUTH! "
+	db "... ... ... ... "
+	db "What?  Illusion?"
+	db $ff  ; end
 ;@ path: unused
 ;@ Free space at the end of the bank's data, filled with $FF.
 Bank16FreeSpace2::
-	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
+	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff

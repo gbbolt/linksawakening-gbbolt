@@ -11,7 +11,8 @@ import _la  # noqa: E402
 GROUP = 'indoors'
 DUNGEONS = ['Tail Cave', 'Bottle Grotto', 'Key Cavern', "Angler's Tunnel", "Catfish's Maw", 'Face Shrine',
             "Eagle's Tower", 'Turtle Rock', "Wind Fish's Egg", None, 'Caves']
-LAYOUTS = 0x4200                # bank $14: 64 bytes per map $00-$0A, the room at each of the 8 x 8 positions
+CHESTS = []
+LAYOUTS = 0x4200               # bank $14: 64 bytes per map $00-$0A, the room at each of the 8 x 8 positions
 EMPTY = 255
 
 
@@ -62,6 +63,14 @@ def room_sheet(ctx, rd, names, g, mp, room, pic, grid, where):
         ['Room template', d['template']],
         ['Floor object', '${:02X}'.format(d['floor'])],
     ]}]
+    chests = _la.find_chests(grid)
+    if chests:
+        c = _la.chest_content(rd.rom, g, room)
+        sections[0]['fields'].append(['Chest', '{} (content ${:02X}) at {}'.format(
+            _la.chest_content_name(c), c, ', '.join('({}, {})'.format(x, y) for x, y in chests))])
+        CHESTS.append([{'asset': 'in-{}-{:02x}'.format(g.lower(), room), 'text': '{}${:02X}'.format(g, room)},
+                       where, ', '.join('({}, {})'.format(x, y) for x, y in chests), '${:02X}'.format(c),
+                       _la.chest_content_name(c)])
     if ents:
         sections.append({'title': 'Entities', 'columns': ['x', 'y', 'type'],
                          'rows': [[x * 16, y * 16, names.entity_cell(t)] for x, y, t in ents]})
@@ -90,6 +99,7 @@ def build(ctx):
     rd = _la.RoomData(rom)
     names = _la.Names(ctx)
     world = _la.World(rom)
+    CHESTS.clear()
     out, cards = [], []
     done = set()
     # ---- the dungeons, from their 8 x 8 layouts
@@ -137,11 +147,11 @@ def build(ctx):
                           subtitle='{} rooms'.format(len(marks)),
                           doc=['{} as the game draws it: each room at its place of the 8 x 8 layout of the map '
                                '(bank $14, $4200 + 64 x map: the room number at each position, read by the loader '
-                               'Call_2ED7 with the position in $DBAE), built by the game\'s own loader with its '
+                               'LoadRoom with the position in $DBAE), built by the game\'s own loader with its '
                                'entities as they appear a few frames after entering. Side-view rooms show as the '
                                'game draws them from above. Link is left out; click a room for its '
                                'sheet.'.format(title if mp < 10 else 'The caves of map $0A')],
-                          users=['Call_2ED7', 'Indoor{}RoomPointers'.format(g), 'Indoor{}EntityPointers'.format(g)]))
+                          users=['LoadRoom', 'Indoor{}RoomPointers'.format(g), 'Indoor{}EntityPointers'.format(g)]))
     # ---- every other room: houses, caves, shops, side views
     dest = all_warps(rd)
     for g in 'AB':
@@ -182,5 +192,14 @@ def build(ctx):
                                'caves, wells and the side-view passages, in room number order, each built by the '
                                'game\'s own loader on the map that the warps into it name (bank ${:02X}, '
                                'Indoor{}RoomPointers).'.format(g, 0x0A if g == 'A' else 0x0B, g)],
-                          users=['Call_2ED7', 'Indoor{}RoomPointers'.format(g)]))
+                          users=['LoadRoom', 'Indoor{}RoomPointers'.format(g)]))
+    out.append({'name': 'indoor-chests', 'type': 'table', 'title': 'Chests indoors', 'subtitle': '{} rooms'.format(len(CHESTS)),
+                'columns': ['room', 'where', 'chest at (x, y)', 'content', 'item'], 'rows': CHESTS,
+                'doc': ['Every indoor room whose built object grid holds a closed chest (object $A0), with what the '
+                        'chest gives: the room\'s byte in the room table of bank $14 ($4500 + $100 x group + room), '
+                        'handed to the rising item (EntityInit_ChestItem): $00-$0B the items of '
+                        'ChestItemInventoryIds, $0C-$15 counters, $16-$1A dungeon items, $1B-$1F rupees '
+                        '(ChestRupeesLow / ChestRupeesHigh). Rooms whose chest only appears after an event '
+                        '(enemies beaten, a switch) are not listed.'],
+                'users': ['CheckLiftAndRead', 'EntityInit_ChestItem', 'ChestItemInventoryIds']})
     return out + cards

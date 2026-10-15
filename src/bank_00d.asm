@@ -5,6 +5,10 @@
 
 SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 
+;@ path: gfx/tiles/indoor
+;@ Background tiles of all indoor maps at $9200-$97FF (LoadTileset06, tile set request 6); the maps' own pieces from the tables at $01:$7F64 and $01:$7F84 are copied over parts of them. 96 tiles.
+;@ asset: tiles bpp=2 length=$600
+IndoorCommonTiles::
 	db $00, $00, $7f, $00, $70, $3f, $78, $3f, $5c, $3f, $4e, $3f, $47, $3f, $43, $3f
 	db $00, $00, $fe, $00, $0e, $fc, $1e, $fc, $3a, $fc, $72, $fc, $e2, $fc, $c2, $fc
 	db $43, $3f, $47, $3f, $4e, $3f, $5c, $3f, $78, $3f, $70, $3f, $7f, $00, $00, $00
@@ -101,6 +105,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+;@ path: gfx/tiles/indoor
+;@ Page $46: copied to $9200 ($200 bytes) on the indoor maps whose entry in $01:$7F84 is $46. 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+IndoorMapTiles46::
 	db $00, $00, $07, $00, $04, $03, $04, $03, $0c, $03, $7c, $03, $60, $1f, $4f, $3f
 	db $00, $00, $e0, $00, $60, $80, $20, $c0, $b0, $c0, $be, $c0, $82, $fc, $82, $fc
 	db $41, $3f, $41, $3f, $7d, $03, $0d, $03, $04, $03, $06, $01, $07, $00, $00, $00
@@ -133,6 +141,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $89, $f7, $99, $e7, $b9, $c7, $bd, $c3, $df, $e3, $7e, $ff, $bd, $7e, $ff, $00
 	db $9d, $e3, $cb, $f7, $66, $ff, $bc, $7f, $bc, $7f, $66, $ff, $cb, $f7, $8d, $f3
 	db $fb, $fc, $0d, $fe, $37, $ce, $7f, $86, $ff, $06, $1f, $e6, $0d, $fe, $fb, $fc
+;@ path: gfx/tiles/indoor
+;@ Page $48: copied to $9200 ($200 bytes) on the indoor maps whose entry in $01:$7F84 is $48. 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+IndoorMapTiles48::
 	db $ff, $00, $80, $00, $80, $3f, $9f, $3f, $9f, $38, $9f, $34, $9f, $32, $9f, $31
 	db $ff, $00, $01, $00, $01, $fc, $f9, $fc, $f9, $1c, $f9, $2c, $f9, $4c, $f9, $8c
 	db $9f, $31, $9f, $32, $9f, $34, $9f, $38, $9f, $3f, $80, $3f, $80, $00, $ff, $00
@@ -165,6 +177,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $3e, $dd, $f7, $3e, $e3, $ff, $81, $ff, $81, $ff, $85, $fb, $7e, $81, $81, $00
 	db $f6, $fb, $ca, $ff, $8f, $f6, $87, $fb, $8f, $f7, $9f, $ee, $be, $db, $f6, $fb
 	db $7d, $be, $e2, $7c, $c6, $f8, $82, $fc, $c2, $fc, $e2, $7c, $62, $bc, $7d, $be
+;@ path: gfx/tiles/indoor
+;@ Page $4A: copied to $9200 ($200 bytes) on the indoor maps whose entry in $01:$7F84 is $4A. 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+IndoorMapTiles4A::
 	db $00, $00, $6f, $70, $75, $7a, $3a, $7d, $5c, $3f, $6e, $1f, $57, $2f, $63, $1f
 	db $00, $00, $f6, $0e, $ae, $5e, $5c, $be, $3a, $fc, $76, $f8, $ea, $f4, $c6, $f8
 	db $63, $1f, $57, $2f, $6e, $1f, $5c, $3f, $3a, $7d, $75, $7a, $6f, $70, $00, $00
@@ -197,6 +213,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $3e, $dd, $f7, $3e, $e3, $ff, $89, $ff, $a3, $dd, $89, $f7, $76, $89, $81, $00
 	db $f2, $ff, $e8, $ff, $ff, $f6, $d7, $fb, $ff, $f7, $ff, $ee, $f8, $df, $f0, $ff
 	db $7d, $be, $ea, $74, $c2, $fc, $94, $fa, $c2, $fc, $ea, $74, $62, $bc, $7d, $be
+;@ path: gfx/tiles/indoor
+;@ Page $4C: copied to $9100 ($100 bytes) on the indoor maps whose entry in $01:$7F64 is $4C. 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorMapTiles4C::
 	db $41, $00, $41, $00, $45, $00, $c1, $00, $e3, $00, $fc, $00, $38, $00, $12, $00
 	db $f8, $00, $18, $00, $0c, $00, $04, $00, $87, $00, $c7, $00, $44, $00, $6c, $00
 	db $50, $00, $10, $00, $91, $00, $18, $00, $3c, $00, $e3, $00, $c1, $00, $c9, $00
@@ -213,6 +233,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $f8, $00, $18, $00, $2c, $10, $d0, $24, $20, $c7, $29, $c6, $3a, $c4, $00, $fc
 	db $6d, $12, $2f, $10, $ae, $11, $2f, $10, $47, $38, $98, $67, $22, $c1, $c9, $00
 	db $84, $78, $c2, $38, $c0, $38, $d4, $28, $aa, $44, $55, $82, $45, $82, $3f, $c0
+;@ path: gfx/tiles/indoor
+;@ Page $4D: copied to $9100 on the indoor maps whose entry in $01:$7F64 is $4D. 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorMapTiles4D::
 	db $06, $00, $28, $01, $0c, $03, $00, $00, $20, $00, $02, $00, $60, $00, $b1, $00
 	db $20, $00, $00, $00, $00, $00, $10, $00, $20, $08, $28, $10, $00, $00, $80, $00
 	db $e1, $10, $11, $60, $00, $00, $0c, $00, $56, $00, $0c, $12, $12, $0c, $00, $00
@@ -229,6 +253,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $10, $00, $09, $00, $02, $0c, $00, $08, $00, $f8, $00, $24, $00, $22, $00, $41
 	db $02, $04, $03, $07, $c1, $09, $20, $10, $10, $00, $18, $00, $67, $00, $01, $00
 	db $40, $41, $e0, $f9, $c0, $86, $80, $84, $00, $84, $3e, $c0, $01, $00, $00, $00
+;@ path: gfx/tiles/indoor
+;@ Page $4E: copied to $9100 on the indoor maps whose entry in $01:$7F64 is $4E. 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorMapTiles4E::
 	db $00, $00, $00, $00, $60, $00, $00, $00, $00, $00, $00, $00, $00, $00, $ff, $00
 	db $00, $00, $00, $00, $00, $00, $00, $00, $e0, $00, $00, $00, $00, $00, $ff, $00
 	db $38, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $01, $00, $ff, $00
@@ -245,6 +273,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $10, $00, $09, $00, $02, $0c, $00, $08, $00, $f8, $00, $24, $00, $22, $00, $41
 	db $02, $04, $03, $07, $c1, $09, $20, $10, $10, $00, $18, $00, $67, $00, $01, $00
 	db $40, $41, $e0, $f9, $c0, $86, $80, $84, $00, $84, $3e, $c0, $01, $00, $00, $00
+;@ path: gfx/tiles/indoor
+;@ Page $4F: copied to $9100 on the indoor maps whose entry in $01:$7F64 is $4F. 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorMapTiles4F::
 	db $f0, $00, $12, $00, $10, $00, $18, $00, $0f, $00, $01, $00, $21, $00, $01, $00
 	db $01, $00, $01, $00, $41, $00, $0f, $00, $18, $00, $10, $00, $12, $00, $f0, $00
 	db $8f, $00, $08, $00, $08, $00, $18, $00, $f0, $00, $84, $00, $80, $00, $80, $00
@@ -261,6 +293,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $00, $21, $20, $41, $3e, $41, $80, $7f, $04, $f8, $a8, $10, $ea, $10, $00, $fc
 	db $00, $3f, $30, $0f, $15, $08, $65, $18, $00, $ff, $84, $01, $81, $00, $80, $00
 	db $44, $82, $10, $82, $44, $82, $00, $ff, $67, $98, $90, $08, $00, $08, $0f, $00
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $00: copied to $9000 ($100 bytes) when a room with this set in IndoorATilesetIds / IndoorBTilesetIds is loaded (LoadTileset09, (hWorldTileset + $50) * $100). 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset00::
 	db $80, $80, $c0, $c0, $a0, $a0, $9f, $97, $c8, $88, $e8, $c0, $f3, $a1, $d3, $b3
 	db $01, $01, $03, $03, $05, $05, $f9, $e9, $13, $11, $17, $03, $cf, $85, $cb, $cd
 	db $d3, $b3, $d3, $b3, $d9, $b1, $e5, $a1, $ed, $ad, $f6, $bc, $c3, $be, $ff, $ff
@@ -277,6 +313,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $00, $00, $ff, $00, $fb, $fc, $fd, $fe, $ff, $fe, $ff, $fe, $ff, $fe, $ff, $fe
 	db $cd, $7e, $db, $7c, $f7, $78, $ef, $70, $dd, $63, $f6, $4f, $d8, $7c, $ff, $ff
 	db $ff, $7e, $ff, $3e, $ff, $3e, $63, $f2, $83, $c2, $03, $02, $03, $02, $ff, $ff
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $01: copied to $9000 ($100 bytes) when a room with this set in IndoorATilesetIds / IndoorBTilesetIds is loaded (LoadTileset09, (hWorldTileset + $50) * $100). 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset01::
 	db $bf, $7f, $ff, $7f, $d0, $ef, $90, $ef, $90, $ef, $9f, $e0, $bf, $df, $e0, $bf
 	db $fd, $fe, $ff, $fe, $0b, $f7, $09, $f7, $09, $f7, $f9, $07, $fd, $fb, $07, $fd
 	db $d0, $ef, $90, $ef, $90, $ef, $90, $ef, $9f, $e0, $bf, $ff, $e0, $ff, $df, $e0
@@ -293,6 +333,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $00, $00, $80, $80, $4e, $4e, $32, $32, $66, $22, $ae, $62, $2c, $e4, $37, $ef
 	db $5c, $68, $2e, $38, $7b, $79, $9a, $9a, $ce, $8a, $6e, $4a, $36, $3e, $05, $03
 	db $2b, $f9, $b1, $f3, $66, $62, $6a, $26, $ec, $24, $f4, $2c, $b8, $78, $d0, $e0
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $02: copied to $9000 ($100 bytes) when a room with this set in IndoorATilesetIds / IndoorBTilesetIds is loaded (LoadTileset09, (hWorldTileset + $50) * $100). 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset02::
 	db $80, $80, $80, $80, $80, $80, $ff, $83, $ff, $84, $ff, $88, $ff, $88, $ff, $88
 	db $01, $01, $01, $01, $01, $01, $ff, $c1, $ff, $21, $ff, $11, $ff, $11, $ff, $11
 	db $ff, $9c, $f7, $a0, $ef, $c8, $ff, $f8, $fe, $88, $ff, $89, $f9, $89, $ff, $ff
@@ -309,6 +353,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $ff, $ff, $f9, $81, $e1, $07, $01, $1f, $c1, $df, $c9, $df, $8d, $9f, $87, $9d
 	db $b8, $80, $f0, $87, $e1, $8f, $c1, $9f, $81, $bf, $81, $be, $80, $ff, $ff, $ff
 	db $03, $1d, $11, $ef, $89, $f7, $85, $fb, $83, $fd, $83, $7d, $01, $ff, $ff, $ff
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $03: copied to $9000 ($100 bytes) when a room with this set in IndoorATilesetIds / IndoorBTilesetIds is loaded (LoadTileset09, (hWorldTileset + $50) * $100). 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset03::
 	db $00, $00, $ff, $00, $df, $3f, $bf, $7f, $ff, $7f, $ff, $7f, $ff, $7c, $ff, $78
 	db $00, $00, $ff, $00, $fb, $fc, $fd, $86, $df, $82, $af, $c2, $97, $e2, $cb, $72
 	db $fb, $70, $f4, $78, $f1, $7e, $fc, $7f, $eb, $47, $c1, $40, $c0, $40, $ff, $ff
@@ -325,6 +373,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $00, $00, $ff, $00, $fb, $fc, $fd, $fe, $ff, $fe, $ff, $fe, $ff, $fe, $ff, $fe
 	db $cd, $7e, $db, $7c, $f7, $78, $ef, $70, $dd, $63, $f6, $4f, $d8, $7c, $ff, $ff
 	db $ff, $7e, $ff, $3e, $ff, $3e, $63, $f2, $83, $c2, $03, $02, $03, $02, $ff, $ff
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $04: copied to $9000 ($100 bytes) when a room with this set in IndoorATilesetIds / IndoorBTilesetIds is loaded (LoadTileset09, (hWorldTileset + $50) * $100). 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset04::
 	db $ff, $fe, $9d, $e1, $9d, $e1, $a9, $d1, $a9, $d1, $99, $e1, $9d, $e1, $9d, $e1
 	db $89, $f1, $a9, $d1, $a9, $d1, $bd, $fd, $c3, $c3, $81, $99, $81, $a5, $81, $a5
 	db $ff, $7f, $b9, $87, $b9, $87, $95, $8b, $95, $8b, $99, $87, $b9, $87, $b9, $87
@@ -341,6 +393,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $00, $00, $00, $00, $00, $00, $80, $80, $fe, $fe, $82, $82, $82, $82, $82, $82
 	db $bf, $a1, $bf, $a0, $bf, $bf, $80, $80, $ff, $80, $ff, $ff, $92, $ff, $ff, $ff
 	db $82, $82, $82, $82, $82, $82, $02, $02, $fe, $02, $fe, $fe, $4a, $fe, $fe, $fe
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $05: copied to $9000 ($100 bytes) when a room with this set in IndoorATilesetIds / IndoorBTilesetIds is loaded (LoadTileset09, (hWorldTileset + $50) * $100). 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset05::
 	db $fa, $dc, $2d, $f2, $1c, $e1, $d8, $21, $d0, $21, $c0, $31, $e8, $72, $90, $ec
 	db $90, $e4, $90, $e4, $b0, $c4, $78, $82, $c4, $01, $82, $01, $00, $01, $01, $00
 	db $5f, $3f, $b0, $4f, $38, $87, $1d, $82, $1b, $84, $0b, $84, $07, $4e, $09, $37
@@ -357,6 +413,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $00, $00, $80, $80, $4e, $4e, $32, $32, $66, $22, $ae, $62, $2c, $e4, $37, $ef
 	db $5c, $68, $2e, $38, $7b, $79, $9a, $9a, $ce, $8a, $6e, $4a, $36, $3e, $05, $03
 	db $2b, $f9, $b1, $f3, $66, $62, $6a, $26, $ec, $24, $f4, $2c, $b8, $78, $d0, $e0
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $06: copied to $9000 ($100 bytes) when a room with this set in IndoorATilesetIds / IndoorBTilesetIds is loaded (LoadTileset09, (hWorldTileset + $50) * $100). 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset06::
 	db $80, $80, $c0, $c0, $a0, $a0, $9f, $97, $c8, $88, $e8, $c0, $f3, $a1, $d3, $b3
 	db $01, $01, $03, $03, $05, $05, $f9, $e9, $13, $11, $17, $03, $cf, $85, $cb, $cd
 	db $d3, $b3, $d3, $b3, $d9, $b1, $e5, $a1, $ed, $ad, $f6, $bc, $c3, $be, $ff, $ff
@@ -373,6 +433,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $ff, $ff, $f9, $81, $e1, $07, $01, $1f, $c1, $df, $c9, $df, $8d, $9f, $87, $9d
 	db $b8, $80, $f0, $87, $e1, $8f, $c1, $9f, $81, $bf, $81, $be, $80, $ff, $ff, $ff
 	db $03, $1d, $11, $ef, $89, $f7, $85, $fb, $83, $fd, $83, $7d, $01, $ff, $ff, $ff
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $07: copied to $9000 ($100 bytes) when a room with this set in IndoorATilesetIds / IndoorBTilesetIds is loaded (LoadTileset09, (hWorldTileset + $50) * $100). 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset07::
 	db $00, $00, $ff, $00, $df, $3f, $bf, $7f, $ff, $7f, $ff, $7f, $ff, $7c, $ff, $78
 	db $00, $00, $ff, $00, $fb, $fc, $fd, $86, $df, $82, $af, $c2, $97, $e2, $cb, $72
 	db $fb, $70, $f4, $78, $f1, $7e, $fc, $7f, $eb, $47, $c1, $40, $c0, $40, $ff, $ff
@@ -389,6 +453,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $ff, $ff, $f9, $81, $e1, $07, $01, $1f, $c1, $df, $c9, $df, $8d, $9f, $87, $9d
 	db $b8, $80, $f0, $87, $e1, $8f, $c1, $9f, $81, $bf, $81, $be, $80, $ff, $ff, $ff
 	db $03, $1d, $11, $ef, $89, $f7, $85, $fb, $83, $fd, $83, $7d, $01, $ff, $ff, $ff
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $08: copied to $9000 ($100 bytes) when a room with this set in IndoorATilesetIds / IndoorBTilesetIds is loaded (LoadTileset09, (hWorldTileset + $50) * $100). 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset08::
 	db $ff, $fe, $9d, $e1, $9d, $e1, $a9, $d1, $a9, $d1, $99, $e1, $9d, $e1, $9d, $e1
 	db $89, $f1, $a9, $d1, $a9, $d1, $bd, $fd, $c3, $c3, $81, $99, $81, $a5, $81, $a5
 	db $ff, $7f, $b9, $87, $b9, $87, $95, $8b, $95, $8b, $99, $87, $b9, $87, $b9, $87
@@ -405,6 +473,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $f8, $f8, $fc, $04, $fe, $02, $fe, $02, $fe, $02, $fe, $02, $fe, $02, $fe, $02
 	db $7f, $40, $5f, $40, $6f, $40, $50, $60, $20, $3f, $3f, $3f, $2d, $33, $3f, $1e
 	db $fe, $02, $fa, $02, $f6, $02, $0a, $06, $04, $fc, $fc, $fc, $b4, $cc, $fc, $78
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $09: copied to $9000 ($100 bytes) when a room with this set in IndoorATilesetIds / IndoorBTilesetIds is loaded (LoadTileset09, (hWorldTileset + $50) * $100). 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset09::
 	db $03, $03, $04, $04, $0a, $08, $15, $10, $2c, $21, $58, $45, $52, $49, $52, $49
 	db $c0, $c0, $20, $20, $50, $10, $a8, $08, $14, $a4, $0a, $b2, $26, $9a, $42, $9a
 	db $4a, $41, $73, $40, $e8, $50, $e2, $59, $c1, $7b, $e5, $3b, $74, $1b, $3f, $0f
@@ -421,6 +493,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $ff, $ff, $f9, $81, $e1, $07, $01, $1f, $c1, $df, $c9, $df, $8d, $9f, $87, $9d
 	db $b8, $80, $f0, $87, $e1, $8f, $c1, $9f, $81, $bf, $81, $be, $80, $ff, $ff, $ff
 	db $03, $1d, $11, $ef, $89, $f7, $85, $fb, $83, $fd, $83, $7d, $01, $ff, $ff, $ff
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $0A: copied to $9000 ($100 bytes) when a room with this set in IndoorATilesetIds / IndoorBTilesetIds is loaded (LoadTileset09, (hWorldTileset + $50) * $100). 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset0A::
 	db $80, $80, $c0, $c0, $a0, $a0, $9f, $97, $c8, $88, $e8, $c0, $f3, $a1, $d3, $b3
 	db $01, $01, $03, $03, $05, $05, $f9, $e9, $13, $11, $17, $03, $cf, $85, $cb, $cd
 	db $d3, $b3, $d3, $b3, $d9, $b1, $e5, $a1, $ed, $ad, $f6, $bc, $c3, $be, $ff, $ff
@@ -437,6 +513,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $ff, $ff, $f9, $81, $e1, $07, $01, $1f, $c1, $df, $c9, $df, $8d, $9f, $87, $9d
 	db $b8, $80, $f0, $87, $e1, $8f, $c1, $9f, $81, $bf, $81, $be, $80, $ff, $ff, $ff
 	db $03, $1d, $11, $ef, $89, $f7, $85, $fb, $83, $fd, $83, $7d, $01, $ff, $ff, $ff
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $0B: copied to $9000 ($100 bytes) when a room with this set in IndoorATilesetIds / IndoorBTilesetIds is loaded (LoadTileset09, (hWorldTileset + $50) * $100). 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset0B::
 	db $80, $80, $80, $80, $80, $80, $ff, $83, $ff, $84, $ff, $88, $ff, $88, $ff, $88
 	db $01, $01, $01, $01, $01, $01, $ff, $c1, $ff, $21, $ff, $11, $ff, $11, $ff, $11
 	db $ff, $9c, $f7, $a0, $ef, $c8, $ff, $f8, $fe, $88, $ff, $89, $f9, $89, $ff, $ff
@@ -453,6 +533,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $00, $00, $ff, $00, $fb, $fc, $fd, $fe, $ff, $fe, $ff, $fe, $ff, $fe, $ff, $fe
 	db $cd, $7e, $db, $7c, $f7, $78, $ef, $70, $dd, $63, $f6, $4f, $d8, $7c, $ff, $ff
 	db $ff, $7e, $ff, $3e, $ff, $3e, $63, $f2, $83, $c2, $03, $02, $03, $02, $ff, $ff
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $0C: copied to $9000 ($100 bytes) when a room with this set in IndoorATilesetIds / IndoorBTilesetIds is loaded (LoadTileset09, (hWorldTileset + $50) * $100). 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset0C::
 	db $fa, $dc, $2d, $f2, $1c, $e1, $d8, $21, $d0, $21, $c0, $31, $e8, $72, $90, $ec
 	db $90, $e4, $90, $e4, $b0, $c4, $78, $82, $c4, $01, $82, $01, $00, $01, $01, $00
 	db $5f, $3f, $b0, $4f, $38, $87, $1d, $82, $1b, $84, $0b, $84, $07, $4e, $09, $37
@@ -469,6 +553,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $c0, $c0, $20, $20, $50, $10, $a8, $08, $14, $a4, $0a, $b2, $26, $9a, $42, $9a
 	db $4a, $41, $73, $40, $e8, $50, $e2, $59, $c1, $7b, $e5, $3b, $74, $1b, $3f, $0f
 	db $46, $92, $ca, $06, $1b, $0e, $2b, $de, $bf, $de, $bf, $dc, $3e, $d8, $fc, $f0
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $0D: copied to $9000 ($100 bytes) when a room with this set in IndoorATilesetIds / IndoorBTilesetIds is loaded (LoadTileset09, (hWorldTileset + $50) * $100). 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset0D::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
@@ -485,6 +573,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $c0, $c0, $20, $20, $50, $10, $a8, $08, $14, $a4, $0a, $b2, $26, $9a, $42, $9a
 	db $4a, $41, $73, $40, $e8, $50, $e2, $59, $c1, $7b, $e5, $3b, $74, $1b, $3f, $0f
 	db $46, $92, $ca, $06, $1b, $0e, $2b, $de, $bf, $de, $bf, $dc, $3e, $d8, $fc, $f0
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $0E: copied to $9000 ($100 bytes) when a room with this set in IndoorATilesetIds / IndoorBTilesetIds is loaded (LoadTileset09, (hWorldTileset + $50) * $100). 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset0E::
 	db $80, $80, $c0, $c0, $a0, $a0, $9f, $97, $c8, $88, $e8, $c0, $f3, $a1, $d3, $b3
 	db $01, $01, $03, $03, $05, $05, $f9, $e9, $13, $11, $17, $03, $cf, $85, $cb, $cd
 	db $d3, $b3, $d3, $b3, $d9, $b1, $e5, $a1, $ed, $ad, $f6, $bc, $c3, $be, $ff, $ff
@@ -501,6 +593,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $00, $00, $ff, $00, $fb, $fc, $fd, $86, $df, $82, $af, $c2, $97, $e2, $cb, $72
 	db $fb, $70, $f4, $78, $f1, $7e, $fc, $7f, $eb, $47, $c1, $40, $c0, $40, $ff, $ff
 	db $e7, $3a, $f3, $1e, $3b, $0e, $4f, $86, $97, $e2, $73, $fe, $2f, $1e, $ff, $fe
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $0F: copied to $9000 ($100 bytes) when a room with this set in IndoorATilesetIds / IndoorBTilesetIds is loaded (LoadTileset09, (hWorldTileset + $50) * $100). 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset0F::
 	db $0f, $0f, $12, $10, $22, $20, $43, $47, $77, $4f, $4f, $4f, $4f, $4f, $7f, $4f
 	db $f0, $f0, $48, $08, $44, $04, $c2, $e2, $ee, $f2, $f2, $f2, $f2, $f2, $fe, $f2
 	db $47, $47, $62, $40, $72, $60, $7f, $52, $5f, $6f, $40, $70, $2f, $30, $1f, $1f
@@ -517,6 +613,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $ea, $ea, $4d, $49, $1f, $0d, $73, $33, $f9, $f1, $b5, $b9, $9f, $99, $9b, $9d
 	db $f9, $f9, $9f, $f9, $a9, $df, $b7, $cf, $df, $60, $4f, $70, $30, $3f, $1f, $0f
 	db $9f, $9f, $f9, $9f, $95, $fb, $ed, $f3, $fb, $06, $f2, $0e, $0c, $fc, $f8, $f0
+;@ path: gfx/tiles/indoor
+;@ Page $60: copied to $9100 ($100 bytes) on the indoor maps whose entry in $01:$7F64 is $60. 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorMapTiles60::
 	db $7c, $00, $86, $00, $82, $00, $82, $00, $86, $00, $cc, $00, $79, $00, $03, $00
 	db $03, $00, $79, $00, $cc, $00, $86, $00, $82, $00, $82, $00, $86, $00, $7c, $00
 	db $3e, $00, $61, $00, $41, $00, $41, $00, $61, $00, $33, $00, $9e, $00, $c0, $00
@@ -533,6 +633,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $03, $10, $09, $f0, $84, $40, $02, $80, $00, $82, $44, $82, $3c, $c2, $80, $7c
 	db $01, $3e, $1c, $63, $22, $41, $40, $01, $42, $01, $3c, $03, $80, $1e, $c0, $00
 	db $00, $f8, $60, $9e, $d2, $21, $a1, $40, $81, $40, $21, $c0, $53, $20, $26, $18
+;@ path: gfx/tiles/indoor
+;@ Page $61: copied to $9100 ($100 bytes) on the indoor maps whose entry in $01:$7F64 is $61. 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorMapTiles61::
 	db $05, $00, $45, $00, $09, $00, $13, $00, $26, $00, $cd, $00, $1b, $00, $f7, $00
 	db $a0, $00, $a0, $00, $a4, $00, $d0, $00, $68, $00, $b7, $00, $d8, $00, $ef, $00
 	db $f7, $00, $1b, $00, $ed, $00, $16, $00, $0b, $00, $05, $00, $45, $00, $05, $00
@@ -549,6 +653,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $a0, $00, $a2, $00, $a0, $0e, $d0, $08, $00, $f8, $93, $24, $d8, $22, $ae, $41
 	db $d3, $24, $1b, $27, $c5, $39, $06, $10, $0b, $30, $00, $2f, $45, $20, $05, $40
 	db $ee, $41, $e0, $f9, $b1, $86, $e8, $84, $50, $84, $00, $fc, $a0, $42, $a1, $40
+;@ path: gfx/tiles/indoor
+;@ Page $62: copied to $9100 ($100 bytes) on the indoor maps whose entry in $01:$7F64 is $62. 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorMapTiles62::
 	db $84, $00, $27, $00, $68, $00, $09, $00, $9a, $00, $f2, $00, $20, $00, $29, $00
 	db $14, $00, $f6, $00, $12, $00, $d8, $00, $0f, $00, $66, $00, $04, $00, $95, $00
 	db $2c, $00, $2c, $00, $60, $00, $f9, $00, $0c, $00, $67, $00, $24, $00, $94, $00
@@ -565,6 +673,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $24, $10, $06, $f0, $0a, $f0, $44, $38, $40, $3f, $92, $6c, $28, $c4, $99, $44
 	db $15, $22, $10, $27, $5a, $24, $00, $fc, $13, $0c, $68, $07, $20, $04, $90, $04
 	db $80, $44, $28, $c4, $51, $2e, $47, $38, $c8, $30, $16, $e0, $04, $20, $11, $20
+;@ path: gfx/tiles/indoor
+;@ Page $63: copied to $9100 ($100 bytes) on the indoor maps whose entry in $01:$7F64 is $63. 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorMapTiles63::
 	db $89, $00, $41, $00, $22, $00, $3c, $00, $30, $00, $24, $00, $48, $00, $d0, $00
 	db $88, $00, $c0, $00, $24, $00, $12, $00, $98, $00, $38, $00, $44, $00, $83, $00
 	db $c1, $00, $22, $00, $1c, $00, $09, $00, $48, $00, $24, $00, $13, $00, $01, $00
@@ -581,6 +693,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $80, $00, $c2, $00, $2c, $c0, $08, $30, $c8, $30, $d0, $28, $88, $44, $44, $83
 	db $18, $e7, $02, $3c, $04, $18, $14, $08, $14, $08, $13, $0c, $60, $13, $00, $01
 	db $45, $82, $bc, $42, $58, $24, $44, $38, $4c, $30, $a4, $40, $42, $80, $81, $00
+;@ path: gfx/tiles/indoor
+;@ Page $64: copied to $9100 ($100 bytes) on the indoor maps whose entry in $01:$7F64 is $64. 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorMapTiles64::
 	db $80, $00, $8c, $00, $8e, $00, $c6, $00, $60, $00, $30, $00, $58, $00, $0f, $00
 	db $0f, $00, $18, $00, $30, $00, $62, $00, $c0, $00, $8c, $00, $8c, $00, $80, $00
 	db $01, $00, $31, $00, $71, $00, $63, $00, $06, $00, $0c, $00, $18, $00, $f0, $00
@@ -597,6 +713,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $13, $0c, $24, $18, $48, $b0, $02, $f0, $08, $f0, $51, $8e, $44, $88, $30, $c8
 	db $14, $23, $42, $21, $d2, $21, $0d, $f2, $11, $0e, $10, $0f, $20, $18, $80, $70
 	db $00, $f8, $64, $98, $92, $0c, $11, $0e, $e0, $13, $00, $e1, $80, $01, $01, $00
+;@ path: gfx/tiles/indoor
+;@ Page $65: copied to $9100 ($100 bytes) on the indoor maps whose entry in $01:$7F64 is $65. 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorMapTiles65::
 	db $13, $00, $26, $00, $4c, $00, $98, $00, $30, $00, $64, $00, $c8, $00, $90, $00
 	db $c0, $00, $60, $00, $32, $00, $99, $00, $4c, $00, $26, $00, $13, $00, $09, $00
 	db $90, $00, $c8, $00, $64, $00, $32, $00, $99, $00, $4c, $00, $06, $00, $03, $00
@@ -613,6 +733,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $41, $80, $a1, $40, $52, $24, $20, $18, $44, $28, $8a, $44, $09, $c6, $32, $c9
 	db $45, $82, $b8, $47, $56, $29, $25, $18, $94, $08, $42, $0c, $05, $3a, $e2, $01
 	db $8a, $71, $95, $42, $6a, $84, $14, $e8, $c9, $30, $42, $3c, $a4, $42, $49, $80
+;@ path: gfx/tiles/indoor
+;@ Page $66: copied to $9100 ($100 bytes) on the indoor maps whose entry in $01:$7F64 is $66. 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorMapTiles66::
 	db $3e, $00, $3e, $00, $a2, $00, $41, $00, $41, $00, $63, $00, $9f, $00, $07, $00
 	db $10, $00, $08, $00, $2f, $00, $08, $00, $f8, $00, $e4, $00, $e3, $00, $e1, $00
 	db $27, $00, $87, $00, $c8, $00, $70, $00, $70, $00, $79, $00, $c7, $00, $43, $00
@@ -629,6 +753,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $10, $00, $00, $08, $20, $0f, $90, $08, $00, $f8, $14, $e0, $d3, $e0, $d1, $e0
 	db $0b, $07, $89, $07, $c4, $09, $68, $10, $48, $30, $34, $48, $c3, $04, $43, $00
 	db $d1, $e0, $89, $f0, $f2, $8c, $48, $84, $50, $84, $84, $40, $b9, $40, $b0, $40
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $17: copied to $9000 ($100 bytes) by LoadTileset09 for the rooms that use it. 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset17::
 	db $80, $80, $c0, $c0, $a0, $a0, $9f, $97, $c8, $88, $e8, $c0, $f3, $a1, $d3, $b3
 	db $01, $01, $03, $03, $05, $05, $f9, $e9, $13, $11, $17, $03, $cf, $85, $cb, $cd
 	db $d3, $b3, $d3, $b3, $d9, $b1, $e5, $a1, $ed, $ad, $f6, $bc, $c3, $be, $ff, $ff
@@ -645,6 +773,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $00, $00, $ff, $00, $fb, $fc, $fd, $86, $df, $82, $af, $c2, $97, $e2, $cb, $72
 	db $fb, $70, $f4, $78, $f1, $7e, $fc, $7f, $eb, $47, $c1, $40, $c0, $40, $ff, $ff
 	db $e7, $3a, $f3, $1e, $3b, $0e, $4f, $86, $97, $e2, $73, $fe, $2f, $1e, $ff, $fe
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $18: copied to $9000 ($100 bytes) by LoadTileset09 for the rooms that use it. 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset18::
 	db $ff, $ff, $ff, $ff, $ff, $ff, $fe, $fe, $fc, $fc, $f8, $f8, $f0, $f0, $e0, $e0
 	db $ff, $ff, $f0, $f0, $80, $80, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	db $ff, $ff, $0f, $0f, $01, $01, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
@@ -661,6 +793,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $80, $80, $f0, $f0, $ff, $ff
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $01, $01, $0f, $0f, $ff, $ff
 	db $07, $07, $0f, $0f, $1f, $1f, $3f, $3f, $7f, $7f, $ff, $ff, $ff, $ff, $ff, $ff
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $19: copied to $9000 ($100 bytes) by LoadTileset09 for the rooms that use it. 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset19::
 	db $fa, $dc, $2d, $f2, $1c, $e1, $d8, $21, $d0, $21, $c0, $31, $e8, $72, $90, $ec
 	db $90, $e4, $90, $e4, $b0, $c4, $78, $82, $c4, $01, $82, $01, $00, $01, $01, $00
 	db $5f, $3f, $b0, $4f, $38, $87, $1d, $82, $1b, $84, $0b, $84, $07, $4e, $09, $37
@@ -677,6 +813,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $ad, $69, $37, $f7, $30, $d0, $70, $90, $dc, $3c, $e2, $22, $bd, $79, $cd, $7d
 	db $a7, $ba, $a5, $bb, $a3, $bc, $df, $9f, $a0, $c0, $80, $ff, $40, $7f, $3f, $3f
 	db $e5, $5d, $a5, $dd, $c5, $3d, $fb, $f9, $05, $03, $01, $ff, $02, $fe, $fc, $fc
+;@ path: gfx/tiles/indoor
+;@ Indoor room tile set $1A: copied to $9000 ($100 bytes) by LoadTileset09 for the rooms that use it. 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorTileset1A::
 	db $3c, $00, $46, $00, $e2, $00, $f2, $00, $fa, $00, $f8, $00, $fd, $00, $7d, $00
 	db $00, $00, $73, $00, $cf, $00, $bf, $00, $7f, $00, $ff, $00, $ff, $00, $ff, $00
 	db $7b, $00, $77, $00, $37, $00, $2f, $00, $2f, $00, $1f, $00, $9f, $00, $9f, $00
@@ -693,6 +833,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $3c, $00, $3c, $00, $78, $00, $f8, $00, $fc, $00, $fc, $00, $fe, $00, $fe, $00
 	db $df, $00, $9f, $00, $5e, $00, $59, $00, $41, $00, $33, $00, $9e, $00, $c0, $00
 	db $fe, $00, $be, $00, $3f, $00, $5f, $00, $4f, $00, $4e, $00, $62, $00, $3c, $00
+;@ path: gfx/tiles/indoor
+;@ Page $6B: copied to $9100 on the indoor maps whose entry in $01:$7F64 is $6B. 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+IndoorMapTiles6B::
 	db $83, $00, $23, $00, $00, $00, $00, $00, $30, $00, $30, $00, $01, $00, $01, $00
 	db $07, $00, $0e, $00, $1c, $00, $58, $00, $18, $00, $18, $00, $98, $00, $99, $00
 	db $40, $00, $00, $00, $00, $00, $3f, $00, $7f, $00, $e0, $00, $c2, $00, $80, $00
@@ -709,6 +853,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $07, $00, $88, $07, $90, $0c, $d0, $08, $70, $88, $00, $f8, $68, $90, $a9, $10
 	db $45, $22, $45, $22, $5d, $22, $40, $3f, $1f, $60, $a1, $40, $81, $40, $02, $81
 	db $ac, $10, $46, $38, $99, $66, $20, $c0, $40, $80, $46, $80, $46, $80, $80, $00
+;@ path: gfx/tiles/indoor
+;@ Page $6C: copied to $9200 ($200 bytes) on the indoor maps whose entry in $01:$7F84 is $6C. 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+IndoorMapTiles6C::
 	db $00, $00, $7f, $00, $78, $3f, $7c, $3f, $5e, $3f, $4f, $3f, $47, $3f, $47, $3f
 	db $00, $00, $fe, $00, $1e, $fc, $3e, $fc, $7a, $fc, $f2, $fc, $e2, $fc, $e2, $fc
 	db $47, $3f, $47, $3f, $4f, $3f, $5e, $3f, $7c, $3f, $78, $3f, $7f, $00, $00, $00
@@ -741,6 +889,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $3c, $df, $ff, $3c, $ff, $ff, $e3, $ff, $80, $ff, $92, $ed, $fe, $81, $81, $00
 	db $f6, $fb, $fe, $fb, $ff, $ff, $d7, $fb, $d7, $fb, $df, $f7, $fe, $ff, $fe, $fb
 	db $71, $be, $76, $b8, $e2, $fc, $e2, $fc, $e6, $f8, $f2, $7c, $72, $bc, $7f, $be
+;@ path: gfx/tiles/indoor
+;@ Page $6E: copied to $9200 ($200 bytes) on the indoor maps whose entry in $01:$7F84 is $6E. 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+IndoorMapTiles6E::
 	db $00, $00, $1f, $00, $2c, $1f, $5f, $3f, $7c, $3f, $5e, $3f, $57, $3f, $53, $3f
 	db $00, $00, $f8, $00, $34, $f8, $fa, $fc, $3e, $fc, $7a, $fc, $ea, $fc, $ca, $fc
 	db $53, $3f, $57, $3f, $5e, $3f, $7c, $3f, $5f, $3f, $2c, $1f, $1f, $00, $00, $00
@@ -773,6 +925,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $7f, $ff, $6e, $fd, $c7, $7e, $c3, $ff, $83, $c3, $66, $c3, $bd, $7e, $00, $00
 	db $fb, $fd, $9b, $fd, $df, $ef, $df, $ef, $db, $ed, $99, $fe, $f1, $fe, $f3, $fd
 	db $3a, $dc, $f4, $fe, $c6, $f2, $82, $f2, $c2, $f2, $e6, $f2, $fc, $be, $ba, $dc
+;@ path: gfx/tiles/sideview
+;@ Background tiles of the side-view rooms: LoadTileset09 copies them to $9000 ($800 bytes) in side-view rooms of the houses and caves and of map 6. 128 tiles.
+;@ asset: tiles bpp=2 length=$800
+SideViewTiles::
 	db $ff, $00, $07, $f8, $00, $ff, $7c, $ff, $c7, $ff, $39, $c7, $fe, $01, $df, $20
 	db $ff, $00, $fc, $03, $60, $9f, $00, $ff, $07, $ff, $dc, $ff, $73, $fc, $0f, $f0
 	db $9f, $e0, $99, $e6, $cc, $f3, $c4, $f3, $d0, $e7, $ae, $c1, $ab, $c4, $bf, $c0
@@ -901,6 +1057,10 @@ SECTION "ROM Bank $00d", ROMX[$4000], BANK[$d]
 	db $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+;@ path: gfx/tiles/sideview
+;@ Background tiles of the side-view rooms of the dungeons (maps below $0A except 6) and of room $E9: copied to $9000 ($800 bytes) by LoadTileset09. 128 tiles.
+;@ asset: tiles bpp=2 length=$800
+DungeonSideViewTiles::
 	db $46, $ff, $45, $fe, $c9, $fe, $f9, $fe, $c4, $ff, $9a, $e7, $bd, $c3, $be, $c1
 	db $20, $ff, $90, $7f, $c8, $3f, $a7, $5f, $f3, $0f, $79, $87, $01, $ff, $ff, $ff
 	db $e6, $9f, $85, $fe, $c9, $fe, $f9, $fe, $c4, $ff, $aa, $c7, $8d, $c3, $be, $c1

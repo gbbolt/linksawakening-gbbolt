@@ -5,6 +5,10 @@
 
 SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 
+;@ path: gfx/tiles/menu
+;@ Tiles of the file menu: LoadTileset04 (tile set request 4) copies $4000-$43FF to $8800. 64 tiles.
+;@ asset: tiles bpp=2 length=$400
+FileMenuTiles::
 	db $87, $87, $01, $01, $c0, $c0, $9c, $9c, $9c, $9c, $18, $18, $81, $81, $83, $83
 	db $e7, $e7, $cf, $cf, $c9, $cf, $89, $8f, $99, $9f, $93, $9f, $12, $1e, $1f, $1f
 	db $c7, $c7, $c3, $c3, $83, $83, $93, $93, $b3, $b3, $31, $31, $01, $01, $03, $03
@@ -69,6 +73,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	db $08, $08, $0c, $0c, $fe, $fe, $ff, $ff, $fe, $fe, $0c, $0c, $08, $08, $00, $00
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+;@ path: gfx/tiles/menu
+;@ Tiles of the save and game over menus: LoadTileset0D (tile set request $0D) copies $4400-$48FF to $8800. 80 tiles.
+;@ asset: tiles bpp=2 length=$500
+SaveMenuTiles::
 	db $ff, $07, $ff, $1f, $ff, $30, $ff, $60, $ff, $40, $ff, $c0, $ff, $c0, $ff, $c0
 	db $ff, $80, $ff, $e0, $ff, $f0, $ff, $78, $ff, $78, $ff, $31, $ff, $02, $ff, $02
 	db $ff, $00, $ff, $00, $ff, $30, $ff, $10, $ff, $18, $ff, $98, $ff, $8d, $ff, $8f
@@ -149,6 +157,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $00, $00, $30, $30, $88, $88, $04, $04, $84, $84, $84, $84, $88, $88, $30, $30
 	db $00, $00, $00, $00, $44, $00, $28, $00, $10, $00, $28, $00, $44, $00, $00, $00
 	db $00, $00, $00, $00, $44, $00, $28, $00, $10, $00, $28, $00, $44, $00, $00, $00
+;@ path: gfx/tiles/title
+;@ Tiles of the beach of the opening and the title screen: LoadTileset11 (tile set request $11) copies $4900-$4FFF to $8800. 112 tiles.
+;@ asset: tiles bpp=2 length=$700
+TitleTiles::
 	db $00, $01, $00, $01, $00, $01, $00, $02, $00, $02, $00, $02, $01, $05, $01, $05
 	db $00, $ff, $00, $00, $7f, $7f, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $fc, $ff, $f8
 	db $00, $ff, $00, $00, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $00, $ff, $00
@@ -261,6 +273,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $44, $ef, $44, $ef, $64, $ff, $54, $ff, $4c, $ff, $44, $ef, $44, $ef, $00, $44
 	db $91, $fb, $91, $fb, $99, $ff, $95, $ff, $93, $ff, $91, $fb, $91, $fb, $00, $91
 	db $38, $fc, $44, $fe, $40, $fc, $5c, $fe, $44, $fe, $44, $fe, $38, $fc, $00, $38
+;@ path: gfx/tiles/font
+;@ The font: one 8 x 8 glyph per tile, the letters of the dialogs (DialogTypeChar copies glyph DialogCharGlyphs[code] from here) and of the file menu (LoadTileset04 copies $5000-$57FF to $9000). 128 tiles.
+;@ asset: tiles bpp=2 length=$800
+FontTiles::
 	db $fd, $fd, $f9, $f9, $f5, $f5, $ed, $ed, $c1, $c1, $bd, $bd, $7d, $7d, $ff, $ff
 	db $c3, $c3, $dd, $dd, $dd, $dd, $83, $83, $bb, $bb, $7b, $7b, $07, $07, $ff, $ff
 	db $e3, $e3, $dd, $dd, $bf, $bf, $bf, $bf, $7f, $7f, $7b, $7b, $87, $87, $ff, $ff
@@ -389,6 +405,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+;@ path: gfx/tiles/menu
+;@ Tiles at $5800-$5BFF that no whole-set loader copies. 64 tiles.
+;@ asset: tiles bpp=2 length=$400
+Tiles0F5800::
 	db $c3, $c3, $99, $99, $99, $99, $99, $99, $81, $81, $99, $99, $99, $99, $ff, $ff
 	db $03, $03, $99, $99, $99, $99, $83, $83, $99, $99, $99, $99, $03, $03, $ff, $ff
 	db $ff, $ff, $81, $81, $9f, $9f, $9f, $9f, $9f, $9f, $9f, $9f, $81, $81, $ff, $ff
@@ -453,6 +473,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $00, $00, $00, $00, $44, $00, $28, $00, $10, $00, $28, $00, $44, $00, $00, $00
 	db $00, $00, $00, $00, $44, $00, $28, $00, $10, $00, $28, $00, $44, $00, $00, $00
 	db $00, $00, $00, $00, $44, $00, $28, $00, $10, $00, $28, $00, $44, $00, $00, $00
+;@ path: gfx/tiles/overworld
+;@ Overworld area tile set $1C: copied to $9000 ($200 bytes) when a room of an area with this set in OverworldTilesetIds is entered (LoadTileset09 and the VBlank handler, (hWorldTileset + $40) * $100). 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+OverworldTileset1C::
 	db $f3, $0f, $cf, $3f, $9c, $7f, $38, $ff, $38, $f7, $3b, $f4, $3f, $f3, $7f, $f4
 	db $cf, $f0, $f3, $fc, $39, $fe, $1c, $ff, $1c, $ef, $dc, $2f, $fc, $cf, $fe, $3f
 	db $b6, $7f, $64, $3f, $69, $3e, $58, $6f, $4a, $7f, $6c, $7f, $d4, $6f, $85, $fe
@@ -485,6 +509,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $51, $88, $51, $88, $45, $88, $40, $8f, $07, $f8, $77, $88, $77, $8f, $f8, $ff
 	db $38, $e0, $f8, $20, $a6, $79, $46, $f9, $79, $c0, $59, $e0, $ce, $f1, $ff, $ff
 	db $7b, $c7, $43, $ff, $43, $ff, $43, $ff, $c2, $7f, $c5, $7e, $7a, $fc, $f0, $c0
+;@ path: gfx/tiles/overworld
+;@ Overworld area tile set $1E: copied to $9000 ($200 bytes) when a room of an area with this set in OverworldTilesetIds is entered (LoadTileset09 and the VBlank handler, (hWorldTileset + $40) * $100). 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+OverworldTileset1E::
 	db $01, $01, $06, $07, $0b, $0c, $16, $18, $17, $18, $23, $3f, $2f, $3c, $74, $38
 	db $ff, $ff, $fe, $08, $1f, $04, $0f, $07, $f8, $0a, $f2, $f4, $d3, $34, $78, $13
 	db $ff, $ff, $7f, $10, $f9, $20, $f0, $e0, $1f, $50, $4f, $2f, $cb, $2c, $1e, $c8
@@ -517,6 +545,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $ff, $01, $ff, $f1, $ef, $1e, $ff, $f1, $ff, $01, $73, $8f, $ff, $01, $ff, $ff
 	db $e7, $00, $db, $18, $a5, $24, $4e, $4a, $4e, $4a, $5e, $52, $bd, $3c, $c3, $00
 	db $00, $00, $42, $42, $24, $24, $18, $18, $18, $18, $24, $24, $42, $42, $00, $00
+;@ path: gfx/tiles/overworld
+;@ Overworld area tile set $20: copied to $9000 ($200 bytes) when a room of an area with this set in OverworldTilesetIds is entered (LoadTileset09 and the VBlank handler, (hWorldTileset + $40) * $100). LoadTileset1D (the ending) copies $6000-$67FF to $8800. 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+OverworldTileset20::
 	db $e7, $18, $c3, $3c, $00, $ff, $18, $ff, $3c, $ff, $ff, $ff, $c3, $ff, $66, $81
 	db $c3, $c3, $24, $e7, $db, $3c, $e7, $18, $ff, $00, $ff, $00, $ff, $00, $ff, $00
 	db $9f, $e0, $df, $e0, $e7, $f8, $ef, $70, $ff, $60, $df, $60, $9f, $e0, $9f, $e0
@@ -549,6 +581,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $00, $00, $00, $1f, $00, $26, $00, $2a, $00, $52, $00, $84, $00, $f8, $00, $00
 	db $00, $00, $42, $42, $24, $24, $18, $18, $18, $18, $24, $24, $42, $42, $00, $00
 	db $c3, $ff, $81, $ff, $3c, $c3, $ff, $00, $99, $00, $00, $00, $00, $00, $00, $00
+;@ path: gfx/tiles/overworld
+;@ Overworld area tile set $22: copied to $9000 ($200 bytes) when a room of an area with this set in OverworldTilesetIds is entered (LoadTileset09 and the VBlank handler, (hWorldTileset + $40) * $100). 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+OverworldTileset22::
 	db $00, $00, $07, $07, $1f, $18, $2f, $30, $50, $6f, $83, $ff, $9c, $ff, $eb, $ec
 	db $03, $03, $85, $86, $49, $ce, $a9, $6e, $55, $bf, $8e, $fa, $5a, $f2, $9b, $72
 	db $e0, $e0, $91, $71, $92, $73, $95, $76, $a8, $ff, $71, $5f, $52, $5f, $d9, $4e
@@ -581,6 +617,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $3e, $00, $7e, $00, $fe, $00, $fc, $00, $fc, $00, $f8, $00, $e0, $00, $00, $00
 	db $38, $c7, $00, $3e, $00, $1c, $03, $00, $0f, $20, $0f, $50, $0f, $70, $ff, $00
 	db $3e, $00, $1e, $60, $8e, $50, $64, $88, $b0, $44, $d8, $22, $ec, $13, $00, $0e
+;@ path: gfx/tiles/overworld
+;@ Overworld area tile set $24: copied to $9000 ($200 bytes) when a room of an area with this set in OverworldTilesetIds is entered (LoadTileset09 and the VBlank handler, (hWorldTileset + $40) * $100). 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+OverworldTileset24::
 	db $03, $03, $06, $04, $3d, $3e, $47, $47, $9e, $82, $b6, $8a, $e6, $9a, $7c, $44
 	db $80, $80, $f0, $70, $d8, $88, $a8, $d8, $5c, $7c, $36, $22, $3e, $22, $3e, $3e
 	db $3f, $38, $47, $44, $d7, $d4, $c7, $c4, $fb, $fc, $e0, $bf, $b8, $9f, $d7, $cf
@@ -613,6 +653,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $07, $05, $fd, $fb, $19, $17, $d3, $df, $9f, $9d, $bd, $ab, $2a, $3e, $fc, $fc
 	db $e7, $00, $db, $18, $a5, $24, $4e, $4a, $4e, $4a, $5e, $52, $bd, $3c, $c3, $00
 	db $55, $ff, $00, $ff, $aa, $55, $ff, $00, $00, $00, $00, $00, $00, $00, $00, $00
+;@ path: gfx/tiles/overworld
+;@ Overworld area tile set $26: copied to $9000 ($200 bytes) when a room of an area with this set in OverworldTilesetIds is entered (LoadTileset09 and the VBlank handler, (hWorldTileset + $40) * $100). 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+OverworldTileset26::
 	db $18, $18, $28, $28, $2e, $2e, $5f, $49, $bf, $9f, $b1, $b1, $f5, $f5, $b1, $b1
 	db $00, $00, $03, $03, $05, $05, $75, $75, $f7, $95, $f7, $f5, $f7, $f7, $fd, $fd
 	db $04, $04, $03, $03, $1e, $1e, $36, $32, $76, $52, $f7, $d3, $f7, $d0, $f0, $d0
@@ -645,6 +689,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $ff, $ff, $00, $00, $b3, $b3, $12, $12, $1e, $9e, $92, $92, $33, $b3, $00, $00
 	db $ff, $ff, $00, $00, $39, $39, $44, $44, $44, $44, $44, $44, $39, $39, $00, $00
 	db $fc, $fc, $03, $02, $e1, $f1, $91, $91, $e3, $f3, $81, $81, $c1, $c1, $02, $03
+;@ path: gfx/tiles/overworld
+;@ Overworld area tile set $28: copied to $9000 ($200 bytes) when a room of an area with this set in OverworldTilesetIds is entered (LoadTileset09 and the VBlank handler, (hWorldTileset + $40) * $100). 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+OverworldTileset28::
 	db $8f, $f0, $c8, $b7, $a8, $d7, $98, $e7, $8f, $f0, $c0, $bf, $a0, $df, $90, $ef
 	db $f1, $0f, $03, $fd, $05, $fb, $09, $f7, $f1, $0f, $13, $ed, $15, $eb, $19, $e7
 	db $3f, $ff, $7f, $c0, $ff, $87, $f8, $88, $f0, $90, $f0, $90, $f2, $90, $f0, $90
@@ -677,6 +725,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $ff, $01, $ff, $f1, $ef, $1e, $ff, $f1, $ff, $01, $73, $8f, $ff, $01, $ff, $ff
 	db $ff, $ff, $81, $81, $cb, $b5, $cb, $b5, $db, $a5, $e7, $99, $c3, $bd, $ff, $ff
 	db $ff, $ff, $ff, $ff, $55, $ff, $00, $ff, $aa, $55, $ff, $00, $00, $00, $ff, $ff
+;@ path: gfx/tiles/overworld
+;@ Overworld area tile set $2A: copied to $9000 ($200 bytes) when a room of an area with this set in OverworldTilesetIds is entered (LoadTileset09 and the VBlank handler, (hWorldTileset + $40) * $100). 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+OverworldTileset2A::
 	db $3f, $3f, $40, $40, $90, $8f, $af, $9f, $9b, $b4, $bf, $a0, $b6, $a9, $bf, $a0
 	db $f8, $f8, $04, $04, $12, $e2, $ea, $f2, $72, $9a, $ea, $1a, $fa, $0a, $ba, $4a
 	db $2e, $30, $24, $38, $24, $38, $2e, $30, $6e, $70, $e4, $b8, $a4, $b8, $ac, $b0
@@ -709,6 +761,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $2a, $00, $ea, $00, $0a, $00, $e6, $00, $98, $00, $84, $00, $fc, $00, $00, $00
 	db $00, $00, $ff, $00, $ff, $ff, $7e, $81, $7e, $81, $00, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $83, $ff, $01, $ff, $fe, $01, $00, $01, $01, $00, $81, $00, $7f, $00
+;@ path: gfx/tiles/overworld
+;@ Overworld area tile set $2C: copied to $9000 ($200 bytes) when a room of an area with this set in OverworldTilesetIds is entered (LoadTileset09 and the VBlank handler, (hWorldTileset + $40) * $100). 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+OverworldTileset2C::
 	db $fd, $1d, $e2, $3f, $cd, $73, $e6, $7a, $f3, $1e, $e7, $3d, $d7, $6c, $a3, $df
 	db $df, $d8, $27, $fc, $b3, $ce, $4d, $7f, $df, $73, $ef, $bc, $eb, $36, $c5, $fb
 	db $ef, $3e, $ff, $19, $ce, $08, $8f, $0c, $8f, $0a, $0f, $09, $1e, $18, $37, $24
@@ -741,6 +797,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $3e, $00, $7e, $00, $fe, $00, $fc, $00, $fc, $00, $f8, $00, $e0, $00, $00, $00
 	db $00, $00, $42, $42, $24, $24, $18, $18, $18, $18, $24, $24, $42, $42, $00, $00
 	db $00, $00, $42, $42, $24, $24, $18, $18, $18, $18, $24, $24, $42, $42, $00, $00
+;@ path: gfx/tiles/overworld
+;@ Overworld area tile set $2E: copied to $9000 ($200 bytes) when a room of an area with this set in OverworldTilesetIds is entered (LoadTileset09 and the VBlank handler, (hWorldTileset + $40) * $100). 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+OverworldTileset2E::
 	db $00, $00, $03, $03, $06, $04, $0e, $08, $0f, $08, $0f, $08, $07, $04, $07, $04
 	db $00, $00, $c0, $c0, $60, $20, $70, $10, $f0, $10, $f0, $10, $d0, $30, $20, $e0
 	db $f8, $90, $bf, $c8, $5f, $67, $ef, $b0, $b8, $9f, $d7, $8f, $a0, $c0, $9f, $e0
@@ -773,6 +833,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $e1, $ff, $21, $3f, $d3, $df, $df, $dd, $9d, $93, $b1, $bf, $22, $3e, $fc, $fc
 	db $a0, $60, $d0, $30, $e8, $18, $f4, $0c, $f2, $8e, $66, $5e, $7c, $7c, $c8, $c8
 	db $44, $ff, $ff, $ff, $ee, $11, $ee, $11, $ee, $11, $ff, $ff, $00, $00, $00, $00
+;@ path: gfx/tiles/overworld
+;@ Overworld area tile set $30: copied to $9000 ($200 bytes) when a room of an area with this set in OverworldTilesetIds is entered (LoadTileset09 and the VBlank handler, (hWorldTileset + $40) * $100). 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+OverworldTileset30::
 	db $a2, $ff, $a2, $ff, $a2, $ff, $a2, $ff, $a2, $ff, $e2, $ff, $9e, $ff, $97, $fb
 	db $ff, $03, $06, $fa, $1a, $f6, $07, $fa, $4b, $f6, $17, $fa, $03, $ff, $ff, $ff
 	db $fb, $06, $a6, $5b, $c2, $3f, $aa, $5f, $c2, $3f, $e2, $1f, $82, $7f, $ff, $ff
@@ -805,6 +869,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $67, $7e, $7f, $3c, $1f, $18, $5f, $52, $1f, $13, $7f, $3e, $ff, $70, $ff, $ff
 	db $fd, $09, $fd, $49, $fd, $49, $fd, $49, $fd, $e9, $fd, $39, $ff, $1e, $ff, $ff
 	db $ff, $ff, $ff, $03, $07, $03, $ff, $ff, $ff, $ff, $ff, $03, $07, $03, $ff, $ff
+;@ path: gfx/tiles/overworld
+;@ Overworld area tile set $32: copied to $9000 ($200 bytes) when a room of an area with this set in OverworldTilesetIds is entered (LoadTileset09 and the VBlank handler, (hWorldTileset + $40) * $100). 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+OverworldTileset32::
 	db $ff, $00, $ff, $03, $f4, $07, $c4, $07, $e8, $0f, $f1, $3e, $c3, $7c, $c7, $78
 	db $e3, $ff, $1c, $ff, $18, $e7, $31, $ce, $03, $fc, $c3, $3c, $c1, $3e, $80, $7f
 	db $c7, $ff, $38, $ff, $18, $e7, $8c, $73, $c0, $3f, $c3, $3c, $83, $7c, $01, $fe
@@ -837,6 +905,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $28, $c4, $68, $94, $d8, $24, $80, $78, $00, $40, $00, $40, $00, $40, $01, $80
 	db $1c, $ff, $1c, $ff, $08, $ff, $00, $ff, $10, $ff, $8c, $7f, $c2, $3f, $e2, $1f
 	db $e1, $ff, $c3, $ff, $23, $fe, $25, $fc, $1e, $fa, $8e, $7e, $c2, $3e, $e3, $1e
+;@ path: gfx/tiles/overworld
+;@ Overworld area tile set $34: copied to $9000 ($200 bytes) when a room of an area with this set in OverworldTilesetIds is entered (LoadTileset09 and the VBlank handler, (hWorldTileset + $40) * $100). 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+OverworldTileset34::
 	db $e1, $1f, $7f, $82, $3e, $fc, $7f, $e5, $67, $c5, $dd, $c6, $fe, $c7, $dd, $e7
 	db $ff, $ff, $3f, $1f, $df, $08, $f9, $8e, $f8, $8f, $eb, $1f, $11, $ff, $e5, $ff
 	db $ff, $f8, $ce, $8d, $fc, $c7, $fe, $67, $7e, $bf, $3f, $c7, $81, $ff, $bc, $ff
@@ -869,6 +941,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $7d, $23, $2d, $f3, $f5, $fb, $39, $0f, $0d, $07, $06, $03, $f3, $01, $1d, $e0
 	db $67, $41, $5f, $61, $4d, $73, $a1, $3f, $73, $9e, $be, $cf, $4f, $ff, $b7, $f8
 	db $c3, $43, $9f, $81, $3f, $1f, $62, $3f, $da, $67, $ba, $c7, $f4, $cf, $bf, $7f
+;@ path: gfx/tiles/overworld
+;@ Overworld area tile set $36: copied to $9000 ($200 bytes) when a room of an area with this set in OverworldTilesetIds is entered (LoadTileset09 and the VBlank handler, (hWorldTileset + $40) * $100). 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+OverworldTileset36::
 	db $fe, $f1, $8f, $cf, $55, $e4, $23, $fc, $25, $f3, $6f, $f3, $c2, $cf, $ca, $87
 	db $fd, $fe, $4e, $93, $69, $93, $f1, $fd, $db, $bd, $8f, $dd, $77, $cd, $c7, $ff
 	db $b2, $c1, $8d, $f3, $83, $cf, $ab, $c7, $b1, $cf, $80, $f1, $d8, $e1, $ce, $f1
@@ -901,6 +977,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $19, $80, $7f, $00, $87, $78, $03, $fc, $0f, $f0, $01, $fc, $03, $78, $87, $00
 	db $cf, $fe, $7f, $fe, $be, $7f, $7c, $9f, $37, $f8, $58, $e0, $a7, $c0, $5c, $83
 	db $f3, $7f, $fe, $7f, $7d, $fe, $3e, $f9, $ec, $1f, $1a, $07, $e5, $03, $3a, $c1
+;@ path: gfx/tiles/overworld
+;@ Overworld area tile set $38: copied to $9000 ($200 bytes) when a room of an area with this set in OverworldTilesetIds is entered (LoadTileset09 and the VBlank handler, (hWorldTileset + $40) * $100). 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+OverworldTileset38::
 	db $38, $38, $46, $46, $99, $81, $f0, $88, $7f, $78, $09, $0e, $05, $06, $73, $73
 	db $01, $01, $02, $02, $06, $04, $c6, $c4, $3f, $3c, $75, $06, $ca, $65, $a5, $c8
 	db $80, $80, $46, $46, $25, $25, $66, $24, $f2, $12, $df, $3c, $2c, $d0, $d5, $0a
@@ -933,6 +1013,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $28, $c4, $68, $94, $d8, $24, $80, $78, $00, $40, $00, $40, $00, $40, $01, $80
 	db $bf, $af, $ba, $aa, $bf, $af, $bf, $a0, $bf, $bf, $80, $80, $ff, $98, $67, $67
 	db $fd, $f5, $5d, $55, $fd, $f5, $fd, $05, $fd, $fd, $01, $01, $ff, $19, $e6, $e6
+;@ path: gfx/tiles/overworld
+;@ Overworld area tile set $3A: copied to $9000 ($200 bytes) when a room of an area with this set in OverworldTilesetIds is entered (LoadTileset09 and the VBlank handler, (hWorldTileset + $40) * $100). 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+OverworldTileset3A::
 	db $ff, $f0, $9f, $98, $ec, $4c, $e7, $24, $e5, $24, $e6, $24, $ef, $24, $cf, $49
 	db $ff, $00, $87, $00, $60, $00, $ff, $00, $ff, $39, $7e, $47, $8c, $f3, $e6, $f9
 	db $ff, $00, $ff, $0f, $ff, $30, $ff, $c0, $f8, $07, $c0, $3f, $00, $ff, $0f, $ff
@@ -965,6 +1049,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $ff, $01, $ff, $f1, $ef, $1e, $ff, $f1, $ff, $01, $73, $8f, $ff, $01, $ff, $ff
 	db $e7, $00, $db, $18, $a5, $24, $4e, $4a, $4e, $4a, $5e, $52, $bd, $3c, $c3, $00
 	db $c3, $ff, $81, $ff, $00, $ff, $00, $ff, $3c, $c3, $c3, $81, $7e, $7e, $81, $00
+;@ path: gfx/tiles/overworld
+;@ Overworld area tile set $3C: copied to $9000 ($200 bytes) when a room of an area with this set in OverworldTilesetIds is entered (LoadTileset09 and the VBlank handler, (hWorldTileset + $40) * $100). 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+OverworldTileset3C::
 	db $ff, $00, $ff, $00, $ff, $03, $fe, $0c, $f8, $10, $f0, $20, $c0, $40, $80, $80
 	db $ff, $0f, $ff, $70, $df, $80, $0f, $00, $03, $00, $00, $00, $00, $00, $00, $00
 	db $ff, $f0, $ff, $0f, $f9, $00, $f0, $00, $c0, $00, $00, $00, $00, $00, $00, $00
@@ -997,6 +1085,10 @@ SECTION "ROM Bank $00f", ROMX[$4000], BANK[$f]
 	db $51, $88, $51, $88, $45, $88, $40, $8f, $07, $f8, $77, $88, $77, $8f, $f8, $ff
 	db $00, $00, $00, $00, $00, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $00, $ff
 	db $ff, $ff, $ff, $7e, $7e, $3c, $3c, $00, $81, $81, $c3, $42, $ff, $3c, $00, $ff
+;@ path: gfx/tiles/overworld
+;@ Overworld area tile set $3E: copied to $9000 ($200 bytes) when a room of an area with this set in OverworldTilesetIds is entered (LoadTileset09 and the VBlank handler, (hWorldTileset + $40) * $100). 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+OverworldTileset3E::
 	db $bd, $7e, $5a, $e7, $a5, $c3, $a5, $c3, $a5, $c3, $a5, $c3, $ad, $c3, $a5, $c3
 	db $bd, $7e, $5a, $e7, $a5, $c3, $ff, $ff, $80, $80, $00, $00, $7f, $00, $ff, $3e
 	db $bd, $7e, $5a, $e7, $a5, $c3, $ff, $ff, $00, $00, $00, $00, $ff, $00, $ff, $1c

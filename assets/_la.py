@@ -90,6 +90,10 @@ class World:
         self.m = boot(rom)
         self.saved = pickle.dumps(self.m)
 
+    def reset(self):
+        import pickle
+        self.m = pickle.loads(self.saved)
+
     def load(self, *args, **kw):
         import pickle
         try:
@@ -158,6 +162,9 @@ class RoomData:
         a = lin(bank, p)
         start = a
         out = {'bank': bank, 'addr': p, 'anim': r[a], 'objects': [], 'warps': []}
+        if r[a] == 0xFE:                        # a room without objects
+            out['floor'], out['template'], out['size'] = None, None, 1
+            return out
         if g == 'ow':
             out['floor'], out['template'] = r[a + 1], None
         else:
@@ -203,6 +210,33 @@ class RoomData:
 
     def spriteset(self, g, room):
         return self.rom[lin(8, SPRITESET_IDS[g] + room)]
+
+
+CHEST = 0xA0                    # the object of a closed chest
+ROOM_INFO = 0x4500              # bank $14: one byte per room (overworld, group A, group B): a chest's content
+CHEST_CONTENTS = ['Power Bracelet', 'shield', 'bow', 'hookshot', 'Fire Rod', 'Pegasus Boots', 'Ocarina',
+                  'feather', 'shovel', 'magic powder', 'bombs', 'sword']
+RUPEES = {0x1B: 50, 0x1C: 20, 0x1D: 100, 0x1E: 200, 0x1F: 500}
+
+
+def chest_content(rom, g, room):
+    return rom[lin(0x14, ROOM_INFO + {'ow': 0, 'A': 0x100, 'B': 0x200}[g] + room)]
+
+
+def chest_content_name(c):
+    if c < len(CHEST_CONTENTS):
+        return CHEST_CONTENTS[c]
+    if c in RUPEES:
+        return '{} rupees'.format(RUPEES[c])
+    if 0x0C <= c <= 0x15:
+        return 'counter item ${:02X}'.format(c)
+    if 0x16 <= c <= 0x1A:
+        return 'dungeon item ${:02X}'.format(c)
+    return 'content ${:02X}'.format(c)
+
+
+def find_chests(grid):
+    return [(x, y) for y, row in enumerate(grid) for x, o in enumerate(row) if o == CHEST]
 
 
 # ---------------------------------------------------------------- names from the disassembly

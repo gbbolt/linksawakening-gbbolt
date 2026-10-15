@@ -13,7 +13,7 @@ DEF wEntitySpeedY EQU $C250 ;@ u8[16] Entity vertical speed (signed, 1/16 pixel 
 DEF wEntityStatus EQU $C280 ;@ u8[16] Entity slot status (0 = free slot; others: dying, active, lifted, ...)
 DEF wEntityState EQU $C290 ;@ u8[16] Entity handler state (step of its state machine)
 DEF wEntityTimer EQU $C2E0 ;@ u8[16] Entity countdown timer, counts down by itself every frame
-DEF wEntityType EQU $C3A0 ;@ u8[16] Entity type (index into the handler table JumpTable_3953)
+DEF wEntityType EQU $C3A0 ;@ u8[16] Entity type (index into the handler table EntityHandlers)
 DEF wEntitySpriteVariant EQU $C3B0 ;@ u8[16] Entity sprite / animation frame chosen by its handler
 DEF wActiveEntitySlot EQU $C123 ;@ u8 Slot number of the entity whose handler is running
 DEF hFrameCounter EQU $FFE7 ;@ u8 Counts up once per frame
@@ -517,3 +517,102 @@ DEF wMarinReunionTimer EQU $D468 ;@ u8 Countdown between the steps of the follow
 DEF wDebugDialogIndex EQU $C109 ;@ u8 Dialogue number chosen with the joypad in the text debugger (entity $6B)
 DEF wEvilEagleAttack EQU $D205 ;@ u8 The Evil Eagle's next attack (0 swoop, 1/4 drop from above, 2/3 fly across and blow)
 DEF wEvilEagleFightStarted EQU $D478 ;@ u8 Nonzero once the fight on top of Eagle's Tower has begun (set to 2)
+DEF wSignpostMazeStep EQU $D472 ;@ u8 How many signs of the signpost maze Link has read in the right order (0-13)
+DEF wSignpostReadPos EQU $D473 ;@ u8 Position (row and column nibbles) of the sign Link just read; 0 once handled
+DEF wDoorAnimation EQU $C188 ;@ u8 Door animation running: 0 none, 1 a door opens, 2 a shutter closes
+DEF wDoorAnimIndex EQU $C189 ;@ u8 Door being animated (0-3 locked doors, 4-7 shutters, 8 boss door)
+DEF wOpenShuttersRequest EQU $C18C ;@ u8 Nonzero: open the room's shutter doors one after another
+DEF wCloseShuttersRequest EQU $C18D ;@ u8 Nonzero: close the room's shutter doors one after another
+DEF wDoorAnimFrame EQU $DBAC ;@ u8 Frame counter of the door animation
+DEF wDashBumpFrames EQU $C178 ;@ u8 Frames left in which entities react to the point Link dashed into (set to 2)
+DEF wDashBumpX EQU $C179 ;@ u8 X of the point in front of Link that a dash into a wall shakes
+DEF wDashBumpY EQU $C17A ;@ u8 Y of that point
+DEF wLinkOAMAttrLeft EQU $C11D ;@ u8 OAM attributes of the left half of Link's sprite (flip bits from LinkPoseAttributes; bit 7 = behind the background)
+DEF wLinkOAMAttrRight EQU $C11E ;@ u8 OAM attributes of the right half of Link's sprite
+DEF wLinkFlashAttr EQU $C135 ;@ u8 Palette bit ($10) ORed into Link's sprites; blinks while he is invincible
+DEF wBombArrowBombSlot EQU $C1C1 ;@ u8 Slot of the bomb laid last (an arrow shot within wBombArrowWindow takes it along)
+DEF wBombArrowArrowSlot EQU $C1C2 ;@ u8 Slot of the arrow shot last (a bomb laid within wBombArrowWindow joins it)
+DEF wShopItemCarried EQU $C509 ;@ u8 Shop item Link carries without having paid (0 = none); leaving the shop with it makes him a thief
+DEF wShowThiefMessage EQU $D47E ;@ u8 Set when Link left the shop with an item he did not pay for: the next fade-in opens dialogue $36
+DEF wOverworldRoom EQU $DB54 ;@ u8 The overworld room Link is in, or was last in before going indoors (his position on the map screen)
+DEF wWorldMapCursor EQU $DBB4 ;@ u8 Map screen: the room the cursor is on (high nibble row, low nibble column)
+DEF wWorldMapMarkerFrame EQU $C1B0 ;@ u8 Map screen: animation frame of the place marker popup (0 = fully shown, 1-3 growing / shrinking)
+DEF wWorldMapMarkerType EQU $C1B1 ;@ u8 Map screen: kind of place marker shown (0 none, 1-5 = icon of WorldMapMarkerIcons)
+DEF wWorldMapMarkerAppearTimer EQU $C1B2 ;@ u8 Map screen: counts down while a place marker pops up
+DEF wWorldMapMarkerHideTimer EQU $C1B3 ;@ u8 Map screen: counts down while a place marker disappears
+DEF wWorldMapMarkerRoom EQU $C1B4 ;@ u8 Map screen: the room whose place marker is shown (decides the corner of the popup)
+DEF wDelayedWaveSfxTimer EQU $C5A7 ;@ u8 Frames until wave sound effect $10 plays (counted down by UpdateEntities; 0 = none)
+DEF wClashBoxX EQU $D5C0 ;@ u8 X offset (from the entity) of the box where Link's sword clashes with it instead of hurting it ($80 = none yet)
+DEF wClashBoxHalfWidth EQU $D5C1 ;@ u8 Half width of the sword clash box
+DEF wClashBoxY EQU $D5C2 ;@ u8 Y offset (from the entity) of the sword clash box
+DEF wClashBoxHalfHeight EQU $D5C3 ;@ u8 Half height of the sword clash box
+DEF wEntityWorkRAM3 EQU $D200 ;@ u8[256] Third work area (the Desert Lanmola's trail of heights, ...); its first bytes also serve as single variables (wSmasherBallSlot, ...)
+DEF wLanmolaHoleX EQU $C1CD ;@ u8 X of the hole the Desert Lanmola came out of / dives into (sand spurts from it)
+DEF wLanmolaHoleY EQU $C1CE ;@ u8 Y of the Desert Lanmola's hole
+DEF wRoomEventShuttersClosed EQU $C190 ;@ u8 Nonzero once a room event has closed the shutters behind Link (they open when its trigger fires)
+DEF wRoomEventCounter EQU $C1A2 ;@ u8 Counter that room event trigger 5 waits for (two torches lit); cleared when a room loads
+DEF wMonkeysLeaving EQU $C168 ;@ u8 Set (to $63) when Kiki's monkeys have finished the bridge and run off
+DEF wFinalNightmareHidden EQU $D21A ;@ u8 1 while the final boss's main body is not shown (between forms, while it teleports); hits are then ignored
+DEF wFinalNightmareTargetX EQU $D21B ;@ u8 X position the final boss moves to (Agahnim's shadow teleporting)
+DEF wFinalNightmareTargetY EQU $D21C ;@ u8 Y position the final boss moves to
+DEF wFinalNightmareHits EQU $D220 ;@ u8 Hits the current form of the final boss has taken (powder on the gel, reflected balls on Agahnim's shadow, ...)
+DEF hActiveEntityTileOffset EQU $FFF5 ;@ u8 Added to the tile numbers of the entity being drawn (cleared for every entity)
+DEF wHeartPieces EQU $DB5C ;@ u8 Pieces of heart collected towards the next heart container (0-3; the fourth turns into a container)
+DEF wKeyItemFlags EQU $DB11 ;@ u8[4] Set when Link gets the key of variant 1-4 of type $30 (Tail, Angler, Face, Bird Key)
+DEF wLiftPullCounter EQU $C15F ;@ u8 Frames Link has pulled at an object with the Power Bracelet
+DEF wRecentRoomsIndex EQU $CE80 ;@ u8 Slot of wRecentRooms that was filled last (0-5)
+DEF wRecentRooms EQU $CE81 ;@ u8[6] The last six rooms entered; a room dropped from this list forgets its defeated enemies (wRoomDefeatedEntityBits)
+DEF wPodobooCount EQU $C5A0 ;@ u8 Podoboos in the air this frame (each counts itself; cleared every frame)
+DEF wPodobooCountPrev EQU $C5A1 ;@ u8 wPodobooCount of the previous frame (at most 2 podoboos leap at once)
+DEF wHasInstrument2 EQU $DB66 ;@ u8 Progress flags of the second dungeon (Bottle Grotto); bit 1 set once its instrument is obtained
+DEF wInventorySlideSpeed EQU $C150 ;@ s8 Pixels the window moves per frame while the inventory slides: -8 up (opening), +8 down (closing)
+DEF wInventoryStaticDrawn EQU $C151 ;@ u8 Nonzero once the fixed parts of the sliding inventory are queued for drawing
+DEF wInventoryRowsToDraw EQU $C154 ;@ u8 Inventory rows still to be drawn while it slides in (counts down from 11)
+DEF wRupeeCountDelay EQU $C3CE ;@ u8 Frames before the rupee counter starts counting (set when a chest gives rupees)
+DEF wSongMenuShown EQU $C1B5 ;@ u8 Nonzero while the ocarina song menu is shown in the inventory
+DEF wSongMenuOpenTimer EQU $C1B8 ;@ u8 Frames left of the song menu opening
+DEF wSongMenuCloseTimer EQU $C1B9 ;@ u8 Frames left of the song menu closing
+DEF wSeashells EQU $DB0F ;@ u8 Secret seashells found (BCD, up to $99)
+DEF wTowerPillarsDestroyed EQU $DB72 ;@ u8 How many of the pillars in Eagle's Tower (dungeon 7) have been destroyed (4 = the tower collapses)
+DEF wHookshotOut EQU $C1C6 ;@ u8 2 while the hookshot is out, 0 once it is back at Link
+DEF wRoomDarkness EQU $C3CD ;@ u8 How dark the room is drawn ($0C dark); each lit torch takes 4 off, each torch going out adds 4
+DEF wUnusedSfxTimer EQU $D391 ;@ u8 A fourth effect timer between the square and wave ones; only ever cleared
+DEF wUnusedSfxStep EQU $D395 ;@ u8 A fourth effect step counter; only ever cleared
+DEF wSoundUnusedA0 EQU $D3A0 ;@ u8 Cleared when sounds stop and when a square-channel effect ends; nothing reads it
+DEF wSoundUnusedA1 EQU $D3A1 ;@ u8 Cleared when sounds stop; nothing reads it
+DEF wSoundUnusedA2 EQU $D3A2 ;@ u8 Cleared when sounds stop; nothing reads it
+DEF wSoundUnusedA3 EQU $D3A3 ;@ u8 Cleared when a song starts and when sounds stop; nothing reads it
+DEF wJingleRepeat EQU $D3BC ;@ u8 Repeat counter of the square-channel effect: set by its start, counted down by CountDownJingleRepeat each time its steps run through
+DEF wUnusedSfxRepeat EQU $D3BD ;@ u8 A fourth effect repeat counter (CountDownSfxRepeat2); nothing sets it
+DEF wWaveSfxRepeat EQU $D3BE ;@ u8 Repeat counter of the wave-channel effect (counted down by CountDownWaveSfxRepeat)
+DEF wNoiseSfxRepeat EQU $D3BF ;@ u8 Repeat counter of the noise-channel effect (counted down by CountDownNoiseSfxRepeat); cleared when it ends
+DEF wJingleFreq EQU $D3C0 ;@ u16 Square 1 frequency of the effect while it slides (the NR13 / NR14 value; SaveSquare1Freq, SlideSquare1)
+DEF wSquare2SfxFreq EQU $D3C2 ;@ u16 Square 2 frequency of an effect while it slides (SaveSquare2Freq, SlideSquare2)
+DEF wWaveSfxFreq EQU $D3C4 ;@ u16 Wave channel frequency of the effect while it slides (SaveWaveFreq, SlideWave)
+DEF wUnusedSfxLocked EQU $D3C7 ;@ u8 A fourth effect lock flag; only ever cleared
+DEF wSoundUnusedD8 EQU $D3D8 ;@ u8 Cleared when sounds stop; nothing reads it
+DEF wJingleSubStep EQU $D3E2 ;@ u8 A second step counter some square-channel effects use; cleared when one starts
+DEF wSoundUnusedE3 EQU $D3E3 ;@ u8 Cleared when sounds stop; nothing reads it
+DEF wSoundUnusedE4 EQU $D3E4 ;@ u8 Cleared when sounds stop; nothing reads it
+DEF wSoundUnusedE5 EQU $D3E5 ;@ u8 Cleared when the music starts or sounds stop; nothing reads it
+DEF wHealthIsFull EQU $C5A9 ;@ u8 1 while Link's hearts are full (updated every frame)
+DEF wTracyMedicineSales EQU $DB75 ;@ u8 Crazy Tracy's sales of the secret medicine, counted 0-7 (her eighth sale is special)
+DEF wKillCounter EQU $D415 ;@ u8 Enemies defeated since the counter was last reset (a Piece of Power drops at a limit; Crazy Tracy's price depends on it)
+DEF wLiftableObjectSlot EQU $C50C ;@ u8 Slot of the liftable object (rock, pot) handled last
+DEF wInventoryItems EQU $DB02 ;@ u8[10] Items in the 10 inventory slots (two per row), after wItemB and wItemA
+DEF wInventoryCursor EQU $DBA3 ;@ u8 Selected inventory slot (0-9)
+DEF wInventoryCursorPrev EQU $C1B6 ;@ u8 wInventoryCursor at the start of the frame
+DEF wInventoryCursorBlink EQU $C159 ;@ u8 Frame counter that blinks the inventory selector (hidden while bit 4 is set)
+DEF wCloseInventoryAfterSongMenu EQU $C1BA ;@ u8 Set by Start in the song menu: close the inventory once the song menu has closed
+DEF wNightmareChargeFrame EQU $D21D ;@ u8 Final boss: frame + 1 of the ball Agahnim's shadow charges in its hand (0 = none drawn)
+DEF wNightmareFacing EQU $D21E ;@ u8 Final boss: direction of the current form toward Link (0 right, 1 left, 2 up, 3 down)
+DEF wSfxFastVariant EQU $D3D6 ;@ u8 Set by Moldorm (and the bank $15 boss built like it) while it moves fast: square effect $38 and noise effect $1B then play their fast variant
+DEF wJingle22Count EQU $D3D7 ;@ u8 How many times square effect $22 has started in a row; picks its pitch (1-12, then over again)
+DEF wWaveSfx1ECount EQU $D3DC ;@ u8 Rounds left of wave effect $1E
+DEF wWaveSfx1FCount EQU $D3DD ;@ u8 Round counter of wave effect $1F (it requests music track $59 after its last round)
+DEF wWaveSfx20Count EQU $D3DE ;@ u8 Rounds left of wave effect $20
+DEF wNoiseSfx34CountA EQU $D3DF ;@ u8 Repeats left of the first loop of noise effect $34
+DEF wNoiseSfx34CountB EQU $D3E0 ;@ u8 Repeats left of the second loop of noise effect $34
+DEF wWaveSfx22Count EQU $D3E1 ;@ u8 Round counter of wave effect $22
+DEF wHoldNoiseSfx3E EQU $D3E8 ;@ u8 While set (by the Slime Eel), noise effect $3E holds its current step
+DEF wRoomNoiseLoop EQU $C50E ;@ u8 Set ($E9) by a room with overworld object $E9; while set, noise effect $1E starts again whenever no noise effect plays

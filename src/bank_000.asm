@@ -1083,7 +1083,7 @@ DoNothing::
 ;@ path: object/raised_blocks
 ;@ The two raised-block steps the VBlank handler sets while hTileSwapFinishCount counts down
 ;@ after a room transition (index hTileSwapFinishCount - 1: $09 first, then $07); each is then
-;@ advanced by one in Call_1DEE.
+;@ advanced by one in UpdateRaisedBlocks.
 VBlankAnimFrames::
 	db $07, $09
 
@@ -1184,8 +1184,8 @@ VBlankHandler::
 	jr nc, .dma
 
 .linkTiles
-;>@lt                     Call_1CCC()
-	call Call_1CCC
+;>@lt                     DrawLinkOAM()
+	call DrawLinkOAM
 
 .dma
 ;>                 hDMARoutine()
@@ -1209,9 +1209,9 @@ VBlankHandler::
 	add hl, de
 	ld a, [hl]
 	ld [wRaisedBlockStep], a
-;>                 Call_1DEE(wRaisedBlockStep)
-	call Call_1DEE
-;>                 Call_1CCC()
+;>                 UpdateRaisedBlocks(wRaisedBlockStep)
+	call UpdateRaisedBlocks
+;>                 DrawLinkOAM()
 ;>                 hDMARoutine()
 ;=@lt
 	jr .linkTiles
@@ -1937,9 +1937,9 @@ jr_000_0894:
 ;@ Spawns entity $AF - the item Link holds up when he gets something - at Link's position.
 ;@ test: skip spawns an entity
 SpawnHeldItemEntity::
-;> slot = SpawnEntity(0xAF)                 # Call_3C01: new slot in de (no check whether it worked)
+;> slot = SpawnEntity(0xAF)                 # SpawnEntity: new slot in de (no check whether it worked)
 	ld a, $af
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = hLinkX
 	ldh a, [hLinkX]
 	ld hl, wEntityX
@@ -2665,7 +2665,7 @@ GameModeEnding::
 
 ;@ def UpdateEntitiesBank17()
 ;@ path: entity/engine
-;@ Runs Call_3843 (the entity update) with bank 3 switched in, for code in bank $17, and switches
+;@ Runs UpdateEntities (the entity update) with bank 3 switched in, for code in bank $17, and switches
 ;@ bank $17 back in. UpdateEntitiesBank1 and UpdateEntitiesBank2 do the same for banks 1 and 2.
 ;@ test: skip switches ROM banks
 UpdateEntitiesBank17::
@@ -2676,9 +2676,9 @@ UpdateEntitiesBank17::
 	ld a, $17
 
 jr_000_0b1a:
-;> Call_3843()
+;> UpdateEntities()
 	push af
-	call Call_3843
+	call UpdateEntities
 	pop af
 ;> return SwitchBank(back)
 	jp SwitchBank
@@ -2686,26 +2686,26 @@ jr_000_0b1a:
 
 ;@ def UpdateEntitiesBank1()
 ;@ path: entity/engine
-;@ Runs Call_3843 with bank 3 switched in, then switches bank 1 back in.
+;@ Runs UpdateEntities with bank 3 switched in, then switches bank 1 back in.
 ;@ test: skip switches ROM banks
 UpdateEntitiesBank1::
 ;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-;> Call_3843()                              # (the end of UpdateEntitiesBank17)
+;> UpdateEntities()                              # (the end of UpdateEntitiesBank17)
 ;> return SwitchBank(0x01)
 	ld a, $01
 	jr jr_000_0b1a
 
 ;@ def UpdateEntitiesBank2()
 ;@ path: entity/engine
-;@ Runs Call_3843 with bank 3 switched in, then switches bank 2 back in.
+;@ Runs UpdateEntities with bank 3 switched in, then switches bank 2 back in.
 ;@ test: skip switches ROM banks
 UpdateEntitiesBank2::
 ;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-;> Call_3843()                              # (the end of UpdateEntitiesBank17)
+;> UpdateEntities()                              # (the end of UpdateEntitiesBank17)
 ;> return SwitchBank(0x02)
 	ld a, $02
 	jr jr_000_0b1a
@@ -2864,10 +2864,10 @@ WorldGameplayFrame::
 ;> wLinkSpriteDY = 0
 	ld [wLinkSpriteDY], a
 ;> mem[0xC11D] &= 0x7F                      # attributes of Link's two sprites: bit 7 (behind the background) off
-	ld hl, $c11d
+	ld hl, wLinkOAMAttrLeft
 	res 7, [hl]
 ;> mem[0xC11E] &= 0x7F
-	ld hl, $c11e
+	ld hl, wLinkOAMAttrRight
 	res 7, [hl]
 ;> Bank02_5731()
 	call $5731
@@ -2906,8 +2906,8 @@ WorldGameplayFrame::
 	call SwitchBank
 ;> Bank19_769B()
 	call $769b
-;> Call_3843()                              # all entities
-	call Call_3843
+;> UpdateEntities()                              # all entities
+	call UpdateEntities
 ;> SwitchBank(2)
 	ld a, $02
 	call SwitchBank
@@ -3106,10 +3106,10 @@ UpdateLinkMain::
 	ld [$2100], a
 ;>             Bank02_781B()
 	call $781b
-;>             Call_1CCC()
-	call Call_1CCC
-;>             Call_3843()
-	call Call_3843
+;>             DrawLinkOAM()
+	call DrawLinkOAM
+;>             UpdateEntities()
+	call UpdateEntities
 ;>             return_from_caller()          # skips the rest of the world frame
 	pop af
 	ret
@@ -3145,8 +3145,8 @@ UpdateLinkMain::
 ;> if wDialogState:
 	ld a, [wDialogState]
 	and a
-;>     return Call_149B()                   # only Link's sprite while a dialogue is open
-	jp nz, Call_149B
+;>     return UpdateLinkItemSprites()                   # only Link's sprite while a dialogue is open
+	jp nz, UpdateLinkItemSprites
 
 ;> if wRoomTransitionState:
 	ld a, [wRoomTransitionState]
@@ -3214,13 +3214,13 @@ LinkMotionHandlers::
 
 ;@ def UpdateLinkInTransition()
 ;@ path: link/frame
-;@ While the room scrolls: only Link's sprites are updated (Call_149B, then Call_1CCC).
+;@ While the room scrolls: only Link's sprites are updated (UpdateLinkItemSprites, then DrawLinkOAM).
 ;@ test: skip
 UpdateLinkInTransition::
-;> Call_149B()
-	call Call_149B
-;> return Call_1CCC()
-	jp Call_1CCC
+;> UpdateLinkItemSprites()
+	call UpdateLinkItemSprites
+;> return DrawLinkOAM()
+	jp DrawLinkOAM
 
 
 ;@ def LinkMotionBank19()
@@ -3259,611 +3259,892 @@ LinkMotionNormal::
 	ret
 
 
-Call_0D68::
+;@ def HandleItemButtons()
+;@ path: link/items
+;@ Reads the A and B buttons for the items on them: while dashing a sword is held out in front
+;@ (or the shield raised); the Pegasus Boots charge while their button is held; the shield is
+;@ raised while its button is held; a newly pressed button uses its item (UseItem), a held one
+;@ keeps using it (HoldItem). Nothing happens while Link is held by a scene, the hookshot is
+;@ out, he carries something, or (outside the end of a sword swing) his controls are blocked.
+;@ While Link can talk to someone, A (and B when wCanTalkToEntity is 2) talks instead.
+;@ test: skip calls item routines in other banks
+HandleItemButtons::
+;> if mem[0xC50A] or wLinkFrozen or wHookshotInUse:
 	ld a, [$c50a]
 	ld hl, wLinkFrozen
 	or [hl]
 	ld hl, wHookshotInUse
 	or [hl]
+;>     return
 	ret nz
 
+;>@dash if wIsUsingPegasusBoots:
 	ld a, [wIsUsingPegasusBoots]
 	and a
-	jr z, jr_000_0dad
+	jr z, .notDashing
 
+;>@sw     if wItemA != 1 and wItemB != 1:      # no sword on a button
 	ld a, [wItemA]
 	cp $01
-	jr z, jr_000_0d9b
+	jr z, .swordOut
 
 	ld a, [wItemB]
 	cp $01
-	jr z, jr_000_0d9b
+	jr z, .swordOut
 
+;>         if wItemA == 4 or wItemB == 4:   # the shield
 	ld a, [wItemA]
 	cp $04
-	jr z, jr_000_0d96
+	jr z, .shield
 
 	ld a, [wItemB]
 	cp $04
-	jr nz, jr_000_0dab
+	jr nz, .dashDone
 
-jr_000_0d96:
-	call Call_0F34
-	jr jr_000_0dab
+.shield
+;>             RaiseShield()
+	call RaiseShield
+;=@sw
+	jr .dashDone
 
-jr_000_0d9b:
+;>     else:                                # the sword is held out in front while dashing
+.swordOut
+;>         if not 1 <= wSwordAnimationState <= 4:
 	ld a, [wSwordAnimationState]
 	dec a
 	cp $04
-	jr c, jr_000_0dab
+	jr c, .dashDone
 
+;>             wSwordAnimationState = 5
 	ld a, $05
 	ld [wSwordAnimationState], a
+;>             wSwordAnimationStatePrev = 5
 	ld [wSwordAnimationStatePrev], a
 
-jr_000_0dab:
-	jr jr_000_0db4
+.dashDone
+;=@dash
+	jr .buttons
 
-jr_000_0dad:
+;> else:
+.notDashing
+;>     wIsUsingShield = 0
 	xor a
 	ld [wIsUsingShield], a
+;>     wShieldLevelEquipped = 0
 	ld [wShieldLevelEquipped], a
 
-jr_000_0db4:
+.buttons
+;> if wLinkSlowAnimation or wIsCarryingLiftedObject:
 	ld a, [wLinkSlowAnimation]
 	and a
 	jp nz, Jump_000_0ed0
 
 	ld a, [wIsCarryingLiftedObject]
 	and a
+;>     return
 	jp nz, Jump_000_0ed0
 
+;>@bl if not (wSwordAnimationState == 3 and wSwordStateTimer >= 3) and hLinkInteractiveMotionBlocked:
 	ld a, [wSwordAnimationState]
 	and a
-	jr z, jr_000_0dd3
+	jr z, .blocked
 
 	cp $03
-	jr nz, jr_000_0dd3
+	jr nz, .blocked
 
+;=@bl
 	ld a, [wSwordStateTimer]
 	cp $03
-	jr nc, jr_000_0dd9
+	jr nc, .boots
 
-jr_000_0dd3:
+.blocked
+;=@bl
 	ldh a, [hLinkInteractiveMotionBlocked]
 	and a
+;>     return
 	jp nz, Jump_000_0ed0
 
-jr_000_0dd9:
+.boots
+;> if wItemB == 8:                          # Pegasus Boots on B
 	ld a, [wItemB]
 	cp $08
-	jr nz, jr_000_0def
+	jr nz, .bootsA
 
+;>     if hJoypadHeld & 0x20:
 	ldh a, [hJoypadHeld]
 	and $20
-	jr z, jr_000_0deb
+	jr z, .releaseB
 
-	call Call_140C
-	jr jr_000_0def
+;>         ChargePegasusBoots()
+	call ChargePegasusBoots
+;=@b1
+	jr .bootsA
 
-jr_000_0deb:
+;>@b1     else:
+.releaseB
+;>         wPegasusBootsChargeMeter = 0
 	xor a
 	ld [wPegasusBootsChargeMeter], a
 
-jr_000_0def:
+.bootsA
+;> if wItemA == 8:                          # Pegasus Boots on A
 	ld a, [wItemA]
 	cp $08
-	jr nz, jr_000_0e05
+	jr nz, .shieldA
 
+;>     if hJoypadHeld & 0x10:
 	ldh a, [hJoypadHeld]
 	and $10
-	jr z, jr_000_0e01
+	jr z, .releaseA
 
-	call Call_140C
-	jr jr_000_0e05
+;>         ChargePegasusBoots()
+	call ChargePegasusBoots
+;=@b2
+	jr .shieldA
 
-jr_000_0e01:
+;>@b2     else:
+.releaseA
+;>         wPegasusBootsChargeMeter = 0
 	xor a
 	ld [wPegasusBootsChargeMeter], a
 
-jr_000_0e05:
+.shieldA
+;> if wItemA == 4:                          # the shield on A
 	ld a, [wItemA]
 	cp $04
-	jr nz, jr_000_0e26
+	jr nz, .shieldB
 
+;>     wShieldLevelEquipped = wShieldLevel
 	ld a, [wShieldLevel]
 	ld [wShieldLevelEquipped], a
+;>     if hJoypadHeld & 0x10 and wCanTalkToEntity not in (1, 2):
 	ldh a, [hJoypadHeld]
 	and $10
-	jr z, jr_000_0e26
+	jr z, .shieldB
 
+;=@s1
 	ld a, [wCanTalkToEntity]
 	cp $01
-	jr z, jr_000_0e26
+	jr z, .shieldB
 
 	cp $02
-	jr z, jr_000_0e26
+	jr z, .shieldB
 
-	call Call_0F34
+;>@s1         RaiseShield()
+	call RaiseShield
 
-jr_000_0e26:
+.shieldB
+;> if wItemB == 4:                          # the shield on B
 	ld a, [wItemB]
 	cp $04
-	jr nz, jr_000_0e3c
+	jr nz, .pressB
 
+;>     wShieldLevelEquipped = wShieldLevel
 	ld a, [wShieldLevel]
 	ld [wShieldLevelEquipped], a
+;>     if hJoypadHeld & 0x20:
 	ldh a, [hJoypadHeld]
 	and $20
-	jr z, jr_000_0e3c
+	jr z, .pressB
 
-	call Call_0F34
+;>         RaiseShield()
+	call RaiseShield
 
-jr_000_0e3c:
+.pressB
+;> if hJoypadPressed & 0x20 and wCanTalkToEntity != 2:
 	ldh a, [hJoypadPressed]
 	and $20
-	jr z, jr_000_0e4f
+	jr z, .pressA
 
 	ld a, [wCanTalkToEntity]
 	cp $02
-	jr z, jr_000_0e4f
+	jr z, .pressA
 
+;>     UseItem(wItemB)
 	ld a, [wItemB]
-	call Call_0E7F
+	call UseItem
 
-jr_000_0e4f:
+.pressA
+;>@pa if hJoypadPressed & 0x10 and wCanTalkToEntity not in (1, 2):
 	ldh a, [hJoypadPressed]
 	and $10
-	jr z, jr_000_0e66
+	jr z, .holdB
 
+;=@pa
 	ld a, [wCanTalkToEntity]
 	cp $01
-	jr z, jr_000_0e66
+	jr z, .holdB
 
 	cp $02
-	jr z, jr_000_0e66
+	jr z, .holdB
 
+;>     UseItem(wItemA)
 	ld a, [wItemA]
-	call Call_0E7F
+	call UseItem
 
-jr_000_0e66:
+.holdB
+;> if hJoypadHeld & 0x20:
 	ldh a, [hJoypadHeld]
 	and $20
-	jr z, jr_000_0e72
+	jr z, .holdA
 
+;>     HoldItem(wItemB)
 	ld a, [wItemB]
-	call Call_0F05
+	call HoldItem
 
-jr_000_0e72:
+.holdA
+;> if hJoypadHeld & 0x10:
 	ldh a, [hJoypadHeld]
 	and $10
-	jr z, jr_000_0e7e
+	jr z, .done
 
+;>     HoldItem(wItemA)
 	ld a, [wItemA]
-	call Call_0F05
+	call HoldItem
 
-jr_000_0e7e:
+.done
+;> return
 	ret
 
 
-Call_0E7F::
+;@ def UseItem(item: a)
+;@ path: link/items
+;@ Uses inventory item `item` (its button was just pressed): 1 sword, 2 bombs, 3 Power Bracelet,
+;@ 4 shield, 5 bow, 6 hookshot, 7 magic rod, 9 ocarina (bank 2 $41E6), $0A Roc's Feather,
+;@ $0B shovel, $0C magic powder, $0D boomerang. The magic rod only puts Link into its pose
+;@ (wItemUsePoseTimer $8E, bit 7 = draw the rod); its fireball comes from Link's code.
+;@ test: skip calls item routines in other banks
+UseItem::
+;> if item == 0x01:
 	ld c, a
 	cp $01
-	jp z, Jump_000_122f
+;>     return UseSword()
+	jp z, UseSword
 
+;> elif item == 0x04:
 	cp $04
-	jp z, Jump_000_0ed1
+;>     return UseShield()
+	jp z, UseShield
 
+;> elif item == 0x02:
 	cp $02
-	jp z, Jump_000_0f76
+;>     return UseBombs()
+	jp z, UseBombs
 
+;> elif item == 0x03:
 	cp $03
-	jp z, Jump_000_1007
+;>     return UsePowerBracelet()
+	jp z, UsePowerBracelet
 
+;> elif item == 0x05:
 	cp $05
-	jp z, Jump_000_1079
+;>     return UseBow()
+	jp z, UseBow
 
+;> elif item == 0x0D:
 	cp $0d
-	jp z, Jump_000_100e
+;>     return UseBoomerang()
+	jp z, UseBoomerang
 
+;> elif item == 0x06:
 	cp $06
-	jp z, Jump_000_0efc
+;>     return UseHookshotItem()
+	jp z, UseHookshotItem
 
+;> elif item == 0x0A:
 	cp $0a
-	jp z, Jump_000_11d1
+;>     return UseRocsFeather()
+	jp z, UseRocsFeather
 
+;> elif item == 0x09:
 	cp $09
+;>     return UseOcarina()                  # bank 2 $41E6
 	jp z, $41e6
 
+;> elif item == 0x0C:
 	cp $0c
-	jp z, Jump_000_1151
+;>     return UseMagicPowder()
+	jp z, UseMagicPowder
 
+;> elif item == 0x0B:
 	cp $0b
-	jp z, Jump_000_0edb
+;>     return UseShovel()
+	jp z, UseShovel
 
+;> elif item == 0x07:                       # the magic rod
 	cp $07
-	jr nz, jr_000_0ed0
+	jr nz, Jump_000_0ed0
 
+;>     if not (wItemUsePoseTimer or wSwordAnimationState) and wActiveProjectileCount < 2:
 	ld hl, wSwordAnimationState
 	ld a, [wItemUsePoseTimer]
 	or [hl]
-	jr nz, jr_000_0ed0
+	jr nz, Jump_000_0ed0
 
+;=@rod
 	ld a, [wActiveProjectileCount]
 	cp $02
-	jr nc, jr_000_0ed0
+	jr nc, Jump_000_0ed0
 
+;>@rod         wItemUsePoseTimer = 0x8E
 	ld a, $8e
 	ld [wItemUsePoseTimer], a
 
 Jump_000_0ed0:
-jr_000_0ed0:
+;> return
 	ret
 
 
-Jump_000_0ed1:
+;@ def UseShield()
+;@ path: link/items
+;@ Pressing the shield's button: plays the shield noise ($16) unless Link is pushing against
+;@ something. Holding it is handled by HandleItemButtons.
+UseShield::
+;> if wLinkPushingTimer:
 	ld a, [wLinkPushingTimer]
 	and a
+;>     return
 	ret nz
 
+;> hNoiseSfx = 0x16
 	ld a, $16
 	ldh [hNoiseSfx], a
 	ret
 
 
-Jump_000_0edb:
+;@ def UseShovel()
+;@ path: link/items
+;@ Digs with the shovel (unless already digging or in the air). Bank 2 $4C35 checks the square
+;@ in front of Link: carry = it cannot be dug (clink, square sound 7), otherwise the dig noise
+;@ ($0E). Then the dig animation starts (wDigState 1).
+;@ test: skip calls bank 2
+UseShovel::
+;> if wDigState or wIsLinkInTheAir:
 	ld a, [wDigState]
 	ld hl, wIsLinkInTheAir
 	or [hl]
+;>     return
 	ret nz
 
+;> if CheckDiggableSquare():                # bank 2 $4C35, carry = hard ground
 	call $4c35
-	jr nc, jr_000_0eee
+	jr nc, .soft
 
+;>     hJingle = 0x07
 	ld a, $07
 	ldh [hJingle], a
-	jr jr_000_0ef2
+;=@h
+	jr .dig
 
-jr_000_0eee:
+;>@h else:
+.soft
+;>     hNoiseSfx = 0x0E
 	ld a, $0e
 	ldh [hNoiseSfx], a
 
-jr_000_0ef2:
+.dig
+;> wDigState = 1
 	ld a, $01
 	ld [wDigState], a
+;> wDigCounter = 0
 	xor a
 	ld [wDigCounter], a
 	ret
 
 
-Jump_000_0efc:
+;@ def UseHookshotItem()
+;@ path: link/items
+;@ Fires the hookshot (bank 2 $423B) unless it is already out.
+;@ test: skip calls bank 2
+UseHookshotItem::
+;> if wHookshotInUse:
 	ld a, [wHookshotInUse]
 	and a
+;>     return
 	ret nz
 
+;> FireHookshot()                           # bank 2 $423B
 	call $423b
 	ret
 
 
-Call_0F05::
+;@ def HoldItem(item: a)
+;@ path: link/items
+;@ An item button is held: for the sword (1) this holds it out in front, ready for a spin
+;@ attack (wSwordAnimationState 5), when no swing is running and Link is not in talking position.
+HoldItem::
+;> if item != 0x01:
 	cp $01
+;>     return
 	ret nz
 
+;> if wSwordAnimationState or wCanTalkToEntity & 3:
 	ld hl, wSwordAnimationState
 	ld a, [wCanTalkToEntity]
 	and $03
 	or [hl]
+;>     return
 	ret nz
 
+;> if mem[0xC160]:
 	ld a, [$c160]
 	and a
+;>     return
 	ret nz
 
+;> wSwordDirectionLocked = 0
 	xor a
 	ld [wSwordDirectionLocked], a
+;> wSwordAnimationState = 5
 	ld a, $05
 	ld [wSwordAnimationState], a
+;> wSwordCollisionEnabled = 5
 	ld [wSwordCollisionEnabled], a
 	ret
 
 
+;@ path: link/items
+;@ Shield hitbox by Link's direction (right, left, up, down): x offset from hLinkX (signed).
 ShieldHitboxDX::
 	db $10, $00, $08, $08
 
+;@ path: link/items
+;@ Shield hitbox by direction: half width.
 ShieldHitboxWidth::
 	db $03, $03, $08, $08
 
+;@ path: link/items
+;@ Shield hitbox by direction: y offset from wLinkDrawY.
 ShieldHitboxDY::
 	db $08, $08, $00, $0d
 
+;@ path: link/items
+;@ Shield hitbox by direction: half height.
 ShieldHitboxHeight::
 	db $08, $08, $03, $04
 
-Call_0F34::
+;@ def RaiseShield()
+;@ path: link/items
+;@ Link holds up his shield: sets wIsUsingShield and the shield hitbox (SetShieldHitbox).
+RaiseShield::
+;> wIsUsingShield = 1
 	ld a, $01
 	ld [wIsUsingShield], a
+;> wShieldLevelEquipped = wShieldLevel
 	ld a, [wShieldLevel]
 	ld [wShieldLevelEquipped], a
+;> return SetShieldHitbox()
 
-Call_0F3F::
+;@ def SetShieldHitbox()
+;@ path: link/items
+;@ Puts the item hitbox (wSwordHitboxX ...) on the shield, in front of Link (ShieldHitboxDX ...).
+;@ test: hLinkDirection = rand(0, 3)
+SetShieldHitbox::
+;> d = hLinkDirection
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, $00
-	ld hl, $0f24
+;> wSwordHitboxX = u8(hLinkX + ShieldHitboxDX[d])
+	ld hl, ShieldHitboxDX
 	add hl, de
 	ldh a, [hLinkX]
 	add [hl]
 	ld [wSwordHitboxX], a
-	ld hl, $0f28
+;> wSwordHitboxWidth = ShieldHitboxWidth[d]
+	ld hl, ShieldHitboxWidth
 	add hl, de
 	ld a, [hl]
 	ld [wSwordHitboxWidth], a
-	ld hl, $0f2c
+;> wSwordHitboxY = u8(wLinkDrawY + ShieldHitboxDY[d])
+	ld hl, ShieldHitboxDY
 	add hl, de
 	ld a, [wLinkDrawY]
 	add [hl]
 	ld [wSwordHitboxY], a
-	ld hl, $0f30
+;> wSwordHitboxHeight = ShieldHitboxHeight[d]
+	ld hl, ShieldHitboxHeight
 	add hl, de
 	ld a, [hl]
 	ld [wSwordHitboxHeight], a
+;> wSwordCollisionEnabled = 0
 	xor a
 	ld [wSwordCollisionEnabled], a
 	ret
 
 
+;@ path: link/items
+;@ Where a new bomb is placed, by Link's direction (right, left, up, down): x offset from hLinkX.
 BombPlaceDX::
 	db $08, $f8, $00, $00
 
+;@ path: link/items
+;@ Where a new bomb is placed, by direction: y offset from hLinkY.
 BombPlaceDY::
 	db $00, $00, $fd, $04
 
-Jump_000_0f76:
+;@ def UseBombs()
+;@ path: link/items
+;@ Lays a bomb (entity type 2) in front of Link, if no other bomb is out and he has one; with
+;@ none left the "can't" buzz plays. An arrow shot within 6 frames before (wBombArrowWindow)
+;@ turns into a bomb arrow instead (its state becomes 1); otherwise the window opens for an arrow
+;@ shot just after. The bomb's fuse is wEntityTimer = $A0.
+;@ test: skip spawns an entity
+UseBombs::
+;> if wBombsOnScreen >= 1:
 	ld a, [wBombsOnScreen]
 	cp $01
+;>     return
 	ret nc
 
+;> if wBombCount == 0:
 	ld a, [wBombCount]
 	and a
+;>     return PlayNoAmmoSound()
 	jp z, PlayNoAmmoSound
 
+;> wBombCount = to_bcd(bcd_to_int(wBombCount) - 1)
 	sub $01
 	daa
 	ld [wBombCount], a
+;> slot = SpawnLinkProjectile(0x02)         # carry: no free slot
 	ld a, $02
-	call Call_10EB
+	call SpawnLinkProjectile
+;> if slot is None: return                  # carry: no free entity slot
 	ret c
 
+;> wEntityTimer1[slot] = 0x10
 	ld hl, wEntityTimer1
 	add hl, de
 	ld [hl], $10
+;> if wBombArrowWindow:                     # an arrow was just shot: it becomes a bomb arrow
 	ld a, [wBombArrowWindow]
 	and a
-	jp z, Jump_000_0fac
+	jp z, .fuse
 
+;>     wBombArrowWindow = 0
 	xor a
 	ld [wBombArrowWindow], a
+;>     wEntityState[wBombArrowArrowSlot] = 1
 	ld a, [$c1c2]
 	ld c, a
 	ld b, d
 	ld hl, wEntityState
 	add hl, bc
 	ld [hl], $01
+;>     return
 	ret
 
 
-Jump_000_0fac:
+.fuse
+;> wBombArrowWindow = 6                     # an arrow shot within 6 frames joins this bomb
 	ld a, $06
 	ld [wBombArrowWindow], a
+;> wBombArrowBombSlot = slot
 	ld a, e
 	ld [$c1c1], a
+;> wItemUsePoseTimer = 0x0C
 	ld a, $0c
 	ld [wItemUsePoseTimer], a
+;> wEntityTimer[slot] = 0xA0                # the fuse
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $a0
+;> wEntitySpriteVariant[slot] = 0
 	ld hl, wEntitySpriteVariant
 	add hl, de
 	ld [hl], d
+;> wEntityDyingTimer[slot] = 3
 	ld hl, wEntityDyingTimer
 	add hl, de
 	ld [hl], $03
+;> if not hIsSideScrolling:
 	ldh a, [hIsSideScrolling]
 	and a
-	jr nz, jr_000_0fd6
+	jr nz, .sideView
 
+;>     hJingle = 0x09
 	ld a, $09
 	ldh [hJingle], a
-	jr jr_000_0fdb
+;=@sv
+	jr .place
 
-jr_000_0fd6:
+;>@sv else:
+.sideView
+;>     wEntityZ[slot] = 0
 	ld hl, wEntityZ
 	add hl, de
 	ld [hl], d
 
-jr_000_0fdb:
+.place
+;> wEntitySpeedX[slot] = 0
 	ld hl, wEntitySpeedX
 	add hl, de
 	ld [hl], d
+;> wEntitySpeedY[slot] = 0
 	ld hl, wEntitySpeedY
 	add hl, de
 	ld [hl], d
+;> wEntitySpeedZ[slot] = 0
 	ld hl, wEntitySpeedZ
 	add hl, de
 	ld [hl], d
+;> d = hLinkDirection
 	ldh a, [hLinkDirection]
 	ld c, a
 	ld b, d
-	ld hl, $0f6e
+;>@bx wEntityX[slot] = u8(hLinkX + BombPlaceDX[d])
+	ld hl, BombPlaceDX
 	add hl, bc
 	ldh a, [hLinkX]
 	add [hl]
+;=@bx
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ld hl, $0f72
+;>@by wEntityY[slot] = u8(hLinkY + BombPlaceDY[d])
+	ld hl, BombPlaceDY
 	add hl, bc
 	ldh a, [hLinkY]
 	add [hl]
+;=@by
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
 	ret
 
 
-Jump_000_1007:
+;@ def UsePowerBracelet()
+;@ path: link/items
+;@ The Power Bracelet does nothing when pressed (lifting is handled by Link's movement code).
+;@ The six bytes after the `ret` are the boomerang's diagonal speeds (BoomerangDiagonalSpeedX/Y).
+UsePowerBracelet::
+;> return
 	ret
 
 
+;@ path: link/items
+;@ Boomerang thrown diagonally: x speed by the held left/right button (index 0 right, 1 left;
+;@ read as BoomerangDiagonalSpeedX - 1 + (hJoypadHeld & 3)).
 BoomerangDiagonalSpeedX::
 	db $18, $e8, $00
 
+;@ path: link/items
+;@ Boomerang thrown diagonally: y speed by the held up/down button (index 0 up, 1 down).
 BoomerangDiagonalSpeedY::
 	db $e8, $18, $00
 
-Jump_000_100e:
+;@ def UseBoomerang()
+;@ path: link/items
+;@ Throws the boomerang (entity type 1) unless one of Link's projectiles is out. It flies for
+;@ $28 frames; with two direction buttons held it flies diagonally.
+;@ test: skip spawns an entity
+UseBoomerang::
+;> if wActiveProjectileCount:
 	ld a, [wActiveProjectileCount]
 	and a
+;>     return
 	ret nz
 
+;> slot = SpawnLinkProjectile(0x01)
 	ld a, $01
-	call Call_10EB
+	call SpawnLinkProjectile
+;> if slot is None: return                  # carry: no free entity slot
 	ret c
 
+;> wEntityTimer[slot] = 0x28
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $28
+;>@n pressed = bin(hJoypadHeld & 0x0F).count('1')     # direction buttons held
 	ld c, $04
 	ld b, $00
 	ldh a, [hJoypadHeld]
 
-jr_000_1025:
+.count
+;=@n
 	srl a
-	jr nc, jr_000_102a
+	jr nc, .notHeld
 
 	inc b
 
-jr_000_102a:
+.notHeld
+;=@n
 	dec c
-	jr nz, jr_000_1025
+	jr nz, .count
 
+;> if pressed >= 2:                          # diagonal
 	ld a, b
 	cp $02
-	jr c, jr_000_1058
+	jr c, .done
 
+;>@x     wEntitySpeedX[slot] = mem[BoomerangDiagonalSpeedX - 1 + (hJoypadHeld & 3)]
 	ldh a, [hJoypadHeld]
 	and $03
 	ld c, a
 	ld b, $00
-	ld hl, $1007
+	ld hl, BoomerangDiagonalSpeedX - 1
 	add hl, bc
+;=@x
 	ld a, [hl]
 	ld hl, wEntitySpeedX
 	add hl, de
 	ld [hl], a
+;>@y     wEntitySpeedY[slot] = mem[BoomerangDiagonalSpeedY - 1 + ((hJoypadHeld >> 2) & 3)]
 	ldh a, [hJoypadHeld]
 	srl a
 	srl a
 	and $03
 	ld c, a
 	ld b, $00
-	ld hl, $100a
+;=@y
+	ld hl, BoomerangDiagonalSpeedY - 1
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntitySpeedY
 	add hl, de
 	ld [hl], a
 
-jr_000_1058:
+.done
+;> return
 	ret
 
 
+;@ path: link/items
+;@ Start position of a projectile of Link's, by his direction (right, left, up, down): x offset.
 ProjectileStartDX::
 	db $00, $00, $00, $00
 
+;@ path: link/items
+;@ Start position of a projectile, by direction: y offset.
 ProjectileStartDY::
 	db $00, $00, $00, $00
 
+;@ path: link/items
+;@ Start speed of a projectile, by direction: x speed (signed).
 ProjectileSpeedX::
 	db $20, $e0, $00, $00
 
+;@ path: link/items
+;@ Start speed of a projectile, by direction: y speed (signed).
 ProjectileSpeedY::
 	db $00, $00, $e0, $20
+;@ path: link/items
+;@ Arrow x speed, by direction; entries 4-7 with a Piece of Power (faster).
 ArrowSpeedX::
 	db $30, $d0, $00, $00, $40, $c0, $00, $00
 
+;@ path: link/items
+;@ Arrow y speed, by direction; entries 4-7 with a Piece of Power.
 ArrowSpeedY::
 	db $00, $00, $d0, $30, $00, $00, $c0, $40
 
-Jump_000_1079:
+;@ def UseBow()
+;@ path: link/items
+;@ Shoots an arrow (entity type 0) if the bow is ready, fewer than 2 projectiles are out and
+;@ Link has arrows (otherwise the "can't" buzz). Link turns to the held direction first. A bomb
+;@ laid within the last 6 frames is taken along: the bomb vanishes and the arrow becomes a bomb
+;@ arrow (state 1). Ends in SetArrowSpeed.
+;@ test: skip spawns an entity
+UseBow::
+;> if wArrowCooldown:
 	ld a, [wArrowCooldown]
 	and a
+;>     return
 	ret nz
 
+;> if wActiveProjectileCount >= 2:
 	ld a, [wActiveProjectileCount]
 	cp $02
+;>     return
 	jr nc, jr_000_10ea
 
+;> wArrowCooldown = 0x10
 	ld a, $10
 	ld [wArrowCooldown], a
+;> if wArrowCount == 0:
 	ld a, [wArrowCount]
 	and a
+;>     return PlayNoAmmoSound()
 	jp z, PlayNoAmmoSound
 
+;> wArrowCount = to_bcd(bcd_to_int(wArrowCount) - 1)
 	sub $01
 	daa
 	ld [wArrowCount], a
-	call Call_1283
+;> SetLinkDirectionFromDpad()
+	call SetLinkDirectionFromDpad
+;> slot = SpawnLinkProjectile(0x00)
 	ld a, $00
-	call Call_10EB
+	call SpawnLinkProjectile
+;> if slot is None: return                  # carry: no free entity slot
 	ret c
 
+;> wBombArrowArrowSlot = slot
 	ld a, e
 	ld [$c1c2], a
+;>@w if wBombArrowWindow:                     # a bomb was just laid: make a bomb arrow
 	ld a, [wBombArrowWindow]
 	and a
-	jr z, jr_000_10bd
+	jr z, .plainArrow
 
+;>     wEntityStatus[wBombArrowBombSlot] = 0       # the bomb goes
 	ld a, [$c1c1]
 	ld c, a
 	ld b, d
 	ld hl, wEntityStatus
 	add hl, bc
 	ld [hl], b
+;>     wEntityState[slot] = 1
 	ld hl, wEntityState
 	add hl, de
 	ld [hl], $01
+;>     wBombArrowWindow = 0
 	xor a
-	jr jr_000_10c3
+;=@w
+	jr .window
 
-jr_000_10bd:
+;> else:
+.plainArrow
+;>     hNoiseSfx = 0x0A
 	ld a, $0a
 	ldh [hNoiseSfx], a
+;>     wBombArrowWindow = 6                 # a bomb laid within 6 frames joins this arrow
 	ld a, $06
 
-jr_000_10c3:
+.window
+;=@w
 	ld [wBombArrowWindow], a
+;> return SetArrowSpeed(hLinkDirection, slot)
 	ldh a, [hLinkDirection]
 	ld c, a
 	ld b, $00
 
-Jump_000_10cb:
+;@ def SetArrowSpeed(direction: c, slot: de)
+;@ path: link/items
+;@ Gives the arrow in `slot` its speed for `direction` (ArrowSpeedX/Y), faster with a Piece of
+;@ Power. Also used by bank 2.
+;@ test: skip
+SetArrowSpeed::
+;> if wActivePowerUp == 1:
 	ld a, [wActivePowerUp]
 	cp $01
-	jr nz, jr_000_10d6
+	jr nz, .speed
 
+;>     direction += 4
 	ld a, c
 	add $04
 	ld c, a
 
-jr_000_10d6:
-	ld hl, $1069
+.speed
+;> wEntitySpeedX[slot] = ArrowSpeedX[direction]
+	ld hl, ArrowSpeedX
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntitySpeedX
 	add hl, de
 	ld [hl], a
-	ld hl, $1071
+;> wEntitySpeedY[slot] = ArrowSpeedY[direction]
+	ld hl, ArrowSpeedY
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntitySpeedY
@@ -3871,151 +4152,209 @@ jr_000_10d6:
 	ld [hl], a
 
 jr_000_10ea:
+;> return
 	ret
 
 
-Call_10EB::
-	call Call_3C01
+;@ def SpawnLinkProjectile(kind: a) -> de
+;@ path: link/items
+;@ Spawns entity `kind` as a projectile of Link's (arrow 0, boomerang 1, bomb 2, sword beam $DF,
+;@ ...) in front of him: start position, height, speed and direction from his direction
+;@ (ProjectileStartDX ...), and Link takes the item-use pose for $0C frames. Returns the slot in
+;@ de, carry set when no entity slot was free. Keeps bc.
+;@ test: skip spawns an entity
+SpawnLinkProjectile::
+;> slot = SpawnEntity(kind)                   # spawn the entity; carry = no free slot
+	call SpawnEntity
+;> if slot is None: return                  # carry: no free entity slot
 	ret c
 
+;> wItemUsePoseTimer = 0x0C
 	ld a, $0c
 	ld [wItemUsePoseTimer], a
+;> d = hLinkDirection
 	push bc
 	ldh a, [hLinkDirection]
 	ld c, a
 	ld b, $00
-	ld hl, $1059
+;>@px wEntityX[slot] = u8(hLinkX + ProjectileStartDX[d])
+	ld hl, ProjectileStartDX
 	add hl, bc
 	ldh a, [hLinkX]
 	add [hl]
+;=@px
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ld hl, $105d
+;>@py wEntityY[slot] = u8(hLinkY + ProjectileStartDY[d])
+	ld hl, ProjectileStartDY
 	add hl, bc
 	ldh a, [hLinkY]
 	add [hl]
+;=@py
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
+;> wEntityZ[slot] = u8(hLinkPositionZ + 1)
 	ldh a, [hLinkPositionZ]
 	inc a
 	ld hl, wEntityZ
 	add hl, de
 	ld [hl], a
-	ld hl, $1061
+;> wEntitySpeedX[slot] = ProjectileSpeedX[d]
+	ld hl, ProjectileSpeedX
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntitySpeedX
 	add hl, de
 	ld [hl], a
-	ld hl, $1065
+;> wEntitySpeedY[slot] = ProjectileSpeedY[d]
+	ld hl, ProjectileSpeedY
 	add hl, bc
 	ld a, [hl]
 	ld hl, wEntitySpeedY
 	add hl, de
 	ld [hl], a
+;> wEntitySpriteVariant[slot] = d
 	ldh a, [hLinkDirection]
 	ld hl, wEntitySpriteVariant
 	add hl, de
 	ld [hl], a
+;> wEntityDirection[slot] = d
 	ld hl, wEntityDirection
 	add hl, de
 	ld [hl], a
+;> mem[0xC5D0 + slot] = d
 	ld hl, $c5d0
 	add hl, de
 	ld [hl], a
+;> mem[0xC4F0 + slot] = 1
 	ld hl, $c4f0
 	add hl, de
 	ld [hl], $01
+;> return slot                              # carry clear
 	pop bc
 	scf
 	ccf
 	ret
 
 
+;@ path: link/items
+;@ Magic powder cloud position by Link's direction (right, left, up, down): x offset.
 MagicPowderDX::
 	db $0e, $f2, $00, $00
 
+;@ path: link/items
+;@ Magic powder cloud position by direction: y offset.
 MagicPowderDY::
 	db $00, $00, $f4, $0c
 
-Jump_000_1151:
+;@ def UseMagicPowder()
+;@ path: link/items
+;@ Item $0C. While Link carries the Sleepy Toadstool instead, he holds it up (pose 2, its text
+;@ follows). Otherwise sprinkles a dose of magic powder (entity type 8, square sound 5) in front
+;@ of him; when the last dose is used the item leaves its button.
+;@ test: skip spawns an entity
+UseMagicPowder::
+;> if wItemUsePoseTimer:
 	ld a, [wItemUsePoseTimer]
 	and a
+;>     return
 	ret nz
 
+;> if wHasToadstool:
 	ld a, [wHasToadstool]
 	and a
-	jr z, jr_000_116b
+	jr z, .powder
 
+;>     if hLinkPositionZ: return            # not in the air
 	ldh a, [hLinkPositionZ]
 	and a
 	ret nz
 
+;>     wLinkShowItemPose = 2
 	ld a, $02
 	ld [wLinkShowItemPose], a
+;>     wLinkShowItemTimer = 0x2A
 	ld a, $2a
 	ld [wLinkShowItemTimer], a
+;>     return
 	ret
 
 
-jr_000_116b:
+.powder
+;> if wMagicPowderCount == 0:
 	ld a, [wMagicPowderCount]
 	and a
+;>     return PlayNoAmmoSound()
 	jp z, PlayNoAmmoSound
 
+;> slot = SpawnEntity(0x08)                   # the powder cloud
 	ld a, $08
-	call Call_3C01
+	call SpawnEntity
+;> if slot is None: return                  # carry: no free entity slot
 	ret c
 
+;> hJingle = 0x05
 	ld a, $05
 	ldh [hJingle], a
+;> wItemUsePoseTimer = 0x0E
 	ld a, $0e
 	ld [wItemUsePoseTimer], a
+;> wMagicPowderCount = to_bcd(bcd_to_int(wMagicPowderCount) - 1)
 	ld a, [wMagicPowderCount]
 	sub $01
 	daa
 	ld [wMagicPowderCount], a
-	jr nz, jr_000_119e
+;> if wMagicPowderCount == 0:               # the last dose: take the item off its buttons
+	jr nz, .place
 
+;>     if wItemB == 0x0C: wItemB = 0
 	ld hl, wItemB
 	ld a, [hl]
 	cp $0c
-	jr nz, jr_000_1196
+	jr nz, .checkA
 
 	ld [hl], $00
 
-jr_000_1196:
+.checkA
+;>     if wItemA == 0x0C: wItemA = 0
 	inc hl
 	ld a, [hl]
 	cp $0c
-	jr nz, jr_000_119e
+	jr nz, .place
 
 	ld [hl], $00
 
-jr_000_119e:
+.place
+;> d = hLinkDirection
 	push bc
 	ldh a, [hLinkDirection]
 	ld c, a
-	ld hl, $1149
+;>@mx wEntityX[slot] = u8(hLinkX + MagicPowderDX[d])
+	ld hl, MagicPowderDX
 	add hl, bc
 	ldh a, [hLinkX]
 	add [hl]
+;=@mx
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
-	ld hl, $114d
+;>@my wEntityY[slot] = u8(hLinkY + MagicPowderDY[d])
+	ld hl, MagicPowderDY
 	add hl, bc
 	ldh a, [hLinkY]
 	add [hl]
+;=@my
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
+;> wEntityZ[slot] = hLinkPositionZ
 	ldh a, [hLinkPositionZ]
 	ld hl, wEntityZ
 	add hl, de
 	ld [hl], a
+;> wEntityTimer[slot] = 0x17
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $17
@@ -4023,899 +4362,1312 @@ jr_000_119e:
 	ret
 
 
+;@ path: link/items
+;@ Horizontal speed of a jump started while dashing, by Link's direction (right, left, up, down).
 FeatherDashSpeedX::
 	db $1c, $e4, $00, $00
 
+;@ path: link/items
+;@ Vertical speed of a jump started while dashing, by direction.
 FeatherDashSpeedY::
 	db $00, $00, $e4, $1c
 
-Jump_000_11d1:
+;@ def UseRocsFeather()
+;@ path: link/items
+;@ Jumps with Roc's Feather (not in sinking sand, not when already in the air): square sound
+;@ $0D, jump animation from the start, StartJump. In side view the jump is a vertical leap
+;@ ($EA, or $E8 while moving sideways) handled by bank 2 $6FB1.
+;@ test: skip calls other banks
+UseRocsFeather::
+;> if wLinkGroundVfxPrev == 7:              # sinking sand
 	ld a, [wLinkGroundVfxPrev]
 	cp $07
+;>     return
 	ret z
 
+;> if wIsLinkInTheAir:
 	ld a, [wIsLinkInTheAir]
 	and a
+;>     return
 	ret nz
 
+;> wIsLinkInTheAir = 1
 	ld a, $01
 	ld [wIsLinkInTheAir], a
+;> wJumpAnimationFrame = 0
 	xor a
 	ld [wJumpAnimationFrame], a
+;> wJumpAnimationCounter = 0
 	ld [wJumpAnimationCounter], a
+;> hJingle = 0x0D
 	ld a, $0d
 	ldh [hJingle], a
+;> if not hIsSideScrolling:
 	ldh a, [hIsSideScrolling]
 	and a
-	jr z, Call_120F
+;>     return StartJump()
+	jr z, StartJump
 
-	call Call_120F
+;> StartJump()
+	call StartJump
+;> hLinkSpeedY = 0xEA if hJoypadHeld & 3 == 0 else 0xE8
 	ldh a, [hJoypadHeld]
 	and $03
 	ld a, $ea
-	jr z, jr_000_11fe
+	jr z, .speed
 
 	ld a, $e8
 
-jr_000_11fe:
+.speed
 	ldh [hLinkSpeedY], a
+;> hLinkSpeedZ = 0
 	xor a
 	ldh [hLinkSpeedZ], a
+;> ApplyLinkSpeed()
 	call ApplyLinkSpeed
+;> SwitchBank(2)
 	ld a, $02
 	call SwitchBank
+;> SideViewJump()                           # bank 2 $6FB1
 	call $6fb1
 	ret
 
 
-Call_120F::
+;@ def StartJump()
+;@ path: link/items
+;@ Starts Link's jump: height speed $20; while dashing also a forward speed (FeatherDashSpeedX/Y).
+;@ test: hLinkDirection = rand(0, 3)
+StartJump::
+;> hLinkSpeedZ = 0x20
 	ld a, $20
 	ldh [hLinkSpeedZ], a
+;> if not wIsUsingPegasusBoots:
 	ld a, [wIsUsingPegasusBoots]
 	and a
+;>     return
 	ret z
 
+;> d = hLinkDirection
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, b
-	ld hl, $11c9
+;> hLinkSpeedX = FeatherDashSpeedX[d]
+	ld hl, FeatherDashSpeedX
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkSpeedX], a
-	ld hl, $11cd
+;> hLinkSpeedY = FeatherDashSpeedY[d]
+	ld hl, FeatherDashSpeedY
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkSpeedY], a
 	ret
 
 
+;@ path: link/sword
+;@ Noise sound of a sword swing, one of four picked at random.
 SwordSwingNoises::
 	db $02, $14, $15, $18
 
-Jump_000_122f:
+;@ def UseSword()
+;@ path: link/sword
+;@ Swings the sword (not while a poke or a spin attack runs): swing state 1 for 3 frames, a
+;@ random swing noise, Link turns to the held direction and stops (unless jumping). With the
+;@ Level-2 sword and wC5A9 set (and none of Link's projectiles out) it also shoots a sword beam
+;@ (entity $DF).
+;@ test: skip spawns an entity
+UseSword::
+;> if wSwordPokeTimer or wSpinAttackTimer:
 	ld a, [wSwordPokeTimer]
 	ld hl, wSpinAttackTimer
 	or [hl]
+;>     return
 	ret nz
 
+;> wSwordStateTimer = 3
 	ld a, $03
 	ld [wSwordStateTimer], a
+;> wSwordAnimationState = 1
 	ld a, $01
 	ld [wSwordAnimationState], a
+;> wSwordCollisionEnabled = 1
 	ld [wSwordCollisionEnabled], a
+;> mem[0xC160] = 0
 	xor a
 	ld [$c160], a
+;> wSwordDirectionLocked = 0
 	ld [wSwordDirectionLocked], a
+;>@nz hNoiseSfx = SwordSwingNoises[GetRandomByte() & 3]   # a random swing noise
 	call GetRandomByte
 	and $03
 	ld e, a
 	ld d, $00
-	ld hl, $122b
+	ld hl, SwordSwingNoises
 	add hl, de
+;=@nz
 	ld a, [hl]
 	ldh [hNoiseSfx], a
-	call Call_1283
+;> SetLinkDirectionFromDpad()
+	call SetLinkDirectionFromDpad
+;> if not wIsLinkInTheAir:
 	ld a, [wIsLinkInTheAir]
 	and a
-	jr nz, jr_000_1269
+	jr nz, .beam
 
+;>     ResetSpinAttackAndDash()
 	call ResetSpinAttackAndDash
-	call Call_1495
+;>     StopLinkSpeed()
+	call StopLinkSpeed
 
-jr_000_1269:
+.beam
+;>@bm if wActiveProjectileCount or not mem[0xC5A9] or wSwordLevel != 2:
 	ld a, [wActiveProjectileCount]
 	and a
 	ret nz
 
-	ld a, [$c5a9]
+	ld a, [wHealthIsFull]
 	and a
 	ret z
 
+;=@bm
 	ld a, [wSwordLevel]
 	cp $02
+;>     return
 	ret nz
 
+;> SpawnLinkProjectile(0xDF)                # the sword beam
 	ld a, $df
-	call Call_10EB
+	call SpawnLinkProjectile
+;> wItemUsePoseTimer = 0
 	xor a
 	ld [wItemUsePoseTimer], a
 	ret
 
 
-Call_1283::
+;@ def SetLinkDirectionFromDpad()
+;@ path: link/movement
+;@ Turns Link to the direction of the held d-pad buttons (table in bank 2 at $48B3, one byte per
+;@ combination of the four buttons; $0F = no change).
+;@ test: skip reads a table in bank 2
+SetLinkDirectionFromDpad::
+;>@dd d = mem[0x48B3 + (hJoypadHeld & 0x0F)]
 	ldh a, [hJoypadHeld]
 	and $0f
 	ld e, a
 	ld d, $00
 	ld hl, $48b3
 	add hl, de
+;=@dd
 	ld a, [hl]
+;> if d != 0x0F:
 	cp $0f
-	jr z, jr_000_1295
+	jr z, .done
 
+;>     hLinkDirection = d
 	ldh [hLinkDirection], a
 
-jr_000_1295:
+.done
+;> return
 	ret
 
 
+;@ path: link/sword
+;@ Where the sword checks the room for bushes, grass and walls: x offset from hLinkX, one byte
+;@ per direction (right, left, up, down), then 8 entries for the frames of the spin attack
+;@ (index wSwordSpriteFrame + 4).
 SwordProbeDX::
 	db $16, $fa, $08, $08, $16, $16, $08, $fa, $fa, $fa, $08, $16
 
+;@ path: link/sword
+;@ The same for the y offset from hLinkY.
 SwordProbeDY::
-	db $08, $08, $fa, $16
-	db $08, $16, $16, $16, $08, $fa, $fa, $fa
+	db $08, $08, $fa, $16, $08, $16, $16, $16, $08, $fa, $fa, $fa
 
-Call_12AE::
-	call Call_12B6
+;@ def CheckSwordHitsObjectBank2()
+;@ path: link/sword
+;@ CheckSwordHitsObject for code in bank 2 (switches bank 2 back in afterwards).
+;@ test: skip switches ROM banks
+CheckSwordHitsObjectBank2::
+;> CheckSwordHitsObject()
+	call CheckSwordHitsObject
+;> return SwitchBank(2)
 	ld a, $02
 	jp SwitchBank
 
 
-Call_12B6::
+;@ def CheckSwordHitsObject()
+;@ path: link/sword
+;@ The sword against the room's objects: looks at the 16x16 square at the sword's tip
+;@ (SwordProbeDX/DY). A hard object (collision type 1 or $90 and above) makes a clink
+;@ (SwordHitsHardObject). Bushes and grass are cut: indoors only object $DD, on the overworld
+;@ $D3 and $5C (and $0A, with a different leaf variant). The object is replaced (RemoveRoomObject),
+;@ the cut leaves fly (entity type 5), and one time in 8 a heart or a rupee drops (entity $2D /
+;@ $2E; never from object $D3). Not while Link holds the sword out without dashing.
+;@ test: skip spawns entities and changes the room
+CheckSwordHitsObject::
+;> if wLinkJumpSquashTimer:
 	ld a, [wLinkJumpSquashTimer]
 	and a
+;>     return
 	ret nz
 
+;> if not wIsUsingPegasusBoots and wSwordAnimationStatePrev == 5:   # sword held out
 	ld a, [wIsUsingPegasusBoots]
 	and a
-	jr nz, jr_000_12c7
+	jr nz, .probe
 
 	ld a, [wSwordAnimationStatePrev]
 	cp $05
+;>     return
 	ret z
 
-jr_000_12c7:
+.probe
+;>@i i = wSwordSpriteFrame + 4 if wSpinAttackTimer else hLinkDirection
 	ld a, [wSpinAttackTimer]
 	and a
-	jr z, jr_000_12d4
+	jr z, .notSpinning
 
+;=@i
 	ld a, [wSwordSpriteFrame]
 	add $04
-	jr jr_000_12d6
+	jr .index
 
-jr_000_12d4:
+.notSpinning
 	ldh a, [hLinkDirection]
 
-jr_000_12d6:
+.index
+;>@px hBGPosX = (hLinkX + SwordProbeDX[i] - 8) & 0xF0
 	ld e, a
 	ld d, $00
-	ld hl, $1296
+	ld hl, SwordProbeDX
 	add hl, de
 	ldh a, [hLinkX]
 	add [hl]
+;=@px
 	sub $08
 	and $f0
 	ldh [hBGPosX], a
+;> column = hBGPosX >> 4
 	swap a
 	ld c, a
-	ld hl, $12a2
+;>@py hBGPosY = (hLinkY + SwordProbeDY[i] - 0x10) & 0xF0
+	ld hl, SwordProbeDY
 	add hl, de
 	ldh a, [hLinkY]
 	add [hl]
 	sub $10
 	and $f0
+;=@py
 	ldh [hBGPosY], a
+;> square = hBGPosY | column
 	or c
 	ld e, a
+;> if hi(wRoomObjects + square) != 0xD7:   # outside the room
 	ld hl, wRoomObjects
 	add hl, de
 	ld a, h
 	cp $d7
+;>     return
 	ret nz
 
+;> hRoomObjectType = mem[wRoomObjects + square]
 	push de
 	ld a, [hl]
 	ldh [hRoomObjectType], a
+;> collision = GetObjectPhysics(hRoomObjectType, wIsIndoor)   # the object's collision type
 	ld e, a
 	ld a, [wIsIndoor]
 	ld d, a
 	call GetObjectPhysics
 	pop de
+;>@hc if collision >= 0x90 or collision == 0x01:
 	cp $d0
-	jp c, Jump_000_1317
+	jp c, .notD0
 
 	cp $d4
-	jp c, Jump_000_13c9
+	jp c, SwordHitsHardObject
 
-Jump_000_1317:
+.notD0
+;=@hc
 	cp $90
-	jp nc, Jump_000_13c9
+	jp nc, SwordHitsHardObject
 
 	cp $01
-	jp z, Jump_000_13c9
+;>     return SwordHitsHardObject(collision)
+	jp z, SwordHitsHardObject
 
+;> variant = 0
 	ld c, $00
+;>@cut if wIsIndoor:
 	ld a, [wIsIndoor]
 	and a
 	ldh a, [hRoomObjectType]
-	jr z, jr_000_1330
+	jr z, .overworld
 
+;>     if hRoomObjectType != 0xDD: return
 	cp $dd
-	jr z, jr_000_133e
+	jr z, .cut
 
 	ret
 
 
-jr_000_1330:
+.overworld
+;>@ow else:
+;>     variant = 1
 	inc c
+;>     if hRoomObjectType in (0xD3, 0x5C):
 	cp $d3
-	jr z, jr_000_133e
+	jr z, .cut
 
 	cp $5c
-	jr z, jr_000_133e
+	jr z, .cut
 
+;>         pass
+;>     elif hRoomObjectType == 0x0A:
 	cp $0a
+;>         variant = 0xFF
+;>     else:
+;>         return
 	ret nz
 
 	ld c, $ff
 
-jr_000_133e:
+.cut
+;> hActiveEntitySpriteVariant = variant
 	ld a, c
 	ldh [hActiveEntitySpriteVariant], a
+;> RemoveRoomObject()                              # replaces the cut object
 	call RemoveRoomObject
+;>@held if not wIsUsingPegasusBoots and wSwordAnimationStatePrev == 5:
 	ld a, [wIsUsingPegasusBoots]
 	and a
-	jr nz, jr_000_135a
+	jr nz, .leaves
 
+;=@held
 	ld a, [wSwordAnimationStatePrev]
 	cp $05
-	jr nz, jr_000_135a
+	jr nz, .leaves
 
+;>     wSwordCharge = 0
 	xor a
 	ld [wSwordCharge], a
+;>     wSwordPokeTimer = 0x0C
 	ld a, $0c
 	ld [wSwordPokeTimer], a
 
-jr_000_135a:
+.leaves
+;> slot = SpawnLinkProjectile(0x05)          # the flying leaves
 	ld a, $05
-	call Call_10EB
-	jr c, jr_000_1383
+	call SpawnLinkProjectile
+;> if slot is not None:
+	jr c, .drop
 
+;>     wItemUsePoseTimer = 0
 	xor a
 	ld [wItemUsePoseTimer], a
+;>     wEntityX[slot] = hBGPosX + 8
 	ld hl, wEntityX
 	add hl, de
 	ldh a, [hBGPosX]
 	add $08
 	ld [hl], a
+;>     wEntityY[slot] = hBGPosY + 0x10
 	ld hl, wEntityY
 	add hl, de
 	ldh a, [hBGPosY]
 	add $10
 	ld [hl], a
+;>     wEntitySpriteVariant[slot] = hActiveEntitySpriteVariant
 	ld hl, wEntitySpriteVariant
 	add hl, de
 	ldh a, [hActiveEntitySpriteVariant]
 	ld [hl], a
+;>     BreakThrownObjectFar(slot)
 	push de
 	pop bc
-	call Call_3803
+	call BreakThrownObjectFar
 
-jr_000_1383:
+.drop
+;> if GetRandomByte() & 7:                      # one time in 8 something drops
 	call GetRandomByte
 	and $07
+;>     return
 	ret nz
 
+;> if hRoomObjectType == 0xD3:
 	ldh a, [hRoomObjectType]
 	cp $d3
+;>     return
 	ret z
 
+;> kind = 0x2D if GetRandomByte() & 1 else 0x2E   # heart or rupee
 	call GetRandomByte
 	rra
 	ld a, $2e
-	jr nc, jr_000_1398
+	jr nc, .spawnDrop
 
 	ld a, $2d
 
-jr_000_1398:
-	call Call_3C01
+.spawnDrop
+;> slot = SpawnEntity(kind)
+	call SpawnEntity
+;> if slot is None: return
 	ret c
 
+;> wEntityX[slot] = hBGPosX + 8
 	ld hl, wEntityX
 	add hl, de
 	ldh a, [hBGPosX]
 	add $08
 	ld [hl], a
+;> wEntityY[slot] = hBGPosY + 0x10
 	ld hl, wEntityY
 	add hl, de
 	ldh a, [hBGPosY]
 	add $10
 	ld [hl], a
+;> wEntityDropTimer[slot] = 0x80
 	ld hl, wEntityDropTimer
 	add hl, de
 	ld [hl], $80
+;> wEntityTimer1[slot] = 0x18
 	ld hl, wEntityTimer1
 	add hl, de
 	ld [hl], $18
+;> wEntitySpeedZ[slot] = 0x10              # it hops up
 	ld hl, wEntitySpeedZ
 	add hl, de
 	ld [hl], $10
 	ret
 
 
+;@ path: link/sword
+;@ Where the clink star appears when the sword hits something hard: x offset from hLinkX, by
+;@ Link's direction (right, left, up, down).
 SwordClinkDX::
-	db $12, $ee, $fc, $04, $04, $04, $ee, $12
+	db $12, $ee, $fc, $04
 
-Jump_000_13c9:
+;@ path: link/sword
+;@ The same for the y offset from hLinkY.
+SwordClinkDY::
+	db $04, $04, $ee, $12
+
+;@ def SwordHitsHardObject(collision: a)
+;@ path: link/sword
+;@ The held-out sword poked something hard (only while wSwordPokeTimer runs): clink star in front
+;@ of Link, wClinkTimer, a short lock (wLinkJumpSquashTimer $10) and the clink sound - the
+;@ noise $17 for objects of collision type $9x, the square sound 7 otherwise.
+;@ test: hLinkDirection = rand(0, 3)
+SwordHitsHardObject::
+;> if not wSwordPokeTimer:
 	ld c, a
 	ld a, [wSwordPokeTimer]
 	and a
+;>     return
 	ret z
 
+;> d = hLinkDirection
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, $00
-	ld hl, $13c1
+;> hMultiPurpose0 = u8(hLinkX + SwordClinkDX[d])
+	ld hl, SwordClinkDX
 	add hl, de
 	ldh a, [hLinkX]
 	add [hl]
 	ldh [hMultiPurpose0], a
-	ld hl, $13c5
+;> hMultiPurpose1 = u8(hLinkY + SwordClinkDY[d])
+	ld hl, SwordClinkDY
 	add hl, de
 	ldh a, [hLinkY]
 	add [hl]
 	ldh [hMultiPurpose1], a
+;> wClinkTimer = 4
 	ld a, $04
 	ld [wClinkTimer], a
+;> AddClinkVfx()
 	call AddClinkVfx
+;> wLinkJumpSquashTimer = 0x10
 	ld a, $10
 	ld [wLinkJumpSquashTimer], a
+;> if collision & 0xF0 == 0x90:
 	ld a, c
 	and $f0
 	cp $90
-	jr z, jr_000_13ff
+	jr z, .noise
 
+;>@n     hNoiseSfx = 0x17
+;> else:
+;>     hJingle = 0x07
 	ld a, $07
 	ldh [hJingle], a
 	ret
 
 
-jr_000_13ff:
+.noise
+;=@n
 	ld a, $17
 	ldh [hNoiseSfx], a
 	ret
 
 
-	db $20, $e0, $00, $00, $00, $00, $e0, $20
+;@ path: link/pegasus_boots
+;@ Dash speed of the Pegasus Boots, by Link's direction (right, left, up, down): x speed.
+PegasusDashSpeedX::
+	db $20, $e0, $00, $00
 
-Call_140C::
+;@ path: link/pegasus_boots
+;@ Dash speed by direction: y speed.
+PegasusDashSpeedY::
+	db $00, $00, $e0, $20
+
+;@ def ChargePegasusBoots()
+;@ path: link/pegasus_boots
+;@ The Pegasus Boots' button is held: Link runs on the spot (faster walk animation, dust) while
+;@ the charge fills; after $20 frames the dash starts with the speed for his direction. In side
+;@ view only when facing left or right and not on a ladder.
+;@ test: hLinkDirection = rand(0, 3)
+ChargePegasusBoots::
+;>@sv if hIsSideScrolling and (hLinkMotionStep or hLinkDirection & 2):
 	ldh a, [hIsSideScrolling]
 	and a
-	jr z, jr_000_141a
+	jr z, .charge
 
+;=@sv
 	ldh a, [hLinkMotionStep]
 	and a
 	ret nz
 
 	ldh a, [hLinkDirection]
 	and $02
+;>     return
 	ret nz
 
-jr_000_141a:
+.charge
+;> if wIsUsingPegasusBoots:
 	ld a, [wIsUsingPegasusBoots]
 	and a
+;>     return
 	ret nz
 
+;> if hLinkPositionZ or wIsLinkInTheAir:
 	ldh a, [hLinkPositionZ]
 	ld hl, wIsLinkInTheAir
 	or [hl]
+;>     return
 	ret nz
 
+;> wLinkWalkingFrameCount = u8(wLinkWalkingFrameCount + 2)
 	ld a, [wLinkWalkingFrameCount]
 	add $02
 	ld [wLinkWalkingFrameCount], a
-	call Call_145D
+;> AddDashDustVfx()
+	call AddDashDustVfx
+;> wPegasusBootsChargeMeter += 1
 	ld a, [wPegasusBootsChargeMeter]
 	inc a
 	ld [wPegasusBootsChargeMeter], a
+;> if wPegasusBootsChargeMeter != 0x20:
 	cp $20
+;>     return
 	ret nz
 
+;> wIsUsingPegasusBoots = 0x20              # the dash starts
 	ld [wIsUsingPegasusBoots], a
+;> wSpinAttackTimer = 0
 	xor a
 	ld [wSpinAttackTimer], a
+;> wSwordCharge = 0
 	ld [wSwordCharge], a
+;> d = hLinkDirection
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, $00
-	ld hl, $1404
+;> hLinkSpeedX = PegasusDashSpeedX[d]
+	ld hl, PegasusDashSpeedX
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkSpeedX], a
-	ld hl, $1408
+;> hLinkSpeedY = PegasusDashSpeedY[d]
+	ld hl, PegasusDashSpeedY
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkSpeedY], a
+;> wSwordDirectionLocked = 0
 	xor a
 	ld [wSwordDirectionLocked], a
 	ret
 
 
-Call_145D::
+;@ def AddDashDustVfx()
+;@ path: link/pegasus_boots
+;@ Every 8th frame while Link runs on the ground: a dust cloud at his feet (effect $0B, noise 7),
+;@ or a splash (effect $0C, square sound $0E) in shallow water.
+AddDashDustVfx::
+;>@c if hFrameCounter & 7 or hLinkPositionZ or hLinkInteractiveMotionBlocked or wIsLinkInTheAir:
 	ldh a, [hFrameCounter]
 	and $07
 	ld hl, hLinkPositionZ
 	or [hl]
 	ld hl, hLinkInteractiveMotionBlocked
 	or [hl]
+;=@c
 	ld hl, wIsLinkInTheAir
 	or [hl]
+;>     return
 	ret nz
 
+;> hMultiPurpose0 = hLinkX
 	ldh a, [hLinkX]
 	ldh [hMultiPurpose0], a
+;> if wLinkGroundType != 5:                 # not shallow water
 	ld a, [wLinkGroundType]
 	cp $05
-	jr z, jr_000_1488
+	jr z, .splash
 
+;>     hNoiseSfx = 0x07
 	ld a, $07
 	ldh [hNoiseSfx], a
+;>     hMultiPurpose1 = u8(hLinkY + 6)
 	ldh a, [hLinkY]
 	add $06
 	ldh [hMultiPurpose1], a
+;>     return AddTransientVfx(0x0B)
 	ld a, $0b
 	jp AddTransientVfx
 
 
-jr_000_1488:
+.splash
+;> else:
+;>     hMultiPurpose1 = hLinkY
 	ldh a, [hLinkY]
 	ldh [hMultiPurpose1], a
+;>     hJingle = 0x0E
 	ld a, $0e
 	ldh [hJingle], a
+;>     return AddTransientVfx(0x0C)
 	ld a, $0c
 	jp AddTransientVfx
 
 
-Call_1495::
+;@ def StopLinkSpeed()
+;@ path: link/movement
+;@ Sets Link's speed to 0.
+StopLinkSpeed::
+;> hLinkSpeedX = 0
 	xor a
 	ldh [hLinkSpeedX], a
+;> hLinkSpeedY = 0
 	ldh [hLinkSpeedY], a
 	ret
 
 
-Call_149B::
+;@ def UpdateLinkItemSprites()
+;@ path: link/sprites
+;@ Runs bank 2 $77FA, then draws Link's sword or held item (DrawLinkItemSprites).
+;@ test: skip calls bank 2
+UpdateLinkItemSprites::
+;> Bank02_77FA()
 	call $77fa
 
-Call_149E::
+;@ def DrawLinkItemSprites()
+;@ path: link/sprites
+;@ Draws what Link holds next to him: while a sword pose is shown (wSwordAnimationStatePrev) the
+;@ sword's two sprites go into OAM entries 4-5 (flashing once the spin attack is charged); in the
+;@ magic rod pose (wItemUsePoseTimer bit 7) bank 2 draws the rod, and at the right moment of the
+;@ pose the rod's fireball (entity 4) is shot. Nothing while Link falls (motion state 1).
+;@ test: skip calls bank 2
+DrawLinkItemSprites::
+;> if wLinkMotionState == 1:
 	ld a, [wLinkMotionState]
 	cp $01
+;>     return
 	ret z
 
+;> if wSwordAnimationStatePrev:
 	ld a, [wSwordAnimationStatePrev]
 	and a
-	jr z, jr_000_14e2
+	jr z, .item
 
-	ld bc, $c010
+;>     oam = wOAMBuffer + 0x10              # OAM entries 4 and 5
+	ld bc, wOAMBuffer + $10
+;>     hMultiPurpose0 = u8(wLinkDrawY + wLinkSpriteDY)
 	ld a, [wLinkDrawY]
 	ld hl, wLinkSpriteDY
 	add [hl]
 	ldh [hMultiPurpose0], a
+;>     hMultiPurpose1 = hLinkX
 	ldh a, [hLinkX]
 	ldh [hMultiPurpose1], a
+;>     hMultiPurpose3 = 0                   # attribute bits: palette 0
 	ld hl, hMultiPurpose3
 	ld [hl], $00
+;>     if wSwordCharge >= 0x28:             # charged: the sword flashes
 	ld a, [wSwordCharge]
 	cp $28
-	jr c, jr_000_14cd
+	jr c, .notCharged
 
+;>         hMultiPurpose3 = (hFrameCounter << 2) & 0x10
 	ldh a, [hFrameCounter]
 	rla
 	rla
 	and $10
 	ld [hl], a
 
-jr_000_14cd:
+.notCharged
+;>     offset = (wSwordSpriteDY << 8) | wSwordSpriteDX
 	ld a, [wSwordSpriteDY]
 	ld h, a
 	ld a, [wSwordSpriteDX]
 	ld l, a
+;>     hMultiPurpose2 = wSwordSpriteFrame
 	ld a, [wSwordSpriteFrame]
 	ldh [hMultiPurpose2], a
+;>     if hLinkY >= 0x88:                   # off the bottom of the play area
 	ldh a, [hLinkY]
 	cp $88
+;>         return
 	ret nc
 
-	jp Call_1540
+;>     return DrawSpritePair(oam, offset)
+	jp DrawSpritePair
 
 
-jr_000_14e2:
+.item
+;> else:
+;>     saved = wItemUsePoseTimer
 	ld a, [wItemUsePoseTimer]
 	push af
+;>     if saved & 0x80:                     # the magic rod is shown
 	bit 7, a
-	jp z, Jump_000_151b
+	jp z, .restore
 
+;>         SwitchBank(2)
 	ld a, $02
 	call SwitchBank
+;>         DrawMagicRod()                   # bank 2 $514B
 	call $514b
+;>         if wItemUsePoseTimer & 0x7F == 0x0C and not (wDialogState or wRoomTransitionState):
 	ld a, [wItemUsePoseTimer]
 	and $7f
 	cp $0c
-	jr nz, jr_000_151b
+	jr nz, .restore
 
+;=@f
 	ld hl, wDialogState
 	ld a, [wRoomTransitionState]
 	or [hl]
-	jr nz, jr_000_151b
+	jr nz, .restore
 
-	call Call_1283
+;>@f             SetLinkDirectionFromDpad()
+	call SetLinkDirectionFromDpad
+;>             slot = SpawnLinkProjectile(0x04)     # the rod's fireball
 	ld a, $04
-	call Call_10EB
-	jr c, jr_000_151b
+	call SpawnLinkProjectile
+;>             if slot is not None:
+	jr c, .restore
 
+;>                 hNoiseSfx = 0x0D
 	ld a, $0d
 	ldh [hNoiseSfx], a
+;>                 SwitchBank(2)
 	ld a, $02
 	call SwitchBank
+;>                 Bank02_51C6()
 	call $51c6
 
-Jump_000_151b:
-jr_000_151b:
+.restore
+;>     wItemUsePoseTimer = saved
 	pop af
 	ld [wItemUsePoseTimer], a
 	ret
 
 
+;@ path: link/sword
+;@ Tiles of the sword's two sprites for each sword frame (wSwordSpriteFrame), two bytes per
+;@ frame (left sprite, right sprite; $FF = that sprite is hidden).
+SwordSpriteTiles::
 	db $08, $06, $0c, $0a, $ff, $04, $0a, $0c, $06, $08, $0a, $0c, $ff, $04, $0c, $0a
+;@ path: link/sword
+;@ OAM attributes of the sword's two sprites for each sword frame (bit 5 x flip, bit 6 y flip).
+SwordSpriteAttributes::
 	db $20, $20, $60, $60, $00, $00, $40, $40, $00, $00, $00, $00, $40, $40, $20, $20
 
-Call_1540::
+;@ def DrawSpritePair(oam: bc, offset: hl)
+;@ path: link/sprites
+;@ Writes a pair of side-by-side sprites (16x16, e.g. the sword) into OAM at `oam`: position
+;@ (hMultiPurpose1, hMultiPurpose0) plus `offset` (h = y, l = x), frame hMultiPurpose2 from
+;@ SwordSpriteTiles / SwordSpriteAttributes, extra attribute bits hMultiPurpose3. A tile $FF
+;@ hides the left sprite (y = $F0).
+;@ test: hMultiPurpose2 = rand(0, 7)
+DrawSpritePair::
+;> mem[oam] = u8(hMultiPurpose0 + hi(offset))
 	push hl
 	ldh a, [hMultiPurpose0]
 	add h
 	ld [bc], a
 	inc bc
+;> mem[oam + 1] = u8(hMultiPurpose1 + lo(offset))
 	ldh a, [hMultiPurpose1]
 	add l
 	ld [bc], a
 	inc bc
-	ld hl, $1520
+;> f = 2 * hMultiPurpose2
+	ld hl, SwordSpriteTiles
 	ldh a, [hMultiPurpose2]
 	sla a
 	ld e, a
 	ld d, $00
+;> mem[oam + 2] = SwordSpriteTiles[f]
 	add hl, de
 	ld a, [hl]
 	ld [bc], a
+;> if SwordSpriteTiles[f] == 0xFF:
 	cp $ff
-	jr nz, jr_000_1561
+	jr nz, .attr
 
+;>     mem[oam] = 0xF0                      # hidden
 	dec bc
 	ld a, $f0
 	ld [bc], a
 	inc bc
 
-jr_000_1561:
+.attr
+;> mem[oam + 3] = SwordSpriteAttributes[f] | hMultiPurpose3
 	inc bc
-	ld hl, $1530
+	ld hl, SwordSpriteAttributes
 	add hl, de
 	ld a, [hl]
 	ld hl, hMultiPurpose3
 	or [hl]
+;=@a
 	ld [bc], a
 	inc bc
+;>@a mem[oam + 4] = u8(hMultiPurpose0 + hi(offset))
 	pop hl
 	ldh a, [hMultiPurpose0]
 	add h
 	ld [bc], a
 	inc bc
+;> mem[oam + 5] = u8(hMultiPurpose1 + lo(offset) + 8)
 	ldh a, [hMultiPurpose1]
 	add l
 	add $08
 	ld [bc], a
 	inc bc
-	ld hl, $1521
+;> mem[oam + 6] = SwordSpriteTiles[f + 1]
+	ld hl, SwordSpriteTiles + 1
 	add hl, de
 	ld a, [hl]
 	ld [bc], a
 	inc bc
-	ld hl, $1531
+;>@o7 mem[oam + 7] = SwordSpriteAttributes[f + 1] | hMultiPurpose3
+	ld hl, SwordSpriteAttributes + 1
 	add hl, de
 	ld a, [hl]
 	ld hl, hMultiPurpose3
 	or [hl]
+;=@o7
 	ld [bc], a
 	ret
 
 
-	db $10, $f0, $08, $08, $0c, $0c, $f0, $10
+;@ path: link/pegasus_boots
+;@ Point in front of Link that a dash into a wall shakes (wDashBumpX), by his direction (right,
+;@ left, up, down): x offset from hLinkX.
+DashBumpDX::
+	db $10, $f0, $08, $08
 
-Call_1594::
+;@ path: link/pegasus_boots
+;@ The same for the y offset from hLinkY.
+DashBumpDY::
+	db $0c, $0c, $f0, $10
+
+;@ def SetDashBumpPoint()
+;@ path: link/pegasus_boots
+;@ Link dashed into a wall: marks the point in front of him (DashBumpDX/DY) for 2 frames, so the
+;@ entities there react (things fall from a tree, ...).
+;@ test: hLinkDirection = rand(0, 3)
+SetDashBumpPoint::
+;> d = hLinkDirection
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, $00
-	ld hl, $158c
+;> wDashBumpX = u8(hLinkX + DashBumpDX[d])
+	ld hl, DashBumpDX
 	add hl, de
 	ldh a, [hLinkX]
 	add [hl]
-	ld [$c179], a
-	ld hl, $1590
+	ld [wDashBumpX], a
+;> wDashBumpY = u8(hLinkY + DashBumpDY[d])
+	ld hl, DashBumpDY
 	add hl, de
 	ldh a, [hLinkY]
 	add [hl]
-	ld [$c17a], a
+	ld [wDashBumpY], a
+;> wDashBumpFrames = 2
 	ld a, $02
-	ld [$c178], a
+	ld [wDashBumpFrames], a
 	ret
 
 
+;@ def LinkMotionMapFadeOut()
+;@ path: world/warps
+;@ Motion state 3: the screen fades to white; once the fade is done the warp is taken. All
+;@ entities are removed; a shop item carried out without paying makes Link a thief. On the
+;@ overworld the warp record whose arrival square matches Link's square is used (4 records of 5
+;@ bytes at wWarpType: kind, map, room, x, y). The new place is set up (side view, dungeon map
+;@ position, music and power-up reset, the dungeon's name popup) and the world mode restarts at
+;@ step 0 to load it. Entering a dungeon saves its entrance as the restart point.
+;@ test: skip calls routines in other banks
 LinkMotionMapFadeOut::
+;> Bank02_780F()                            # Link stands still during the fade
 	call $780f
+;> if mem[0xC3C9]:                          # the fade was asked to start again
 	ld a, [$c3c9]
 	and a
-	jr z, jr_000_15c3
+	jr z, .fade
 
+;>     mem[0xC3C9] = 0
 	xor a
 	ld [$c3c9], a
+;>     return StartWarpFadeOutWithNoise()
 	jp StartWarpFadeOutWithNoise
 
 
-jr_000_15c3:
+.fade
+;> FadePalettesToWhite()
 	call FadePalettesToWhite
+;> wBumpShakeTimer = 0
 	xor a
 	ld [wBumpShakeTimer], a
+;> wLinkShowItemPoseActive = 1              # the characters wait
 	inc a
 	ld [wLinkShowItemPoseActive], a
+;> if wTransitionSequenceCounter != 4:      # still fading
 	ld a, [wTransitionSequenceCounter]
 	cp $04
+;>     return
 	jp nz, Jump_000_172d
 
+;> hBaseScrollX = 0
 	xor a
 	ldh [hBaseScrollX], a
+;> hBaseScrollY = 0
 	ldh [hBaseScrollY], a
+;> mem[0xFFB4] = 0
 	ldh [$ffb4], a
+;> fill(wEntityStatus, 0, 16)               # no entities
 	ld e, $10
 	ld hl, wEntityStatus
 
-jr_000_15e2:
+.clear
 	ld [hli], a
 	dec e
-	jr nz, jr_000_15e2
+	jr nz, .clear
 
+;> if mem[0xC509]:                          # a shop item carried out without paying
 	ld a, [$c509]
 	and a
-	jr z, jr_000_1606
+	jr z, .notThief
 
+;>     SwitchBank(4)
 	push af
 	ld a, $04
 	call SwitchBank
 	pop af
+;>     Bank04_79FA(mem[0xC509])
 	call $79fa
+;>     wIsThief += 1
 	ld hl, wIsThief
 	inc [hl]
+;>     mem[0xDB46] += 1
 	ld hl, $db46
 	inc [hl]
+;>     mem[0xD47E] = 1                      # the "thief" text follows the fade-in
 	ld a, $01
 	ld [$d47e], a
+;>     hLinkAnimationState = 0
 	xor a
 	ldh [hLinkAnimationState], a
 
-jr_000_1606:
+.notThief
+;> hMultiPurposeD = hIsSideScrolling        # where Link comes from
 	ldh a, [hIsSideScrolling]
 	ldh [hMultiPurposeD], a
+;> wGameplayType = 0x0B
 	ld a, $0b
 	ld [wGameplayType], a
+;> wGameplaySubtype = 0                     # the world mode loads the new place
 	xor a
 	ld [wGameplaySubtype], a
+;> mem[0xC3CB] = 0
 	ld [$c3cb], a
+;> hIsSideScrolling = 0
 	ldh [hIsSideScrolling], a
+;> record = wWarpType
 	ld hl, wWarpType
+;> hMultiPurposeF = wIsIndoor
 	ld a, [wIsIndoor]
 	ldh [hMultiPurposeF], a
+;> if not wIsIndoor:                        # overworld: the warp of the square Link stands on
 	and a
-	jr nz, jr_000_164d
+	jr nz, .record
 
+;>     c = 0
 	ld hl, wWarpDestPosition
 	ld c, $00
 
-jr_000_1628:
+.findWarp
+;>@fw     while c != 4 and mem[wWarpDestPosition + c] != (((hLinkY - 8) & 0xF0) | (hLinkX >> 4)):
 	ldh a, [hLinkX]
 	swap a
 	and $0f
 	ld e, a
 	ldh a, [hLinkY]
 	sub $08
+;=@fw
 	and $f0
 	or e
 	cp [hl]
-	jr z, jr_000_1640
+	jr z, .found
 
+;>         c += 1
 	inc hl
 	inc c
+;=@fw
 	ld a, c
 	cp $04
-	jr nz, jr_000_1628
+	jr nz, .findWarp
 
-jr_000_1640:
+.found
+;>@rc     record = wWarpType + 5 * c
 	ld a, c
 	sla a
 	sla a
 	add c
 	ld e, a
 	ld d, $00
+;=@rc
 	ld hl, wWarpType
 	add hl, de
 
-jr_000_164d:
+.record
+;> wIsIndoor = mem[record]
 	push hl
 	ld a, [hli]
 	ld [wIsIndoor], a
+;> if wIsIndoor == 2:                       # a side-view place
 	cp $02
-	jr nz, jr_000_1660
+	jr nz, .map
 
+;>     hIsSideScrolling = 2
 	ldh [hIsSideScrolling], a
+;>     wIsIndoor = 1
 	dec a
 	ld [wIsIndoor], a
+;>     hLinkMotionStep = 1
 	ld a, $01
 	ldh [hLinkMotionStep], a
 
-jr_000_1660:
+.map
+;> hMapId = mem[record + 1]
 	ld a, [hli]
 	ldh [hMapId], a
+;> hMapRoom = mem[record + 2]
 	ld a, [wIsIndoor]
 	and a
 	ld a, [hli]
 	ldh [hMapRoom], a
-	jr nz, jr_000_1677
+;>@io if not wIsIndoor:                       # to the overworld
+	jr nz, .indoor
 
+;>     if hMultiPurposeF: wActivePowerUp = 0   # left an indoor place
 	ldh a, [hMultiPurposeF]
 	and a
-	jr z, jr_000_1675
+	jr z, .owDone
 
 	xor a
 	ld [wActivePowerUp], a
 
-jr_000_1675:
-	jr jr_000_16d4
+.owDone
+;=@io
+	jr .entrance
 
-jr_000_1677:
+;> else:
+.indoor
+;>     SwitchBank(0x14)
 	ld c, a
 	ld a, $14
 	call SwitchBank
+;>@grid     grid = 0x4200 + 64 * hMapId         # bank $14: the map's 8x8 grid of rooms
 	push hl
 	ldh a, [hMapId]
 	swap a
 	ld e, a
 	ld d, $00
 	sla e
+;=@grid
 	rl d
 	sla e
 	rl d
 	ld hl, $4200
 	add hl, de
+;>     if hMapId == 6 and wDungeon7Flags & 4:   # the other layout of map 6
 	ldh a, [hMapId]
 	cp $06
-	jr nz, jr_000_16a1
+	jr nz, .search
 
 	ld a, [wDungeon7Flags]
 	and $04
-	jr z, jr_000_16a1
+	jr z, .search
 
+;>         grid = 0x44C0
 	ld hl, $44c0
 
-jr_000_16a1:
+.search
+;>     cell = 0
 	ld e, $00
 
-jr_000_16a3:
+.cell
+;>@cl     while cell != 0x40 and mem[grid + cell] != hMapRoom:
 	ld a, [hli]
 	cp c
-	jr z, jr_000_16ad
+	jr z, .cellFound
 
+;>         cell += 1
 	inc e
+;=@cl
 	ld a, e
 	cp $40
-	jr nz, jr_000_16a3
+	jr nz, .cell
 
-jr_000_16ad:
+.cellFound
+;>     wIndoorRoom = cell
 	ld a, e
 	ld [wIndoorRoom], a
+;>     if not hMultiPurposeF:               # came in from the overworld
 	ldh a, [hMultiPurposeF]
 	and a
-	jr nz, jr_000_16d3
+	jr nz, .indoorDone
 
+;>         wActivePowerUp = 0
 	xor a
 	ld [wActivePowerUp], a
+;>         if hMapId < 0x0A:                # a dungeon
 	ldh a, [hMapId]
 	cp $0a
-	jr nc, jr_000_16d3
+	jr nc, .indoorDone
 
+;>             SwitchBank(2)
 	ld a, $02
 	call SwitchBank
+;>             Bank02_6A9B()
 	call $6a9b
+;>             mem[0xFFB4] = 0x30           # the dungeon's name shows after a moment
 	ld a, $30
 	ldh [$ffb4], a
+;>             wRaisedBlocksState = 0
 	xor a
 	ld [wRaisedBlocksState], a
+;>             wRaisedBlockStep = 0
 	ld [wRaisedBlockStep], a
 
-jr_000_16d3:
+.indoorDone
 	pop hl
 
-jr_000_16d4:
+.entrance
+;> wMapEntrancePositionX = mem[record + 3]
 	ld a, [hli]
 	ld [wMapEntrancePositionX], a
+;> wMapEntrancePositionY = mem[record + 4]
 	ld a, [hl]
 	ld [wMapEntrancePositionY], a
 	pop hl
+;> if hIsSideScrolling:
 	ldh a, [hIsSideScrolling]
 	and a
+;>     hLinkDirection = 0
+;>     return
 	jr nz, jr_000_172e
 
+;> if hMultiPurposeD:                       # came from a side-view place
 	ldh a, [hMultiPurposeD]
 	and a
-	jr nz, jr_000_172d
+;>     return
+	jr nz, Jump_000_172d
 
+;> if not wIsIndoor or hMapId >= 0x0A:
 	ld a, [wIsIndoor]
 	and a
 	jr z, SetSpawnPoint
 
 	ldh a, [hMapId]
 	cp $0a
+;>     return SetSpawnPoint(record)
 	jr nc, SetSpawnPoint
 
+;>@en entry = 0x53E5 + 5 * hMapId              # a dungeon: its entrance (bank $14 table)
 	ld e, a
 	sla a
 	sla a
 	add e
 	ld e, a
 	ld d, $00
+;=@en
 	ld hl, $53e5
 	add hl, de
+;> set_rom_bank(0x14)
 	ld a, $14
 	ld [$2100], a
+;> SetSpawnPoint(entry)
 	call SetSpawnPoint
+;>@sr wSpawnIndoorRoom = mem[0x5412 + hMapId]  # the entrance's cell in the dungeon grid
 	push de
 	ldh a, [hMapId]
 	ld e, a
 	ld d, $00
 	ld hl, $5412
 	add hl, de
+;=@sr
 	ld a, [hl]
 	pop de
 	ld [de], a
+;> return
 	ret
 
 
+;@ def SetSpawnPoint(record: hl)
+;@ path: save/spawn
+;@ Saves a restart point: the 5 bytes of `record` (kind, map, room, x, y) to wSpawnIsIndoor...
+;@ wSpawnY, and wIndoorRoom to wSpawnIndoorRoom. Returns with de pointing at wSpawnIndoorRoom.
+;@ test: skip
 SetSpawnPoint::
+;> hMultiPurpose0 = 0
 	ld a, $00
 	ldh [hMultiPurpose0], a
 	ld de, wSpawnIsIndoor
 
-jr_000_171d:
+.copy
+;>@c while hMultiPurpose0 != 5:
+;>     mem[wSpawnIsIndoor + hMultiPurpose0] = mem[record + hMultiPurpose0]
 	ld a, [hli]
 	ld [de], a
 	inc de
+;>     hMultiPurpose0 += 1
 	ldh a, [hMultiPurpose0]
 	inc a
 	ldh [hMultiPurpose0], a
+;=@c
 	cp $05
-	jr nz, jr_000_171d
+	jr nz, .copy
 
+;> wSpawnIndoorRoom = wIndoorRoom
 	ld a, [wIndoorRoom]
 	ld [de], a
 
 Jump_000_172d:
-jr_000_172d:
+;> return
 	ret
 
 
@@ -4925,170 +5677,246 @@ jr_000_172e:
 	ret
 
 
+;@ def LinkMotionMapFadeIn()
+;@ path: world/warps
+;@ Motion state 4: the new place fades in from white (or, after a warp that asked for it, the
+;@ wave effect type 3 plays instead). When done Link gets his motion state back (1 if it was
+;@ saved as 1, otherwise 0), and a thief gets told off (dialogue $36).
+;@ test: skip calls routines in other banks
 LinkMotionMapFadeIn::
+;> Bank02_780F()
 	call $780f
+;>@w if mem[0xD474]:                          # arrive with the wave effect
 	ld a, [$d474]
 	and a
-	jr z, jr_000_1750
+	jr z, .fadeIn
 
+;>     mem[0xD474] = 0
 	xor a
 	ld [$d474], a
+;>     wTransitionGfxFrameCount = 0x30
 	ld a, $30
 	ld [wTransitionGfxFrameCount], a
+;>     wTransitionGfx = 3
 	ld a, $03
 	ld [wTransitionGfx], a
+;>     wTransitionSequenceCounter = 4
 	ld a, $04
 	ld [wTransitionSequenceCounter], a
-	jr jr_000_175a
+;=@w
+	jr .done
 
-jr_000_1750:
+;> else:
+.fadeIn
+;>     FadePalettesIn()
 	call FadePalettesIn
+;>     if wTransitionSequenceCounter != 4:
 	ld a, [wTransitionSequenceCounter]
 	cp $04
-	jr nz, jr_000_1775
+;>         return
+	jr nz, .ret
 
-jr_000_175a:
+.done
+;> wLinkMotionState = 1 if wSavedLinkMotionState == 1 else 0
 	ld a, [wSavedLinkMotionState]
 	cp $01
-	jr z, jr_000_1763
+	jr z, .setState
 
 	ld a, $00
 
-jr_000_1763:
+.setState
 	ld [wLinkMotionState], a
+;> if mem[0xD47E]:
 	ld a, [$d47e]
 	and a
-	jr z, jr_000_1775
+	jr z, .ret
 
+;>     mem[0xD47E] = 0
 	xor a
 	ld [$d47e], a
+;>     OpenDialog(0x36)
 	ld a, $36
 	call OpenDialog
 
-jr_000_1775:
+.ret
+;> return
 	ret
 
 
+;@ def FadePalettesToWhite()
+;@ path: gfx/palettes
+;@ One step of the fade to white, every 4th frame until wTransitionSequenceCounter reaches 4:
+;@ every colour of the three palettes (wBGPalette, wOBJ0Palette, wOBJ1Palette) gets one shade
+;@ lighter.
 FadePalettesToWhite::
+;> wTransitionFrameCounter = u8(wTransitionFrameCounter + 1)
 	ld hl, wTransitionFrameCounter
 	inc [hl]
+;> if wTransitionFrameCounter & 3 or wTransitionSequenceCounter == 4:
 	ld a, [wTransitionFrameCounter]
 	and $03
-	jr nz, jr_000_17b6
+	jr nz, .done
 
 	ld hl, wTransitionSequenceCounter
 	ld a, [hl]
 	cp $04
-	jr z, jr_000_17b6
+;>     return
+	jr z, .done
 
+;> wTransitionSequenceCounter += 1
 	inc [hl]
+;> hMultiPurpose0 = 0
 	xor a
 	ldh [hMultiPurpose0], a
 
-jr_000_178d:
+.palette
+;>@p while hMultiPurpose0 != 3:              # the three palettes
 	ldh a, [hMultiPurpose0]
 	cp $03
-	jr z, jr_000_17b6
+	jr z, .done
 
+;>     pal = mem[wBGPalette + hMultiPurpose0]
 	ld hl, wBGPalette
 	ld e, a
 	ld d, $00
 	add hl, de
 	ld a, [hl]
+;>@i     for i in range(4):                   # the four colours
 	ld c, a
 	ld b, $00
 
-jr_000_179e:
+.colour
+;>         if pal & 3: pal -= 1             # one shade lighter
 	ld a, c
 	and $03
-	jr z, jr_000_17a4
+	jr z, .rotate
 
 	dec c
 
-jr_000_17a4:
+.rotate
+;>         pal = (pal >> 2) | ((pal & 3) << 6)
 	rrc c
 	rrc c
+;=@i
 	inc b
 	ld a, b
 	cp $04
-	jr nz, jr_000_179e
+	jr nz, .colour
 
+;>     mem[wBGPalette + hMultiPurpose0] = pal
 	ld a, c
 	ld [hl], a
+;>     hMultiPurpose0 += 1
 	ld hl, hMultiPurpose0
 	inc [hl]
-	jr jr_000_178d
+;=@p
+	jr .palette
 
-jr_000_17b6:
+.done
+;> return
 	ret
 
 
+;@ path: gfx/palettes
+;@ Colours the fade-in of FadePalettesIn ends at, 4 per palette (colour 0-3, each a shade 0-3):
+;@ BG 0,1,2,3 ($E4), OBJ0 0,3,1,0 ($1C), OBJ1 0,1,2,3 ($E4).
+PaletteFadeTargets::
 	db $00, $01, $02, $03, $00, $03, $01, $00, $00, $01, $02, $03
 
+;@ def FadePalettesIn()
+;@ path: gfx/palettes
+;@ One step of the fade in from white, every 4th frame until wTransitionSequenceCounter reaches
+;@ 4: each colour of the three palettes gets one shade darker until it reaches its value in
+;@ PaletteFadeTargets.
 FadePalettesIn::
+;> wTransitionFrameCounter = u8(wTransitionFrameCounter + 1)
 	ld hl, wTransitionFrameCounter
 	inc [hl]
+;> if wTransitionFrameCounter & 3:
 	ld a, [wTransitionFrameCounter]
 	and $03
-	jr nz, jr_000_1812
+;>     return
+	jr nz, .done
 
+;> step = wTransitionSequenceCounter
 	ld hl, wTransitionSequenceCounter
 	ld a, [hl]
+;> wTransitionSequenceCounter = u8(step + 1)
 	inc [hl]
+;> if step == 4:
 	cp $04
-	jr z, jr_000_17b6
+;>     return
+	jr z, FadePalettesToWhite.done
 
+;> hMultiPurpose0 = 0
 	xor a
 	ldh [hMultiPurpose0], a
 
-jr_000_17da:
+.palette
+;>@p while hMultiPurpose0 != 3:
 	ldh a, [hMultiPurpose0]
 	cp $03
-	jr z, jr_000_1812
+	jr z, .done
 
+;>     pal = mem[wBGPalette + hMultiPurpose0]
 	ld hl, wBGPalette
 	ld e, a
 	ld d, $00
 	add hl, de
 	ld a, [hl]
+;>@i     for i in range(4):
 	push hl
 	ld c, a
 	ld b, $00
 
-jr_000_17ec:
+.colour
+;>@t         if pal & 3 != PaletteFadeTargets[4 * hMultiPurpose0 + i]: pal += 1
 	ldh a, [hMultiPurpose0]
 	sla a
 	sla a
 	or b
 	ld e, a
-	ld hl, $17b7
+	ld hl, PaletteFadeTargets
+;=@t
 	add hl, de
 	ld a, c
 	and $03
 	cp [hl]
-	jr z, jr_000_17ff
+	jr z, .rotate
 
 	inc c
 
-jr_000_17ff:
+.rotate
+;>         pal = (pal >> 2) | ((pal & 3) << 6)
 	rrc c
 	rrc c
+;=@i
 	inc b
 	ld a, b
 	cp $04
-	jr nz, jr_000_17ec
+	jr nz, .colour
 
+;>     mem[wBGPalette + hMultiPurpose0] = pal
 	ld a, c
 	pop hl
 	ld [hl], a
+;>     hMultiPurpose0 += 1
 	ld hl, hMultiPurpose0
 	inc [hl]
-	jr jr_000_17da
+;=@p
+	jr .palette
 
-jr_000_1812:
+.done
+;> return
 	ret
 
 
+;@ path: link/animation
+;@ Link's poses (hLinkAnimationState, 119 of them): two tile numbers per pose, for the left and
+;@ the right 8x16 half of his 16x16 sprite. UpdateLinkTiles copies the two tiles from bank $0C
+;@ $5800 + 16 * tile into sprite tiles 0-3. The pose tables in bank 2 (UpdateLinkAnimationState)
+;@ pick the pose; LinkPoseAttributes gives the flip bits.
+LinkPoseTiles::
 	db $00, $02, $02, $00, $10, $02, $12, $00, $04, $06, $06, $04, $08, $0a, $0c, $0e
 	db $18, $0a, $1c, $0e, $0a, $08, $0e, $0c, $0a, $18, $0e, $1c, $20, $22, $24, $26
 	db $28, $2a, $2a, $28, $30, $32, $20, $22, $34, $36, $24, $26, $38, $3a, $28, $2a
@@ -5103,7 +5931,13 @@ jr_000_1812:
 	db $10, $12, $14, $16, $18, $1c, $12, $10, $16, $14, $1c, $18, $66, $68, $6a, $6c
 	db $68, $66, $68, $66, $6c, $6a, $66, $68, $60, $60, $62, $62, $64, $64, $62, $62
 	db $64, $64, $60, $60, $54, $54, $3c, $3e, $fe, $fe, $18, $1a, $1c, $1e, $2c, $2e
-	db $b8, $ba, $2e, $2c, $ba, $b8, $bc, $be, $d0, $d2, $a0, $fc, $fc, $a0, $00, $00
+	db $b8, $ba, $2e, $2c, $ba, $b8, $bc, $be, $d0, $d2, $a0, $fc, $fc, $a0
+
+;@ path: link/animation
+;@ OAM attribute bits of the two halves of each of Link's poses, two bytes per pose (same index
+;@ as LinkPoseTiles): $20 = x flip, $40 = y flip, $60 = both. Bits 5-6 of wLinkOAMAttrLeft/Right.
+LinkPoseAttributes::
+	db $00, $00
 	db $20, $20, $00, $00, $00, $20, $00, $00, $20, $20, $00, $00, $00, $00, $00, $00
 	db $00, $00, $20, $20, $20, $20, $20, $20, $20, $20, $00, $00, $00, $00, $00, $00
 	db $20, $20, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $20, $20
@@ -5120,77 +5954,105 @@ jr_000_1812:
 	db $40, $60, $00, $20, $00, $00, $00, $20, $00, $00, $00, $00, $00, $00, $00, $00
 	db $20, $20, $20, $20, $00, $00, $00, $00, $00, $00, $20, $20
 
+;@ def UpdateLinkAnimationState()
+;@ path: link/animation
+;@ Picks Link's pose (hLinkAnimationState) from a table in bank 2 chosen by what he does -
+;@ normal walking ($48BE), with the shield ($48C6, $48D6 with the mirror shield; +8 while it is
+;@ raised), pushing ($48E6), carrying ($48EE), motion state 1 ($48F6 / $48FE) and climbing a
+;@ ladder in side view ($4906) - indexed by 2 * direction + the walk frame (bit 3 of
+;@ wLinkWalkingFrameCount). Runs with bank 2 switched in (UpdateLinkAnimationStateFar).
+;@ test: skip reads tables in bank 2
 UpdateLinkAnimationState::
+;> frame = (wLinkWalkingFrameCount >> 3) & 1
 	ld a, [wLinkWalkingFrameCount]
 	sra a
 	sra a
 	sra a
 	and $01
 	ld d, a
+;> i = 2 * hLinkDirection + frame
 	ldh a, [hLinkDirection]
 	sla a
 	or d
 	ld c, a
 	ld b, $00
+;> table = 0x48F6
 	ld hl, $48f6
+;> if wLinkMotionState == 1:
 	ld a, [wLinkMotionState]
 	cp $01
-	jr nz, jr_000_1a17
+	jr nz, .notState1
 
+;>     if hLinkMotionStep: table = 0x48FE
 	ldh a, [hLinkMotionStep]
 	and a
-	jr z, jr_000_1a15
+	jr z, .state1Done
 
 	ld hl, $48fe
 
-jr_000_1a15:
-	jr jr_000_1a66
+.state1Done
+;=@t
+	jr .pose
 
-jr_000_1a17:
+.notState1
+;>@t elif hIsSideScrolling and hLinkMotionStep == 2:   # on a ladder
 	ldh a, [hIsSideScrolling]
 	and a
-	jr z, jr_000_1a27
+	jr z, .notLadder
 
 	ldh a, [hLinkMotionStep]
 	cp $02
-	jr nz, jr_000_1a27
+	jr nz, .notLadder
 
+;>     table = 0x4906
 	ld hl, $4906
-	jr jr_000_1a66
+;=@t
+	jr .pose
 
-jr_000_1a27:
+.notLadder
+;>@t elif wIsCarryingLiftedObject == 1:
 	ld a, [wIsCarryingLiftedObject]
 	cp $01
-	jr z, jr_000_1a63
+	jr z, .carrying
 
+;>@cp     table = 0x48EE
+;> elif not hLinkInWater and wLinkPushingTimer:
 	ldh a, [hLinkInWater]
 	and a
-	jr nz, jr_000_1a39
+	jr nz, .shield
 
 	ld a, [wLinkPushingTimer]
 	and a
-	jr nz, jr_000_1a5e
+	jr nz, .pushing
 
-jr_000_1a39:
+;>@pu     table = 0x48E6
+;> elif not wShieldLevelEquipped:
+.shield
 	ld a, [wShieldLevelEquipped]
 	and a
-	jr nz, jr_000_1a44
+	jr nz, .withShield
 
+;>     table = 0x48BE
 	ld hl, $48be
-	jr jr_000_1a66
+;=@t
+	jr .pose
 
-jr_000_1a44:
+;> else:
+.withShield
+;>     table = 0x48D6 if wShieldLevelEquipped == 2 else 0x48C6
 	ld hl, $48c6
 	cp $02
-	jr nz, jr_000_1a4e
+	jr nz, .raised
 
 	ld hl, $48d6
 
-jr_000_1a4e:
+.raised
+;>@r     if wIsUsingShield: table += 8        # the shield is raised
 	ld a, [wIsUsingShield]
 	and a
-	jr z, jr_000_1a5c
+	jr z, .shieldDone
 
+;=@r
 	ld a, l
 	add $08
 	ld l, a
@@ -5198,758 +6060,1230 @@ jr_000_1a4e:
 	adc $00
 	ld h, a
 
-jr_000_1a5c:
-	jr jr_000_1a66
+.shieldDone
+;=@t
+	jr .pose
 
-jr_000_1a5e:
+.pushing
+;=@pu
 	ld hl, $48e6
-	jr jr_000_1a66
+	jr .pose
 
-jr_000_1a63:
+.carrying
+;=@cp
 	ld hl, $48ee
 
-jr_000_1a66:
+.pose
+;> hLinkAnimationState = mem[table + i]
 	add hl, bc
 	ld a, [hl]
 	ldh [hLinkAnimationState], a
 	ret
 
 
-jr_000_1a6b:
+;@ def AnimateMarinBeachTiles()
+;@ path: gfx/animation
+;@ Animated tiles of game mode 9 (the beach scene): on frames 0 and 8 of every 16 copies 64
+;@ bytes of the waves from bank $10 ($6500 / $6540, one of 4 frames picked by bits 4-5 of the
+;@ frame counter) to $9500 / $9540. Not while background draw commands are queued.
+;@ test: skip switches ROM banks and writes VRAM
+AnimateMarinBeachTiles::
+;> if wDrawCommand[0]:
 	ld a, [wDrawCommand]
 	and a
+;>     return
 	ret nz
 
+;> set_rom_bank(0x10)
 	ld a, $10
 	ld [$2100], a
+;> src = 0x6500
 	ld hl, $6500
+;> dest = 0x9500
 	ld de, $9500
+;> f = hFrameCounter & 0x0F
 	ldh a, [hFrameCounter]
 	and $0f
-	jr z, jr_000_1a87
+;> if f == 0:                               # the first half of the tiles
+;>     pass
+	jr z, .copy
 
+;> elif f != 8:
 	cp $08
+;>     return
 	ret nz
 
+;> else:                                    # the second half
+;>     src = 0x6540
 	ld l, $40
+;>     dest = 0x9540
 	ld e, l
 
-jr_000_1a87:
+.copy
+;>@h src += (hFrameCounter & 0x30) << 3     # the animation frame
 	ldh a, [hFrameCounter]
 	and $30
 	ld c, a
 	ld b, $00
 	sla c
 	rl b
+;=@h
 	sla c
 	rl b
 	sla c
 	rl b
 	add hl, bc
+;> copy(dest, src, 0x40)
 	ld bc, $0040
 	jp CopyData
 
 
+;@ path: unused/data
+;@ Eight bytes nothing reads ($20, $60, $A0, $E0, $E0, $E0, $A0, $60: a ping-pong sequence like
+;@ AnimatedTilesPhases).
+Unused1AA1::
 	db $20, $60, $a0, $e0, $e0, $e0, $a0, $60
 
+;@ def UpdateAnimatedTiles()
+;@ path: gfx/animation
+;@ The VBlank's regular graphics job. The beach scene and the intro have their own tile
+;@ animations. In the world (mode $0B, window hidden): a requested background change
+;@ (hBGChangeRequest) is done, else the raised blocks step on, else the room's animated tiles
+;@ (hAnimatedTilesGroup) advance. Ends with Link's sprite tiles and OAM entries.
+;@ test: skip switches ROM banks and writes VRAM
 UpdateAnimatedTiles::
+;> if wGameplayType == 0x09:
 	ld a, [wGameplayType]
 	cp $09
-	jr z, jr_000_1a6b
+;>     return AnimateMarinBeachTiles()
+	jr z, AnimateMarinBeachTiles
 
+;> if wGameplayType == 0x00:                # the intro
 	cp $00
-	jr nz, jr_000_1adf
+	jr nz, .notIntro
 
+;>     if wDrawCommand[0] or hFrameCounter & 0x0F < 4:
 	ld a, [wDrawCommand]
 	and a
-	jp nz, Jump_000_1ade
+	jp nz, .ret
 
 	ldh a, [hFrameCounter]
 	and $0f
 	cp $04
-	jr c, jr_000_1ade
+;>         return
+	jr c, .ret
 
+;>     set_rom_bank(0x10)
 	ld a, $10
 	ld [$2100], a
+;>@ic     copy(mem16[wSceneTimer3], mem16[wSceneTimer], 0x20)   # the intro keeps source and target at $D006 / $D008
 	ld a, [wSceneTimer]
 	ld l, a
-	ld a, [wSceneTimer2]
+	ld a, [wSceneTimer + 1]
 	ld h, a
 	ld a, [wSceneTimer3]
 	ld e, a
-	ld a, [wSceneSlowTimer]
+;=@ic
+	ld a, [wSceneTimer3 + 1]
 	ld d, a
 	ld bc, $0020
 	call CopyData
 
-Jump_000_1ade:
-jr_000_1ade:
+.ret
+;>     return
 	ret
 
 
-jr_000_1adf:
+.notIntro
+;> if wGameplayType == 0x01:                # the ending: only background changes
 	ld a, [wGameplayType]
 	cp $01
-	jr nz, jr_000_1aec
+	jr nz, .world
 
+;>     if not hBGChangeRequest: return
 	ldh a, [hBGChangeRequest]
 	and a
-	jr nz, jr_000_1b1b
+	jr nz, .bgChange
 
 	ret
 
 
-jr_000_1aec:
+.world
+;> elif wGameplayType < 0x0B or wWindowY != 0x80:
 	cp $0b
 	jp c, Jump_000_1d14
 
 	ld a, [wWindowY]
 	cp $80
+;>     return
 	jp nz, Jump_000_1d14
 
+;> elif wInventoryAppearing or wDrawCommand[0] or wRoomTransitionState:
 	ld a, [wInventoryAppearing]
 	and a
-	jp nz, Call_1CCC
+	jp nz, DrawLinkOAM
 
 	ld hl, wRoomTransitionState
 	ld a, [wDrawCommand]
 	or [hl]
-	jp nz, Call_1CCC
+;>     return DrawLinkOAM()
+	jp nz, DrawLinkOAM
 
+;> elif wRaisedBlockStep:
 	ld a, [wRaisedBlockStep]
 	and a
-	jr z, jr_000_1b16
+	jr z, .noBlocks
 
-	call Call_1DEE
-	jp Call_1CCC
+;>     UpdateRaisedBlocks(wRaisedBlockStep)
+	call UpdateRaisedBlocks
+;>     return DrawLinkOAM()
+	jp DrawLinkOAM
 
 
-jr_000_1b16:
+.noBlocks
+;> elif not hBGChangeRequest:
 	ldh a, [hBGChangeRequest]
 	and a
-	jr z, jr_000_1b66
+	jr z, .animate
 
-jr_000_1b1b:
+;>@an     hAnimatedTilesFrameCount += 1
+;>@an2     return RunAnimatedTiles()
+;> # a background change (hBGChangeRequest 1-$10)
+.bgChange
+;> if hBGChangeRequest == 0x01: return Jump_000_3fbd()
 	cp $01
 	jp z, Jump_000_3fbd
 
+;> if hBGChangeRequest == 0x02: return Jump_000_3fd3()
 	cp $02
 	jp z, Jump_000_3fd3
 
+;> if hBGChangeRequest == 0x03: return BGChangeTiles9140A()
 	cp $03
-	jp z, Jump_000_1dcf
+	jp z, BGChangeTiles9140A
 
+;> if hBGChangeRequest == 0x04: return BGChangeTiles9140B()
 	cp $04
-	jp z, Jump_000_1dd6
+	jp z, BGChangeTiles9140B
 
+;> if hBGChangeRequest == 0x08: return BGChangeTilesBank13()
 	cp $08
-	jp z, Jump_000_1d8c
+	jp z, BGChangeTilesBank13
 
+;> if hBGChangeRequest == 0x09: return BGChangeTiles8CA0()
 	cp $09
-	jp z, Call_1DBE
+	jp z, BGChangeTiles8CA0
 
+;> if hBGChangeRequest == 0x0A: return BGChangeTiles88E0Alt()
 	cp $0a
-	jp z, Call_1D54
+	jp z, BGChangeTiles88E0Alt
 
+;> if hBGChangeRequest == 0x0B: return BGChangeTiles88E0()
 	cp $0b
-	jp z, Jump_000_1dad
+	jp z, BGChangeTiles88E0
 
+;> if hBGChangeRequest == 0x0C: return BGChangeTilesBank11()
 	cp $0c
-	jp z, Jump_000_1d5c
+	jp z, BGChangeTilesBank11
 
+;> if hBGChangeRequest == 0x0D: return BGChangeTradeItemTiles()
 	cp $0d
-	jp z, Jump_000_1d2d
+	jp z, BGChangeTradeItemTiles
 
+;> if hBGChangeRequest == 0x0E:
 	cp $0e
-	jr z, jr_000_1b5e
+	jr z, .bank17
 
+;>@e17     set_rom_bank(0x17)
+;>@e17b     return Bank17_4060()
+;> if hBGChangeRequest == 0x0F: return BGChangeEntityTilesB()
 	cp $0f
-	jp z, Jump_000_1d1c
+	jp z, BGChangeEntityTilesB
 
+;> if hBGChangeRequest == 0x10: return BGChangeEntityTilesA()
 	cp $10
-	jp z, Jump_000_1d15
+	jp z, BGChangeEntityTilesA
 
-	jp Call_1CCC
+;> return DrawLinkOAM()
+	jp DrawLinkOAM
 
 
-jr_000_1b5e:
+.bank17
+;=@e17
 	ld a, $17
 	ld [$2100], a
+;=@e17b
 	jp $4060
 
 
-jr_000_1b66:
+.animate
+;=@an
 	ldh a, [hAnimatedTilesFrameCount]
 	inc a
 	ldh [hAnimatedTilesFrameCount], a
+;=@an2
 
-Call_1B6B::
+;@ def RunAnimatedTiles()
+;@ path: gfx/animation
+;@ Runs the animated-tiles routine of the room's group (hAnimatedTilesGroup).
+;@ test: skip writes VRAM
+RunAnimatedTiles::
+;> return AnimatedTilesHandlers[hAnimatedTilesGroup]()
 	ldh a, [hAnimatedTilesGroup]
 	rst $00
 
-JumpTable_1B6E::
-	dw Jump_1C5A
-	dw Jump_1B90
-	dw Jump_1BAA
-	dw Jump_1BAE
-	dw Jump_1BCD
-	dw Jump_1BF1
-	dw Jump_1BF5
-	dw Jump_1C10
-	dw Jump_1C21
-	dw Jump_1C30
-	dw Jump_1C3F
-	dw Jump_1BB6
-	dw Jump_1BB2
-	dw Jump_1C4A
-	dw Jump_1C56
-	dw Jump_1C4E
-	dw Jump_1C52
+;@ path: gfx/animation
+;@ Animated-tiles routine of each room group (hAnimatedTilesGroup 0-$10). Most copy one 64-byte
+;@ frame (4 tiles) from bank $0C to tiles $6C-$6F ($96C0): from page $6A-$77 (the group's own
+;@ page, 4 frames at offset hAnimatedTilesStep) every 4, 8 or 16 frames, or a ping-pong of
+;@ frames (AnimatedTilesPhases). Group 0 has no animated tiles; group 1 runs bank 1 $5F62;
+;@ group 7 also copies tiles from the RAM buffer at $DCC0 to $90C0. All end in UpdateLinkTiles.
+AnimatedTilesHandlers::
+	dw UpdateLinkTiles
+	dw AnimateTilesGroup1
+	dw AnimateTilesGroup2
+	dw AnimateTilesGroup3
+	dw AnimateTilesGroup4
+	dw AnimateTilesGroup5
+	dw AnimateTilesGroup6
+	dw AnimateTilesGroup7
+	dw AnimateTilesGroup8
+	dw AnimateTilesGroup9
+	dw AnimateTilesGroupA
+	dw AnimateTilesGroupB
+	dw AnimateTilesGroupC
+	dw AnimateTilesGroupD
+	dw AnimateTilesGroupE
+	dw AnimateTilesGroupF
+	dw AnimateTilesGroup10
 
-Jump_1B90::
+;@ def AnimateTilesGroup1()
+;@ path: gfx/animation
+;@ Animated tiles group 1: every 8 frames bank 1 $5F62 does the animation.
+;@ test: skip calls bank 1
+AnimateTilesGroup1::
+;> if hAnimatedTilesFrameCount & 7:
 	ldh a, [hAnimatedTilesFrameCount]
 	and $07
-	jp nz, Jump_1C5A
+;>     return UpdateLinkTiles()
+	jp nz, UpdateLinkTiles
 
+;> set_rom_bank(1)
 	ld a, $01
 	ld [$2100], a
+;> Bank01_5F62()
 	call $5f62
+;> set_rom_bank(0x0C)
 	ld a, $0c
 	ld [$2100], a
-	jp Call_1CCC
+;> return DrawLinkOAM()
+	jp DrawLinkOAM
 
 
 Jump_000_1ba7:
 	ld l, a
 	jr jr_000_1be5
 
-Jump_1BAA::
+;@ def AnimateTilesGroup2()
+;@ path: gfx/animation
+;@ Animated tiles group 2: page $6B, a new frame every 16 frames.
+;@ test: skip writes VRAM
+AnimateTilesGroup2::
+;> page = 0x6B
 	ld h, $6b
+;> return AnimateTilesEvery16(page)
 	jr jr_000_1bb8
 
-Jump_1BAE::
+;@ def AnimateTilesGroup3()
+;@ path: gfx/animation
+;@ Animated tiles group 3: page $6C every 16 frames.
+;@ test: skip writes VRAM
+AnimateTilesGroup3::
+;> page = 0x6C
 	ld h, $6c
+;> return AnimateTilesEvery16(page)
 	jr jr_000_1bb8
 
-Jump_1BB2::
+;@ def AnimateTilesGroupC()
+;@ path: gfx/animation
+;@ Animated tiles group $0C: page $73 every 16 frames.
+;@ test: skip writes VRAM
+AnimateTilesGroupC::
+;> page = 0x73
 	ld h, $73
+;> return AnimateTilesEvery16(page)
 	jr jr_000_1bb8
 
-Jump_1BB6::
+;@ def AnimateTilesGroupB()
+;@ path: gfx/animation
+;@ Animated tiles group $0B: page $6A every 16 frames. Its end (jr_000_1bb8) is shared by the
+;@ groups that change every 16 frames: on a new frame it steps hAnimatedTilesStep by $40 and
+;@ copies 64 bytes from page:hAnimatedTilesStep (Jump_000_1ba7) to $96C0.
+;@ test: skip writes VRAM
+AnimateTilesGroupB::
+;> page = 0x6A
 	ld h, $6a
 
 jr_000_1bb8:
+;> if hAnimatedTilesFrameCount & 0x0F:
 	ldh a, [hAnimatedTilesFrameCount]
 	and $0f
-	jp nz, Jump_1C5A
+;>     return UpdateLinkTiles()
+	jp nz, UpdateLinkTiles
 
-	call Call_1C43
+;> step = NextAnimatedTilesStep()
+	call NextAnimatedTilesStep
+;> copy(0x96C0, (page << 8) | step, 0x40)
+;> return DrawLinkOAM()
 	jp Jump_000_1ba7
 
 
+;@ path: gfx/animation
+;@ Ping-pong frame order of the animated tiles (offsets of the 4 frames in a page: 0, 1, 2, 3,
+;@ 3, 3, 2, 1), indexed by bits 3-5 of hAnimatedTilesFrameCount.
+AnimatedTilesPhases::
 	db $00, $40, $80, $c0, $c0, $c0, $80, $40
 
-Jump_1BCD::
+;@ def AnimateTilesGroup4()
+;@ path: gfx/animation
+;@ Animated tiles group 4: page $6D, every 8 frames the next frame of the ping-pong order
+;@ (AnimatedTilesPhases). The copy to $96C0 at its end is shared by the other groups.
+;@ test: skip writes VRAM
+AnimateTilesGroup4::
+;> if hAnimatedTilesFrameCount & 7:
 	ldh a, [hAnimatedTilesFrameCount]
 	and $07
-	jp nz, Jump_1C5A
+;>     return UpdateLinkTiles()
+	jp nz, UpdateLinkTiles
 
+;>@s src = 0x6D00 | AnimatedTilesPhases[(hAnimatedTilesFrameCount >> 3) & 7]
 	ldh a, [hAnimatedTilesFrameCount]
 	rra
 	rra
 	rra
 	and $07
 	ld e, a
+;=@s
 	ld d, $00
-	ld hl, $1bc5
+	ld hl, AnimatedTilesPhases
 	add hl, de
 	ld l, [hl]
 	ld h, $6d
 
-Jump_000_1be5:
 jr_000_1be5:
+;> dest = 0x96C0
 	ld de, $96c0
 
-Jump_000_1be8:
+jr_000_1be8:
+;> copy(dest, src, 0x40)
 	ld bc, $0040
 	call CopyData
-	jp Call_1CCC
+;> return DrawLinkOAM()
+	jp DrawLinkOAM
 
 
-Jump_1BF1::
+;@ def AnimateTilesGroup5()
+;@ path: gfx/animation
+;@ Animated tiles group 5: page $6E every 16 frames.
+;@ test: skip writes VRAM
+AnimateTilesGroup5::
+;> page = 0x6E
 	ld h, $6e
+;> return AnimateTilesEvery16(page)
 	jr jr_000_1bb8
 
-Jump_1BF5::
+;@ def AnimateTilesGroup6()
+;@ path: gfx/animation
+;@ Animated tiles group 6: page $6F, ping-pong order every 8 frames.
+;@ test: skip writes VRAM
+AnimateTilesGroup6::
+;> if hAnimatedTilesFrameCount & 7:
 	ldh a, [hAnimatedTilesFrameCount]
 	and $07
-	jp nz, Jump_1C5A
+;>     return UpdateLinkTiles()
+	jp nz, UpdateLinkTiles
 
+;>@s src = 0x6F00 | AnimatedTilesPhases[(hAnimatedTilesFrameCount >> 3) & 7]
 	ldh a, [hAnimatedTilesFrameCount]
 	rra
 	rra
 	rra
 	and $07
 	ld e, a
+;=@s
 	ld d, $00
-	ld hl, $1bc5
+	ld hl, AnimatedTilesPhases
 	add hl, de
 	ld l, [hl]
 	ld h, $6f
-	jp Jump_000_1be5
+;> copy(0x96C0, src, 0x40)                 # the end of AnimateTilesGroup4
+;> return DrawLinkOAM()
+	jp jr_000_1be5
 
 
-Jump_1C10::
+;@ def AnimateTilesGroup7()
+;@ path: gfx/animation
+;@ Animated tiles group 7: like group 4, but on every 4th frame (when the next frame count is a
+;@ multiple of 4) it copies 4 tiles from the RAM buffer at $DCC0 to $90C0 instead.
+;@ test: skip writes VRAM
+AnimateTilesGroup7::
+;> if (hAnimatedTilesFrameCount + 1) & 3:
 	ldh a, [hAnimatedTilesFrameCount]
 	inc a
 	and $03
-	jp nz, Jump_1BCD
+;>     return AnimateTilesGroup4()
+	jp nz, AnimateTilesGroup4
 
+;> copy(0x90C0, 0xDCC0, 0x40)
 	ld hl, $dcc0
 	ld de, $90c0
-	jp Jump_000_1be8
+;> return DrawLinkOAM()
+	jp jr_000_1be8
 
 
-Jump_1C21::
+;@ def AnimateTilesGroup8()
+;@ path: gfx/animation
+;@ Animated tiles group 8: page $70, a new frame every 8 frames. Its end (jr_000_1c23) is shared
+;@ by the groups that change every 8 frames.
+;@ test: skip writes VRAM
+AnimateTilesGroup8::
+;> page = 0x70
 	ld h, $70
 
 jr_000_1c23:
+;> if hAnimatedTilesFrameCount & 7:
 	ldh a, [hAnimatedTilesFrameCount]
 	and $07
-	jp nz, Jump_1C5A
+;>     return UpdateLinkTiles()
+	jp nz, UpdateLinkTiles
 
-	call Call_1C43
+;> step = NextAnimatedTilesStep()
+	call NextAnimatedTilesStep
+;> copy(0x96C0, (page << 8) | step, 0x40)
+;> return DrawLinkOAM()
 	jp Jump_000_1ba7
 
 
-Jump_1C30::
+;@ def AnimateTilesGroup9()
+;@ path: gfx/animation
+;@ Animated tiles group 9: page $71, a new frame every 4 frames. Its end (jr_000_1c32) is shared
+;@ by the groups that change every 4 frames.
+;@ test: skip writes VRAM
+AnimateTilesGroup9::
+;> page = 0x71
 	ld h, $71
 
 jr_000_1c32:
+;> if hAnimatedTilesFrameCount & 3:
 	ldh a, [hAnimatedTilesFrameCount]
 	and $03
-	jp nz, Jump_1C5A
+;>     return UpdateLinkTiles()
+	jp nz, UpdateLinkTiles
 
-	call Call_1C43
+;> step = NextAnimatedTilesStep()
+	call NextAnimatedTilesStep
+;> copy(0x96C0, (page << 8) | step, 0x40)
+;> return DrawLinkOAM()
 	jp Jump_000_1ba7
 
 
-Jump_1C3F::
+;@ def AnimateTilesGroupA()
+;@ path: gfx/animation
+;@ Animated tiles group $0A: page $72 every 4 frames.
+;@ test: skip writes VRAM
+AnimateTilesGroupA::
+;> page = 0x72
 	ld h, $72
+;> return AnimateTilesEvery4(page)
 	jr jr_000_1c32
 
-Call_1C43::
+;@ def NextAnimatedTilesStep() -> a
+;@ path: gfx/animation
+;@ Steps hAnimatedTilesStep to the next of the 4 frames of a page ($40 bytes each) and returns it.
+NextAnimatedTilesStep::
+;> hAnimatedTilesStep = u8(hAnimatedTilesStep + 0x40)
 	ldh a, [hAnimatedTilesStep]
 	add $40
 	ldh [hAnimatedTilesStep], a
+;> return hAnimatedTilesStep
 	ret
 
 
-Jump_1C4A::
+;@ def AnimateTilesGroupD()
+;@ path: gfx/animation
+;@ Animated tiles group $0D: page $75 every 4 frames.
+;@ test: skip writes VRAM
+AnimateTilesGroupD::
+;> page = 0x75
 	ld h, $75
+;> return AnimateTilesEvery4(page)
 	jr jr_000_1c32
 
-Jump_1C4E::
+;@ def AnimateTilesGroupF()
+;@ path: gfx/animation
+;@ Animated tiles group $0F: page $74 every 8 frames.
+;@ test: skip writes VRAM
+AnimateTilesGroupF::
+;> page = 0x74
 	ld h, $74
+;> return AnimateTilesEvery8(page)
 	jr jr_000_1c23
 
-Jump_1C52::
+;@ def AnimateTilesGroup10()
+;@ path: gfx/animation
+;@ Animated tiles group $10: page $77 every 8 frames.
+;@ test: skip writes VRAM
+AnimateTilesGroup10::
+;> page = 0x77
 	ld h, $77
+;> return AnimateTilesEvery8(page)
 	jr jr_000_1c23
 
-Jump_1C56::
+;@ def AnimateTilesGroupE()
+;@ path: gfx/animation
+;@ Animated tiles group $0E: page $76 every 8 frames.
+;@ test: skip writes VRAM
+AnimateTilesGroupE::
+;> page = 0x76
 	ld h, $76
+;> return AnimateTilesEvery8(page)
 	jr jr_000_1c23
 
-Jump_1C5A::
+;@ def UpdateLinkTiles()
+;@ path: link/sprites
+;@ Copies the two tiles of Link's current pose to sprite tiles 0-3 ($8000-$803F): tile numbers
+;@ from LinkPoseTiles (two per pose, the tiles are at bank $0C $5800 + 16 * tile), and his
+;@ sprites' flip bits (bits 5-6) from LinkPoseAttributes into wLinkOAMAttrLeft/Right. Then
+;@ DrawLinkOAM puts Link's sprites in OAM. Nothing when Link is not drawn (pose $FF).
+;@ test: skip writes VRAM
+UpdateLinkTiles::
+;> if hLinkAnimationState == 0xFF:
 	ldh a, [hLinkAnimationState]
 	cp $ff
-	jp z, Call_1CCC
+;>     return DrawLinkOAM()
+	jp z, DrawLinkOAM
 
-	ld hl, $1813
+;> i = 2 * hLinkAnimationState
+	ld hl, LinkPoseTiles
 	sla a
 	ld c, a
 	ld b, $00
+;> left = LinkPoseTiles[i]
 	add hl, bc
 	ld e, [hl]
 	push hl
-	ld hl, $1901
+;>@al wLinkOAMAttrLeft = (wLinkOAMAttrLeft & 0x9F) | LinkPoseAttributes[i]
+	ld hl, LinkPoseAttributes
 	add hl, bc
-	ld a, [$c11d]
+	ld a, [wLinkOAMAttrLeft]
 	and $9f
 	or [hl]
-	ld [$c11d], a
+;=@al
+	ld [wLinkOAMAttrLeft], a
+;> wLinkOAMAttrRight =(wLinkOAMAttrRight & 0x9F) | LinkPoseAttributes[i + 1]
 	inc hl
-	ld a, [$c11e]
+	ld a, [wLinkOAMAttrRight]
 	and $9f
 	or [hl]
-	ld [$c11e], a
+	ld [wLinkOAMAttrRight], a
+;>@cl copy(0x8000, 0x5800 + 16 * left, 0x20)  # the pose's left half (two 8x8 tiles)
 	ld d, $00
 	sla e
 	rl d
 	sla e
 	rl d
 	sla e
+;=@cl
 	rl d
 	sla e
 	rl d
 	ld hl, $5800
 	add hl, de
 	push hl
+;=@cl
 	pop bc
 	ld hl, $8000
 	ld d, $20
 
-jr_000_1ca0:
+.copyLeft
+;=@cl
 	ld a, [bc]
 	inc bc
 	ld [hli], a
 	dec d
-	jr nz, jr_000_1ca0
+	jr nz, .copyLeft
 
+;> right = LinkPoseTiles[i + 1]
 	pop hl
 	inc hl
 	ld e, [hl]
+;>@cr copy(0x8020, 0x5800 + 16 * right, 0x20)  # the right half
 	ld d, $00
 	sla e
 	rl d
 	sla e
 	rl d
 	sla e
+;=@cr
 	rl d
 	sla e
 	rl d
 	ld hl, $5800
 	add hl, de
 	push hl
+;=@cr
 	pop bc
 	ld hl, $8020
 	ld d, $20
 
-jr_000_1cc6:
+.copyRight
+;=@cr
 	ld a, [bc]
 	inc bc
 	ld [hli], a
 	dec d
-	jr nz, jr_000_1cc6
+	jr nz, .copyRight
 
-Call_1CCC::
+;> return DrawLinkOAM()
+
+;@ def DrawLinkOAM()
+;@ path: link/sprites
+;@ Puts Link's two 8x16 sprites in OAM entries 2-3 at his drawing position (with the sprite
+;@ offsets), tiles 0 and 2, attributes wLinkOAMAttrLeft/Right; while invincible the palette bit
+;@ blinks. Not when Link is hidden (pose $FF) or below the play area.
+DrawLinkOAM::
+;> if hLinkAnimationState == 0xFF:
 	ldh a, [hLinkAnimationState]
 	inc a
-	jr z, jr_000_1d14
+;>     return
+	jr z, Jump_000_1d14
 
+;> wLinkFlashAttr = (wInvincibilityCounter << 2) & 0x10   # palette 1 on alternate 4-frame phases
 	ld a, [wInvincibilityCounter]
 	rla
 	rla
 	and $10
-	ld [$c135], a
-	ld hl, $c008
+	ld [wLinkFlashAttr], a
+;> y = u8(wLinkSpriteDY + wLinkDrawY)
+	ld hl, wOAMBuffer + $08
 	ld a, [wLinkSpriteDY]
 	ld c, a
 	ld a, [wLinkDrawY]
 	add c
+;> if y >= 0x88:
 	cp $88
-	jr nc, jr_000_1d14
+;>     return
+	jr nc, Jump_000_1d14
 
+;> wOAMBuffer[8] = y
 	push af
 	ld [hli], a
+;> x = u8(hLinkX + wLinkSpriteDX)
 	ld a, [wLinkSpriteDX]
 	ld c, a
 	ldh a, [hLinkX]
 	add c
+;> wOAMBuffer[9] = x
 	ld [hli], a
+;> wOAMBuffer[10] = 0x00
 	ld a, $00
 	ld [hli], a
-	ld a, [$c135]
+;> wOAMBuffer[11] = wLinkOAMAttrLeft | wLinkFlashAttr
+	ld a, [wLinkFlashAttr]
 	ld d, a
-	ld a, [$c11d]
+	ld a, [wLinkOAMAttrLeft]
 	or d
 	ld [hli], a
+;> wOAMBuffer[12] = y
 	pop af
 	ld [hli], a
+;> wOAMBuffer[13] = u8(x + 8)
 	ldh a, [hLinkX]
 	add c
 	add $08
 	ld [hli], a
+;> wOAMBuffer[14] = 0x02
 	ld a, $02
 	ld [hli], a
-	ld a, [$c135]
+;> wOAMBuffer[15] = wLinkOAMAttrRight | wLinkFlashAttr
+	ld a, [wLinkFlashAttr]
 	ld d, a
-	ld a, [$c11e]
+	ld a, [wLinkOAMAttrRight]
 	or d
 	ld [hli], a
 
 Jump_000_1d14:
-jr_000_1d14:
+;> return
 	ret
 
 
-Jump_000_1d15:
+;@ def BGChangeEntityTilesA()
+;@ path: gfx/tiles
+;@ Background change $10: 4 tiles from bank $0E $4F00 into the first entity tile slot ($8400).
+;@ test: skip switches ROM banks and writes VRAM
+BGChangeEntityTilesA::
+;> src = 0x4F00
 	ld hl, $4f00
+;> bank = 0x0E
 	ld a, $0e
+;> set_rom_bank(bank)                       # (the end of BGChangeEntityTilesB)
+;> return CopyBGChangeTiles(src, 0x8400, 0x40)
 	jr jr_000_1d21
 
-Jump_000_1d1c:
+;@ def BGChangeEntityTilesB()
+;@ path: gfx/tiles
+;@ Background change $0F: 4 tiles from bank $12 $6080 into the first entity tile slot ($8400).
+;@ BGChangeEntityTilesA shares its end.
+;@ test: skip switches ROM banks and writes VRAM
+BGChangeEntityTilesB::
+;> bank = 0x12
 	ld a, $12
+;> src = 0x6080
 	ld hl, $6080
 
 jr_000_1d21:
+;> set_rom_bank(bank)
 	ld [$2100], a
+;> return CopyBGChangeTiles(src, 0x8400, 0x40)
 	ld de, $8400
 	ld bc, $0040
-	jp Jump_000_1e4d
+	jp CopyBGChangeTiles
 
 
-Jump_000_1d2d:
+;@ def BGChangeTradeItemTiles()
+;@ path: gfx/tiles
+;@ Background change $0D: the tiles of the current trading item (wTradeSequenceItem 2 and up,
+;@ 64 bytes each from bank $0C $4400 + (item - 2) * $40) into tiles $9A-$9D ($89A0).
+;@ test: skip switches ROM banks and writes VRAM
+BGChangeTradeItemTiles::
+;> if wTradeSequenceItem < 2:
 	ld a, [wTradeSequenceItem]
 	cp $02
-	jp c, Jump_000_1e50
+;>     return FinishBGChange()
+	jp c, FinishBGChange
 
+;>@s src = 0x4400 + (wTradeSequenceItem - 2) * 0x40
 	sub $02
 	ld d, a
 	ld e, $00
 	sra d
 	rr e
 	sra d
+;=@s
 	rr e
 	ld hl, $4400
 	add hl, de
+;> set_rom_bank(0x0C)
 	ld de, $89a0
 	ld bc, $0040
 	ld a, $0c
 	ld [$2100], a
-	jp Jump_000_1e4d
+;> return CopyBGChangeTiles(src, 0x89A0, 0x40)
+	jp CopyBGChangeTiles
 
 
-Call_1D54::
+;@ def BGChangeTiles88E0Alt()
+;@ path: gfx/tiles
+;@ Background change $0A: 2 tiles from bank $0C $68C0 to tiles $8E-$8F ($88E0).
+;@ test: skip switches ROM banks and writes VRAM
+BGChangeTiles88E0Alt::
+;> src = 0x68C0
 	ld hl, $68c0
+;> dest = 0x88E0
 	ld de, $88e0
+;> return BGChangeTiles8CA0.copy2(src, dest)   # (shared end of BGChangeTiles8CA0)
 	jr jr_000_1dc4
 
-Jump_000_1d5c:
+;@ def BGChangeTilesBank11()
+;@ path: gfx/tiles
+;@ Background change $0C: 4 tiles from bank $11 ($5000 + $40 * the low nibble of $D000) to the
+;@ same place in tiles $D0-$FF ($8D00 + ...). Ends without updating Link's sprite.
+;@ test: skip switches ROM banks and writes VRAM
+BGChangeTilesBank11::
+;> set_rom_bank(0x11)
 	ld a, $11
 	ld [$2100], a
+;>@o offset = (wEntityWorkRAM & 0x0F) * 0x40
 	ld a, [wEntityWorkRAM]
 	swap a
 	and $f0
 	ld e, a
 	ld d, $00
 	sla e
+;=@o
 	rl d
 	sla e
 	rl d
+;> dest = 0x8D00 + offset
 	ld hl, $8d00
 	add hl, de
 	push hl
+;> src = 0x5000 + offset
 	ld hl, $5000
 
 jr_000_1d7b:
 	add hl, de
 	pop de
+;> copy(dest, src, 0x40)
 	ld bc, $0040
 	call CopyData
+;> hBGChangeRequest = 0
 	xor a
 	ldh [hBGChangeRequest], a
+;> set_rom_bank(0x0C)
 	ld a, $0c
 	ld [$2100], a
 	ret
 
 
-Jump_000_1d8c:
+;@ def BGChangeTilesBank13()
+;@ path: gfx/tiles
+;@ Background change 8: like BGChangeTilesBank11 with bank $13 $4D00.
+;@ test: skip switches ROM banks and writes VRAM
+BGChangeTilesBank13::
+;> set_rom_bank(0x13)
 	ld a, $13
 	ld [$2100], a
+;>@o offset = (wEntityWorkRAM & 0x0F) * 0x40
 	ld a, [wEntityWorkRAM]
 	swap a
 	and $f0
 	ld e, a
 	ld d, $00
 	sla e
+;=@o
 	rl d
 	sla e
 	rl d
+;> dest = 0x8D00 + offset
 	ld hl, $8d00
 	add hl, de
 	push hl
+;> copy(dest, 0x4D00 + offset, 0x40)       # the end of BGChangeTilesBank11
 	ld hl, $4d00
 	jr jr_000_1d7b
 
-Jump_000_1dad:
+;@ def BGChangeTiles88E0()
+;@ path: gfx/tiles
+;@ Background change $0B: 2 tiles from bank $0C $48E0 to tiles $8E-$8F ($88E0).
+;@ test: skip switches ROM banks and writes VRAM
+BGChangeTiles88E0::
+;> set_rom_bank(0x0C)
 	ld hl, $48e0
 	ld de, $88e0
 	ld a, $0c
 	ld [$2100], a
+;> return CopyBGChangeTiles(0x48E0, 0x88E0, 0x20)
 	ld bc, $0020
-	jp Jump_000_1e4d
+	jp CopyBGChangeTiles
 
 
-Call_1DBE::
+;@ def BGChangeTiles8CA0()
+;@ path: gfx/tiles
+;@ Background change 9: 2 tiles from bank $0C $68E0 to tiles $CA-$CB ($8CA0). Its end (bank $0C,
+;@ 32 bytes) is shared with BGChangeTiles88E0Alt.
+;@ test: skip switches ROM banks and writes VRAM
+BGChangeTiles8CA0::
+;> src = 0x68E0
 	ld hl, $68e0
+;> dest = 0x8CA0
 	ld de, $8ca0
 
 jr_000_1dc4:
+;> set_rom_bank(0x0C)
 	ld a, $0c
 	ld [$2100], a
+;> return CopyBGChangeTiles(src, dest, 0x20)
 	ld bc, $0020
-	jp Jump_000_1e4d
+	jp CopyBGChangeTiles
 
 
-Jump_000_1dcf:
+;@ def BGChangeTiles9140A()
+;@ path: gfx/tiles
+;@ Background change 3: 4 tiles from bank $12 $7F00 to background tiles $14-$17 ($9140).
+;@ test: skip switches ROM banks and writes VRAM
+BGChangeTiles9140A::
+;> src = 0x7F00
 	ld hl, $7f00
+;> bank = 0x12
 	ld a, $12
+;> set_rom_bank(bank)                       # (the end of BGChangeTiles9140B)
+;> return CopyBGChangeTiles64(src, 0x9140)
 	jr jr_000_1ddb
 
-Jump_000_1dd6:
+;@ def BGChangeTiles9140B()
+;@ path: gfx/tiles
+;@ Background change 4: 4 tiles from bank $0D $4C40 to $9140 (BGChangeTiles9140A shares its end).
+;@ test: skip switches ROM banks and writes VRAM
+BGChangeTiles9140B::
+;> src = 0x4C40
 	ld hl, $4c40
+;> bank = 0x0D
 	ld a, $0d
 
 jr_000_1ddb:
+;> set_rom_bank(bank)
 	ld [$2100], a
+;> return CopyBGChangeTiles64(src, 0x9140)
 	ld de, $9140
-	jp Jump_000_1e4a
+	jp CopyBGChangeTiles64
 
 
-	db $40, $68, $40, $68, $00, $68, $80, $68, $00, $68
+;@ path: object/raised_blocks
+;@ Bank $0C sources of the raised-block tiles (64 bytes each), read with wRaisedBlocksState (0 or
+;@ 2) as byte offset: entries 0-1 at step 4 and 6, entries 2-3 at step 8 and $0A.
+RaisedBlockTilePointers::
+	dw $6840, $6840, $6800, $6880, $6800
 
-Call_1DEE::
+;@ def UpdateRaisedBlocks(step: a)
+;@ path: object/raised_blocks
+;@ One frame of the raised / lowered blocks changing over (after a crystal switch): the step
+;@ counts up; at step 3 the raised set flips (wRaisedBlocksState ^= 2); at steps 4 and 8 the
+;@ tiles at $9040, at steps 6 and $0A those at $9080 are swapped (RaisedBlockTilePointers); after
+;@ $0A it is over. Link cannot walk meanwhile. Other steps only update Link's sprite.
+;@ test: skip writes VRAM
+UpdateRaisedBlocks::
+;> set_rom_bank(0x0C)
 	ld hl, $2100
 	ld [hl], $0c
+;> hLinkInteractiveMotionBlocked = 1
 	ld hl, hLinkInteractiveMotionBlocked
 	ld [hl], $01
+;> variant = wRaisedBlocksState
 	ld hl, wRaisedBlocksState
 	ld e, [hl]
 	ld d, $00
+;> step += 1
 	inc a
+;> if step == 3:
 	cp $03
-	jr nz, jr_000_1e0d
+	jr nz, .store
 
+;>     wRaisedBlocksState ^= 2
 	push af
 	ld a, [wRaisedBlocksState]
 	xor $02
 	ld [wRaisedBlocksState], a
 	pop af
 
-jr_000_1e0d:
+.store
+;> wRaisedBlockStep = step
 	ld [wRaisedBlockStep], a
+;> if step == 4:
 	cp $04
-	jr nz, jr_000_1e19
+	jr nz, .not4
 
-	ld hl, $1de4
-	jr jr_000_1e20
+;>     src = mem16[RaisedBlockTilePointers + variant]
+	ld hl, RaisedBlockTilePointers
+;>     dest = 0x9040                        # (shared with step 8)
+	jr .at9040
 
-jr_000_1e19:
+.not4
+;> elif step == 8:
 	cp $08
-	jr nz, jr_000_1e26
+	jr nz, .not8
 
-	ld hl, $1de8
+;>     src = mem16[RaisedBlockTilePointers + 4 + variant]
+	ld hl, RaisedBlockTilePointers + 4
 
-jr_000_1e20:
+.at9040
+;>     dest = 0x9040
 	add hl, de
 	ld de, $9040
-	jr jr_000_1e3e
+	jr .copy
 
-jr_000_1e26:
+.not8
+;> elif step == 6:
 	cp $06
-	jr nz, jr_000_1e2f
+	jr nz, .notA6
 
-	ld hl, $1de4
-	jr jr_000_1e3a
+;>     src = mem16[RaisedBlockTilePointers + variant]
+	ld hl, RaisedBlockTilePointers
+;>     dest = 0x9080                        # (shared with step $0A)
+	jr .at9080
 
-jr_000_1e2f:
+.notA6
+;> elif step == 0x0A:                       # the last step
 	cp $0a
-	jr nz, jr_000_1e47
+	jr nz, .noCopy
 
+;>     wRaisedBlockStep = 0
 	xor a
 	ld [wRaisedBlockStep], a
-	ld hl, $1dea
+;>     src = mem16[RaisedBlockTilePointers + 6 + variant]
+	ld hl, RaisedBlockTilePointers + 6
 
-jr_000_1e3a:
+.at9080
+;>     dest = 0x9080
 	add hl, de
 	ld de, $9080
+;> else:
+;>@nc     return DrawLinkOAM()
 
-jr_000_1e3e:
+.copy
+;> copy(dest, src, 0x40)
 	ld bc, $0040
 	ld a, [hli]
 	ld h, [hl]
 	ld l, a
 	jp CopyData
 
+.noCopy
+;=@nc
+	jp DrawLinkOAM
 
-jr_000_1e47:
-	jp Call_1CCC
 
-
-Jump_000_1e4a:
+;@ def CopyBGChangeTiles64(src: hl, dest: de)
+;@ path: gfx/tiles
+;@ CopyBGChangeTiles with 64 bytes.
+;@ test: skip writes VRAM
+CopyBGChangeTiles64::
+;> count = 0x40
 	ld bc, $0040
 
-Jump_000_1e4d:
+;@ def CopyBGChangeTiles(src: hl, dest: de, count: bc)
+;@ path: gfx/tiles
+;@ Copies the tiles of a background change, then finishes it (FinishBGChange).
+;@ test: skip writes VRAM
+CopyBGChangeTiles::
+;> copy(dest, src, count)
 	call CopyData
 
-Jump_000_1e50:
+;@ def FinishBGChange()
+;@ path: gfx/tiles
+;@ Clears hBGChangeRequest, switches bank $0C back in and updates Link's sprite (DrawLinkOAM).
+;@ test: skip switches ROM banks
+FinishBGChange::
+;> hBGChangeRequest = 0
 	xor a
 	ldh [hBGChangeRequest], a
+;> set_rom_bank(0x0C)
 	ld a, $0c
 	ld [$2100], a
-	jp Call_1CCC
+;> return DrawLinkOAM()
+	jp DrawLinkOAM
 
 
-	db $0c, $03, $08, $08, $0a, $0a, $05, $10, $36, $38, $3a, $3c, $02, $01, $08, $04
-	db $fc, $04, $00, $00, $00, $00, $04, $00
+;@ path: link/lift
+;@ Where Link looks for something to lift, read or open, by his direction (right, left, up,
+;@ down): x offset from hLinkX.
+LiftProbeDX::
+	db $0c, $03, $08, $08
 
-Call_1E73::
-	call Call_1E7B
+;@ path: link/lift
+;@ The same for the y offset from hLinkY.
+LiftProbeDY::
+	db $0a, $0a, $05, $10
+
+;@ path: link/lift
+;@ Link's pose while pulling with the Power Bracelet, by direction (the next pose number is the
+;@ second frame).
+LiftPullPoses::
+	db $36, $38, $3a, $3c
+
+;@ path: link/lift
+;@ The d-pad button that pulls (the opposite of Link's direction: left, right, down, up), by
+;@ direction.
+LiftPullButtons::
+	db $02, $01, $08, $04
+;@ path: link/lift
+;@ Link's sprite x offset while he pulls, by direction.
+LiftPullSpriteDX::
+	db $fc, $04, $00, $00
+
+;@ path: link/lift
+;@ Link's sprite y offset while he pulls, by direction.
+LiftPullSpriteDY::
+	db $00, $00, $04, $00
+
+;@ def CheckLiftAndReadBank2()
+;@ path: link/lift
+;@ CheckLiftAndRead for code in bank 2 (switches bank 2 back in).
+;@ test: skip switches ROM banks
+CheckLiftAndReadBank2::
+;> CheckLiftAndRead()
+	call CheckLiftAndRead
+;> return SwitchBank(2)
 	ld a, $02
 	jp SwitchBank
 
 
-Call_1E7B::
+;@ def CheckLiftAndRead()
+;@ path: link/lift
+;@ Link's actions on the square in front of him (LiftProbeDX/DY), when he stands on the ground
+;@ and carries nothing. Facing up, A or B reads a sign or other readable object (texts per room
+;@ from bank $14 $55FF), or opens a chest (object $A0; its content from bank $14 $4500, opened
+;@ by bank 2 $41BA). With the Power Bracelet's button held he pulls at the object: after 8 frames
+;@ (3 with a Piece of Power) of pulling against the opposite direction he lifts it (pots $8E,
+;@ $20 and, on the overworld, rocks $5C) - LiftRoomObject.
+;@ test: skip calls routines in other banks
+CheckLiftAndRead::
+;>@b if wIsCarryingLiftedObject or wIsUsingPegasusBoots or hLinkPositionZ or wLinkMotionState:
 	ld hl, wIsUsingPegasusBoots
 	ld a, [wIsCarryingLiftedObject]
 	or [hl]
 	ld hl, hLinkPositionZ
 	or [hl]
 	ld hl, wLinkMotionState
+;=@b
 	or [hl]
+;>     return
 	jp nz, Jump_000_20a5
 
+;> d = hLinkDirection
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, $00
-	ld hl, $1e5b
+;>@px hBGPosX = (hLinkX + LiftProbeDX[d] - 8) & 0xF0
+	ld hl, LiftProbeDX
 	add hl, de
 	ldh a, [hLinkX]
 	add [hl]
 	sub $08
 	and $f0
+;=@px
 	ldh [hBGPosX], a
+;> c = hBGPosX >> 4
 	swap a
 	ld c, a
-	ld hl, $1e5f
+;>@py hBGPosY = (hLinkY + LiftProbeDY[d] - 0x10) & 0xF0
+	ld hl, LiftProbeDY
 	add hl, de
 	ldh a, [hLinkY]
 	add [hl]
 	sub $10
 	and $f0
+;=@py
 	ldh [hBGPosY], a
+;> square = hBGPosY | c
 	or c
 	ld e, a
+;> hMultiPurpose1 = square
 	ldh [hMultiPurpose1], a
+;> if hi(wRoomObjects + square) != 0xD7:   # outside the room
 	ld hl, wRoomObjects
 	add hl, de
 	ld a, h
 	cp $d7
+;>     return ResetLiftPull()
 	jp nz, Jump_000_207c
 
+;> hMultiPurpose0 = mem[wRoomObjects + square]   # the object there
 	ld a, [hl]
 	ldh [hMultiPurpose0], a
+;> hMultiPurpose5 = GetObjectPhysics(hMultiPurpose0, wIsIndoor)
 	ld e, a
 	ld a, [wIsIndoor]
 	ld d, a
 	call GetObjectPhysics
 	ldh [hMultiPurpose5], a
+;> obj = hMultiPurpose0
+;> if obj != 0x9A:
 	ldh a, [hMultiPurpose0]
 	cp $9a
 	jr z, jr_000_1f10
 
+;>@ph     if hMultiPurpose5 in (0x00, 0x50, 0x51) or not (hMultiPurpose5 == 1 or 0x11 <= hMultiPurpose5 < 0x7C or 0xD0 <= hMultiPurpose5 < 0xD4):
 	ldh a, [hMultiPurpose5]
 	cp $00
 	jp z, Jump_000_207c
@@ -5957,6 +7291,7 @@ Call_1E7B::
 	cp $01
 	jr z, jr_000_1ef8
 
+;=@ph
 	cp $50
 	jp z, Jump_000_207c
 
@@ -5966,6 +7301,7 @@ Call_1E7B::
 	cp $11
 	jp c, Jump_000_207c
 
+;=@ph
 	cp $d4
 	jp nc, Jump_000_207c
 
@@ -5973,9 +7309,11 @@ Call_1E7B::
 	jr nc, jr_000_1ef8
 
 	cp $7c
+;>         return ResetLiftPull()           # nothing to do with it
 	jp nc, Jump_000_207c
 
 jr_000_1ef8:
+;>@rd if obj == 0x9A or (obj in (0x6F, 0x5E, 0xD4) and not wIsIndoor):   # readable: signs and tablets outdoors
 	ldh a, [hMultiPurpose0]
 	ld e, a
 	cp $6f
@@ -5984,32 +7322,40 @@ jr_000_1ef8:
 	cp $5e
 	jr z, jr_000_1f08
 
+;=@rd
 	cp $d4
 	jp nz, Jump_000_1fa1
 
 jr_000_1f08:
+;=@rd
 	ld a, [wIsIndoor]
 	and a
 	ld a, e
 	jp nz, Jump_000_1fa1
 
 jr_000_1f10:
+;>     if hLinkDirection == 2:              # facing up
 	ld e, a
 	ldh a, [hLinkDirection]
 	cp $02
 	jp nz, Jump_000_1ffd
 
+;>         wCanTalkToEntity = 2
 	ld a, $02
 	ld [wCanTalkToEntity], a
+;>         if hJoypadPressed & 0x30:        # A or B
 	ldh a, [hJoypadPressed]
 	and $30
 	jp z, Jump_000_1ffd
 
+;>             if obj == 0x5E:
 	ld a, e
 	cp $5e
+;>                 OpenDialogTable1(0x8E)   # (the call at jr_000_1f96)
 	ld a, $8e
 	jr z, jr_000_1f96
 
+;>             elif obj not in (0x6F, 0xD4):
 	ld a, e
 	cp $6f
 	jr z, jr_000_1f5b
@@ -6017,16 +7363,20 @@ jr_000_1f10:
 	cp $d4
 	jr z, jr_000_1f5b
 
+;>                 if wIsMarinFollowingLink:   # object $9A
 	ld a, [wIsMarinFollowingLink]
 	and a
 	jr z, jr_000_1f42
 
+;>                     OpenDialogTable2(0x78)
 	ld a, $78
 	call OpenDialogTable2
 	jp Jump_000_1ffd
 
 
 jr_000_1f42:
+;>                 else:
+;>@tx                     text = 0xFF if (wSwordLevel == 0 and hMapRoom == 0xA3) else 0xFC if hMapRoom == 0xFA else 0xFD
 	ld a, [wSwordLevel]
 	and a
 	ldh a, [hMapRoom]
@@ -6034,9 +7384,11 @@ jr_000_1f42:
 
 	ld e, $ff
 	cp $a3
+;=@tx
 	jr z, jr_000_1f58
 
 jr_000_1f50:
+;=@tx
 	ld e, $fc
 	cp $fa
 	jr z, jr_000_1f58
@@ -6044,20 +7396,25 @@ jr_000_1f50:
 	ld e, $fd
 
 jr_000_1f58:
+;>@od                     OpenDialog(text)
 	ld a, e
 	jr jr_000_1f9c
 
 jr_000_1f5b:
+;>             else:                        # a sign: its text from the room's entry
+;>                 set_rom_bank(0x14)
 	ldh a, [hMapRoom]
 	ld e, a
 	ld d, $00
 	ld a, $14
 	ld [$2100], a
+;>                 text = mem[0x55FF + hMapRoom]
 	ld hl, $55ff
 	add hl, de
 	ld a, [wOcarinaSongFlags]
 	ld e, a
 	ld a, [hl]
+;>                 if text == 0xA9 and wOcarinaSongFlags & 1: text = 0xAF
 	cp $a9
 	jr nz, jr_000_1f78
 
@@ -6067,26 +7424,34 @@ jr_000_1f5b:
 	ld a, $af
 
 jr_000_1f78:
+;>                 if text == 0xAF and not wOcarinaSongFlags & 1:
 	cp $af
 	jr nz, jr_000_1f92
 
 	bit 0, e
 	jr nz, jr_000_1f92
 
+;>@sp                     wSignpostReadPos = (hBGPosY & 0xF0) | (hBGPosX >> 4)   # where it was read
 	ldh a, [hBGPosX]
 	swap a
 	and $0f
 	ld e, a
 	ldh a, [hBGPosY]
 	and $f0
+;=@sp
 	or e
-	ld [$d473], a
+	ld [wSignpostReadPos], a
 	jp Jump_000_1ffd
 
 
 jr_000_1f92:
+;>                 elif text == 0x83:
 	cp $83
+;>                     OpenDialog(text)     # (the call at jr_000_1f9c)
 	jr z, jr_000_1f9c
+
+;>                 else:
+;>                     OpenDialogTable1(text)
 
 jr_000_1f96:
 	call OpenDialogTable1
@@ -6094,10 +7459,13 @@ jr_000_1f96:
 
 
 jr_000_1f9c:
+;=@od
 	call OpenDialog
 	jr jr_000_1ffd
 
 Jump_000_1fa1:
+;> else:                                    # object $A0 is a chest
+;>@ch     if obj == 0xA0 and wRoomEvent & 0x1F != 0x0D and hLinkDirection == 2:
 	cp $a0
 	jr nz, jr_000_1ffd
 
@@ -6106,11 +7474,14 @@ Jump_000_1fa1:
 	cp $0d
 	jr z, jr_000_1ffd
 
+;=@ch
 	ldh a, [hLinkDirection]
 	cp $02
 	jr nz, jr_000_1ffd
 
+;>         wCanTalkToEntity = 2
 	ld [wCanTalkToEntity], a
+;>@op         if hJoypadPressed & 0x30 and (hIsSideScrolling or hLinkDirection == 2):
 	ldh a, [hJoypadPressed]
 	and $30
 	jr z, jr_000_1ffd
@@ -6119,19 +7490,23 @@ Jump_000_1fa1:
 	and a
 	jr nz, jr_000_1fc8
 
+;=@op
 	ldh a, [hLinkDirection]
 	cp $02
 	jr nz, jr_000_1ffd
 
 jr_000_1fc8:
+;>             set_rom_bank(0x14)
 	ld a, $14
 	ld [$2100], a
+;>@pg             page = wIsIndoor + (1 if 0x06 <= hMapId < 0x1A else 0)
 	ldh a, [hMapRoom]
 	ld e, a
 	ld a, [wIsIndoor]
 	ld d, a
 	ldh a, [hMapId]
 	cp $1a
+;=@pg
 	jr nc, jr_000_1fdf
 
 	cp $06
@@ -6140,12 +7515,15 @@ jr_000_1fc8:
 	inc d
 
 jr_000_1fdf:
+;>             content = mem[0x4500 + (page << 8) + hMapRoom]   # what the chest holds
 	ld hl, $4500
 	add hl, de
 	ld a, [hl]
+;>             if content == 0x20:
 	cp $20
 	jr nz, jr_000_1ff3
 
+;>                 content = 0x20 if wSwordLevel < 2 else 0x1C
 	ld a, [wSwordLevel]
 	cp $02
 	ld a, $20
@@ -6154,17 +7532,23 @@ jr_000_1fdf:
 	ld a, $1c
 
 jr_000_1ff3:
+;>             hMultiPurpose8 = content
 	ldh [hMultiPurpose8], a
+;>             set_rom_bank(2)
 	ld a, $02
 	ld [$2100], a
+;>             OpenChest()                  # bank 2 $41BA
 	call $41ba
 
 Jump_000_1ffd:
 jr_000_1ffd:
+;> # pulling with the Power Bracelet
+;> if wItemB == 3:
 	ld a, [wItemB]
 	cp $03
 	jr nz, jr_000_200b
 
+;>     if not hJoypadHeld & 0x20: return
 	ldh a, [hJoypadHeld]
 	and $20
 	jr nz, jr_000_201a
@@ -6173,43 +7557,56 @@ jr_000_1ffd:
 
 
 jr_000_200b:
+;> elif wItemA != 3 or not hJoypadHeld & 0x10:
 	ld a, [wItemA]
 	cp $03
 	jp nz, Jump_000_20a5
 
 	ldh a, [hJoypadHeld]
 	and $10
+;>     return
 	jp z, Jump_000_20a5
 
 jr_000_201a:
+;> set_rom_bank(2)
 	ld a, $02
 	ld [$2100], a
+;> Bank02_485E()
 	call $485e
+;> hLinkInteractiveMotionBlocked = 1
 	ld a, $01
 	ldh [hLinkInteractiveMotionBlocked], a
+;> d = hLinkDirection
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, $00
-	ld hl, $1e63
+;> hLinkAnimationState = LiftPullPoses[d]
+	ld hl, LiftPullPoses
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkAnimationState], a
-	ld hl, $1e67
+;> if not hJoypadHeld & LiftPullButtons[d]:   # not pulling back
+	ld hl, LiftPullButtons
 	add hl, de
 	ldh a, [hJoypadHeld]
 	and [hl]
+;>     return ResetLiftPull()
 	jr z, jr_000_207c
 
-	ld hl, $1e6b
+;> wLinkSpriteDX = LiftPullSpriteDX[d]
+	ld hl, LiftPullSpriteDX
 	add hl, de
 	ld a, [hl]
 	ld [wLinkSpriteDX], a
-	ld hl, $1e6f
+;> wLinkSpriteDY = LiftPullSpriteDY[d]
+	ld hl, LiftPullSpriteDY
 	add hl, de
 	ld a, [hl]
 	ld [wLinkSpriteDY], a
+;> hLinkAnimationState += 1                 # the pulling frame
 	ld hl, hLinkAnimationState
 	inc [hl]
+;> needed = 3 if wActivePowerUp == 1 else 8
 	ld e, $08
 	ld a, [wActivePowerUp]
 	cp $01
@@ -6218,14 +7615,19 @@ jr_000_201a:
 	ld e, $03
 
 jr_000_205a:
-	ld hl, $c15f
+;> wLiftPullCounter += 1
+	ld hl, wLiftPullCounter
 	inc [hl]
+;> if wLiftPullCounter < needed:
 	ld a, [hl]
 	cp e
+;>     return
 	jr c, jr_000_207b
 
+;> hMultiPurposeE = 0
 	xor a
 	ldh [hMultiPurposeE], a
+;> if obj in (0x8E, 0x20):                  # pots
 	ldh a, [hMultiPurpose0]
 	cp $8e
 	jr z, jr_000_2081
@@ -6233,6 +7635,11 @@ jr_000_205a:
 	cp $20
 	jr z, jr_000_2081
 
+;>@rk     LiftRoomObject()
+;>@rk2     set_rom_bank(0x14)
+;>@rk3     Bank14_55AA()
+;>@rk4     return RestoreBank()
+;> elif not wIsIndoor and obj == 0x5C:      # an overworld rock
 	ld a, [wIsIndoor]
 	and a
 	jr nz, jr_000_207b
@@ -6241,26 +7648,36 @@ jr_000_205a:
 	cp $5c
 	jr z, jr_000_208f
 
+;>@rk5     hMultiPurposeE = 1; return LiftRoomObject()   # by running on into it
+
 jr_000_207b:
+;> return
 	ret
 
 
 Jump_000_207c:
 jr_000_207c:
+;> # ResetLiftPull:
+;> wLiftPullCounter = 0
 	xor a
-	ld [$c15f], a
+	ld [wLiftPullCounter], a
 	ret
 
 
 jr_000_2081:
+;=@rk
 	call LiftRoomObject
+;=@rk2
 	ld a, $14
 	ld [$2100], a
+;=@rk3
 	call $55aa
+;=@rk4
 	jp RestoreBank
 
 
 jr_000_208f:
+;=@rk5
 	ld a, $01
 	ldh [hMultiPurposeE], a
 
@@ -6308,9 +7725,9 @@ RemoveRoomObject::
 ;@ variant from hMultiPurposeE (1 = a bush), and lets bank 3 place it over Link's head. Nothing happens when
 ;@ all entity slots are taken.
 SpawnLiftedObject::
-;> slot = Call_10EB(0x05)                   # a new entity of type 5; carry = no free slot
+;> slot = SpawnLinkProjectile(0x05)                   # a new entity of type 5; carry = no free slot
 	ld a, $05
-	call Call_10EB
+	call SpawnLinkProjectile
 ;> if slot is None: return
 	jr c, .done
 
@@ -8067,7 +9484,7 @@ FadeOutVolume::
 
 ;@ def ResetSoundEngine()
 ;@ path: sound/engine
-;@ Stops all music and sound effects (Call_1F_4003 in the sound bank), unless hSkipMusicSelection asks to
+;@ Stops all music and sound effects (SoundEntryStopAll in the sound bank), unless hSkipMusicSelection asks to
 ;@ keep the music running across this room change.
 ResetSoundEngine::
 ;> if not hSkipMusicSelection:
@@ -8078,8 +9495,8 @@ ResetSoundEngine::
 ;>     set_rom_bank(0x1F)
 	ld a, $1f
 	ld [$2100], a
-;>     Call_1F_4003()
-	call Call_1F_4003
+;>     SoundEntryStopAll()
+	call SoundEntryStopAll
 
 .done
 ;> set_rom_bank(wCurrentBank)
@@ -8089,13 +9506,13 @@ ResetSoundEngine::
 ;@ def SaveDungeonItemFlags()
 ;@ path: world/dungeon
 ;@ In a dungeon, copies the dungeon's item flags (map, compass, ...) from the working copy back into its
-;@ entry in the save data (Call_01_5BCF).
+;@ entry in the save data (StoreDungeonItemFlags).
 SaveDungeonItemFlags::
 ;> set_rom_bank(0x01)
 	ld a, $01
 	ld [$2100], a
-;> Call_01_5BCF()
-	call Call_01_5BCF
+;> StoreDungeonItemFlags()
+	call StoreDungeonItemFlags
 ;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
@@ -8751,13 +10168,13 @@ PlayPeriodicNoiseSfx::
 ;@ def OpenRoomDialog()
 ;@ path: text/dialog
 ;@ Opens the dialog that a table in bank 1 gives for the current room (hMapRoom -> $01:$5707 -> dialog
-;@ number at $01:$56B7; Call_01_5807).
+;@ number at $01:$56B7; ShowCurrentPlaceName).
 OpenRoomDialog::
 ;> set_rom_bank(0x01)
 	ld a, $01
 	ld [$2100], a
-;> Call_01_5807()
-	call Call_01_5807
+;> ShowCurrentPlaceName()
+	call ShowCurrentPlaceName
 ;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
@@ -9246,12 +10663,12 @@ LoadTileset06::
 ;@ while Link carries it, the golden leaves part once all 6 are found (not inside the dungeons), and a
 ;@ background change (request $0D) once the trading sequence is past its first item.
 LoadWorldItemTiles::
-;> if wHasToadstool: Call_1D54()
+;> if wHasToadstool: BGChangeTiles88E0Alt()
 	ld a, [wHasToadstool]
 	and a
 	jr z, .noToadstool
 
-	call Call_1D54
+	call BGChangeTiles88E0Alt
 
 .noToadstool
 ;> if not wIsIndoor or hMapId >= 0x0A:
@@ -9264,12 +10681,12 @@ LoadWorldItemTiles::
 	jr c, .tradeItem
 
 .notDungeon
-;>     if wGoldenLeaves >= 6: Call_1DBE()
+;>     if wGoldenLeaves >= 6: BGChangeTiles8CA0()
 	ld a, [wGoldenLeaves]
 	cp $06
 	jr c, .tradeItem
 
-	call Call_1DBE
+	call BGChangeTiles8CA0
 
 .tradeItem
 ;> if wTradeSequenceItem >= 2: hBGChangeRequest = 0x0D
@@ -9319,8 +10736,8 @@ LoadCommonWorldTiles::
 	ldh [hAnimatedTilesFrameCount], a
 ;> hAnimatedTilesStep = 0
 	ldh [hAnimatedTilesStep], a
-;> Call_1B6B()
-	call Call_1B6B
+;> RunAnimatedTiles()
+	call RunAnimatedTiles
 ;> CopyData(0x4800, 0x8800, 0x800)
 	ld hl, $4800
 	ld de, $8800
@@ -9843,9 +11260,9 @@ LoadRoom::
 ;> mem[0xDBC9] = 0
 	ld [$dbc9], a
 ;> mem[0xC1A2] = 0
-	ld [$c1a2], a
+	ld [wRoomEventCounter], a
 ;> mem[0xC1C6] = 0
-	ld [$c1c6], a
+	ld [wHookshotOut], a
 ;> mem[0xD6FA] = 0
 	ld [$d6fa], a
 ;> mem[0xC50A] = 0
@@ -9859,7 +11276,7 @@ LoadRoom::
 ;> wBossInRoom = 0
 	ld [wBossInRoom], a
 ;> mem[0xC50E] = 0
-	ld [$c50e], a
+	ld [wRoomNoiseLoop], a
 ;> wMarinSinging = 0
 	ld [wMarinSinging], a
 ;> wRoomEventJustDone = 0
@@ -9867,7 +11284,7 @@ LoadRoom::
 ;> wCompassChimeDelay = 0
 	ld [wCompassChimeDelay], a
 ;> mem[0xC3CD] = 0
-	ld [$c3cd], a
+	ld [wRoomDarkness], a
 ;> wWarpType = 0xFF                         # no warp record yet
 	ld a, $ff
 	ld [wWarpType], a
@@ -9947,7 +11364,7 @@ LoadRoom::
 ;>     wRoomShutterDoorsCopy = 0
 	ld [wRoomShutterDoorsCopy], a
 ;>     mem[0xC190] = 0
-	ld [$c190], a
+	ld [wRoomEventShuttersClosed], a
 ;>     wRoomEventDone = 0
 	ld [wRoomEventDone], a
 ;>@cl     fill(addr(wDefeatedEntityCount), 0, 17)    # and the list wDefeatedEntities
@@ -10363,7 +11780,7 @@ LoadOverworldObject::
 	cp $e9
 	jr nz, .not_E9
 
-	ld [$c50e], a
+	ld [wRoomNoiseLoop], a
 
 .not_E9
 ;> if obj == 0x5E and status & 0x20: obj = 0xC6     # (done at .toC6 below)
@@ -10590,9 +12007,9 @@ LoadIndoorObject::
 	ld [$c3cb], a
 ;>         mem[0xC3CD] += 4
 	push af
-	ld a, [$c3cd]
+	ld a, [wRoomDarkness]
 	add $04
-	ld [$c3cd], a
+	ld [wRoomDarkness], a
 ;>         wTransitionSequenceCounter = 4
 	ld a, $04
 	ld [wTransitionSequenceCounter], a
@@ -10895,1409 +12312,2057 @@ PlaceRoomObject::
 	ret
 
 
+;@ def OverworldMacroTree(data: bc) -> bc
+;@ path: world/rooms
+;@ Overworld macro $F5: a tree of 2x2 objects at the record's position, or a strip of trees (two squares
+;@ apart, to the right or downwards). A column of $F means one square left of the room's first column, so
+;@ the tree sticks out at the left edge.
 OverworldMacroTree::
+;> e = mem[data - 1] + 0x11
 	dec bc
 	ld a, [bc]
 	add $11
 	ld e, a
+;> if e & 0x0F == 0: e -= 0x10              # column $F: one square to the left
 	and $0f
-	jr nz, jr_000_3345
+	jr nz, .haveSquare
 
 	ld a, e
 	sub $10
 	ld e, a
 
-jr_000_3345:
+.haveSquare
+;> dest = wRoomObjectsArea + e              # = wRoomObjects + the position
 	ld d, $00
 	ld hl, wRoomObjectsArea
 	add hl, de
+;> if not hMultiPurpose0: return PlaceTree(dest, data)   # a single tree
 	ldh a, [hMultiPurpose0]
 	and a
 	jr z, PlaceTree
 
+;>@tr for _ in range(hMultiPurpose0 & 0x0F):
 	and $0f
 	ld e, a
 
-jr_000_3353:
+.tree
+;>     data = PlaceTree(dest, data) - 1     # (data stays at the position byte)
 	call PlaceTree
 	dec bc
+;>@st     step = 0x0F if hMultiPurpose0 & 0x40 else 0xF1   # from the tree's bottom right: down 2 / right 2
 	ldh a, [hMultiPurpose0]
 	and $40
 	ld d, $f1
-	jr z, jr_000_3361
+	jr z, .haveStep
 
+;=@st
 	ld d, $0f
 
-jr_000_3361:
+.haveStep
+;>     dest = (dest & 0xFF00) | u8(dest + 0x11 + step)
 	ld a, l
 	add d
 	ld l, a
+;=@tr
 	dec e
-	jr nz, jr_000_3353
+	jr nz, .tree
 
+;> return data + 1
 	inc bc
 	ret
 
 
+;@ def PlaceTree(dest: hl, data: bc) -> bc
+;@ path: world/rooms
+;@ Writes a 2x2 tree into wRoomObjects at `dest`: objects $25 $26 / $27 $28 on open ground (objects below
+;@ $10). Where a square already holds something else (another tree's half), the joined tree pieces
+;@ $29 $2A / $2A $29 are used, and on the bottom row objects $8A and up get $82 / $83. Returns data + 1.
 PlaceTree::
+;>@t1 mem[dest] = 0x25 if mem[dest] < 0x10 else 0x29
 	ld a, [hl]
 	cp $10
 	ld a, $25
-	jr c, jr_000_3372
+	jr c, .topLeft
 
 	add $04
 
-jr_000_3372:
+.topLeft
+;=@t1
 	ld [hli], a
+;>@t2 mem[dest + 1] = 0x26 if mem[dest + 1] < 0x10 else 0x2A
 	ld a, [hl]
 	cp $10
 	ld a, $26
-	jr c, jr_000_337c
+	jr c, .topRight
 
 	add $04
 
-jr_000_337c:
+.topRight
+;=@t2
 	ld [hld], a
+;>@bl mem[dest + 0x10] = 0x82 if mem[dest + 0x10] >= 0x8A else 0x27 if mem[dest + 0x10] < 0x10 else 0x2A
 	ld a, l
 	add $10
 	ld l, a
 	ld a, [hl]
 	cp $8a
-	jr nc, jr_000_3390
+	jr nc, .bottomLeft82
 
+;=@bl
 	cp $10
 	ld a, $27
-	jr c, jr_000_3392
+	jr c, .bottomLeft
 
 	ld a, $2a
-	jr jr_000_3392
+	jr .bottomLeft
 
-jr_000_3390:
+.bottomLeft82
+;=@bl
 	ld a, $82
 
-jr_000_3392:
+.bottomLeft
+;=@bl
 	ld [hli], a
+;>@br mem[dest + 0x11] = 0x83 if mem[dest + 0x11] >= 0x8A else 0x28 if mem[dest + 0x11] < 0x10 else 0x29
 	ld a, [hl]
 	cp $8a
-	jr nc, jr_000_33a2
+	jr nc, .bottomRight83
 
 	cp $10
 	ld a, $28
-	jr c, jr_000_33a4
+	jr c, .bottomRight
 
+;=@br
 	ld a, $29
-	jr jr_000_33a4
+	jr .bottomRight
 
-jr_000_33a2:
+.bottomRight83
+;=@br
 	ld a, $83
 
-jr_000_33a4:
+.bottomRight
+;=@br
 	ld [hl], a
+;> return data + 1
 	inc bc
 	ret
 
 
+;@ def PlaceObjectShape(base: hl, offsets: bc, objects: de)
+;@ path: world/rooms
+;@ Writes a shape of objects into wRoomObjects: for each offset of the list at `offsets` (row << 4 | column
+;@ from `base`; the list ends with $FF) the next object of `objects`. Entrances ($E1-$E3) are noted in the
+;@ wWarpDestPosition list. Returns to the room data pointer the caller pushed.
+;@ test: skip takes the data pointer from the stack
 PlaceObjectShape::
-jr_000_33a7:
+;> while True:
+;>     dest = base + mem[offsets]
 	push hl
 	push de
 	ld a, [bc]
 	ld e, a
 	ld d, $00
 	add hl, de
+;>     obj = mem[objects]
 	pop de
 	ld a, [de]
+;>@en     if obj in (0xE1, 0xE2, 0xE3):         # an entrance: note its position
 	cp $e1
-	jr z, jr_000_33bc
+	jr z, .entrance
 
 	cp $e2
-	jr z, jr_000_33bc
+	jr z, .entrance
 
 	cp $e3
-	jr nz, jr_000_33d6
+	jr nz, .store
 
-jr_000_33bc:
+.entrance
+;=@en
 	push af
 	push hl
 	push de
 	ld a, l
 	sub $11
 	push af
+;>         n = wRoomDoorCount
 	ld a, [wRoomDoorCount]
 	ld e, a
+;>         wRoomDoorCount = n + 1
 	inc a
 	ld [wRoomDoorCount], a
+;>         wWarpDestPosition[n] = u8(dest - 0x11)   # the low byte is the position in wRoomObjects
 	ld d, $00
 	ld hl, wWarpDestPosition
 	add hl, de
 	pop af
 	ld [hl], a
 	pop de
+;=@en
 	pop hl
 	pop af
 
-jr_000_33d6:
+.store
+;>     mem[dest] = obj
 	ld [hl], a
+;>     objects += 1
 	inc de
+;>     offsets += 1
 	inc bc
 	pop hl
+;>     if mem[offsets] == 0xFF: break
 	ld a, [bc]
 	and a
 	cp $ff
-	jr nz, jr_000_33a7
+	jr nz, PlaceObjectShape
 
+;> return pop_return_address()               # the room data pointer saved by the macro
 	pop bc
 	ret
 
 
+;@ path: world/rooms
+;@ Overworld macro $F8: 3x2 objects. +0 offsets from the record's position (row << 4 | column, $FF ends),
+;@ +7 the objects: $B6 $B7 $66 / $67 $E3 $68 ($E3 an entrance).
 MacroShapeF8::
 	db $00, $01, $02, $10, $11, $12, $ff, $b6, $b7, $66, $67, $e3, $68
 
+;@ def OverworldMacroF8(data: bc) -> bc
+;@ path: world/rooms
+;@ Overworld macro $F8: the shape MacroShapeF8 at the record's position.
 OverworldMacroF8::
+;> PlaceObjectShape(GetObjectRoomAddress(data), MacroShapeF8, MacroShapeF8 + 7)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $33e2
-	ld de, $33e9
+	ld bc, MacroShapeF8
+	ld de, MacroShapeF8 + 7
 	jp PlaceObjectShape
+;> return data
 
 
+;@ def GetObjectRoomAddress(data: bc) -> hl
+;@ path: world/rooms
+;@ The address in wRoomObjects of the position byte before `data` (bc is left pointing at it).
 GetObjectRoomAddress::
+;>@ga return addr(wRoomObjects) + mem[data - 1]
 	dec bc
 	ld a, [bc]
 	ld e, a
 	ld d, $00
 	ld hl, wRoomObjects
 	add hl, de
+;=@ga
 	ret
 
 
+;@ path: world/rooms
+;@ Overworld macro $F6: 5x3 objects (offsets, $FF, then objects): $55 $5A $5A $5A $56 / $57 $59 $59 $59 $58 /
+;@ $5B $E2 $5B $E2 $5B - a wide building with two entrances ($E2).
 MacroShapeF6::
 	db $00, $01, $02, $03, $04, $10, $11, $12, $13, $14, $20, $21, $22, $23, $24, $ff
 	db $55, $5a, $5a, $5a, $56, $57, $59, $59, $59, $58, $5b, $e2, $5b, $e2, $5b
 
+;@ def OverworldMacroF6(data: bc) -> bc
+;@ path: world/rooms
+;@ Overworld macro $F6: the shape MacroShapeF6 at the record's position.
 OverworldMacroF6::
+;> PlaceObjectShape(GetObjectRoomAddress(data), MacroShapeF6, MacroShapeF6 + 16)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $3406
-	ld de, $3416
+	ld bc, MacroShapeF6
+	ld de, MacroShapeF6 + 16
 	jp PlaceObjectShape
+;> return data
 
 
+;@ path: world/rooms
+;@ Overworld macro $F7: 3x3 objects (offsets, $FF, then objects): $55 $5A $56 / $57 $59 $58 / $5B $E2 $5B -
+;@ a small building with an entrance ($E2).
 MacroShapeF7::
 	db $00, $01, $02, $10, $11, $12, $20, $21, $22, $ff, $55, $5a, $56, $57, $59, $58
 	db $5b, $e2, $5b
 
+;@ def OverworldMacroF7(data: bc) -> bc
+;@ path: world/rooms
+;@ Overworld macro $F7: the shape MacroShapeF7 at the record's position.
 OverworldMacroF7::
+;> PlaceObjectShape(GetObjectRoomAddress(data), MacroShapeF7, MacroShapeF7 + 10)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $3432
-	ld de, $343c
+	ld bc, MacroShapeF7
+	ld de, MacroShapeF7 + 10
 	jp PlaceObjectShape
+;> return data
 
 
+;@ path: world/rooms
+;@ Overworld macro $F9: 3x2 objects (offsets, $FF, then objects): $A4 $A5 $A6 / $A7 $E3 $A8 ($E3 an
+;@ entrance).
 MacroShapeF9::
 	db $00, $01, $02, $10, $11, $12, $ff, $a4, $a5, $a6, $a7, $e3, $a8
 
+;@ def OverworldMacroF9(data: bc) -> bc
+;@ path: world/rooms
+;@ Overworld macro $F9: the shape MacroShapeF9 at the record's position.
 OverworldMacroF9::
+;> PlaceObjectShape(GetObjectRoomAddress(data), MacroShapeF9, MacroShapeF9 + 7)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $3452
-	ld de, $3459
+	ld bc, MacroShapeF9
+	ld de, MacroShapeF9 + 7
 	jp PlaceObjectShape
+;> return data
 
 
+;@ path: world/rooms
+;@ Overworld macro $FA: 2x2 objects (offsets, $FF, then two object sets): $BB $BC / $BD $BE, or four $09 once
+;@ room status bit 2 is set.
 MacroShapeFA::
 	db $00, $01, $10, $11, $ff, $bb, $bc, $bd, $be, $09, $09, $09, $09
 
+;@ def OverworldMacroFA(data: bc) -> bc
+;@ path: world/rooms
+;@ Overworld macro $FA: the shape MacroShapeFA; its second object set once room status bit 2 is set.
 OverworldMacroFA::
+;> base = GetObjectRoomAddress(data)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $346c
-	ld de, $3471
+;> objects = MacroShapeFA + 5
+	ld bc, MacroShapeFA
+	ld de, MacroShapeFA + 5
+;> if hRoomStatus & 0x04: objects = MacroShapeFA + 9
 	ldh a, [hRoomStatus]
 	and $04
-	jr z, jr_000_348c
+	jr z, .place
 
-	ld de, $3475
+	ld de, MacroShapeFA + 9
 
-jr_000_348c:
+.place
+;> PlaceObjectShape(base, MacroShapeFA, objects)
 	jp PlaceObjectShape
+;> return data
 
 
+;@ path: world/rooms
+;@ Overworld macro $FB: 2x2 objects (offsets, $FF, then objects): $B6 $B7 / $CD $CE.
 MacroShapeFB::
 	db $00, $01, $10, $11, $ff, $b6, $b7, $cd, $ce
 
+;@ def OverworldMacroFB(data: bc) -> bc
+;@ path: world/rooms
+;@ Overworld macro $FB: the shape MacroShapeFB at the record's position.
 OverworldMacroFB::
+;> PlaceObjectShape(GetObjectRoomAddress(data), MacroShapeFB, MacroShapeFB + 5)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $348f
-	ld de, $3494
+	ld bc, MacroShapeFB
+	ld de, MacroShapeFB + 5
 	jp PlaceObjectShape
+;> return data
 
 
+;@ path: world/rooms
+;@ Overworld macro $FC: 14 objects (offsets, $FF, then objects) in rows of 3, 5 (from one column left) and
+;@ 3: $2B $2C $2D / $37 $E8 $38 ... with entrance $E8 in the middle; $0A fills the rest.
 MacroShapeFC::
 	db $00, $01, $02, $10, $11, $12, $1f, $20, $21, $22, $23, $30, $31, $32, $ff, $2b
 	db $2c, $2d, $37, $e8, $38, $0a, $33, $2f, $34, $0a, $0a, $0a, $0a
 
+;@ def OverworldMacroFC(data: bc) -> bc
+;@ path: world/rooms
+;@ Overworld macro $FC: the shape MacroShapeFC at the record's position.
 OverworldMacroFC::
+;> PlaceObjectShape(GetObjectRoomAddress(data), MacroShapeFC, MacroShapeFC + 15)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $34a5
-	ld de, $34b4
+	ld bc, MacroShapeFC
+	ld de, MacroShapeFC + 15
 	jp PlaceObjectShape
+;> return data
 
 
+;@ path: world/rooms
+;@ Overworld macro $FD: 3x2 objects (offsets, $FF, then objects): $52 $52 $52 / $5B $E2 $5B ($E2 an
+;@ entrance).
 MacroShapeFD::
 	db $00, $01, $02, $10, $11, $12, $ff, $52, $52, $52, $5b, $e2, $5b
 
+;@ def OverworldMacroFD(data: bc) -> bc
+;@ path: world/rooms
+;@ Overworld macro $FD: the shape MacroShapeFD at the record's position.
 OverworldMacroFD::
+;> PlaceObjectShape(GetObjectRoomAddress(data), MacroShapeFD, MacroShapeFD + 7)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $34cf
-	ld de, $34d6
+	ld bc, MacroShapeFD
+	ld de, MacroShapeFD + 7
 	jp PlaceObjectShape
+;> return data
 
 
+;@ path: world/doors
+;@ The two objects (left, right) of a locked door in the top wall: $2D $2E.
 DoorKeyTopObjects::
 	db $2d, $2e
 
+;@ def DoorKeyTop(data: bc) -> bc
+;@ path: world/doors
+;@ Indoor macro: a locked door in the top wall (door slot 0). Once room status bit 2 is set (unlocked) it is
+;@ drawn as an open doorway instead.
 DoorKeyTop::
+;> RecordDoor(0, data)
 	ld e, $00
 	call RecordDoor
+;> if hRoomStatus & 0x04: return DoorOpenTop(data)
 	ldh a, [hRoomStatus]
 	and $04
 	jp nz, DoorOpenTop
 
+;> PlaceObjectShape(GetObjectRoomAddress(data), ShapeHorizontalPair, DoorKeyTopObjects)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $36c9
-	ld de, $34e9
+	ld bc, ShapeHorizontalPair
+	ld de, DoorKeyTopObjects
 	jp PlaceObjectShape
+;> return data
 
 
+;@ path: world/doors
+;@ The two objects (left, right) of a locked door in the bottom wall: $2F $30.
 DoorKeyBottomObjects::
 	db $2f, $30
 
+;@ def DoorKeyBottom(data: bc) -> bc
+;@ path: world/doors
+;@ Indoor macro: a locked door in the bottom wall (door slot 1). Once room status bit 3 is set (unlocked) it is
+;@ drawn as an open doorway instead.
 DoorKeyBottom::
+;> RecordDoor(1, data)
 	ld e, $01
 	call RecordDoor
+;> if hRoomStatus & 0x08: return DoorOpenBottom(data)
 	ldh a, [hRoomStatus]
 	and $08
 	jp nz, DoorOpenBottom
 
+;> PlaceObjectShape(GetObjectRoomAddress(data), ShapeHorizontalPair, DoorKeyBottomObjects)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $36c9
-	ld de, $3504
+	ld bc, ShapeHorizontalPair
+	ld de, DoorKeyBottomObjects
 	jp PlaceObjectShape
+;> return data
 
 
+;@ path: world/doors
+;@ The two objects (top, bottom) of a locked door in the left wall: $31 $32.
 DoorKeyLeftObjects::
 	db $31, $32
 
+;@ def DoorKeyLeft(data: bc) -> bc
+;@ path: world/doors
+;@ Indoor macro: a locked door in the left wall (door slot 2). Once room status bit 1 is set (unlocked) it is
+;@ drawn as an open doorway instead.
 DoorKeyLeft::
+;> RecordDoor(2, data)
 	ld e, $02
 	call RecordDoor
+;> if hRoomStatus & 0x02: return DoorOpenLeft(data)
 	ldh a, [hRoomStatus]
 	and $02
 	jp nz, DoorOpenLeft
 
+;> PlaceObjectShape(GetObjectRoomAddress(data), ShapeVerticalPair, DoorKeyLeftObjects)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $36cc
-	ld de, $351f
+	ld bc, ShapeVerticalPair
+	ld de, DoorKeyLeftObjects
 	jp PlaceObjectShape
+;> return data
 
 
+;@ path: world/doors
+;@ The two objects (top, bottom) of a locked door in the right wall: $33 $34.
 DoorKeyRightObjects::
 	db $33, $34
 
+;@ def DoorKeyRight(data: bc) -> bc
+;@ path: world/doors
+;@ Indoor macro: a locked door in the right wall (door slot 3). Once room status bit 0 is set (unlocked) it is
+;@ drawn as an open doorway instead.
 DoorKeyRight::
+;> RecordDoor(3, data)
 	ld e, $03
 	call RecordDoor
+;> if hRoomStatus & 0x01: return DoorOpenRight(data)
 	ldh a, [hRoomStatus]
 	and $01
 	jp nz, DoorOpenRight
 
+;> PlaceObjectShape(GetObjectRoomAddress(data), ShapeVerticalPair, DoorKeyRightObjects)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $36cc
-	ld de, $353a
+	ld bc, ShapeVerticalPair
+	ld de, DoorKeyRightObjects
 	jp PlaceObjectShape
+;> return data
 
 
+;@ def DoorShutterTop(data: bc) -> bc
+;@ path: world/doors
+;@ Indoor macro: a shutter door in the top wall (door slot 4): noted in wRoomShutterDoors (bit 0) and drawn
+;@ as an open doorway; the shutter closes and opens with the room's event.
 DoorShutterTop::
+;> RecordDoor(4, data)
 	ld e, $04
 	call RecordDoor
+;> wRoomShutterDoors |= 0x01
 	ld a, [wRoomShutterDoors]
 	or $01
 	ld [wRoomShutterDoors], a
+;> wRoomShutterDoorsCopy = wRoomShutterDoors
 	ld [wRoomShutterDoorsCopy], a
+;> return DoorOpenTop(data)
 	jp DoorOpenTop
 
 
+;@ def DoorShutterBottom(data: bc) -> bc
+;@ path: world/doors
+;@ Indoor macro: a shutter door in the bottom wall (door slot 5): noted in wRoomShutterDoors (bit 1) and drawn
+;@ as an open doorway; the shutter closes and opens with the room's event.
 DoorShutterBottom::
+;> RecordDoor(5, data)
 	ld e, $05
 	call RecordDoor
+;> wRoomShutterDoors |= 0x02
 	ld a, [wRoomShutterDoors]
 	or $02
 	ld [wRoomShutterDoors], a
+;> wRoomShutterDoorsCopy = wRoomShutterDoors
 	ld [wRoomShutterDoorsCopy], a
+;> return DoorOpenBottom(data)
 	jp DoorOpenBottom
 
 
+;@ def DoorShutterLeft(data: bc) -> bc
+;@ path: world/doors
+;@ Indoor macro: a shutter door in the left wall (door slot 6): noted in wRoomShutterDoors (bit 2) and drawn
+;@ as an open doorway; the shutter closes and opens with the room's event.
 DoorShutterLeft::
+;> RecordDoor(6, data)
 	ld e, $06
 	call RecordDoor
+;> wRoomShutterDoors |= 0x04
 	ld a, [wRoomShutterDoors]
 	or $04
 	ld [wRoomShutterDoors], a
+;> wRoomShutterDoorsCopy = wRoomShutterDoors
 	ld [wRoomShutterDoorsCopy], a
+;> return DoorOpenLeft(data)
 	jp DoorOpenLeft
 
 
+;@ def DoorShutterRight(data: bc) -> bc
+;@ path: world/doors
+;@ Indoor macro: a shutter door in the right wall (door slot 7): noted in wRoomShutterDoors (bit 3) and drawn
+;@ as an open doorway; the shutter closes and opens with the room's event.
 DoorShutterRight::
+;> RecordDoor(7, data)
 	ld e, $07
 	call RecordDoor
+;> wRoomShutterDoors |= 0x08
 	ld a, [wRoomShutterDoors]
 	or $08
 	ld [wRoomShutterDoors], a
+;> wRoomShutterDoorsCopy = wRoomShutterDoors
 	ld [wRoomShutterDoorsCopy], a
+;> return DoorOpenRight(data)
 	jp DoorOpenRight
 
 
+;@ path: world/doors
+;@ The two objects (left, right) of an open doorway in the top wall: $43 $44.
 DoorOpenTopObjects::
 	db $43, $44
 
+;@ def DoorOpenTop(data: bc) -> bc
+;@ path: world/doors
+;@ Indoor macro: an open doorway in the top wall; sets room status bit 2 (this door is open).
 DoorOpenTop::
+;> SetRoomStatusBits(0x04)
 	ld a, $04
 	call SetRoomStatusBits
+;> PlaceObjectShape(GetObjectRoomAddress(data), ShapeHorizontalPair, DoorOpenTopObjects)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $36c9
-	ld de, $35a1
+	ld bc, ShapeHorizontalPair
+	ld de, DoorOpenTopObjects
 	jp PlaceObjectShape
+;> return data
 
 
+;@ def SetRoomStatusBits(bits: a)
+;@ path: world/rooms
+;@ Sets `bits` in the status byte of the current indoor room (in wRoomStatus; maps 6-$19 use the second
+;@ indoor group) and copies the result into hRoomStatus.
 SetRoomStatusBits::
+;>@rm room = hMapRoom + (0x100 if 0x06 <= hMapId < 0x1A else 0)
 	push af
 	ldh a, [hMapRoom]
 	ld e, a
 	ld d, $00
 	ldh a, [hMapId]
 	cp $1a
-	jr nc, jr_000_35c6
+;=@rm
+	jr nc, .firstGroup
 
 	cp $06
-	jr c, jr_000_35c6
+	jr c, .firstGroup
 
 	inc d
 
-jr_000_35c6:
+.firstGroup
+;> wRoomStatus[0x100 + room] |= bits
 	ld hl, $d900
 	add hl, de
 	pop af
 	or [hl]
 	ld [hl], a
+;> hRoomStatus = wRoomStatus[0x100 + room]
 	ldh [hRoomStatus], a
+;> return
 	ret
 
 
+;@ path: world/doors
+;@ The two objects (left, right) of an open doorway in the bottom wall: $8C $08.
 DoorOpenBottomObjects::
 	db $8c, $08
 
+;@ def DoorOpenBottom(data: bc) -> bc
+;@ path: world/doors
+;@ Indoor macro: an open doorway in the bottom wall; sets room status bit 3 (this door is open).
 DoorOpenBottom::
+;> SetRoomStatusBits(0x08)
 	ld a, $08
 	call SetRoomStatusBits
+;> PlaceObjectShape(GetObjectRoomAddress(data), ShapeHorizontalPair, DoorOpenBottomObjects)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $36c9
-	ld de, $35d0
+	ld bc, ShapeHorizontalPair
+	ld de, DoorOpenBottomObjects
 	jp PlaceObjectShape
+;> return data
 
 
+;@ path: world/doors
+;@ The two objects (top, bottom) of an open doorway in the left wall: $09 $0A.
 DoorOpenLeftObjects::
 	db $09, $0a
 
+;@ def DoorOpenLeft(data: bc) -> bc
+;@ path: world/doors
+;@ Indoor macro: an open doorway in the left wall; sets room status bit 1 (this door is open).
 DoorOpenLeft::
+;> SetRoomStatusBits(0x02)
 	ld a, $02
 	call SetRoomStatusBits
+;> PlaceObjectShape(GetObjectRoomAddress(data), ShapeVerticalPair, DoorOpenLeftObjects)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $36cc
-	ld de, $35e4
+	ld bc, ShapeVerticalPair
+	ld de, DoorOpenLeftObjects
 	jp PlaceObjectShape
+;> return data
 
 
+;@ path: world/doors
+;@ The two objects (top, bottom) of an open doorway in the right wall: $0B $0C.
 DoorOpenRightObjects::
 	db $0b, $0c
 
+;@ def DoorOpenRight(data: bc) -> bc
+;@ path: world/doors
+;@ Indoor macro: an open doorway in the right wall; sets room status bit 0 (this door is open).
 DoorOpenRight::
+;> SetRoomStatusBits(0x01)
 	ld a, $01
 	call SetRoomStatusBits
+;> PlaceObjectShape(GetObjectRoomAddress(data), ShapeVerticalPair, DoorOpenRightObjects)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $36cc
-	ld de, $35f8
+	ld bc, ShapeVerticalPair
+	ld de, DoorOpenRightObjects
 	jp PlaceObjectShape
+;> return data
 
 
+;@ path: world/doors
+;@ The two objects (left, right) of the boss door in the top wall, while it is closed: $A4 $A5.
 DoorBossTopObjects::
 	db $a4, $a5
 
+;@ def DoorBossTop(data: bc) -> bc
+;@ path: world/doors
+;@ Indoor macro: the boss door in the top wall (door slot 8); an open doorway once room status bit 2 is
+;@ set.
 DoorBossTop::
+;> RecordDoor(8, data)
 	ld e, $08
 	call RecordDoor
+;> if hRoomStatus & 0x04: return DoorOpenTop(data)
 	ldh a, [hRoomStatus]
 	and $04
 	jp nz, DoorOpenTop
 
+;> PlaceObjectShape(GetObjectRoomAddress(data), ShapeHorizontalPair, DoorBossTopObjects)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $36c9
-	ld de, $360c
+	ld bc, ShapeHorizontalPair
+	ld de, DoorBossTopObjects
 	jp PlaceObjectShape
+;> return data
 
 
+;@ def RecordDoor(slot: e, data: bc)
+;@ path: world/doors
+;@ Notes the door at the record position (the byte before `data`) in door slot `slot`: wDoorPosition,
+;@ and its pixel position in wDoorY (row * 16) and wDoorX (column * 16).
 RecordDoor::
+;> pos = mem[data - 1]
 	ld d, $00
 	ld hl, wDoorPosition
 	add hl, de
 	dec bc
 	ld a, [bc]
+;> wDoorPosition[slot] = pos
 	ld [hl], a
+;> wDoorY[slot] = pos & 0xF0
 	push af
 	and $f0
 	ld hl, wDoorY
 	add hl, de
 	ld [hl], a
+;> wDoorX[slot] = (pos << 4) & 0xF0
 	pop af
 	swap a
 	and $f0
 	ld hl, wDoorX
 	add hl, de
 	ld [hl], a
+;> return
 	inc bc
 	ret
 
 
+;@ path: world/doors
+;@ Indoor macro $F9: two objects one above the other: $AF $B0.
 IndoorMacroF9Objects::
 	db $af, $b0
 
+;@ def IndoorMacroF9(data: bc) -> bc
+;@ path: world/doors
+;@ Indoor macro $F9: places IndoorMacroF9Objects (one above the other).
 IndoorMacroF9::
+;> PlaceObjectShape(GetObjectRoomAddress(data), ShapeVerticalPair, IndoorMacroF9Objects)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $36cc
-	ld de, $3644
+	ld bc, ShapeVerticalPair
+	ld de, IndoorMacroF9Objects
 	jp PlaceObjectShape
+;> return data
 
 
+;@ path: world/doors
+;@ Indoor macro $FA: two objects side by side: $B1 $B2.
 IndoorMacroFAObjects::
 	db $b1, $b2
 
+;@ def IndoorMacroFA(data: bc) -> bc
+;@ path: world/doors
+;@ Indoor macro $FA: places IndoorMacroFAObjects (side by side).
 IndoorMacroFA::
+;> PlaceObjectShape(GetObjectRoomAddress(data), ShapeHorizontalPair, IndoorMacroFAObjects)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $36c9
-	ld de, $3653
+	ld bc, ShapeHorizontalPair
+	ld de, IndoorMacroFAObjects
 	jp PlaceObjectShape
+;> return data
 
 
+;@ path: world/doors
+;@ Indoor macro $FB: two objects side by side: $45 $46.
 IndoorMacroFBObjects::
 	db $45, $46
 
+;@ def IndoorMacroFB(data: bc) -> bc
+;@ path: world/doors
+;@ Indoor macro $FB: places IndoorMacroFBObjects (side by side).
 IndoorMacroFB::
+;> PlaceObjectShape(GetObjectRoomAddress(data), ShapeHorizontalPair, IndoorMacroFBObjects)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $36c9
-	ld de, $3662
+	ld bc, ShapeHorizontalPair
+	ld de, IndoorMacroFBObjects
 	jp PlaceObjectShape
+;> return data
 
 
+;@ path: world/doors
+;@ Indoor macro $FC: 4x3 objects (offsets from the record position, $FF, then the objects):
+;@ $B3 $B4 $B4 $B5 / $B6 $B7 $B8 $B9 / $BA $BB $BC $BD.
 IndoorMacroFCShape::
 	db $00, $01, $02, $03, $10, $11, $12, $13, $20, $21, $22, $23, $ff, $b3, $b4, $b4
 	db $b5, $b6, $b7, $b8, $b9, $ba, $bb, $bc, $bd
 
+;@ def IndoorMacroFC(data: bc) -> bc
+;@ path: world/doors
+;@ Indoor macro $FC: sets room status bit 3 and places the 4x3 shape IndoorMacroFCShape.
 IndoorMacroFC::
+;> SetRoomStatusBits(0x08)
 	ld a, $08
 	call SetRoomStatusBits
+;> PlaceObjectShape(GetObjectRoomAddress(data), IndoorMacroFCShape, IndoorMacroFCShape + 13)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $3671
-	ld de, $367e
+	ld bc, IndoorMacroFCShape
+	ld de, IndoorMacroFCShape + 13
 	jp PlaceObjectShape
+;> return data
 
 
+;@ path: world/doors
+;@ Indoor macro $FD: two objects side by side: $C1 $C2.
 IndoorMacroFDObjects::
 	db $c1, $c2
 
+;@ def IndoorMacroFD(data: bc) -> bc
+;@ path: world/doors
+;@ Indoor macro $FD: in room $D3 of the second indoor group, once $DB46 is set, a shutter door in the
+;@ bottom wall; otherwise sets room status bit 0 and places IndoorMacroFDObjects.
 IndoorMacroFD::
+;>@d3 if 0x06 <= hMapId < 0x1A and hMapRoom == 0xD3 and mem[0xDB46]: return DoorShutterBottom(data)
 	ldh a, [hMapId]
 	cp $1a
-	jr nc, jr_000_36b7
+	jr nc, .other
 
 	cp $06
-	jr c, jr_000_36b7
+	jr c, .other
 
+;=@d3
 	ldh a, [hMapRoom]
 	cp $d3
-	jr nz, jr_000_36b7
+	jr nz, .other
 
 	ld a, [$db46]
 	and a
-	jr z, jr_000_36b7
+	jr z, .other
 
+;=@d3
 	jp DoorShutterBottom
 
-
-jr_000_36b7:
+.other
+;> SetRoomStatusBits(0x01)
 	ld a, $01
 	call SetRoomStatusBits
+;> PlaceObjectShape(GetObjectRoomAddress(data), ShapeHorizontalPair, IndoorMacroFDObjects)
 	push bc
 	call GetObjectRoomAddress
-	ld bc, $36c9
-	ld de, $369c
+	ld bc, ShapeHorizontalPair
+	ld de, IndoorMacroFDObjects
 	jp PlaceObjectShape
+;> return data
 
 
+;@ path: world/rooms
+;@ Offsets for PlaceObjectShape: two squares side by side ($00 $01, then $FF).
 ShapeHorizontalPair::
 	db $00, $01, $ff
 
+;@ path: world/rooms
+;@ Offsets for PlaceObjectShape: two squares one above the other ($00 $10, then $FF).
 ShapeVerticalPair::
 	db $00, $10, $ff
 
+;@ def FillRoomObjects(obj: a)
+;@ path: world/rooms
+;@ Fills the room (columns 1-10 of the rows of wRoomObjects) with object `obj`, the room's floor, which is
+;@ also kept in hMultiPurposeH.
 FillRoomObjects::
+;> hMultiPurposeH = obj
 	ldh [hMultiPurposeH], a
+;>@f for p in range(0x80):
 	ld d, $80
 	ld hl, wRoomObjects
 	ld e, a
 
-jr_000_36d7:
+.loop
+;>     if 1 <= (wRoomObjects + p) & 0x0F < 0x0B: wRoomObjects[p] = obj   # not the border columns
 	ld a, l
 	and $0f
-	jr z, jr_000_36e1
+	jr z, .next
 
 	cp $0b
-	jr nc, jr_000_36e1
+	jr nc, .next
 
 	ld [hl], e
 
-jr_000_36e1:
+.next
+;=@f
 	inc hl
 	dec d
-	jr nz, jr_000_36d7
+	jr nz, .loop
 
+;> return
 	ret
 
 
+;@ def LoadRoomEntities()
+;@ path: entity/spawn
+;@ Spawns the entities of the room being entered. First the list of the last 6 rooms visited is updated
+;@ (RememberRecentRoom: a room that drops out of it gets its defeated entities back). In dungeon 7 (map 6) the
+;@ heavy ball is placed where it was left (wIronBallRoom / X / Y). Then the room's entity list is read from
+;@ bank $16: pointer table at $4000 (overworld), $4200 (indoor group 1) or $4400 (maps 6-$19), two bytes
+;@ per room; each entry is 2 bytes (position row << 4 | column, entity type), $FF ends the list.
 LoadRoomEntities::
+;> set_rom_bank(0x01)
 	ld a, $01
 	ld [$2100], a
-	call $5c61
+;> RememberRecentRoom()
+	call RememberRecentRoom
+;> set_rom_bank(0x16)
 	ld a, $16
 	ld [$2100], a
+;> hMultiPurposeD = 0                       # index in the room's entity list
 	xor a
 	ldh [hMultiPurposeD], a
+;> offset = hMapRoom * 2
 	ldh a, [hMapRoom]
 	ld c, a
 	ld b, $00
 	sla c
 	rl b
+;> table = 0x4000
 	ld hl, $4000
+;> if wIsIndoor:
 	ld a, [wIsIndoor]
 	and a
-	jr z, jr_000_3747
+	jr z, .readPointer
 
+;>@ib     if hMapId == 6 and wIronBallRoom == hMapRoom:   # the heavy ball of dungeon 7 lies here
 	ldh a, [hMapId]
 	cp $06
-	jr nz, jr_000_3738
+	jr nz, .indoorTable
 
+;=@ib
 	ld a, [wIronBallRoom]
 	ld hl, hMapRoom
 	cp [hl]
-	jr nz, jr_000_3738
+	jr nz, .indoorTable
 
+;>         slot = SpawnEntity(0xA8)
 	ld a, $a8
-	call Call_3C01
+	call SpawnEntity
+;>         wEntityX[slot] = wIronBallX
 	ld a, [wIronBallX]
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], a
+;>         wEntityY[slot] = wIronBallY
 	ld a, [wIronBallY]
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], a
+;>         InitLoadedEntity(slot)
 	call InitLoadedEntity
+;>         wEntityLoadOrder[slot] = 0xFF        # not from the list
 	ld hl, wEntityLoadOrder
 	add hl, de
 	ld [hl], $ff
+;>         hMultiPurposeD = 0
 	xor a
 	ldh [hMultiPurposeD], a
 
-jr_000_3738:
+.indoorTable
+;>     table = 0x4200
 	ld hl, $4200
+;>@g2     if 0x06 <= hMapId < 0x1A: table = 0x4400
 	ldh a, [hMapId]
 	cp $1a
-	jr nc, jr_000_3747
+	jr nc, .readPointer
 
 	cp $06
-	jr c, jr_000_3747
+	jr c, .readPointer
 
+;=@g2
 	inc h
 	inc h
 
-jr_000_3747:
+.readPointer
+;> data = mem16[table + offset]
 	add hl, bc
 	ld a, [hli]
 	ld c, a
 	ld a, [hl]
 	ld b, a
 
-jr_000_374c:
+.next
+;> while mem[data] != 0xFF:
 	ld a, [bc]
 	cp $ff
-	jr z, jr_000_3756
+	jr z, .done
 
+;>     data = LoadRoomEntity(data)
 	call LoadRoomEntity
-	jr jr_000_374c
+	jr .next
 
-jr_000_3756:
+.done
+;> set_rom_bank(wCurrentBank)
 	call RestoreBank
+;> return
 	ret
 
 
+;@ path: entity/spawn
+;@ One bit for each of the first 8 entries of a room's entity list (in wRoomDefeatedEntityBits).
 RoomEntityBitMask::
 	db $01, $02, $04, $08, $10, $20, $40, $80
 
+;@ def LoadRoomEntity(data: bc) -> bc
+;@ path: entity/spawn
+;@ Spawns one entry of the room's entity list (hMultiPurposeD = its index) in a free entity slot: status 4
+;@ (being set up), position from the entry (the middle of the square: x + 8, y + $10 for the status bar),
+;@ type. Entries 0-7 are left out when wRoomDefeatedEntityBits says they were defeated; also when all 16
+;@ slots are taken. Returns `data` past the entry.
 LoadRoomEntity::
+;>@df skip = hMultiPurposeD < 8 and bool(wRoomDefeatedEntityBits[hMapRoom] & mem[RoomEntityBitMask + hMultiPurposeD])
 	ldh a, [hMultiPurposeD]
 	cp $08
-	jr nc, jr_000_377a
+	jr nc, .findSlot
 
 	ld e, a
 	ld d, $00
-	ld hl, $375a
+;=@df
+	ld hl, RoomEntityBitMask
 	add hl, de
 	ldh a, [hMapRoom]
 	ld e, a
 	ld a, [hl]
 	ld hl, wRoomDefeatedEntityBits
+;=@df
 	add hl, de
 	and [hl]
-	jr nz, jr_000_378c
+	jr nz, .skip
 
-jr_000_377a:
+.findSlot
+;>@fs slot = None if skip else next((s for s in range(16) if wEntityStatus[s] == 0), None)
 	ld e, $00
 	ld d, e
 
-jr_000_377d:
+.trySlot
+;=@fs
 	ld hl, wEntityStatus
 	add hl, de
 	ld a, [hl]
 	cp $00
-	jr z, jr_000_3793
+	jr z, .spawn
 
+;=@fs
 	inc e
 	ld a, e
 	cp $10
-	jr nz, jr_000_377d
+	jr nz, .trySlot
 
-jr_000_378c:
+.skip
+;> if slot is None:                         # defeated before, or no free slot
+;>     hMultiPurposeD += 1
 	ld hl, hMultiPurposeD
 	inc [hl]
+;>     return data + 2
 	inc bc
 	inc bc
 	ret
 
-
-jr_000_3793:
+.spawn
+;> wEntityStatus[slot] = 4                  # being set up
 	ld [hl], $04
+;> wEntityY[slot] = (mem[data] & 0xF0) + 0x10
 	ld a, [bc]
 	and $f0
 	ld hl, wEntityY
 	add hl, de
 	add $10
 	ld [hl], a
+;>@ex wEntityX[slot] = ((mem[data] << 4) & 0xF0) + 8
 	ld a, [bc]
 	inc bc
 	swap a
 	and $f0
 	ld hl, wEntityX
 	add hl, de
+;=@ex
 	add $08
 	ld [hl], a
+;> wEntityType[slot] = mem[data + 1]
 	ld hl, wEntityType
 	add hl, de
 	ld a, [bc]
 	inc bc
 	ld [hl], a
+;> InitLoadedEntity(slot)
+;> return data + 2
 
+;@ def InitLoadedEntity(slot: de)
+;@ path: entity/spawn
+;@ Sets up a just-spawned entity from its type's defaults (InitSpawnedEntityProperties) and notes its place in the room's
+;@ list (PlaceEntityForRoomScroll: wEntityLoadOrder = hMultiPurposeD, which counts on). Ends with bank $16 switched in.
 InitLoadedEntity::
+;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-	call $6552
+;> InitSpawnedEntityProperties(slot)
+	call InitSpawnedEntityProperties
+;> set_rom_bank(0x01)
 	ld a, $01
 	ld [$2100], a
-	call $5c0a
+;> PlaceEntityForRoomScroll(slot)
+	call PlaceEntityForRoomScroll
+;> set_rom_bank(0x16)
 	ld a, $16
 	ld [$2100], a
+;> return
 	ret
 
 
+;@ def ApplyIndoorRoomTemplate(template: a)
+;@ path: world/rooms
+;@ Builds the walls of an indoor room from one of its templates (Call_14_5000, high nibble of the room
+;@ data's second byte), then switches back to the bank of the room data (kept in hBGTilesRequestCopy by
+;@ LoadRoom). bc is kept.
 ApplyIndoorRoomTemplate::
+;> set_rom_bank(0x14)
 	ld e, a
 	ld a, $14
 	ld [$2100], a
+;> Call_14_5000(template)
 	ld a, e
 	push bc
-	call $5000
+	call Call_14_5000
 	pop bc
+;> set_rom_bank(hBGTilesRequestCopy)
 	ldh a, [hBGTilesRequestCopy]
 	ld [$2100], a
+;> return
 	ret
 
 
+;@ def LoadTileset0E()
+;@ path: menu/map
+;@ Tile set request $0E: draws the world map screen (Call_01_7EE8: rooms not visited yet are hidden).
 LoadTileset0E::
+;> set_rom_bank(0x01)
 	ld a, $01
 	ld [$2100], a
-	call $7ee8
+;> Call_01_7EE8()
+	call Call_01_7EE8
+;> return
 	ret
 
 
+;@ path: unused
+;@ 2 unused bytes ($FF).
 Padding37E4::
 	db $ff, $ff
 
-Call_37E6::
+;@ def GetEntityTypeByte14(type: de) -> a
+;@ path: entity/data
+;@ A byte of the per-entity-type table at $14:$56FF; for code in bank 5, which is switched back in.
+GetEntityTypeByte14::
+;> set_rom_bank(0x14)
 	ld a, $14
 	ld [$2100], a
+;> value = mem[0x56FF + type]
 	ld hl, $56ff
 	add hl, de
 	ld a, [hl]
+;> set_rom_bank(0x05)
 	ld hl, $2100
 	ld [hl], $05
+;> return value
 	ret
 
 
-Call_37F6::
+;@ def ShatterThrownObject()
+;@ path: object/liftable
+;@ A thrown pot or rock breaks into pieces (Call_19_77C6), for code in bank 3.
+ShatterThrownObject::
+;> SwitchBank(0x19)
 	ld a, $19
 	call SwitchBank
-	call $77c6
+;> Call_19_77C6()
+	call Call_19_77C6
+;> SwitchBank(0x03)
 	ld a, $03
 	jp SwitchBank
 
 
-Call_3803::
+;@ def BreakThrownObjectFar()
+;@ path: object/liftable
+;@ BreakThrownObject (bank 3) called from bank 0.
+BreakThrownObjectFar::
+;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-	call $5441
+;> BreakThrownObject()
+	call BreakThrownObject
+;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
-Call_380E::
+;@ def ConfineLinkToArena()
+;@ path: boss/common
+;@ Keeps Link inside the boss arena (Call_14_5964); called by boss handlers.
+ConfineLinkToArena::
+;> set_rom_bank(0x14)
 	ld a, $14
 	ld [$2100], a
-	call $5964
+;> Call_14_5964()
+	call Call_14_5964
+;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
-Call_3819::
+;@ def OnRoomEnteredBank1()
+;@ path: world/rooms
+;@ SpawnFollowers, run by bank 2 when Link has entered a room; bank 2 is switched back in.
+OnRoomEnteredBank1::
+;> SwitchBank(0x01)
 	ld a, $01
 	call SwitchBank
-	call $5d6b
+;> SpawnFollowers()
+	call SpawnFollowers
+;> SwitchBank(0x02)
 	ld a, $02
 	jp SwitchBank
 
 
-Call_3826::
+;@ def InitEntityPropertiesFar(slot: bc)
+;@ path: entity/spawn
+;@ InitEntityProperties (bank 3) called from another bank.
+InitEntityPropertiesFar::
+;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-	call $48b0
+;> InitEntityProperties(slot)
+	call InitEntityProperties
+;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
-Call_3831::
+;@ def UpdateCarriedEntity()
+;@ path: entity/carry
+;@ Call_14_5822, for the entity that Link carries; for code in bank 3, which is switched back in.
+UpdateCarriedEntity::
+;> set_rom_bank(0x14)
 	ld a, $14
 	ld [$2100], a
-	call $5822
+;> Call_14_5822()
+	call Call_14_5822
+;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
+;> return
 	ret
 
 
+;@ path: entity/engine
+;@ First OAM offset handed to the entities each frame (wOAMNextIndex), by frame number & 3: $00 $08 $10 $18.
+;@ Rotating the start makes sprites flicker instead of vanishing when there are too many on a line.
 OAMStartOffsets::
 	db $00, $08, $10, $18
 
-Call_3843::
-	ld hl, $c5a7
+;@ def UpdateEntities()
+;@ path: entity/engine
+;@ Runs all entities once per frame, slot 15 down to 0 (UpdateEntity for each used slot). Before that:
+;@ counts down wDelayedWaveSfxTimer (sound $10 when it runs out), wLinkPoseLock (not during a dialog),
+;@ picks the OAM start (rotating by frame inside the dungeons - maps below $0A - else 0), clears the per-frame
+;@ flags the entities set (Link in water, on a platform, carried entity, ...), and runs Call_02_63E6. Nothing
+;@ runs while wLinkMotionState is 7.
+UpdateEntities::
+;> if wDelayedWaveSfxTimer:
+	ld hl, wDelayedWaveSfxTimer
 	ld a, [hl]
 	and a
-	jr z, jr_000_3851
+	jr z, .poseLock
 
+;>     wDelayedWaveSfxTimer -= 1
 	dec [hl]
-	jr nz, jr_000_3851
+;>     if wDelayedWaveSfxTimer == 0: hWaveSfx = 0x10
+	jr nz, .poseLock
 
 	ld a, $10
 	ldh [hWaveSfx], a
 
-jr_000_3851:
+.poseLock
+;> if not wDialogState:
 	ld a, [wDialogState]
 	and a
-	jr nz, jr_000_3864
+	jr nz, .motion
 
+;>     wLinkShowItemPoseActive = wLinkPoseLock
 	ld a, [wLinkPoseLock]
 	ld [wLinkShowItemPoseActive], a
+;>     if wLinkPoseLock: wLinkPoseLock -= 1
 	and a
-	jr z, jr_000_3864
+	jr z, .motion
 
 	dec a
 	ld [wLinkPoseLock], a
 
-jr_000_3864:
+.motion
+;> if wLinkMotionState == 7: return
 	ld a, [wLinkMotionState]
 	cp $07
 	ret z
 
+;> wOAMEntriesUsed = 0
 	xor a
 	ld [wOAMEntriesUsed], a
+;>@st start = hFrameCounter & 3 if hMapId < 0x0A else 0
 	ldh a, [hMapId]
 	cp $0a
 	ldh a, [hFrameCounter]
-	jr c, jr_000_3877
+	jr c, .haveStart
 
 	xor a
 
-jr_000_3877:
+.haveStart
+;=@st
 	and $03
+;> wOAMNextIndex = mem[OAMStartOffsets + start]
 	ld e, a
 	ld d, $00
-	ld hl, $383f
+	ld hl, OAMStartOffsets
 	add hl, de
 	ld a, [hl]
 	ld [wOAMNextIndex], a
-	ld a, [$c5a0]
-	ld [$c5a1], a
+;> mem[0xC5A1] = mem[0xC5A0]
+	ld a, [wPodobooCount]
+	ld [wPodobooCountPrev], a
+;> mem[0xC5A0] = 0
 	xor a
-	ld [$c5a0], a
+	ld [wPodobooCount], a
+;> wRaccoonLoopsExit = 0
 	ld [wRaccoonLoopsExit], a
+;> hLinkInWater = 0
 	ldh [hLinkInWater], a
+;> wLinkSlowAnimation = 0
 	ld [wLinkSlowAnimation], a
+;> wNoEventJingle = 0
 	ld [wNoEventJingle], a
+;> wLinkOnPlatform = 0
 	ld [wLinkOnPlatform], a
+;> wCarriedEntityType = 0
 	ld [wCarriedEntityType], a
+;> mem[0xD45E] = 0
 	ld [$d45e], a
+;> if not wDialogState: wCanTalkToEntity = 0
 	ld a, [wDialogState]
 	and a
-	jr nz, jr_000_38ab
+	jr nz, .entities
 
 	ld [wCanTalkToEntity], a
 
-jr_000_38ab:
+.entities
+;> SwitchBank(0x02)
 	ld a, $02
 	call SwitchBank
-	call $63e6
+;> Call_02_63E6()
+	call Call_02_63E6
+;>@sl for slot in range(15, -1, -1):
 	ld b, $00
 	ld c, $0f
 
-jr_000_38b7:
+.slot
+;>     wActiveEntitySlot = slot
 	ld a, c
 	ld [wActiveEntitySlot], a
+;>     if wEntityStatus[slot]:
 	ld hl, wEntityStatus
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_000_38c8
+	jr z, .nextSlot
 
+;>         hActiveEntityStatus = wEntityStatus[slot]
 	ldh [hActiveEntityStatus], a
-	call Call_38DD
+;>         UpdateEntity(slot)
+	call UpdateEntity
 
-jr_000_38c8:
+.nextSlot
+;=@sl
 	dec c
 	ld a, c
 	cp $ff
-	jr nz, jr_000_38b7
+	jr nz, .slot
 
-Jump_38CE::
+;> EntityStatusFreeHandler()
+
+;@ def EntityStatusFreeHandler()
+;@ path: entity/engine
+;@ Entry 0 of EntityStatusHandlers (a free slot; never reached, UpdateEntities skips free slots): nothing.
+EntityStatusFreeHandler::
+;> return
 	ret
 
 
-Call_38CF::
+;@ def ResetEntityVariablesFrom3(slot: bc)
+;@ path: entity/engine
+;@ ResetEntityVariables (bank $15) for code in bank 3, which is switched back in.
+ResetEntityVariablesFrom3::
+;> set_rom_bank(0x15)
 	ld a, $15
 	ld [$2100], a
-	call $4000
+;> ResetEntityVariables(slot)
+	call ResetEntityVariables
+;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
+;> return
 	ret
 
 
-Call_38DD::
+;@ def UpdateEntity(slot: bc)
+;@ path: entity/engine
+;@ Runs one entity: copies its type, state and sprite variant to the hActiveEntity bytes, moves it along with
+;@ a room scroll (Call_19_7563) and reads its position (LoadEntityPosition) - for lifted entities, and for type $6A
+;@ while Link swims, in the other order, so they follow Link - runs the common checks of bank $14
+;@ (Call_14_5388), then the code for its status: the type's own handler (RunEntityHandler) when active
+;@ (status 5), else EntityStatusHandlers in bank 3.
+UpdateEntity::
+;> hActiveEntityType = wEntityType[slot]
 	ld hl, wEntityType
 	add hl, bc
 	ld a, [hl]
 	ldh [hActiveEntityType], a
+;> hActiveEntityState = wEntityState[slot]
 	ld hl, wEntityState
 	add hl, bc
 	ld a, [hl]
 	ldh [hActiveEntityState], a
+;> hActiveEntitySpriteVariant = wEntitySpriteVariant[slot]
 	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	ldh [hActiveEntitySpriteVariant], a
+;> SwitchBank(0x19)
 	ld a, $19
 	call SwitchBank
+;>@ft if (hActiveEntityType == 0x6A and hLinkInWater) or hActiveEntityStatus == 7:   # carried along with Link
 	ldh a, [hActiveEntityType]
 	cp $6a
-	jr nz, jr_000_3902
+	jr nz, .checkLifted
 
 	ldh a, [hLinkInWater]
 	and a
-	jr nz, jr_000_3908
+	jr nz, .follows
 
-jr_000_3902:
+.checkLifted
+;=@ft
 	ldh a, [hActiveEntityStatus]
 	cp $07
-	jr nz, jr_000_3910
+	jr nz, .usual
 
-jr_000_3908:
-	call $7563
-	call Call_3DBA
-	jr jr_000_3916
+.follows
+;>     Call_19_7563(slot)                   # moves it with a room scroll first
+	call Call_19_7563
+;>     LoadEntityPosition(slot)                      # then reads its position
+	call LoadEntityPosition
+	jr .common
 
-jr_000_3910:
-	call Call_3DBA
-	call $7563
+.usual
+;> else:
+;>     LoadEntityPosition(slot)
+	call LoadEntityPosition
+;>     Call_19_7563(slot)
+	call Call_19_7563
 
-jr_000_3916:
+.common
+;> SwitchBank(0x14)
 	ld a, $14
 	call SwitchBank
-	call $5388
+;> Call_14_5388(slot)
+	call Call_14_5388
+;> SwitchBank(0x03)
 	ld a, $03
 	call SwitchBank
+;> if hActiveEntityStatus == 5: return RunEntityHandler(slot)   # active
 	ldh a, [hActiveEntityStatus]
 	cp $05
-	jp z, Call_3945
+	jp z, RunEntityHandler
 
+;> return EntityStatusHandlers[hActiveEntityStatus](slot)
 	rst $00
 
-JumpTable_392B::
-	dw Jump_38CE
+;@ path: entity/engine
+;@ Code for each entity status (index = wEntityStatus; bank 3 is switched in): 0 free, 1 dying, 2 falling into
+;@ a pit, 3 destroyed, 4 being set up (init), 5 active (the type's own handler, RunEntityHandler), 6 stunned,
+;@ 7 lifted by Link, 8 thrown.
+EntityStatusHandlers::
+	dw EntityStatusFreeHandler
+	dw EntityStatus1Handler
+	dw EntityStatus2Handler
+	dw EntityStatus3Handler
+	dw EntityStatusInitHandler
+	dw RunEntityHandler
+	dw EntityStatus6Handler
+	dw EntityStatus7Handler
+	dw EntityStatus8Handler
 
-	db $7e, $55, $90, $4d, $26, $4d, $0a, $49, $45, $39, $bc, $4e, $92, $57, $49, $4e
-
-Call_393D::
-	call Call_3945
+;@ def RunEntityHandlerFrom3(slot: bc)
+;@ path: entity/engine
+;@ RunEntityHandler for code in bank 3, which is switched back in afterwards.
+RunEntityHandlerFrom3::
+;> RunEntityHandler(slot)
+	call RunEntityHandler
+;> SwitchBank(0x03)
 	ld a, $03
 	jp SwitchBank
 
 
-Call_3945::
+;@ def RunEntityHandler(slot: bc)
+;@ path: entity/engine
+;@ Runs the handler of the active entity's type (hActiveEntityType): its bank comes from the table at
+;@ $03:$4000 (one byte per type; bank 3 must be switched in), its address from EntityHandlers.
+;@ test: skip dispatches into the entity handlers of eight banks
+RunEntityHandler::
+;>@bk SwitchBank(mem[0x4000 + hActiveEntityType])
 	ldh a, [hActiveEntityType]
 	ld e, a
 	ld d, b
 	ld hl, $4000
 	add hl, de
 	ld a, [hl]
+;=@bk
 	call SwitchBank
+;> return EntityHandlers[hActiveEntityType](slot)
 	ld a, e
 	rst $00
 
-JumpTable_3953::
-	dw Call_03_6A4B
-	dw BoomerangHandler
-	dw Call_03_66BF
-	dw Call_18_7B61
-	dw Call_03_69C9
-	dw LiftableObjectHandler
-	dw PushedBlockHandler
-	dw Call_07_7AE3
-	dw Call_18_7930
-	dw OctorokHandler
-	dw Call_03_6A3D
-	dw MoblinHandler
-	dw Call_03_6AE7
-	dw Call_06_79CD
-	dw Call_04_7E82
-	dw Call_06_7547
-	dw Call_04_5C04
-	dw Call_04_5BFF
-	dw Call_04_5C04
-	dw HeartContainerSprite
-	dw Call_07_785E
-	dw Call_06_797B
-	dw Call_06_6641
-	dw Call_06_6641
-	dw Call_06_7470
-	dw Call_06_673C
-	dw StalfosHandler
-	dw Call_06_7CFC
-	dw Call_06_7CD0
-	dw $0000
-	dw EvasiveStalfosHandler
-	dw Call_06_7F5F
-	dw HardhatBeetleHandler
-	dw Call_06_7727
-	dw Call_06_65FB
-	dw Call_06_7EB5
-	dw IronMaskHandler
-	dw BurningFlameSprites
-	dw BurningFlameSprites
-	dw Call_06_760B
-	dw Call_19_6765
-	dw Call_04_5A8B
-	dw Call_04_6C34
-	dw Call_15_75E5
-	dw Call_07_76BC
-	dw Call_03_5D7F
-	dw Call_03_60C0
-	dw Call_03_617D
-	dw Call_03_5CD0
-	dw Call_03_5BDC
-	dw Call_03_5BCB
-	dw Call_03_5BB0
-	dw Call_03_5BA0
-	dw Call_03_5A9C
-	dw HeartContainerHandler
-	dw Call_03_609D
-	dw Call_03_5FEE
-	dw Call_03_5DDA
-	dw Call_03_5D92
-	dw Call_03_6083
-	dw Call_03_6029
-	dw Call_03_5FFF
-	dw MarinEntityHandler
-	dw TarinEntityHandler
-	dw WitchEntityHandler
-	dw Call_06_6801
-	dw Call_18_5E68
-	dw SeashellMansionTreesHandler
-	dw TalkingBonesHandler
-	dw BouldersHandler
-	dw LeverBlockDownHandler
-	dw LeverBlockUpHandler
-	dw LeverBlockRightHandler
-	dw LeverBlockLeftHandler
-	dw $0000
-	dw EntityHandler_Type4B
-	dw $0000
-	dw Call_04_7682
-	dw Call_04_7634
-	dw Call_04_6E4F
-	dw Call_06_7AB3
-	dw Call_04_697A
-	dw Call_04_67EF
-	dw Call_04_67EF
-	dw Call_04_5F59
-	dw Call_04_7D97
-	dw Call_04_7CA7
-	dw Call_04_5DE9
-	dw Call_04_5EF7
-	dw Call_04_569D
-	dw FacadeHandler
-	dw SlimeEyeHandler
-	dw GenieHandler
-	dw Call_05_6C41
-	dw Call_05_7B05
-	dw Call_07_694D
-	dw Call_05_67CD
-	dw WarpHandler
-	dw Call_05_6261
-	dw EvilEagleEntityHandler
-	dw SkyScrollEntityHandler
-	dw AnglerFishEntityHandler
-	dw CrystalSwitchHandler
-	dw AnglerRoomHelperEntityHandler
-	dw Call_15_7458
-	dw LeverEntityHandler
-	dw RaftOwnerEntityHandler
-	dw TextDebuggerEntityHandler
-	dw CuccoEntityHandler
-	dw BowWowEntityHandler
-	dw Call_06_6BB4
-	dw DogHandler
-	dw Call_06_6248
-	dw Call_06_60C3
-	dw Call_06_60C3
-	dw Call_06_6248
-	dw MamashaEntityHandler
-	dw GrandmaUlriraEntityHandler
-	dw ChristineEntityHandler
-	dw Call_06_5CE8
-	dw Call_06_5ABE
-	dw Call_06_5C4E
-	dw Call_06_5D5C
-	dw Call_06_5EFD
-	dw Call_06_62DE
-	dw Call_06_63CD
-	dw Call_06_642A
-	dw Call_18_72C6
-	dw Call_06_6A88
-	dw Call_06_6C58
-	dw Call_06_6ED4
-	dw Call_06_7066
-	dw Call_06_71C9
-	dw Call_06_7339
-	dw Call_06_7C19
-	dw Call_06_56B5
-	dw Call_06_53A1
-	dw Call_06_5107
-	dw TileGlintHandler
-	dw TileGlintHandler
-	dw LeverGateShiftXHandler
-	dw LeverGateShiftYHandler
-	dw CueBallHandler
-	dw MaskedMimicHandler
-	dw ThreeOfAKindHandler
-	dw AntiKirbyHandler
-	dw SmasherHandler
-	dw MadBomberHandler
-	dw Call_07_70AD
-	dw RichardHandler
-	dw Call_19_5AFD
-	dw SideViewWarpTriggerHandler
-	dw Call_07_7503
-	dw Call_07_7444
-	dw Call_07_7314
-	dw Call_07_71B4
-	dw Call_07_715E
-	dw LiftableStatueHandler
-	dw Call_07_7031
-	dw Call_07_63F1
-	dw Call_07_6525
-	dw Call_07_666D
-	dw Call_07_61FB
-	dw Call_07_60BD
-	dw Call_07_60BD
-	dw Call_07_6198
-	dw Call_07_5F54
-	dw Call_07_5B47
-	dw Call_07_5D87
-	dw Call_07_597C
-	dw Call_19_680A
-	dw Call_19_680A
-	dw Call_19_687E
-	dw Call_07_55D5
-	dw Call_07_53DC
-	dw Call_07_52C6
-	dw Call_07_5109
-	dw HoleFillerHandler
-	dw Call_15_751C
-	dw HoneycombHandler
-	dw TarinHoneycombHandler
-	dw BearHandler
-	dw PapahlHandler
-	dw MermaidHandler
-	dw FishermanUnderBridgeHandler
-	dw Call_18_772B
-	dw Call_18_77EA
-	dw BushCrawlerHandler
-	dw Call_18_6FA8
-	dw Call_18_69C7
-	dw Call_18_64A7
-	dw Call_18_6362
-	dw Call_18_627D
-	dw Call_18_6176
-	dw Call_18_5EB6
-	dw MamuEntityHandler
-	dw WalrusEntityHandler
-	dw Call_15_73C9
-	dw Call_15_734E
-	dw ManboEntityHandler
-	dw BunnyCallingMarinEntityHandler
-	dw MusicalNoteEntityHandler
-	dw MadBatterEntityHandler
-	dw ZoraEntityHandler
-	dw FishHandler
-	dw Call_19_6B9B
-	dw MermaidStatueEntityHandler
-	dw Call_19_6E17
-	dw AnimalD0EntityHandler
-	dw AnimalD1EntityHandler
-	dw AnimalD2EntityHandler
-	dw AnimalD3EntityHandler
-	dw Call_19_5D58
-	dw Call_19_5918
-	dw Call_19_5817
-	dw Call_19_55F3
-	dw Call_19_56E8
-	dw Call_19_54C1
-	dw Call_19_5344
-	dw Call_19_52E4
-	dw Call_19_518A
-	dw BookHandler
-	dw EggSongEventHandler
-	dw SwordBeamHandler
-	dw Call_15_768A
-	dw Call_15_78AC
-	dw FlameShooterHandler
-	dw PokeyHandler
-	dw MoblinKingHandler
-	dw Call_06_7C19
-	dw Call_15_5096
-	dw CastleGateSwitchHandler
-	dw EndingObjectHandler
+;@ path: entity/engine
+;@ The handler of every entity type (index = type, $00-$E8; 233 entries; $0000 = no such type). Each runs in
+;@ the bank the table at $03:$4000 gives for its type, with bc = the entity's slot.
+EntityHandlers::
+	dw Call_03_6A4B                ; $00
+	dw BoomerangHandler            ; $01
+	dw Call_03_66BF                ; $02
+	dw HookshotEntityHandler                ; $03
+	dw Call_03_69C9                ; $04
+	dw LiftableObjectHandler       ; $05
+	dw PushedBlockHandler          ; $06
+	dw Call_07_7AE3                ; $07
+	dw MagicPowderEntityHandler                ; $08
+	dw OctorokHandler              ; $09
+	dw Call_03_6A3D                ; $0A
+	dw MoblinHandler               ; $0B
+	dw Call_03_6AE7                ; $0C
+	dw Call_06_79CD                ; $0D
+	dw Call_04_7E82                ; $0E
+	dw Call_06_7547                ; $0F
+	dw GhiniHandler                ; $10
+	dw GiantGhiniHandler                ; $11
+	dw GhiniHandler                ; $12
+	dw HeartContainerSprite        ; $13
+	dw Call_07_785E                ; $14
+	dw Call_06_797B                ; $15
+	dw Call_06_6641                ; $16
+	dw Call_06_6641                ; $17
+	dw Call_06_7470                ; $18
+	dw Call_06_673C                ; $19
+	dw StalfosHandler              ; $1A
+	dw Call_06_7CFC                ; $1B
+	dw Call_06_7CD0                ; $1C
+	dw $0000                       ; $1D
+	dw EvasiveStalfosHandler       ; $1E
+	dw Call_06_7F5F                ; $1F
+	dw HardhatBeetleHandler        ; $20
+	dw Call_06_7727                ; $21
+	dw Call_06_65FB                ; $22
+	dw Call_06_7EB5                ; $23
+	dw IronMaskHandler             ; $24
+	dw BurningFlameSprites         ; $25
+	dw BurningFlameSprites         ; $26
+	dw Call_06_760B                ; $27
+	dw Call_19_6765                ; $28
+	dw MiniMoldormHandler          ; $29
+	dw Call_04_6C34                ; $2A
+	dw LaserBeamHandler            ; $2B
+	dw Call_07_76BC                ; $2C
+	dw DroppedHeartHandler         ; $2D
+	dw RupeeHandler                ; $2E
+	dw FairyHandler                ; $2F
+	dw KeyDropPointHandler         ; $30
+	dw SwordHandler                ; $31
+	dw Type32Handler               ; $32
+	dw PieceOfPowerHandler         ; $33
+	dw GuardianAcornHandler        ; $34
+	dw HeartPieceHandler           ; $35
+	dw HeartContainerHandler       ; $36
+	dw DroppedArrowsHandler                ; $37
+	dw DroppedBombsHandler                ; $38
+	dw InstrumentHandler           ; $39
+	dw ToadstoolHandler            ; $3A
+	dw MagicPowderHandler                ; $3B
+	dw GoldenLeafHandler                ; $3C
+	dw SecretSeashellHandler                ; $3D
+	dw MarinEntityHandler          ; $3E
+	dw TarinEntityHandler          ; $3F
+	dw WitchEntityHandler          ; $40
+	dw Call_06_6801                ; $41
+	dw OwlStatueEntityHandler      ; $42
+	dw SeashellMansionTreesHandler ; $43
+	dw TalkingBonesHandler         ; $44
+	dw BouldersHandler             ; $45
+	dw LeverBlockDownHandler       ; $46
+	dw LeverBlockUpHandler         ; $47
+	dw LeverBlockRightHandler      ; $48
+	dw LeverBlockLeftHandler       ; $49
+	dw $0000                       ; $4A
+	dw EntityHandler_Type4B        ; $4B
+	dw $0000                       ; $4C
+	dw Call_04_7682                ; $4D
+	dw Call_04_7634                ; $4E
+	dw Call_04_6E4F                ; $4F
+	dw Call_06_7AB3                ; $50
+	dw Call_04_697A                ; $51
+	dw Call_04_67EF                ; $52
+	dw Call_04_67EF                ; $53
+	dw Call_04_5F59                ; $54
+	dw Call_04_7D97                ; $55
+	dw Call_04_7CA7                ; $56
+	dw PairoddHandler                ; $57
+	dw PairoddProjectileHandler                ; $58
+	dw MoldormHandler              ; $59
+	dw FacadeHandler               ; $5A
+	dw SlimeEyeHandler             ; $5B
+	dw GenieHandler                ; $5C
+	dw SlimeEelEntityHandler                ; $5D
+	dw Call_05_7B05                ; $5E
+	dw Call_07_694D                ; $5F
+	dw DodongoSnakeEntityHandler                ; $60
+	dw WarpHandler                 ; $61
+	dw HotHeadEntityHandler        ; $62
+	dw EvilEagleEntityHandler      ; $63
+	dw SkyScrollEntityHandler      ; $64
+	dw AnglerFishEntityHandler     ; $65
+	dw CrystalSwitchHandler        ; $66
+	dw AnglerRoomHelperEntityHandler; $67
+	dw RollingBridgeHandler        ; $68
+	dw LeverEntityHandler          ; $69
+	dw RaftOwnerEntityHandler      ; $6A
+	dw TextDebuggerEntityHandler   ; $6B
+	dw CuccoEntityHandler          ; $6C
+	dw BowWowEntityHandler         ; $6D
+	dw Call_06_6BB4                ; $6E
+	dw DogHandler                  ; $6F
+	dw Call_06_6248                ; $70
+	dw Call_06_60C3                ; $71
+	dw Call_06_60C3                ; $72
+	dw Call_06_6248                ; $73
+	dw MamashaEntityHandler        ; $74
+	dw GrandmaUlriraEntityHandler  ; $75
+	dw ChristineEntityHandler      ; $76
+	dw UlriraHandler                ; $77
+	dw PoodleHandler                ; $78
+	dw MadamMeowMeowHandler                ; $79
+	dw CrowHandler                ; $7A
+	dw CrazyTracyHandler                ; $7B
+	dw Call_06_62DE                ; $7C
+	dw Call_06_63CD                ; $7D
+	dw Call_06_642A                ; $7E
+	dw TurtleRockEntityHandler                ; $7F
+	dw Call_06_6A88                ; $80
+	dw Call_06_6C58                ; $81
+	dw Call_06_6ED4                ; $82
+	dw Call_06_7066                ; $83
+	dw Call_06_71C9                ; $84
+	dw Call_06_7339                ; $85
+	dw Call_06_7C19                ; $86
+	dw LanmolaHandler                ; $87
+	dw ArmosKnightHandler          ; $88
+	dw HinoxHandler                ; $89
+	dw TileGlintHandler            ; $8A
+	dw TileGlintHandler            ; $8B
+	dw LeverGateShiftXHandler      ; $8C
+	dw LeverGateShiftYHandler      ; $8D
+	dw CueBallHandler              ; $8E
+	dw MaskedMimicHandler          ; $8F
+	dw ThreeOfAKindHandler         ; $90
+	dw AntiKirbyHandler            ; $91
+	dw SmasherHandler              ; $92
+	dw MadBomberHandler            ; $93
+	dw Call_07_70AD                ; $94
+	dw RichardHandler              ; $95
+	dw Call_19_5AFD                ; $96
+	dw SideViewWarpTriggerHandler  ; $97
+	dw Call_07_7503                ; $98
+	dw Call_07_7444                ; $99
+	dw Call_07_7314                ; $9A
+	dw Call_07_71B4                ; $9B
+	dw Call_07_715E                ; $9C
+	dw LiftableStatueHandler       ; $9D
+	dw Call_07_7031                ; $9E
+	dw Call_07_63F1                ; $9F
+	dw Call_07_6525                ; $A0
+	dw Call_07_666D                ; $A1
+	dw Call_07_61FB                ; $A2
+	dw Call_07_60BD                ; $A3
+	dw Call_07_60BD                ; $A4
+	dw Call_07_6198                ; $A5
+	dw Call_07_5F54                ; $A6
+	dw PillarHandler                ; $A7
+	dw Call_07_5D87                ; $A8
+	dw BlooperHandler                ; $A9
+	dw Call_19_680A                ; $AA
+	dw Call_19_680A                ; $AB
+	dw Call_19_687E                ; $AC
+	dw KikiHandler                ; $AD
+	dw WingedOctorokHandler        ; $AE
+	dw TradeItemHandler            ; $AF
+	dw PincerHandler               ; $B0
+	dw HoleFillerHandler           ; $B1
+	dw BeetleSpawnerHandler        ; $B2
+	dw HoneycombHandler            ; $B3
+	dw TarinHoneycombHandler       ; $B4
+	dw BearHandler                 ; $B5
+	dw PapahlHandler               ; $B6
+	dw MermaidHandler              ; $B7
+	dw FishermanUnderBridgeHandler ; $B8
+	dw BuzzBlobEntityHandler                ; $B9
+	dw BomberEntityHandler                ; $BA
+	dw BushCrawlerHandler          ; $BB
+	dw GrimCreeperEntityHandler                ; $BC
+	dw VireEntityHandler                ; $BD
+	dw BlainoEntityHandler         ; $BE
+	dw ZombieEntityHandler         ; $BF
+	dw SignpostMazeEntityHandler   ; $C0
+	dw MarinCompanionEntityHandler                ; $C1
+	dw MarinSceneEntityHandler     ; $C2
+	dw MamuEntityHandler           ; $C3
+	dw WalrusEntityHandler         ; $C4
+	dw UrchinHandler               ; $C5
+	dw SandCrabHandler             ; $C6
+	dw ManboEntityHandler          ; $C7
+	dw BunnyCallingMarinEntityHandler; $C8
+	dw MusicalNoteEntityHandler    ; $C9
+	dw MadBatterEntityHandler      ; $CA
+	dw ZoraEntityHandler           ; $CB
+	dw FishHandler                 ; $CC
+	dw Call_19_6B9B                ; $CD
+	dw MermaidStatueEntityHandler  ; $CE
+	dw Call_19_6E17                ; $CF
+	dw AnimalD0EntityHandler       ; $D0
+	dw AnimalD1EntityHandler       ; $D1
+	dw AnimalD2EntityHandler       ; $D2
+	dw AnimalD3EntityHandler       ; $D3
+	dw Call_19_5D58                ; $D4
+	dw Call_19_5918                ; $D5
+	dw SideViewPotHandler                ; $D6
+	dw ThwimpHandler                ; $D7
+	dw ThwompHandler                ; $D8
+	dw RammableBlockHandler                ; $D9
+	dw PodobooHandler                ; $DA
+	dw GiantBubbleHandler                ; $DB
+	dw FlyingRoosterEventsHandler  ; $DC
+	dw BookHandler                 ; $DD
+	dw EggSongEventHandler         ; $DE
+	dw SwordBeamHandler            ; $DF
+	dw MonkeyHandler                ; $E0
+	dw RatHandler                ; $E1
+	dw FlameShooterHandler         ; $E2
+	dw PokeyHandler                ; $E3
+	dw MoblinKingHandler           ; $E4
+	dw Call_06_7C19                ; $E5
+	dw FinalNightmareHandler                ; $E6
+	dw CastleGateSwitchHandler     ; $E7
+	dw EndingObjectHandler         ; $E8
 
+;@ path: entity/engine
+;@ Hitbox shapes, 4 bytes each: x offset, half width, y offset, half height (pixels, from the entity's
+;@ position). LoadEntityHitbox picks one by wEntityHitboxFlags & $7C (bits 2-6 = shape * 4). 16 shapes.
 EntityHitboxTable::
 	db $08, $05, $08, $05, $08, $0a, $08, $0a, $08, $0a, $08, $0a, $08, $10, $04, $0a
 	db $08, $02, $08, $02, $08, $13, $08, $13, $08, $06, $06, $08, $08, $07, $06, $0a
 	db $08, $06, $10, $30, $08, $07, $04, $0a, $0c, $07, $fc, $04, $10, $10, $0c, $12
 	db $08, $08, $02, $08, $10, $0c, $08, $10, $08, $07, $0c, $08, $08, $08, $02, $08
 
-Call_3B65::
+;@ def LoadEntityHitbox(slot: bc)
+;@ path: entity/engine
+;@ Copies the entity's hitbox shape (EntityHitboxTable, by wEntityHitboxFlags) into its 4 bytes of
+;@ wEntityHitbox.
+LoadEntityHitbox::
+;>@sh shape = EntityHitboxTable + (wEntityHitboxFlags[slot] & 0x7C)
 	ld hl, wEntityHitboxFlags
 	add hl, bc
 	ld a, [hl]
 	and $7c
 	ld e, a
 	ld d, b
-	ld hl, $3b25
+;=@sh
+	ld hl, EntityHitboxTable
 	add hl, de
 	push hl
 	pop de
+;>@cp copy(wEntityHitbox + slot * 4, shape, 4)
 	push bc
 	sla c
 	sla c
 	ld hl, wEntityHitbox
 	add hl, bc
 	ld c, $04
-
-jr_000_3b7f:
+;=@cp
+.copy
 	ld a, [de]
 	inc de
 	ld [hli], a
 	dec c
-	jr nz, jr_000_3b7f
+	jr nz, .copy
 
 	pop bc
+;> return
 	ret
 
 
-Call_3B87::
+;@ def SetEntitySpriteVariant(slot: bc, variant: a)
+;@ path: entity/engine
+;@ Sets the entity's sprite variant.
+SetEntitySpriteVariant::
+;> wEntitySpriteVariant[slot] = variant
 	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld [hl], a
+;> return
 	ret
 
 
-Call_3B8D::
+;@ def IncrementEntityState(slot: bc)
+;@ path: entity/engine
+;@ Moves the entity's state machine on to its next state.
+IncrementEntityState::
+;> wEntityState[slot] += 1
 	ld hl, wEntityState
 	add hl, bc
 	inc [hl]
+;> return
 	ret
 
 
-Call_3B93::
+;@ def BounceLinkBack()
+;@ path: link/damage
+;@ Call_02_78B5 (bank 2) from anywhere: Link is hurt and bounced back, unless he is still invincible.
+BounceLinkBack::
+;> set_rom_bank(0x02)
 	ld a, $02
 	ld [$2100], a
-	call $78b5
+;> Call_02_78B5()
+	call Call_02_78B5
+;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
-Call_3B9E::
+;@ def EntityCheckWalls(slot: bc)
+;@ path: entity/collision
+;@ Call_03_7892 from any bank: the entity stops at walls and solid room objects (its ground status is
+;@ looked at and cleared).
+EntityCheckWalls::
+;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-	call $7892
+;> Call_03_7892(slot)
+	call Call_03_7892
+;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
-Call_3BA9::
+;@ def EntityCheckObjectCollision(slot: bc)
+;@ path: entity/collision
+;@ Call_03_7CAA from any bank: what the entity has run into in the room (wall, hole, water, ...).
+EntityCheckObjectCollision::
+;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-	call $7caa
+;> Call_03_7CAA(slot)
+	call Call_03_7CAA
+;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
-Call_3BB4::
+;@ def EntityCheckHits(slot: bc)
+;@ path: entity/collision
+;@ Call_03_6E3D from any bank: contact damage to Link and hits from Link's weapons.
+EntityCheckHits::
+;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-	call $6e3d
+;> Call_03_6E3D(slot)
+	call Call_03_6E3D
+;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
-Call_3BBF::
+;@ def EntityCheckContactDamage(slot: bc)
+;@ path: entity/collision
+;@ Call_03_6C87 from any bank: the entity hurts Link when it touches him.
+EntityCheckContactDamage::
+;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-	call $6c87
+;> Call_03_6C87(slot)
+	call Call_03_6C87
+;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
-Call_3BCA::
+;@ def EntityCheckTouchLink(slot: bc)
+;@ path: entity/collision
+;@ Call_03_6BF9 from any bank: the entity hits Link when they touch (while Link walks on the ground).
+EntityCheckTouchLink::
+;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-	call $6bf9
+;> Call_03_6BF9(slot)
+	call Call_03_6BF9
+;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
-Call_3BD5::
+;@ def EntityTouchesLink(slot: bc) -> carry
+;@ path: entity/collision
+;@ Call_03_6C93 from any bank: carry set when the entity touches Link.
+EntityTouchesLink::
+;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-	call $6c93
+;> r = Call_03_6C93(slot)
+	call Call_03_6C93
+;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
+;> return r
 
 
-Call_3BE0::
+;@ def EntityCheckSwordClash(slot: bc)
+;@ path: entity/collision
+;@ Call_03_73EF from any bank: Link's sword against the entity's clash box (parrying).
+EntityCheckSwordClash::
+;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-	call $73ef
+;> Call_03_73EF(slot)
+	call Call_03_73EF
+;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
-Call_3BEB::
+;@ def EntityCheckWeaponHits(slot: bc)
+;@ path: entity/collision
+;@ Call_03_6E40 from any bank: hits from Link's weapons only (no contact damage).
+EntityCheckWeaponHits::
+;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-	call $6e40
+;> Call_03_6E40(slot)
+	call Call_03_6E40
+;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
-Call_3BF6::
+;@ def EntityHitOtherEntities(slot: bc)
+;@ path: entity/collision
+;@ Call_03_75A6 from any bank: the entity hits the other entities it touches.
+EntityHitOtherEntities::
+;> set_rom_bank(0x03)
 	ld a, $03
 	ld [$2100], a
-	call $75a6
+;> Call_03_75A6(slot)
+	call Call_03_75A6
+;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
-Call_3C01::
+;@ def SpawnEntity(type: a) -> (de, carry)
+;@ path: entity/spawn
+;@ SpawnEntity_03 from any bank: a new entity of type `type` in the first free slot (de = the slot;
+;@ carry set when none is free). The carry is kept across the bank switch back.
+SpawnEntity::
+;> set_rom_bank(0x03)
 	push af
 	ld a, $03
 	ld [$2100], a
 	pop af
-	call $64f8
+;> slot, full = SpawnEntity_03(type)
+	call SpawnEntity_03
+;> set_rom_bank(wCurrentBank)              # (rr / rl l keep the carry)
 	rr l
 	call RestoreBank
 	rl l
+;> return slot, full
 	ret
 
 
-Call_3C13::
+;@ def SpawnEntityFromSlot(type: a, last: e) -> (de, carry)
+;@ path: entity/spawn
+;@ SpawnEntityFromSlot_03 from any bank: like SpawnEntity, but only slots 0-`last` are used (de = the
+;@ slot; carry set when none is free).
+SpawnEntityFromSlot::
+;> set_rom_bank(0x03)
 	push af
 	ld a, $03
 	ld [$2100], a
 	pop af
-	call $64fa
+;> slot, full = SpawnEntityFromSlot_03(type, last)
+	call SpawnEntityFromSlot_03
+;> set_rom_bank(wCurrentBank)              # (rr / rl l keep the carry)
 	rr l
 	call RestoreBank
 	rl l
+;> return slot, full
 	ret
 
 
-Call_3C25::
+;@ def SetEntitySpeedTowardsLink(slot: bc, speed: a)
+;@ path: entity/movement
+;@ Call_03_7E99 from any bank: sets the entity's x / y speed to move towards Link at `speed` (the vector
+;@ is also left in hMultiPurpose0 / 1).
+SetEntitySpeedTowardsLink::
+;> set_rom_bank(0x03)
 	ld hl, $2100
 	ld [hl], $03
-	call $7e99
+;> Call_03_7E99(slot, speed)
+	call Call_03_7E99
+;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
-Call_3C30::
+;@ def GetVectorTowardsLink(slot: bc, speed: a)
+;@ path: entity/movement
+;@ Call_03_7E17 from any bank: the speed vector from the entity towards Link at `speed`: y in
+;@ hMultiPurpose0, x in hMultiPurpose1.
+GetVectorTowardsLink::
+;> set_rom_bank(0x03)
 	ld hl, $2100
 	ld [hl], $03
-	call $7e17
+;> Call_03_7E17(slot, speed)
+	call Call_03_7E17
+;> set_rom_bank(wCurrentBank)
 	jp RestoreBank
 
 
-Call_3C3B::
+DrawEntity16x16::
 	ldh a, [hActiveEntitySpriteVariant]
 	inc a
 	ret z
 
-	call Call_3D87
+	call SkipDrawIfOffscreen
 	push de
 	ld a, [wOAMNextIndex]
 	ld e, a
@@ -12329,7 +14394,7 @@ Call_3C3B::
 	rl b
 	pop hl
 	add hl, bc
-	ldh a, [$fff5]
+	ldh a, [hActiveEntityTileOffset]
 	ld c, a
 	ld a, [hli]
 	add c
@@ -12367,7 +14432,7 @@ jr_000_3c83:
 	ld [de], a
 	inc de
 	pop hl
-	ldh a, [$fff5]
+	ldh a, [hActiveEntityTileOffset]
 	ld c, a
 	ld a, [hli]
 	add c
@@ -12388,7 +14453,7 @@ jr_000_3cb5:
 	xor [hl]
 	ld [de], a
 
-jr_000_3cbc:
+FinishEntityDraw::
 	ld a, [wActiveEntitySlot]
 	ld c, a
 	ld b, $00
@@ -12401,12 +14466,12 @@ jr_000_3cca:
 	jp RestoreBank
 
 
-Call_3CD0::
+DrawEntity8x16::
 	ldh a, [hActiveEntitySpriteVariant]
 	inc a
 	ret z
 
-	call Call_3D87
+	call SkipDrawIfOffscreen
 	push de
 	ld a, [wOAMNextIndex]
 	ld l, a
@@ -12451,19 +14516,19 @@ jr_000_3cf5:
 	xor [hl]
 	ld [de], a
 	inc de
-	jr jr_000_3cbc
+	jr FinishEntityDraw
 
-Call_3D19::
+DrawEntityShadow::
 	ld a, $15
 	ld [$2100], a
 	jr jr_000_3cca
 
-Call_3D20::
+DrawEntitySpritesAtOAMStart::
 	push hl
 	ld hl, wOAMBuffer
-	jr jr_000_3d36
+	jr DrawSpriteListToOAM
 
-Call_3D26::
+DrawEntitySprites::
 	ldh a, [hActiveEntitySpriteVariant]
 	inc a
 	jr z, jr_000_3d82
@@ -12475,7 +14540,7 @@ Call_3D26::
 	ld hl, $c030
 	add hl, de
 
-jr_000_3d36:
+DrawSpriteListToOAM::
 	push hl
 	pop de
 	pop hl
@@ -12483,7 +14548,7 @@ jr_000_3d36:
 	ldh [hMultiPurpose0], a
 	ld a, [wActiveEntitySlot]
 	ld c, a
-	call Call_3D87
+	call SkipDrawIfOffscreen
 	ldh a, [hMultiPurpose0]
 	ld c, a
 
@@ -12502,7 +14567,7 @@ jr_000_3d46:
 	ld [de], a
 	inc hl
 	inc de
-	ldh a, [$fff5]
+	ldh a, [hActiveEntityTileOffset]
 	ld c, a
 	ld a, [hli]
 	push af
@@ -12542,7 +14607,7 @@ jr_000_3d82:
 	ret
 
 
-Call_3D87::
+SkipDrawIfOffscreen::
 	push hl
 	ld a, [wRoomTransitionState]
 	and a
@@ -12578,7 +14643,7 @@ jr_000_3dad:
 	ret
 
 
-Call_3DAF::
+ClearEntitySpeed::
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], b
@@ -12588,7 +14653,7 @@ Call_3DAF::
 	ret
 
 
-Call_3DBA::
+LoadEntityPosition::
 	ld hl, wEntityX
 	add hl, bc
 	ld a, [hl]
@@ -12604,7 +14669,7 @@ Call_3DBA::
 	ret
 
 
-Call_3DD0::
+ReserveOAMEntriesFar::
 	ld hl, $2100
 	ld [hl], $15
 	call $7974
@@ -12945,7 +15010,7 @@ jr_000_3fe7:
 	ldh [hBGChangeRequest], a
 	ld a, $0c
 	ld [$2100], a
-	jp Call_1CCC
+	jp DrawLinkOAM
 
 
 	db $ff, $ff, $ff, $ff, $ff

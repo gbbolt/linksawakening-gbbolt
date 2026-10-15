@@ -173,10 +173,10 @@ SelectAreaMusic::
 ;@ Spawns the entity that rises out of an opened chest (type $07) centred on the chest's square
 ;@ (hBGPosX / hBGPosY), with the item number from hMultiPurpose8 as its sprite variant.
 SpawnChestContents::
-;> slot = Call_3C01(0x07)                       # spawn entity type 7; carry = no free slot
+;> slot = SpawnEntity(0x07)                       # spawn entity type 7; carry = no free slot
 	push bc
 	ld a, $07
-	call Call_3C01
+	call SpawnEntity
 ;> if not carry:
 	jr c, .done
 
@@ -313,9 +313,9 @@ UseHookshot::
 ;>     return
 	jr nz, .done
 
-;> slot = Call_10EB(0x03)                       # spawn Link's projectile type 3 (carry = none free)
+;> slot = SpawnLinkProjectile(0x03)                       # spawn Link's projectile type 3 (carry = none free)
 	ld a, $03
-	call Call_10EB
+	call SpawnLinkProjectile
 ;> if carry:
 ;>     return
 	jr c, .done
@@ -427,10 +427,10 @@ LinkMotionInteractive::
 ;> hLinkInteractiveMotionBlocked = 0
 	xor a
 	ldh [hLinkInteractiveMotionBlocked], a
-;> Call_1E73()
-	call Call_1E73
-;> Call_0D68()                                  # use the items on A / B
-	call Call_0D68
+;> CheckLiftAndReadBank2()
+	call CheckLiftAndReadBank2
+;> HandleItemButtons()                                  # use the items on A / B
+	call HandleItemButtons
 ;> UpdateLinkInAir()                               # in the air: steering and landing
 	call UpdateLinkInAir
 ;> UpdateItemUsePose()                               # item use pose
@@ -439,8 +439,8 @@ LinkMotionInteractive::
 	call UpdateSword
 ;> UpdateDigging()                               # digging with the shovel
 	call UpdateDigging
-;> Call_149B()                                  # ground check, sword sprite
-	call Call_149B
+;> UpdateLinkItemSprites()                                  # ground check, sword sprite
+	call UpdateLinkItemSprites
 ;> UpdateLiftPose()                               # carry pose
 	call UpdateLiftPose
 ;> LinkPlayingOcarina()                               # playing the ocarina
@@ -651,8 +651,8 @@ UpdateLinkMovement::
 	ld a, [wLinkWalkingFrameCount]
 	add $02
 	ld [wLinkWalkingFrameCount], a
-;>             Call_145D()                      # dust / splash under the feet
-	call Call_145D
+;>             AddDashDustVfx()                      # dust / splash under the feet
+	call AddDashDustVfx
 ;>             dashing = True
 	jr jr_002_440a
 
@@ -893,8 +893,8 @@ UpdateLinkRecoil::
 .draw
 ;>     drop_caller_frame()                      # the caller (UpdateLinkMovement) ends here too
 	pop af
-;>     Call_149B()
-	call Call_149B
+;>     UpdateLinkItemSprites()
+	call UpdateLinkItemSprites
 
 .done
 	ret
@@ -951,8 +951,8 @@ LinkFallWithGravity:
 	jr nz, .steer
 
 .stop
-;>         Call_1495()                          # no steering: speeds 0
-	call Call_1495
+;>         StopLinkSpeed()                          # no steering: speeds 0
+	call StopLinkSpeed
 	jr .height
 
 .steer
@@ -1570,8 +1570,8 @@ UpdateSwordPose::
 	ld [wSwordCollisionEnabled], a
 
 .rooms
-;> Call_12AE()                                  # the sword cuts / hits the room's objects
-	call Call_12AE
+;> CheckSwordHitsObjectBank2()                                  # the sword cuts / hits the room's objects
+	call CheckSwordHitsObjectBank2
 	ret
 
 
@@ -1756,15 +1756,15 @@ LinkMotionJumping::
 ;> wIsLinkInTheAir = 1
 	ld a, $01
 	ld [wIsLinkInTheAir], a
-;> Call_0D68()                                  # items on A / B
-	call Call_0D68
+;> HandleItemButtons()                                  # items on A / B
+	call HandleItemButtons
 ;> UpdateSword()
 	call UpdateSword
 ;> wSwordAnimationStatePrev = wSwordAnimationState
 	ld a, [wSwordAnimationState]
 	ld [wSwordAnimationStatePrev], a
-;> Call_149B()
-	call Call_149B
+;> UpdateLinkItemSprites()
+	call UpdateLinkItemSprites
 	ret
 
 ;@ path: link/collision
@@ -1881,8 +1881,8 @@ LinkPlayingOcarina::
 
 .song
 ;> else:
-;>     Call_1495()                              # stand still
-	call Call_1495
+;>     StopLinkSpeed()                              # stand still
+	call StopLinkSpeed
 ;>     ResetSpinAttackAndDash()
 	call ResetSpinAttackAndDash
 ;>     wOcarinaSongState -= 1
@@ -2001,9 +2001,9 @@ LinkPlayingOcarina::
 ;>     return
 	jr nz, .noNote
 
-;> slot = Call_3C01(0xC9)                       # a music note
+;> slot = SpawnEntity(0xC9)                       # a music note
 	ld a, $c9
-	call Call_3C01
+	call SpawnEntity
 ;> if carry:
 ;>     return
 	jr c, .noNote
@@ -2076,8 +2076,8 @@ UpdateDigging::
 	cp $02
 	jr nz, .dig
 
-;>     Call_0F3F()                              # hitbox in front of Link
-	call Call_0F3F
+;>     SetShieldHitbox()                              # hitbox in front of Link
+	call SetShieldHitbox
 ;>     wSwordCollisionEnabled = 1
 	ld a, $01
 	ld [wSwordCollisionEnabled], a
@@ -2086,8 +2086,8 @@ UpdateDigging::
 ;> hLinkInteractiveMotionBlocked = 1
 	ld hl, hLinkInteractiveMotionBlocked
 	ld [hl], $01
-;> Call_1495()                                  # stand still
-	call Call_1495
+;> StopLinkSpeed()                                  # stand still
+	call StopLinkSpeed
 ;> wSwordAnimationState = 0
 	ld [wSwordAnimationState], a
 ;> wSpinAttackTimer = 0
@@ -2298,8 +2298,8 @@ DigUpSquare::
 	ld a, $2d
 
 .spawn
-;>     slot = Call_3C01(kind)
-	call Call_3C01
+;>     slot = SpawnEntity(kind)
+	call SpawnEntity
 ;>     if carry:
 ;>         return
 	jr c, .done
@@ -2328,11 +2328,11 @@ DigUpSquare::
 	ld hl, wEntitySpeedZ
 	add hl, de
 	ld [hl], $20
-;>     Call_3C25(slot, 0x0C)                    # vector toward Link at speed $0C -> hMultiPurpose0 / 1
+;>     SetEntitySpeedTowardsLink(slot, 0x0C)                    # vector toward Link at speed $0C -> hMultiPurpose0 / 1
 	push de
 	pop bc
 	ld a, $0c
-	call Call_3C25
+	call SetEntitySpeedTowardsLink
 ;>     wEntitySpeedY[slot] = -hMultiPurpose0    # away from Link
 	ldh a, [hMultiPurpose0]
 	cpl
@@ -2686,8 +2686,8 @@ LinkMotionSwimming::
 	or [hl]
 	jp z, .controls
 
-;>     Call_1495()                              # float in place
-	call Call_1495
+;>     StopLinkSpeed()                              # float in place
+	call StopLinkSpeed
 ;>     hLinkInteractiveMotionBlocked = 0
 	ldh a, [hLinkInteractiveMotionBlocked]
 	and a
@@ -2716,10 +2716,10 @@ LinkMotionSwimming::
 ;>         hLinkCountdown = 0xA0                # dive length
 	ld a, $a0
 	ldh [hLinkCountdown], a
-;>         Call_02_571D(hLinkY - 3)             # splash
+;>         AddSplashAtLinkY(hLinkY - 3)             # splash
 	ldh a, [hLinkY]
 	sub $03
-	call Call_02_571D
+	call AddSplashAtLinkY
 
 .stroke
 ;> if wSwimStrokeTimer:
@@ -2926,9 +2926,9 @@ LinkMotionSwimming::
 
 ;> hRoomStatus |= 0x20
 	set 5, [hl]
-;> slot = Call_3C01(0x35)                       # the hidden item
+;> slot = SpawnEntity(0x35)                       # the hidden item
 	ld a, $35
-	call Call_3C01
+	call SpawnEntity
 ;> if carry:
 ;>     return
 	jr c, .done
@@ -3021,8 +3021,8 @@ LinkMotionCarriedUp::
 .away
 ;> StartWarpFadeOutMusic()
 	call StartWarpFadeOutMusic
-;> Call_1495()
-	call Call_1495
+;> StopLinkSpeed()
+	call StopLinkSpeed
 ;> hLinkPositionZ = 0
 	ldh [hLinkPositionZ], a
 ;> hLinkSpeedZ = 0
@@ -3169,8 +3169,8 @@ LinkMotionFallingDown::
 .warp
 ;> wWarpTimer = timer
 	ld [wWarpTimer], a
-;> Call_1495()
-	call Call_1495
+;> StopLinkSpeed()
+	call StopLinkSpeed
 ;> hLinkSpeedZ = 0
 	ldh [hLinkSpeedZ], a
 ;> wIsLinkInTheAir = 0
@@ -3282,8 +3282,8 @@ LinkHoldItemUpQuiet::
 	ld [wSwordAnimationState], a
 ;> wLinkPushedTimer = 0
 	ld [wLinkPushedTimer], a
-;> Call_149B()
-	call Call_149B
+;> UpdateLinkItemSprites()
+	call UpdateLinkItemSprites
 ;> ApplyLinkSpeedZ()
 	call ApplyLinkSpeedZ
 ;> hLinkSpeedZ -= 2
@@ -3375,8 +3375,8 @@ LinkHoldItemUpQuiet::
 	ld l, a
 	ld a, $06
 	ldh [hMultiPurpose2], a
-;> Call_1540(oam, 0)                            # draw it (offsets 0)
-	call Call_1540
+;> DrawSpritePair(oam, 0)                            # draw it (offsets 0)
+	call DrawSpritePair
 	ret
 
 ;@ def LinkMotionRecover()
@@ -3387,8 +3387,8 @@ LinkHoldItemUpQuiet::
 LinkMotionRecover::
 ;> ResetSpinAttackAndDash()
 	call ResetSpinAttackAndDash
-;> Call_1495()
-	call Call_1495
+;> StopLinkSpeed()
+	call StopLinkSpeed
 ;> if hLinkCountdown == 0:
 	ldh a, [hLinkCountdown]
 	and a
@@ -3672,8 +3672,8 @@ PlaceMagicRodFireball::
 	ld hl, wEntitySpriteVariant
 	add hl, de
 	ld [hl], d
-;> return Jump_000_10cb()
-	jp Jump_000_10cb
+;> return SetArrowSpeed()
+	jp SetArrowSpeed
 
 
 ;@ def OpenLockedOrPushBlock(kind: hBGTilesRequestCopy)
@@ -3691,7 +3691,7 @@ OpenLockedOrPushBlock::
 	cp $40
 	jr z, .push
 
-;>@p1     slot = Call_3C01(0x06)               # the sliding block
+;>@p1     slot = SpawnEntity(0x06)               # the sliding block
 ;>@p2     if not carry:
 ;>@p3         wEntityStatus[slot] -= 1
 ;>@p4         wEntityX[slot] = (hMultiPurpose4 & 0xF0) + 8
@@ -3708,8 +3708,8 @@ OpenLockedOrPushBlock::
 	call SaveDungeonItemFlags
 ;>     PlayUnlockSound()                           # unlock sound
 	call PlayUnlockSound
-;>     status = Call_02_5987()                  # this room's status byte
-	call Call_02_5987
+;>     status = GetRoomStatusAddress_02()                  # this room's status byte
+	call GetRoomStatusAddress_02
 ;>     mem[status] |= 0x40                      # the block stays open
 	ld a, [hl]
 	or $40
@@ -3749,7 +3749,7 @@ OpenLockedOrPushBlock::
 .push
 ;=@p1
 	ld a, $06
-	call Call_3C01
+	call SpawnEntity
 ;=@p2
 	jr c, .done
 
@@ -3804,8 +3804,8 @@ SpawnFallingRoomEventItem::
 	ld a, $3c
 
 .spawn
-;> slot = Call_3C01(kind)
-	call Call_3C01
+;> slot = SpawnEntity(kind)
+	call SpawnEntity
 ;> if not carry:
 	jr c, .done
 
@@ -4026,7 +4026,7 @@ RunTransientVfx::
 	and a
 	jr nz, .free
 
-;>@f1     Call_02_56DB(c)                      # free the slot
+;>@f1     FreeVfxSlot(c)                      # free the slot
 ;> elif wVfxTimer[c]:
 	ld hl, wVfxTimer
 	add hl, bc
@@ -4042,11 +4042,11 @@ RunTransientVfx::
 ;>     if wVfxTimer[c] == 0:
 	jr nz, .run
 
-;>@f2         Call_02_56DB(c)
+;>@f2         FreeVfxSlot(c)
 .free
 ;=@f1
 ;=@f2
-	call Call_02_56DB
+	call FreeVfxSlot
 
 .run
 ;> TransientVfxHandlers[type - 1]()                # the type's handler
@@ -4060,18 +4060,18 @@ RunTransientVfx::
 ;@ 7 a sprite flying in a direction, 8, 9 the opening of a dungeon entrance, 10 a row of four sprites,
 ;@ 11 dash dust, 12 dash splash, 13 small sparkles.
 TransientVfxHandlers::
-	dw Jump_02_5619
-	dw Jump_02_5699
-	dw Jump_02_5699
-	dw Jump_02_5699
-	dw Jump_02_55E1
-	dw Jump_02_55A7
-	dw Jump_02_5550
-	dw Jump_02_5538
+	dw VfxSplash
+	dw VfxSmoke
+	dw VfxSmoke
+	dw VfxSmoke
+	dw VfxClink
+	dw VfxFlicker
+	dw VfxFlyingSpark
+	dw VfxType8
 	dw VfxGateOpening
 	dw VfxFourSprites
-	dw Jump_02_550A
-	dw Jump_02_5611
+	dw VfxDashDust
+	dw VfxDashSplash
 	dw VfxSparkles
 
 ;@ path: gfx/vfx
@@ -4099,8 +4099,8 @@ VfxSparkles::
 ;>     return
 	ret z
 
-;> Call_02_56C5(c)                              # position into hMultiPurpose1 / 2
-	call Call_02_56C5
+;> LoadVfxPosition(c)                              # position into hMultiPurpose1 / 2
+	call LoadVfxPosition
 ;>@off offset = wVfxDirection[c] * 8
 	ld hl, wVfxDirection
 	add hl, bc
@@ -4146,8 +4146,8 @@ VfxType10Attrs::
 ;@ Visual effect 10: four 8x16 sprites in a row (tiles $6C $6E $6E $6C, the right half mirrored) at the
 ;@ effect's position.
 VfxFourSprites::
-;> Call_02_56C5(c)
-	call Call_02_56C5
+;> LoadVfxPosition(c)
+	call LoadVfxPosition
 ;>@oam oam = wOAMBuffer + 0x30 + wOAMNextIndex
 	ld a, [wOAMNextIndex]
 	ld e, a
@@ -4189,10 +4189,10 @@ VfxFourSprites::
 	dec c
 	jr nz, .loop
 
-;> Call_02_56EA(4)                              # 4 OAM entries used
+;> AdvanceVfxOAM(4)                              # 4 OAM entries used
 	pop bc
 	ld a, $04
-	call Call_02_56EA
+	call AdvanceVfxOAM
 	ret
 
 
@@ -4385,271 +4385,426 @@ VfxGateOpening::
 	ret
 
 
+;@ path: gfx/vfx
+;@ Sprites of visual effect 11 (the dust behind a Pegasus dash), 8 bytes per frame: two OAM sprites of
+;@ (y offset, x offset, tile, attributes). Frame 0 (bytes 0-7, timer below 8): tile $24 twice; frame 1
+;@ (timer 8-15): tile $1E and its mirror image.
 VfxType11Sprites::
 	db $00, $04, $24, $00, $00, $04, $24, $00, $00, $00, $1e, $00, $00, $08, $1e, $60
 
-Jump_02_550A::
-	call Call_02_56C5
+;@ def VfxDashDust(slot: c)
+;@ path: gfx/vfx
+;@ Visual effect 11, the dust cloud of a Pegasus dash: two sprites from VfxType11Sprites (frame by bit 3
+;@ of the timer). While Link still dashes they go to the next free effect OAM entries, otherwise
+;@ into the first two entries of the OAM buffer.
+VfxDashDust::
+;> LoadVfxPosition(c)
+	call LoadVfxPosition
+;> frame = hMultiPurpose0 & 8
 	ldh a, [hMultiPurpose0]
 	and $08
 	ld d, $00
 	ld e, a
-	ld hl, $54fa
+;> if wIsUsingPegasusBoots:
+	ld hl, VfxType11Sprites
 	ld a, [wIsUsingPegasusBoots]
 	and a
+;>     return DrawVfxSpritePair(VfxType11Sprites, frame)
 	jp nz, DrawVfxSpritePair
 
+;> oam = wOAMBuffer
 	add hl, de
 	ld de, wOAMBuffer
-	call Call_02_5649
-	jp Call_02_5649
+;> CopyVfxSprite()                               # first sprite
+	call CopyVfxSprite
+;> return CopyVfxSprite()                        # second sprite
+	jp CopyVfxSprite
 
 
+;@ path: gfx/vfx
+;@ Sprites of visual effect 8, 8 bytes per frame (two OAM sprites of y offset, x offset, tile,
+;@ attributes): frame 0 tile $1E and its mirror, frame 1 tile $30 and its mirror.
 VfxType8Sprites::
 	db $00, $00, $1e, $00, $00, $08, $1e, $60, $00, $00, $30, $00, $00, $08, $30, $60
 
-Jump_02_5538::
-	call Call_02_56C5
+;@ def VfxType8(slot: c)
+;@ path: gfx/vfx
+;@ Visual effect 8: two sprites from VfxType8Sprites, the frame chosen by bit 3 of the timer.
+VfxType8::
+;> LoadVfxPosition(c)
+	call LoadVfxPosition
+;> frame = hMultiPurpose0 & 8
 	ldh a, [hMultiPurpose0]
 	and $08
 	ld d, $00
 	ld e, a
-	ld hl, $5528
+;> return DrawVfxSpritePair(VfxType8Sprites, frame)
+	ld hl, VfxType8Sprites
 	jp DrawVfxSpritePair
 
 
+;@ path: gfx/vfx
+;@ Visual effect 7: x step per frame (signed pixels) by wVfxDirection 0-3 (the four diagonals: down-right,
+;@ down-left, up-right, up-left).
 VfxType7SpeedX::
 	db $01, $ff, $01, $ff
 
+;@ path: gfx/vfx
+;@ Visual effect 7: y step per frame by wVfxDirection (see VfxType7SpeedX).
 VfxType7SpeedY::
 	db $01, $01, $ff, $ff
 
-Jump_02_5550::
+;@ def VfxFlyingSpark(slot: c)
+;@ path: gfx/vfx
+;@ Visual effect 7: a 16x16 spark (tile $3C, later $3A, mirrored on the right) that flies diagonally in
+;@ its direction one pixel per frame while the timer is $0A or more.
+VfxFlyingSpark::
+;> if hMultiPurpose0 >= 0x0A:
 	ldh a, [hMultiPurpose0]
 	cp $0a
-	jr c, jr_002_5572
+	jr c, .draw
 
+;>     d = wVfxDirection[c]
 	ld hl, wVfxDirection
 	add hl, bc
 	ld e, [hl]
 	ld d, b
-	ld hl, $5548
+;>@x     wVfxX[c] += VfxType7SpeedX[d]
+	ld hl, VfxType7SpeedX
 	add hl, de
 	ld a, [hl]
 	ld hl, wVfxX
 	add hl, bc
 	add [hl]
+;=@x
 	ld [hl], a
-	ld hl, $554c
+;>@y     wVfxY[c] += VfxType7SpeedY[d]
+	ld hl, VfxType7SpeedY
 	add hl, de
 	ld a, [hl]
 	ld hl, wVfxY
 	add hl, bc
 	add [hl]
+;=@y
 	ld [hl], a
 
-jr_002_5572:
-	call Call_02_56C5
+.draw
+;> LoadVfxPosition(c)
+	call LoadVfxPosition
+;> tile = 0x3A if hMultiPurpose0 >= 7 else 0x3C
 	push bc
 	ld c, $3a
 	ldh a, [hMultiPurpose0]
 	cp $07
-	jr nc, jr_002_5580
+	jr nc, .oam
 
 	ld c, $3c
 
-jr_002_5580:
+.oam
+;> oam = wOAMBuffer + 0x30 + wOAMNextIndex
 	ld a, [wOAMNextIndex]
 	ld e, a
 	ld d, $00
-	ld hl, $c030
+	ld hl, wOAMBuffer + $30
 	add hl, de
+;> mem[oam + 0] = hMultiPurpose1               # left half
 	ldh a, [hMultiPurpose1]
 	ld [hli], a
+;> mem[oam + 1] = hMultiPurpose2
 	ldh a, [hMultiPurpose2]
 	ld [hli], a
+;> mem[oam + 2] = tile
 	ld a, c
 	ld [hli], a
+;> mem[oam + 3] = 0
 	xor a
 	ld [hli], a
+;> mem[oam + 4] = hMultiPurpose1               # right half, mirrored
 	ldh a, [hMultiPurpose1]
 	ld [hli], a
+;> mem[oam + 5] = hMultiPurpose2 + 8
 	ldh a, [hMultiPurpose2]
 	add $08
 	ld [hli], a
+;> mem[oam + 6] = tile
 	ld a, c
 	ld [hli], a
+;> mem[oam + 7] = 0x20
 	ld [hl], $20
+;> AdvanceVfxOAM(2)
 	pop bc
 	ld a, $02
-	call Call_02_56EA
+	call AdvanceVfxOAM
 	ret
 
 
-Jump_02_55A7::
-	call Call_02_56C5
+;@ def VfxFlicker(slot: c)
+;@ path: gfx/vfx
+;@ Visual effect 6: one sprite (tile $24) whose palette flips every frame (alternating between slots).
+VfxFlicker::
+;> LoadVfxPosition(c)
+	call LoadVfxPosition
+;> oam = wOAMBuffer + 0x30 + wOAMNextIndex
 	ld a, [wOAMNextIndex]
 	ld e, a
 	ld d, $00
-	ld hl, $c030
+	ld hl, wOAMBuffer + $30
 	add hl, de
+;> mem[oam + 0] = hMultiPurpose1
 	ldh a, [hMultiPurpose1]
 	ld [hli], a
+;> mem[oam + 1] = hMultiPurpose2
 	ldh a, [hMultiPurpose2]
 	ld [hli], a
+;> mem[oam + 2] = 0x24
 	ld a, $24
 	ld [hli], a
+;>@pal mem[oam + 3] = ((hFrameCounter ^ c) << 4) & 0x10   # palette 0 / 1
 	ldh a, [hFrameCounter]
 	xor c
 	rl a
 	rl a
 	rl a
 	rl a
+;=@pal
 	and $10
 	ld [hl], a
+;> AdvanceVfxOAM(1)
 	ld a, $01
-	call Call_02_56EA
+	call AdvanceVfxOAM
 	ret
 
 
+;@ path: gfx/vfx
+;@ Sprites of visual effect 5 (the clink star where the sword hits something hard), 8 bytes per frame
+;@ (two OAM sprites of y offset, x offset, tile, attributes): frame 0 tile $3C, frame 1 tile $3A, each
+;@ with its mirror image on the right.
 VfxType5Sprites::
 	db $00, $ff, $3c, $00, $00, $07, $3c, $20, $00, $ff, $3a, $00, $00, $07, $3a, $20
 
-Jump_02_55E1::
-	call Call_02_56C5
+;@ def VfxClink(slot: c)
+;@ path: gfx/vfx
+;@ Visual effect 5, the clink star: two sprites from VfxType5Sprites, frame by bit 3 of the timer.
+VfxClink::
+;> LoadVfxPosition(c)
+	call LoadVfxPosition
+;> frame = hMultiPurpose0 & 8
 	ldh a, [hMultiPurpose0]
 	and $08
 	ld d, $00
 	ld e, a
-	ld hl, $55d1
+;> return DrawVfxSpritePair(VfxType5Sprites, frame)
+	ld hl, VfxType5Sprites
 	jp DrawVfxSpritePair
 
 
+;@ path: gfx/vfx
+;@ Sprites of visual effect 1 (a splash of water), 8 bytes per frame (two OAM sprites of y offset,
+;@ x offset, tile, attributes; tile $18 and its mirror): frame 0 small, frame 1 wide.
 VfxType1Sprites::
 	db $f6, $fe, $18, $00, $f8, $0a, $18, $20, $fc, $00, $18, $00, $fe, $08, $18, $20
+;@ path: gfx/vfx
+;@ Sprites of visual effect 12 (the splash under Link's feet while he dashes through shallow water),
+;@ same layout as VfxType1Sprites.
 VfxType12Sprites::
 	db $00, $fa, $18, $00, $00, $0e, $18, $20, $02, $fc, $18, $00, $02, $0c, $18, $20
 
-Jump_02_5611::
-	call Call_02_56C5
-	ld hl, $5601
+;@ def VfxDashSplash(slot: c)
+;@ path: gfx/vfx
+;@ Visual effect 12: the dash splash, drawn like the splash from VfxType12Sprites.
+VfxDashSplash::
+;> LoadVfxPosition(c)
+	call LoadVfxPosition
+;> return VfxSplashDraw(VfxType12Sprites)
+	ld hl, VfxType12Sprites
 	jr jr_002_5627
 
-Jump_02_5619::
-	call Call_02_56C5
+;@ def VfxSplash(slot: c)
+;@ path: gfx/vfx
+;@ Visual effect 1, a splash: two sprites from VfxType1Sprites, frame by bit 3 of the timer (when
+;@ $C1A7 is 2, the sprites of VfxType1SpritesAlt are used instead).
+VfxSplash::
+;> LoadVfxPosition(c)
+	call LoadVfxPosition
+;> if mem[0xC1A7] == 2:
 	ld a, [$c1a7]
 	cp $02
-	jp z, Jump_002_566c
+;>     return VfxSplashAlt()
+	jp z, VfxSplashAlt
 
-	ld hl, $55f1
+;> table = VfxType1Sprites
+	ld hl, VfxType1Sprites
 
 jr_002_5627:
+;> # (VfxSplashDraw: also used by VfxDashSplash)
+;> frame = hMultiPurpose0 & 8
 	ldh a, [hMultiPurpose0]
 	and $08
 	ld e, a
 	ld d, $00
+;> DrawVfxSpritePair(table, frame)              # (falls through)
 
+;@ def DrawVfxSpritePair(table: hl, offset: de)
+;@ path: gfx/vfx
+;@ Draws two sprites of an effect: the 8 bytes at table + offset (two times y offset, x offset, tile,
+;@ attributes) are added to the effect's position (hMultiPurpose1 / 2) and written to the next free
+;@ effect OAM entries (wOAMBuffer + $30 + wOAMNextIndex).
 DrawVfxSpritePair::
+;> src = table + offset
 	add hl, de
 	push hl
+;>@oam oam = wOAMBuffer + 0x30 + wOAMNextIndex
 	ld a, [wOAMNextIndex]
 	ld e, a
 	ld d, $00
-	ld hl, $c030
+	ld hl, wOAMBuffer + $30
 	add hl, de
 	push hl
+;=@oam
 	pop de
 	pop hl
-	call Call_02_5649
-	call Call_02_5649
+;> CopyVfxSprite(src, oam)
+	call CopyVfxSprite
+;> CopyVfxSprite(src + 4, oam + 4)
+	call CopyVfxSprite
+;> AdvanceVfxOAM(2)
 	ld a, $02
-	call Call_02_56EA
+	call AdvanceVfxOAM
 	ret
 
 
-Call_02_5649::
+;@ def CopyVfxSprite(src: hl, oam: de)
+;@ path: gfx/vfx
+;@ Writes one OAM entry: y = hMultiPurpose1 + src[0], x = hMultiPurpose2 + src[1], tile src[2],
+;@ attributes src[3]; both pointers move on by 4.
+CopyVfxSprite::
+;> mem[oam] = hMultiPurpose1 + mem[src]
 	ldh a, [hMultiPurpose1]
 	add [hl]
 	ld [de], a
 	inc hl
 	inc de
+;> mem[oam + 1] = hMultiPurpose2 + mem[src + 1]
 	ldh a, [hMultiPurpose2]
 	add [hl]
 	ld [de], a
 	inc hl
 	inc de
+;> mem[oam + 2] = mem[src + 2]
 	ld a, [hli]
 	ld [de], a
 	inc de
+;> mem[oam + 3] = mem[src + 3]
 	ld a, [hli]
 	ld [de], a
 	inc de
 	ret
 
 
+;@ path: gfx/vfx
+;@ Alternate sprites of visual effect 1 (used while $C1A7 is 2), same layout as VfxType1Sprites: frame 0
+;@ tile $7A and its mirror, frame 1 tile $78 and its mirror.
 VfxType1SpritesAlt::
 	db $00, $00, $7a, $00, $00, $08, $7a, $20, $00, $00, $78, $00, $00, $08, $78, $20
 
-Jump_002_566c::
+;@ def VfxSplashAlt()
+;@ path: gfx/vfx
+;@ The other look of visual effect 1: two sprites from VfxType1SpritesAlt, frame by bit 3 of the timer.
+VfxSplashAlt::
+;> frame = hMultiPurpose0 & 8
 	ldh a, [hMultiPurpose0]
 	and $08
 	ld d, $00
 	ld e, a
-	ld hl, $565c
+;> return DrawVfxSpritePair(VfxType1SpritesAlt, frame)
+	ld hl, VfxType1SpritesAlt
 	jp DrawVfxSpritePair
 
 
+;@ path: gfx/vfx
+;@ Sprites of the smoke puff (visual effects 2-4), 8 bytes per frame (two OAM sprites of y offset,
+;@ x offset, tile, attributes), index = (timer << 1) & $18: frames 0-1 tile $32, frames 2-3 tile $30,
+;@ each with its mirror image on the right.
 VfxSmokeSprites::
 	db $00, $00, $32, $00, $00, $08, $32, $20, $00, $00, $32, $00, $00, $08, $32, $20
 	db $00, $00, $30, $00, $00, $08, $30, $20, $00, $00, $30, $00, $00, $08, $30, $20
 
-Jump_02_5699::
-	call Call_02_56C5
+;@ def VfxSmoke(slot: c)
+;@ path: gfx/vfx
+;@ Visual effects 2-4, a puff of smoke. When the timer reaches 4, type 3 makes a chest appear
+;@ (RevealChest) and type 4 a staircase (RevealStairs).
+VfxSmoke::
+;> LoadVfxPosition(c)
+	call LoadVfxPosition
+;> if hMultiPurpose0 == 4:
 	ldh a, [hMultiPurpose0]
 	cp $04
-	jr nz, jr_002_56b0
+	jr nz, .type4
 
+;>     if wVfxType[c] == 3:
 	ld hl, wVfxType
 	add hl, bc
 	ld a, [hl]
 	cp $03
-	jr nz, jr_002_56b0
+	jr nz, .type4
 
-	call Call_02_5C92
-	jr jr_002_56b7
+;>         RevealChest()
+	call RevealChest
+	jr .draw
 
-jr_002_56b0:
+.type4
+;>     elif wVfxType[c] == 4:                   # (when the timer is not 4, a = timer here: no match)
 	cp $04
-	jr nz, jr_002_56b7
+	jr nz, .draw
 
-	call Call_02_5D00
+;>         RevealStairs()
 
-jr_002_56b7:
+	call RevealStairs
+
+.draw
+;>@d return DrawVfxSpritePair(VfxSmokeSprites, (hMultiPurpose0 << 1) & 0x18)
 	ldh a, [hMultiPurpose0]
 	rla
 	and $18
 	ld d, $00
 	ld e, a
-	ld hl, $5679
+	ld hl, VfxSmokeSprites
+;=@d
 	jp DrawVfxSpritePair
 
 
-Call_02_56C5::
+;@ def LoadVfxPosition(slot: c)
+;@ path: gfx/vfx
+;@ Loads the effect's position into hMultiPurpose1 (y) and hMultiPurpose2 (x); an effect that is below
+;@ the play area (y >= $88) or past its right edge (x >= $A8) is freed.
+LoadVfxPosition::
+;> hMultiPurpose1 = wVfxY[c]
 	ld hl, wVfxY
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose1], a
+;> if hMultiPurpose1 >= 0x88:
 	cp $88
-	jr nc, Call_02_56DB
+;>     return FreeVfxSlot(c)
+	jr nc, FreeVfxSlot
 
+;> hMultiPurpose2 = wVfxX[c]
 	ld hl, wVfxX
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose2], a
+;> if hMultiPurpose2 < 0xA8:
 	cp $a8
+;>     return
 	jr c, jr_002_56e1
 
-Call_02_56DB::
+;> FreeVfxSlot(c)                              # (falls through)
+
+;@ def FreeVfxSlot(slot: c)
+;@ path: gfx/vfx
+;@ Frees visual effect slot c.
+FreeVfxSlot::
+;> wVfxType[c] = 0
 	ld hl, wVfxType
 	add hl, bc
 	xor a
@@ -4659,173 +4814,257 @@ jr_002_56e1:
 	ret
 
 
+;@ path: gfx/vfx
+;@ OAM offsets (multiples of 8 bytes = two entries) where the effects start drawing once their OAM
+;@ share is used up; picked by (hFrameCounter + slot) & 7, so the sprites flicker in turn.
 VfxOAMStartOffsets::
 	db $00, $08, $10, $18, $20, $28, $30, $38
 
-Call_02_56EA::
+;@ def AdvanceVfxOAM(count: a)
+;@ path: gfx/vfx
+;@ After an effect drew `count` sprites: moves wOAMNextIndex on by count * 4 (wrapping at $60) and adds
+;@ them to wOAMEntriesUsed; once $60 bytes have been handed out the next effect starts at a rotating
+;@ offset (VfxOAMStartOffsets), so that too many sprites flicker instead of vanishing.
+AdvanceVfxOAM::
+;> n = count * 4
 	sla a
 	sla a
 	ld e, a
+;> wOAMNextIndex = (wOAMNextIndex + n) % 0x60
 	ld a, [wOAMNextIndex]
 	add e
 	cp $60
-	jr c, jr_002_56f9
+	jr c, .store
 
 	sub $60
 
-jr_002_56f9:
+.store
 	ld [wOAMNextIndex], a
+;> wOAMEntriesUsed += n
 	ld a, [wOAMEntriesUsed]
 	add e
 	ld [wOAMEntriesUsed], a
+;> if wOAMEntriesUsed >= 0x60:
 	cp $60
-	jr c, jr_002_571a
+	jr c, .done
 
+;>@rot     wOAMNextIndex = VfxOAMStartOffsets[(hFrameCounter + wActiveEntitySlot) & 7]
 	ldh a, [hFrameCounter]
 	ld hl, wActiveEntitySlot
 	add [hl]
 	and $07
 	ld e, a
 	ld d, $00
-	ld hl, $56e2
+;=@rot
+	ld hl, VfxOAMStartOffsets
 	add hl, de
 	ld a, [hl]
 	ld [wOAMNextIndex], a
 
-jr_002_571a:
+.done
 	ret
 
 
-Call_02_571B::
+;@ def AddSplashAtLink()
+;@ path: gfx/vfx
+;@ A splash (visual effect 1, jingle $0E) at Link's feet; AddSplashAtLinkY takes the y position in a.
+AddSplashAtLink::
+;> AddSplashAtLinkY(hLinkY)                     # (falls through)
 	ldh a, [hLinkY]
 
-Call_02_571D::
+;@ def AddSplashAtLinkY(y: a)
+;@ path: gfx/vfx
+;@ A splash (visual effect 1) at (hLinkX, y), with jingle $0E.
+AddSplashAtLinkY::
+;> hMultiPurpose1 = y
 	ldh [hMultiPurpose1], a
+;> hMultiPurpose0 = hLinkX
 	ldh a, [hLinkX]
 	ldh [hMultiPurpose0], a
+;> hJingle = 0x0E
 	ld a, $0e
 	ldh [hJingle], a
+;> AddTransientVfx(1)
 	ld a, $01
 	call AddTransientVfx
 	ret
 
 
+;@ path: object/doors
+;@ Masks that clear one bit of the shutter door bits (wRoomShutterDoors / wRoomShutterDoorsCopy):
+;@ index = door - 4 for the shutter doors 4-7 ($FE, $FD, $FB, $F7). Read by UpdateRoomDoors.
 DoorClearMasks::
 	db $fe, $fd, $fb, $f7
 
+;@ def UpdateRoomDoors()
+;@ path: object/doors
+;@ Runs every frame indoors (from bank 0): the room's event first, then a door animation in progress
+;@ (opening or closing, Link may not walk meanwhile), else the next shutter door to open or close:
+;@ the doors 4-7 whose bits are set in wRoomShutterDoors (open) or wRoomShutterDoorsCopy (close).
+UpdateRoomDoors::
+;> if wDialogState or wRoomTransitionState or wInventoryAppearing:
 	ld hl, wDialogState
 	ld a, [wRoomTransitionState]
 	or [hl]
 	ld hl, wInventoryAppearing
 	or [hl]
-	jr nz, jr_002_575d
+;>     return
+	jr nz, .done
 
+;> if not wIsIndoor:
 	ld a, [wIsIndoor]
 	and a
-	jr z, jr_002_575d
+;>     return
+	jr z, .done
 
-	call Call_02_5B15
-	ld a, [$c188]
+;> RunRoomEvent()                               # the room's event
+	call RunRoomEvent
+;> if wDoorAnimation:
+	ld a, [wDoorAnimation]
 	and a
-	jr z, jr_002_575e
+	jr z, .noAnimation
 
+;>     hLinkInteractiveMotionBlocked = 1
 	cp $02
 	ld a, $01
 	ldh [hLinkInteractiveMotionBlocked], a
-	jr z, jr_002_575a
+;>     if wDoorAnimation != 2:
+	jr z, .close
 
-	call Call_02_5871
-	jr jr_002_575d
+;>         OpenDoorStep()                       # opening
+	call OpenDoorStep
+;>         return
+	jr .done
 
-jr_002_575a:
-	call Call_02_59E1
+.close
+;>     else:
+;>         CloseDoorStep()                       # closing
+	call CloseDoorStep
 
-jr_002_575d:
+.done
+;>     return
 	ret
 
 
-jr_002_575e:
-	ld a, [$c18c]
+.noAnimation
+;> if wOpenShuttersRequest:
+	ld a, [wOpenShuttersRequest]
 	and a
-	jr z, jr_002_5793
+	jr z, .closeRequest
 
+;>     door = 3
 	ld e, $03
+;>     doors = wRoomShutterDoors
 	ld a, [wRoomShutterDoors]
 	ld c, a
 
-jr_002_576a:
+.findOpen
+;>     while True:
+;>         door += 1
 	inc e
+;>         if door == 8:                        # none left
 	ld a, e
 	cp $08
-	jr z, jr_002_578e
-
+	jr z, .openDone
+;>@o1             wOpenShuttersRequest = 0
+;>@o1             return
+;>         carry = doors & 1
+;>         doors >>= 1
 	srl c
-	jr nc, jr_002_576a
+;>         if carry: break
+	jr nc, .findOpen
 
+;>     wRoomShutterDoors &= DoorClearMasks[door - 4]
 	ld d, $00
-	ld hl, $5729
+	ld hl, DoorClearMasks - 4
 	add hl, de
 	ld a, [wRoomShutterDoors]
 	and [hl]
 	ld [wRoomShutterDoors], a
+;>     wDoorAnimIndex = door
 	ld a, e
-	ld [$c189], a
+	ld [wDoorAnimIndex], a
+;>     wDoorAnimFrame = 0
 	xor a
-	ld [$dbac], a
+	ld [wDoorAnimFrame], a
+;>     wDoorAnimation = 1                       # open it
 	inc a
-	ld [$c188], a
+	ld [wDoorAnimation], a
+;>     return
 	ret
 
 
-jr_002_578e:
+.openDone
+;=@o1
 	xor a
-	ld [$c18c], a
+	ld [wOpenShuttersRequest], a
 	ret
 
 
-jr_002_5793:
-	ld a, [$c18d]
+.closeRequest
+;> if not wCloseShuttersRequest:
+	ld a, [wCloseShuttersRequest]
 	and a
-	jr nz, jr_002_579a
+	jr nz, .close2
 
+;>     return
 	ret
 
 
-jr_002_579a:
+.close2
+;> door = 3
 	ld e, $03
+;> doors = wRoomShutterDoorsCopy
 	ld a, [wRoomShutterDoorsCopy]
 	ld c, a
 
-jr_002_57a0:
+.findClose
+;> while True:
+;>     door += 1
 	inc e
+;>     if door == 8:
 	ld a, e
 	cp $08
-	jr z, jr_002_57c5
-
+	jr z, .closeDone
+;>@c1         wCloseShuttersRequest = 0
+;>@c1         return
+;>     carry = doors & 1
+;>     doors >>= 1
 	srl c
-	jr nc, jr_002_57a0
+;>     if carry: break
+	jr nc, .findClose
 
+;> wRoomShutterDoorsCopy &= DoorClearMasks[door - 4]
 	ld d, $00
-	ld hl, $5729
+	ld hl, DoorClearMasks - 4
 	add hl, de
 	ld a, [wRoomShutterDoorsCopy]
 	and [hl]
 	ld [wRoomShutterDoorsCopy], a
+;> wDoorAnimIndex = door
 	ld a, e
-	ld [$c189], a
+	ld [wDoorAnimIndex], a
+;> wDoorAnimation = 2                           # close it
 	ld a, $02
-	ld [$c188], a
+	ld [wDoorAnimation], a
+;> wDoorAnimFrame = 0
 	xor a
-	ld [$dbac], a
+	ld [wDoorAnimFrame], a
 	ret
 
 
-jr_002_57c5:
+.closeDone
+;=@c1
 	xor a
-	ld [$c18d], a
+	ld [wCloseShuttersRequest], a
 	ret
 
 
+;@ path: object/doors
+;@ Background tiles of the opening doors, 72 bytes: index = half * $24 + door * 4 + row * 2 + column.
+;@ door = wDoorAnimIndex: 0-3 locked doors (top, bottom, left, right), 4-7 shutters (same order), 8 the
+;@ boss door (top); half 0 is shown for 8 frames (half open), half 1 at the end (open). Each door is
+;@ drawn as 2 rows of 2 tiles at DoorColumnX / DoorRowDY from its position. Read by OpenDoorStep.
 DoorOpenTiles::
 	db $50, $51, $13, $12, $11, $10, $42, $43, $45, $13, $55, $11, $12, $46, $10, $56
 	db $58, $59, $13, $12, $11, $10, $4a, $4b, $4d, $13, $5d, $11, $12, $4e, $10, $5e
@@ -4833,222 +5072,300 @@ DoorOpenTiles::
 	db $12, $13, $10, $11, $11, $10, $13, $12, $11, $10, $13, $12, $12, $13, $10, $11
 	db $12, $13, $10, $11, $11, $10, $13, $12
 
+;@ path: object/doors
+;@ X offset (pixels) of the drawn door tiles from wDoorX, by door 0-8 ($08 for top / bottom doors,
+;@ 0 for side doors). The last 9 bytes are not read. Read by OpenDoorStep.
 DoorColumnX::
 	db $08, $08, $00, $00, $08, $08, $00, $00
 	db $08, $08, $08, $00, $00, $08, $08, $00, $00, $08
 
+;@ path: object/doors
+;@ Y offset (pixels) of the two drawn tile rows of an opening door from wDoorY, index = row * 9 + door
+;@ (row 0: $00 / $08, row 1: 8 further down). Read by OpenDoorStep.
 DoorRowDY::
 	db $00, $00, $08, $08, $00, $00
 	db $08, $08, $00, $08, $08, $10, $10, $08, $08, $10, $10, $08
 
+;@ path: object/doors
+;@ Offset added to the door's square index (wDoorPosition) for the two room squares a door covers,
+;@ index = (door & 7) and (door & 7) + 8: the first square itself, the second one to the right ($01,
+;@ top / bottom doors) or below ($10, side doors). Read by OpenDoorStep.
 DoorSquareOffsets::
 	db $00, $00, $00, $00
 	db $00, $00, $00, $00, $01, $01, $10, $10, $01, $01, $10, $10
 
+;@ path: object/doors
+;@ Room objects placed in those two squares when a door has opened (the open doorway), same index as
+;@ DoorSquareOffsets. Read by OpenDoorStep.
 DoorOpenObjects::
 	db $43, $8c, $09, $0b
 	db $43, $8c, $09, $0b, $44, $08, $0a, $0c, $44, $08, $0a, $0c
 
+;@ path: object/doors
+;@ Room status bit that records an open door, by door 0-8: $04 top, $08 bottom, $02 left, $01 right.
+;@ Read by OpenDoorStep (set) and CloseDoorStep (cleared).
 DoorRoomStatusBits::
 	db $04, $08, $02, $01
 	db $04, $08, $02, $01, $04
 
+;@ path: object/doors
+;@ Step to the neighbouring room on the dungeon grid behind a door, by door 0-8 (-8 above, +8 below,
+;@ -1 left, +1 right). Read by OpenDoorStep.
 DoorNeighbourRoomDelta::
 	db $f8, $08, $ff, $01, $f8, $08, $ff, $01, $f8
 
+;@ path: object/doors
+;@ Status bit set in that neighbouring room (the same door seen from the other side: top door -> its
+;@ bottom bit $08, ...), by door 0-8. Read by OpenDoorStep.
 DoorNeighbourStatusBits::
 	db $08, $04
 	db $01, $02, $08, $04, $01, $02, $08
 
-Call_02_5871::
+;@ def OpenDoorStep()
+;@ path: object/doors
+;@ One frame of the door opening animation (door wDoorAnimIndex, frame wDoorAnimFrame): both tile rows
+;@ are queued in the half-open look for 8 frames, then in the open look; after that the two squares
+;@ become open doorway objects and the door is recorded as open in this room and in the room behind it.
+;@ test: skip draws through the BG command queue
+OpenDoorStep::
+;>@base base = wDoorAnimIndex * 4                    # offset into DoorOpenTiles
 	ld e, $00
 	ld d, e
 	ld c, e
 	ld b, e
 	xor a
 	ldh [hMultiPurposeC], a
+;=@base
 	ldh [hMultiPurposeE], a
-	ld a, [$c189]
+	ld a, [wDoorAnimIndex]
 	ld c, a
 	and a
-	jr z, jr_002_588b
+	jr z, .setX
 
 	xor a
 
-jr_002_5883:
+.times4
+;=@base
 	add $04
 	ld e, a
 	ld d, $00
 	dec c
-	jr nz, jr_002_5883
+	jr nz, .times4
 
-jr_002_588b:
-	ld hl, $5812
-	ld a, [$c189]
+.setX
+;>@x hBGPosX = DoorColumnX[wDoorAnimIndex] + wDoorX[wDoorAnimIndex]
+	ld hl, DoorColumnX
+	ld a, [wDoorAnimIndex]
 	ld c, a
 	ld b, $00
 	add hl, bc
 	ld a, [hl]
+;=@x
 	ld hl, wDoorX
 	add hl, bc
 	add [hl]
 	ldh [hBGPosX], a
 
 Jump_002_589d:
-	ld hl, $5824
+;> for row in (0, 9):                           # hMultiPurposeC: 0, then 9 (the second row)
+;>@y     hBGPosY = DoorRowDY[row + wDoorAnimIndex] + wDoorY[wDoorAnimIndex]
+	ld hl, DoorRowDY
 	ldh a, [hMultiPurposeC]
 	ld c, a
 	add hl, bc
-	ld a, [$c189]
+	ld a, [wDoorAnimIndex]
 	ld c, a
+;=@y
 	add hl, bc
 	ld a, [hl]
 	ld hl, wDoorY
 	add hl, bc
 	add [hl]
 	ldh [hBGPosY], a
+;>     GetBGAddress()
 	push de
 	call GetBGAddress
 	pop de
+;>     if row:
 	ldh a, [hMultiPurposeC]
 	and a
-	jr z, jr_002_58bd
+	jr z, .command
 
+;>         base += 2
 	inc de
 	inc de
 
-jr_002_58bd:
+.command
+;>@cmd     cmd = wDrawCommand + wDrawCommandsSize   # 5 bytes: address, $01 (2 tiles), the tiles
 	ld a, [wDrawCommandsSize]
 	ld c, a
 	ld b, $00
 	add $05
 	ld [wDrawCommandsSize], a
 	ld hl, wDrawCommand
+;=@cmd
 	add hl, bc
+;>     mem[cmd + 0] = hBGAddrHigh
 	ldh a, [hBGAddrHigh]
 	ld [hli], a
+;>     mem[cmd + 1] = hBGAddrLow
 	ldh a, [hBGAddrLow]
 	ld [hli], a
+;>     mem[cmd + 2] = 0x01
 	ld a, $01
 	ld [hli], a
+;>     mem[cmd + 3] = DoorOpenTiles[base]
 	push hl
-	ld hl, $57ca
+	ld hl, DoorOpenTiles
 	add hl, de
 	ld a, [hl]
 	pop hl
 	ld [hli], a
+;>     mem[cmd + 4] = DoorOpenTiles[base + 1]
 	push hl
-	ld hl, $57cb
+	ld hl, DoorOpenTiles + 1
 	add hl, de
 	ld a, [hl]
 	pop hl
 	ld [hl], a
+;>     if row == 0:
 	ldh a, [hMultiPurposeC]
 	and a
-	jr nz, jr_002_58f1
+	jr nz, .rowsDone
 
+;>         hMultiPurposeC = 9
 	ld a, $09
 	ldh [hMultiPurposeC], a
+;>         continue
 	jp Jump_002_589d
 
 
-jr_002_58f1:
+.rowsDone
+;> mem[cmd + 5] = 0                             # end of the queue
 	xor a
 	inc hl
 	ld [hl], a
-	ld a, [$dbac]
+;> wDoorAnimFrame += 1
+	ld a, [wDoorAnimFrame]
 	add $01
-	ld [$dbac], a
-	ld a, [$dbac]
+	ld [wDoorAnimFrame], a
+;> if wDoorAnimFrame < 8:
+	ld a, [wDoorAnimFrame]
 	cp $08
-	jr nc, jr_002_5904
+	jr nc, .halfDone
 
+;>     return
 	ret
 
 
-jr_002_5904:
+.halfDone
+;> if not hMultiPurposeE:                       # now the open look, once
 	ldh a, [hMultiPurposeE]
 	and a
-	jr nz, jr_002_5919
+	jr nz, .finish
 
+;>     hMultiPurposeC = 0
 	xor a
 	ldh [hMultiPurposeC], a
+;>@b2     base += 0x24 - 2                         # second half of DoorOpenTiles
 	ld a, e
 	add $24
 	ld e, a
 	ld d, $00
+;=@b2
 	ldh [hMultiPurposeE], a
 	dec de
 	dec de
+;>     return the_rows_again()                  # back to the row loop above
 	jp Jump_002_589d
 
 
-jr_002_5919:
+.finish
+;> wDoorAnimation = 0
 	xor a
-	ld [$c188], a
+	ld [wDoorAnimation], a
+;> wLinkShowItemPoseActive = 0
 	ld [wLinkShowItemPoseActive], a
+;> hMultiPurposeE = 0
 	xor a
 	ldh [hMultiPurposeE], a
-	ld a, [$c189]
+;>@pos hMultiPurpose0 = wDoorPosition[wDoorAnimIndex]
+	ld a, [wDoorAnimIndex]
 	ld c, a
 	ld b, $00
 	ld hl, wDoorPosition
 	add hl, bc
 	ld a, [hl]
+;=@pos
 	ldh [hMultiPurpose0], a
+;> i = wDoorAnimIndex & 7
 	ld a, c
 	and $07
 	ld c, a
 
-jr_002_5934:
-	ld hl, $5836
+.squares
+;> while True:                                  # the two squares of the door: i, then i + 8
+;>@sq     wRoomObjects[hMultiPurpose0 + DoorSquareOffsets[i]] = DoorOpenObjects[i]
+	ld hl, DoorSquareOffsets
 	add hl, bc
 	ld a, [hl]
 	ld hl, hMultiPurpose0
 	add [hl]
 	ld e, a
+;=@sq
 	ld d, $00
-	ld hl, $5846
+	ld hl, DoorOpenObjects
 	add hl, bc
 	ld a, [hl]
 	ld hl, wRoomObjects
 	add hl, de
+;=@sq
 	ld [hl], a
+;>     if hMultiPurposeE: break                 # the second square is done
 	ldh a, [hMultiPurposeE]
 	and a
-	jr nz, jr_002_5957
+	jr nz, .status
 
+;>     i += 8
+;>     hMultiPurposeE = i
 	ld a, c
 	add $08
 	ldh [hMultiPurposeE], a
 	ld c, a
-	jr jr_002_5934
+	jr .squares
 
-jr_002_5957:
-	call Call_02_5987
+.status
+;> status = GetRoomStatusAddress_02()
+	call GetRoomStatusAddress_02
 	push hl
 	pop bc
-	ld a, [$c189]
+;>@st mem[status] |= DoorRoomStatusBits[wDoorAnimIndex]
+	ld a, [wDoorAnimIndex]
 	ld e, a
 	ld d, $00
-	ld hl, $5856
+	ld hl, DoorRoomStatusBits
 	add hl, de
 	ld a, [bc]
+;=@st
 	or [hl]
 	ld [bc], a
+;> hRoomStatus = mem[status]
 	ldh [hRoomStatus], a
-	ld hl, $585f
+;> neighbour = GetDungeonRoomStatusAddress(wIndoorRoom + DoorNeighbourRoomDelta[wDoorAnimIndex])
+	ld hl, DoorNeighbourRoomDelta
 	add hl, de
 	ld a, [wIndoorRoom]
 	add [hl]
 	ld e, a
 	call GetDungeonRoomStatusAddress
+;>@nb mem[neighbour] |= DoorNeighbourStatusBits[wDoorAnimIndex]
 	push hl
 	pop bc
-	ld a, [$c189]
+	ld a, [wDoorAnimIndex]
 	ld e, a
 	ld d, $00
-	ld hl, $5868
+	ld hl, DoorNeighbourStatusBits
+;=@nb
 	add hl, de
 	ld a, [bc]
 	or [hl]
@@ -5056,1395 +5373,1953 @@ jr_002_5957:
 	ret
 
 
-Call_02_5987::
+;@ def GetRoomStatusAddress() -> hl
+;@ path: world/rooms
+;@ Address of the current room's byte in wRoomStatus: the overworld group, or for indoor maps the first
+;@ indoor group (maps $00-$05 and $1A-$1F) or the second (maps $06-$19).
+;@ test: hMapRoom = rand(0, 255); wIsIndoor = rand(0, 1); hMapId = rand(0, 0x1F)
+GetRoomStatusAddress_02::
+;> group = wIsIndoor
 	ld hl, wRoomStatus
 	ldh a, [hMapRoom]
 	ld e, a
 	ld a, [wIsIndoor]
 	ld d, a
+;> if wIsIndoor:
 	and a
-	jr z, jr_002_599f
+	jr z, .add
 
+;>     if 0x06 <= hMapId < 0x1A:
 	ldh a, [hMapId]
 	cp $1a
-	jr nc, jr_002_599f
+	jr nc, .add
 
 	cp $06
-	jr c, jr_002_599f
+	jr c, .add
 
+;>         group += 1
 	inc d
 
-jr_002_599f:
+.add
+;> return wRoomStatus + group * 0x100 + hMapRoom
 	add hl, de
 	ret
 
 
+;@ path: object/doors
+;@ Background tiles of the closing shutter doors, 32 bytes: index = half * $10 + (door - 4) * 4 + row * 2
+;@ + column, for the shutters 4-7 (top, bottom, left, right); half 0 for the first 8 frames, half 1 at
+;@ the end. Read by CloseDoorStep.
 DoorCloseTiles::
 	db $58, $59, $13, $12, $11, $10, $4a, $4b, $4d, $13, $5d, $11, $12, $4e, $10, $5e
 	db $40, $41, $58, $59, $4a, $4b, $52, $53, $44, $4d, $54, $5d, $4e, $47, $5e, $57
+;@ path: object/doors
+;@ X offset (pixels) of the closing shutter's tiles from wDoorX, by door - 4 (first 4 bytes; the
+;@ other 4 are not read). Read by CloseDoorStep.
 DoorCloseColumnX::
 	db $08, $08, $00, $00, $08, $08, $00, $00
 
+;@ path: object/doors
+;@ Y offset of the two tile rows of a closing shutter from wDoorY, index = row * 4 + door - 4.
 DoorCloseRowDY::
 	db $00, $00, $08, $08, $08, $08, $10, $10
+;@ path: object/doors
+;@ Offset added to wDoorPosition for the two squares of a closing shutter, index = door - 4 and
+;@ door - 4 + 4 (the second square to the right or below).
 DoorCloseSquareOffsets::
 	db $00, $00, $00, $00, $01, $01, $10, $10
 
+;@ path: object/doors
+;@ Room objects of a closed shutter in those two squares, same index as DoorCloseSquareOffsets.
 DoorCloseObjects::
 	db $35, $37, $39, $3b, $36, $38, $3a, $3c
 
-Call_02_59E1::
+;@ def CloseDoorStep()
+;@ path: object/doors
+;@ One frame of a shutter closing (doors 4-7): like OpenDoorStep with the closing tiles, and when Link's
+;@ respawn point lies in the door's way it moves to where Link stands. At the end the squares become
+;@ closed shutter objects and the room's door bit is cleared.
+;@ test: skip draws through the BG command queue
+CloseDoorStep::
+;> j = wDoorAnimIndex - 4
+;>@base base = j * 4                                 # offset into DoorCloseTiles
 	ld e, $00
 	ld d, e
 	ld c, e
 	ld b, e
 	xor a
 	ldh [hMultiPurposeC], a
+;=@base
 	ldh [hMultiPurposeD], a
 	ldh [hMultiPurposeE], a
-	ld a, [$c189]
+	ld a, [wDoorAnimIndex]
 	sub $04
-	jr z, jr_002_59fe
+	jr z, .setX
 
 	ld c, a
+;=@base
 	xor a
 
-jr_002_59f6:
+.times4
+;=@base
 	add $04
 	ld e, a
 	ld d, $00
 	dec c
-	jr nz, jr_002_59f6
+	jr nz, .times4
 
-jr_002_59fe:
-	ld hl, $59bd
-	ld a, [$c189]
+.setX
+;>@x hBGPosX = DoorCloseColumnX[j] + wDoorX[wDoorAnimIndex]
+	ld hl, DoorCloseColumnX - 4
+	ld a, [wDoorAnimIndex]
 	ld c, a
 	ld b, $00
 	add hl, bc
 	ld a, [hl]
+;=@x
 	ld hl, wDoorX
 	add hl, bc
 	add [hl]
 	ldh [hBGPosX], a
 
 Jump_002_5a10:
-	ld hl, $59c5
+;> for row in (0, 4):                           # hMultiPurposeC
+;>@y     hBGPosY = DoorCloseRowDY[row + j] + wDoorY[wDoorAnimIndex]
+	ld hl, DoorCloseRowDY - 4
 	ldh a, [hMultiPurposeC]
 	ld c, a
 	add hl, bc
-	ld a, [$c189]
+	ld a, [wDoorAnimIndex]
 	ld c, a
+;=@y
 	add hl, bc
 	ld a, [hl]
 	ld hl, wDoorY
 	add hl, bc
 	add [hl]
 	ldh [hBGPosY], a
+;>@resp     if abs(wLinkRespawnY - 0x10 - hBGPosY) < 0x10 and abs(wLinkRespawnX - 8 - hBGPosX) < 0x10:
 	ld a, [wLinkRespawnY]
 	sub $10
 	ld hl, hBGPosY
 	sub [hl]
 	add $10
 	cp $20
-	jr nc, jr_002_5a4c
+;=@resp
+	jr nc, .bg
 
 	ld a, [wLinkRespawnX]
 	sub $08
 	ld hl, hBGPosX
 	sub [hl]
 	add $10
+;=@resp
 	cp $20
-	jr nc, jr_002_5a4c
+	jr nc, .bg
 
+;>         wLinkRespawnX = hLinkX               # do not respawn inside the shutter
 	ldh a, [hLinkX]
 	ld [wLinkRespawnX], a
+;>         wLinkRespawnY = hLinkY
 	ldh a, [hLinkY]
 	ld [wLinkRespawnY], a
 
-jr_002_5a4c:
+.bg
+;>     GetBGAddress()
 	push de
 	call GetBGAddress
 	pop de
+;>     if row:
 	ldh a, [hMultiPurposeC]
 	and a
-	jr z, jr_002_5a58
+	jr z, .command
 
+;>         base += 2
 	inc de
 	inc de
 
-jr_002_5a58:
+.command
+;>@cmd     cmd = wDrawCommand + wDrawCommandsSize   # 5 bytes: address, $01 (2 tiles), the tiles
 	ld a, [wDrawCommandsSize]
 	ld c, a
 	ld b, $00
 	add $05
 	ld [wDrawCommandsSize], a
 	ld hl, wDrawCommand
+;=@cmd
 	add hl, bc
+;>     mem[cmd + 0] = hBGAddrHigh
 	ldh a, [hBGAddrHigh]
 	ld [hli], a
+;>     mem[cmd + 1] = hBGAddrLow
 	ldh a, [hBGAddrLow]
 	ld [hli], a
+;>     mem[cmd + 2] = 0x01
 	ld a, $01
 	ld [hli], a
+;>     mem[cmd + 3] = DoorCloseTiles[base]
 	push hl
-	ld hl, $59a1
+	ld hl, DoorCloseTiles
 	add hl, de
 	ld a, [hl]
 	pop hl
 	ld [hli], a
+;>     mem[cmd + 4] = DoorCloseTiles[base + 1]
 	push hl
-	ld hl, $59a2
+	ld hl, DoorCloseTiles + 1
 	add hl, de
 	ld a, [hl]
 	pop hl
 	ld [hl], a
+;>     if row == 0:
 	ldh a, [hMultiPurposeC]
 	and a
-	jr nz, jr_002_5a8c
+	jr nz, .rowsDone
 
+;>         hMultiPurposeC = 4
 	ld a, $04
 	ldh [hMultiPurposeC], a
+;>         continue
 	jp Jump_002_5a10
 
 
-jr_002_5a8c:
+.rowsDone
+;> mem[cmd + 5] = 0
 	xor a
 	inc hl
 	ld [hl], a
-	ld a, [$dbac]
+;> wDoorAnimFrame += 1
+	ld a, [wDoorAnimFrame]
 	add $01
-	ld [$dbac], a
-	ld a, [$dbac]
+	ld [wDoorAnimFrame], a
+;> if wDoorAnimFrame < 8:
+	ld a, [wDoorAnimFrame]
 	cp $08
-	jr nc, jr_002_5a9f
+	jr nc, .halfDone
 
+;>     return
 	ret
 
 
-jr_002_5a9f:
+.halfDone
+;> if not hMultiPurposeE:                       # now the closed look, once
 	ldh a, [hMultiPurposeE]
 	and a
-	jr nz, jr_002_5ab4
+	jr nz, .finish
 
+;>     hMultiPurposeC = 0
 	xor a
 	ldh [hMultiPurposeC], a
+;>@b2     base += 0x10 - 2                         # second half of DoorCloseTiles
 	ld a, e
 	add $10
 	ld e, a
 	ld d, $00
+;=@b2
 	ldh [hMultiPurposeE], a
 	dec de
 	dec de
+;>     return the_rows_again()                  # back to the row loop above
 	jp Jump_002_5a10
 
 
-jr_002_5ab4:
+.finish
+;> wDoorAnimation = 0
 	xor a
-	ld [$c188], a
+	ld [wDoorAnimation], a
+;> wLinkShowItemPoseActive = 0
 	ld [wLinkShowItemPoseActive], a
+;> hMultiPurposeE = 0
 	xor a
 	ldh [hMultiPurposeE], a
-	ld a, [$c189]
+;>@pos hMultiPurpose0 = wDoorPosition[wDoorAnimIndex]
+	ld a, [wDoorAnimIndex]
 	sub $04
 	ld c, a
 	ld b, $00
-	ld hl, $c1f4
+	ld hl, wDoorPosition + 4
 	add hl, bc
+;=@pos
 	ld a, [hl]
 	ldh [hMultiPurpose0], a
 
-jr_002_5acd:
-	ld hl, $59d1
+.squares
+;> while True:                                  # the two squares of the shutter: i = j, then j + 4
+;>@sq     wRoomObjects[hMultiPurpose0 + DoorCloseSquareOffsets[i]] = DoorCloseObjects[i]
+	ld hl, DoorCloseSquareOffsets
 	add hl, bc
 	ld a, [hl]
 	ld hl, hMultiPurpose0
 	add [hl]
 	ld e, a
+;=@sq
 	ld d, $00
-	ld hl, $59d9
+	ld hl, DoorCloseObjects
 	add hl, bc
 	ld a, [hl]
 	ld hl, wRoomObjects
 	add hl, de
+;=@sq
 	ld [hl], a
+;>     if hMultiPurposeE: break                 # the second square is done
 	ldh a, [hMultiPurposeE]
 	and a
-	jr nz, jr_002_5af0
+	jr nz, .status
 
+;>     i += 4
+;>     hMultiPurposeE = i
 	ld a, c
 	add $04
 	ldh [hMultiPurposeE], a
 	ld c, a
-	jr jr_002_5acd
+	jr .squares
 
-jr_002_5af0:
+.status
+;>@sa status = wRoomStatus + (0x100 if wIsIndoor else 0) + hMapRoom
 	ld hl, wRoomStatus
 	ld a, [wIsIndoor]
 	and a
-	jr z, jr_002_5afc
+	jr z, .room
 
-	ld hl, $d900
+	ld hl, wRoomStatus + $100
 
-jr_002_5afc:
+.room
+;=@sa
 	ldh a, [hMapRoom]
 	ld e, a
 	ld d, $00
 	add hl, de
+;>@clr mem[status] &= ~DoorRoomStatusBits[wDoorAnimIndex]
 	push hl
-	ld a, [$c189]
+	ld a, [wDoorAnimIndex]
 	ld e, a
 	ld d, $00
-	ld hl, $5856
+	ld hl, DoorRoomStatusBits
 	add hl, de
+;=@clr
 	ld a, [hl]
 	cpl
 	pop hl
 	and [hl]
 	ld [hl], a
+;> hRoomStatus = mem[status]
 	ldh [hRoomStatus], a
 	ret
 
 
-Call_02_5B15::
+;@ def RunRoomEvent()
+;@ path: world/room_events
+;@ The room's event (wRoomEvent): bits 0-4 pick the trigger, checked each frame (CheckRoomEventTrigger),
+;@ bits 5-7 the action that RoomEventActions runs: 0 none, 1 shutters close behind Link and open when
+;@ the trigger fires, 2 all enemies die, 3 a chest appears, 4 an item falls down, 5 stairs appear,
+;@ 6 shutters as 1 but only until the dungeon's flag is set, 7 an entity ($2F) drops in.
+RunRoomEvent::
+;> if not wRoomEvent:
 	ld a, [wRoomEvent]
 	and a
+;>     return
 	jp z, Jump_002_5bc8
 
-	call Call_02_5D3F
+;> CheckRoomEventTrigger(wRoomEvent)
+	call CheckRoomEventTrigger
+;>@act return RoomEventActions[wRoomEvent >> 5]()
 	ld a, [wRoomEvent]
 	and $e0
 	srl a
 	srl a
 	srl a
 	srl a
+;=@act
 	srl a
 	rst $00
 
-JumpTable_02_5B2F::
-	dw Jump_02_5D63
-	dw Jump_02_5BED
-	dw Jump_02_5B3F
-	dw Jump_02_5C69
-	dw Jump_02_5BC9
-	dw Jump_02_5BAF
-	dw Jump_02_5BDF
-	dw Jump_02_5B88
+;@ path: world/room_events
+;@ Room event actions, by bits 5-7 of wRoomEvent (2-byte code addresses, run by RunRoomEvent).
+RoomEventActions::
+	dw RoomEventNone
+	dw RoomEventShutters
+	dw RoomEventKillEnemies
+	dw RoomEventChest
+	dw RoomEventDropItem
+	dw RoomEventStairs
+	dw RoomEventShuttersOnce
+	dw RoomEventDropEntity
 
-Jump_02_5B3F::
-	call Call_02_5B75
+;@ def RoomEventKillEnemies()
+;@ path: world/room_events
+;@ Event action 2: once the trigger fires, every living enemy (status 5 and up, not flagged $80 in its
+;@ physics flags) starts dying.
+RoomEventKillEnemies::
+;> RoomEventFired()                             # returns from here until the trigger fires
+	call RoomEventFired
+;> for c in range(15, -1, -1):
 	ld c, $0f
 	ld b, $00
 
-jr_002_5b46:
+.loop
+;>     if not (wEntityPhysicsFlags[c] & 0x80):
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld a, [hl]
 	and $80
-	jr nz, jr_002_5b6e
+	jr nz, .next
 
+;>         if wEntityStatus[c] >= 5:
 	ld hl, wEntityStatus
 	add hl, bc
 	ld a, [hl]
 	cp $05
-	jr c, jr_002_5b6e
+	jr c, .next
 
+;>             wEntityStatus[c] = 1             # dying
 	ld [hl], $01
+;>             wEntityDyingTimer[c] = 0x1F
 	ld hl, wEntityDyingTimer
 	add hl, bc
 	ld [hl], $1f
+;>             wEntityPhysicsFlags[c] = (wEntityPhysicsFlags[c] & 0xF0) | 0x02
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld a, [hl]
 	and $f0
 	or $02
 	ld [hl], a
+;>             hNoiseSfx = 0x13
 	ld a, $13
 	ldh [hNoiseSfx], a
 
-jr_002_5b6e:
+.next
 	dec c
 	ld a, c
 	cp $ff
-	jr nz, jr_002_5b46
+	jr nz, .loop
 
+;> return
 	ret
 
 
-Call_02_5B75::
+;@ def RoomEventFired()
+;@ path: world/room_events
+;@ Lets an event action go on only once: when the trigger has fired (wRoomEventDone) and the room has
+;@ not recorded its event yet (room status bit 4), the event is cleared and the action continues;
+;@ otherwise this returns straight out of the action (it drops its own return address).
+;@ test: skip returns from its caller
+RoomEventFired::
+;> if not (hRoomStatus & 0x10):
 	ldh a, [hRoomStatus]
 	and $10
-	jr nz, jr_002_5b86
+	jr nz, .abort
 
+;>     if wRoomEventDone:
 	ld a, [wRoomEventDone]
 	and a
-	jr z, jr_002_5b86
+	jr z, .abort
 
+;>         wRoomEvent = 0
 	xor a
 	ld [wRoomEvent], a
+;>         return                               # the action goes on
 	ret
 
 
-jr_002_5b86:
+.abort
+;> return_from_caller()
 	pop af
 	ret
 
 
-Jump_02_5B88::
-	call Call_02_5B75
+;@ def RoomEventDropEntity()
+;@ path: world/room_events
+;@ Event action 7: entity $2F drops into the room at (x $88, y $30) in a puff of smoke, and the room
+;@ records its event as done.
+RoomEventDropEntity::
+;> RoomEventFired()
+	call RoomEventFired
+;> e = SpawnEntity(0x2F)
 	ld a, $2f
-	call Call_3C01
+	call SpawnEntity
+;> wEntityX[e] = 0x88
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], $88
+;> wEntityY[e] = 0x30
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $30
+;> wEntityDropTimer[e] = 0x80
 	ld hl, wEntityDropTimer
 	add hl, de
 	ld [hl], $80
+;> hMultiPurpose0 = 0x88
 	ld a, $88
 	ldh [hMultiPurpose0], a
+;> hMultiPurpose1 = 0x30
 	ld a, $30
 	ldh [hMultiPurpose1], a
+;> return RoomEventVfxDone(2)                    # smoke
 	ld a, $02
-	jp Jump_002_5bbc
+	jp RoomEventVfxDone
 
 
-Jump_02_5BAF::
-	call Call_02_5B75
+;@ def RoomEventStairs()
+;@ path: world/room_events
+;@ Event action 5: stairs appear at (x $88, y $20) after a puff of smoke (visual effect 4, which ends
+;@ in RevealStairs), and the room records its event as done.
+RoomEventStairs::
+;> RoomEventFired()
+	call RoomEventFired
+;> hMultiPurpose0 = 0x88
 	ld a, $88
 	ldh [hMultiPurpose0], a
+;> hMultiPurpose1 = 0x20
 	ld a, $20
 	ldh [hMultiPurpose1], a
+;> vfx = 4
 	ld a, $04
 
-Jump_002_5bbc:
+RoomEventVfxDone:
+;> AddTransientVfx(vfx)                         # at (hMultiPurpose0, hMultiPurpose1)
 	call AddTransientVfx
-	call Call_02_5987
+;> status = GetRoomStatusAddress_02()
+	call GetRoomStatusAddress_02
+;> mem[status] |= 0x10                          # the room's event is done
 	ld a, [hl]
 	or $10
 	ld [hl], a
+;> hRoomStatus = mem[status]
 	ldh [hRoomStatus], a
 
 Jump_002_5bc8:
+;> return
 	ret
 
 
-Jump_02_5BC9::
-	call Call_02_5B75
+;@ def RoomEventDropItem()
+;@ path: world/room_events
+;@ Event action 4: the room's item falls down (SpawnFallingRoomEventItem); in room $69 the room also
+;@ records its event as done.
+RoomEventDropItem::
+;> RoomEventFired()
+	call RoomEventFired
+;> if hMapRoom == 0x69:
 	ldh a, [hMapRoom]
 	cp $69
-	jr nz, jr_002_5bdb
+	jr nz, .spawn
 
-	call Call_02_5987
+;>     status = GetRoomStatusAddress_02()
+	call GetRoomStatusAddress_02
+;>     mem[status] |= 0x10
 	ld a, [hl]
 	or $10
 	ld [hl], a
+;>     hRoomStatus = mem[status]
 	ldh [hRoomStatus], a
 
-jr_002_5bdb:
+.spawn
+;> SpawnFallingRoomEventItem()
 	call SpawnFallingRoomEventItem
 	ret
 
 
-Jump_02_5BDF::
+;@ def RoomEventShuttersOnce()
+;@ path: world/room_events
+;@ Event action 6: the shutters of action 1, but only while bit 0 of the dungeon's wDungeonFlags is
+;@ clear (it is set the first time the trigger fires).
+RoomEventShuttersOnce::
+;> flags = wDungeonFlags[hMapId]
 	ldh a, [hMapId]
 	ld e, a
 	ld d, $00
 	ld hl, wDungeonFlags
 	add hl, de
 	ld a, [hl]
+;> if flags & 0x01:
 	and $01
-	jr nz, jr_002_5c3c
+;>     return                                   # else on into RoomEventShutters
+	jr nz, RoomEventShutters.done
 
-Jump_02_5BED::
-	ld a, [$c190]
+;@ def RoomEventShutters()
+;@ path: world/room_events
+;@ Event action 1: the room's shutters close once Link has walked into the room, and open again when
+;@ the trigger fires. With event $C1 (action 6, trigger 1) the dungeon flag bit 0 and status bit 5 of
+;@ the room are set and a jingle plays.
+RoomEventShutters::
+;> if not wRoomEventShuttersClosed:
+	ld a, [wRoomEventShuttersClosed]
 	and a
-	jr nz, jr_002_5bf6
+	jr nz, .check
 
-	call Call_02_5C3D
+;>     CloseShuttersOnEntry()
+	call CloseShuttersOnEntry
 
-jr_002_5bf6:
+.check
+;> if not wRoomEventDone:
 	ld a, [wRoomEventDone]
 	and a
-	jr z, jr_002_5c3c
+;>     return
+	jr z, .done
 
+;> if wRoomEvent == 0xC1:
 	ld a, [wRoomEvent]
 	cp $c1
-	jr nz, jr_002_5c2a
+	jr nz, .open
 
+;>@df     wDungeonFlags[hMapId] |= 0x01
 	ldh a, [hMapId]
 	ld e, a
 	ld d, $00
 	ld hl, wDungeonFlags
 	add hl, de
 	ld a, [hl]
+;=@df
 	or $01
 	ld [hl], a
+;>     group = 1                                # indoor rooms of this map: wRoomStatus + 0x100 ...
 	ld d, $00
 	ldh a, [hMapRoom]
 	ld e, a
-	ld hl, $d900
+	ld hl, wRoomStatus + $100
+;>     if 0x06 <= hMapId < 0x1A:
 	ldh a, [hMapId]
 	cp $1a
-	jr nc, jr_002_5c23
+	jr nc, .set
 
 	cp $06
-	jr c, jr_002_5c23
+	jr c, .set
 
+;>         group = 2                            # ... or wRoomStatus + 0x200
 	inc d
 
-jr_002_5c23:
+.set
+;>     wRoomStatus[group * 0x100 + hMapRoom] |= 0x20
 	add hl, de
 	set 5, [hl]
+;>     hJingle = 0x1B
 	ld a, $1b
 	ldh [hJingle], a
 
-jr_002_5c2a:
-	ld a, [$c190]
+.open
+;> if wRoomEventShuttersClosed:
+	ld a, [wRoomEventShuttersClosed]
 	and a
-	jr z, jr_002_5c3c
+	jr z, .done
 
+;>     wRoomEvent = 0
 	xor a
 	ld [wRoomEvent], a
+;>     wOpenShuttersRequest = 1
 	ld a, $01
-	ld [$c18c], a
+	ld [wOpenShuttersRequest], a
+;>     PlayUnlockSound()
 	call PlayUnlockSound
 
-jr_002_5c3c:
+.done
 	ret
 
 
-Call_02_5C3D::
+;@ def CloseShuttersOnEntry()
+;@ path: world/room_events
+;@ Closes the room's shutters once Link stands inside the room (x $11-$8E, y $16-$73), as long as the
+;@ event's trigger has not fired yet.
+CloseShuttersOnEntry::
+;> if ((hLinkX - 0x11) & 0xFF) >= 0x7E:
 	ldh a, [hLinkX]
 	sub $11
 	cp $7e
-	jr nc, jr_002_5c64
+;>     return
+	jr nc, .done
 
+;> if ((hLinkY - 0x16) & 0xFF) >= 0x5E:
 	ldh a, [hLinkY]
 	sub $16
 	cp $5e
-	jr nc, jr_002_5c64
+;>     return
+	jr nc, .done
 
+;> if wRoomEventDone:
 	ld a, [wRoomEventDone]
 	and a
-	jr nz, jr_002_5c64
+;>     return
+	jr nz, .done
 
+;> wCloseShuttersRequest = 1
 	ld a, $01
-	ld [$c18d], a
-	ld [$c190], a
+	ld [wCloseShuttersRequest], a
+;> wRoomEventShuttersClosed = 1
+	ld [wRoomEventShuttersClosed], a
+;> wLinkPoseLock = 4
 	ld a, $04
 	ld [wLinkPoseLock], a
+;> hNoiseSfx = 0x10
 	ld a, $10
 	ldh [hNoiseSfx], a
 
-jr_002_5c64:
+.done
 	ret
 
 
-StairsAppearTiles::
+;@ path: world/room_events
+;@ Background tiles of the chest that a room event makes appear: left column top / bottom, then the
+;@ right column top / bottom. Read by RevealChest.
+ChestTiles::
 	db $60, $70, $61, $71
 
-Jump_02_5C69::
-	call Call_02_5B75
+;@ def RoomEventChest()
+;@ path: world/room_events
+;@ Event action 3: a puff of smoke (visual effect 3, which ends in RevealChest) at x $88 and y $30, or
+;@ y $40 when Link stands where the chest would appear.
+RoomEventChest::
+;> RoomEventFired()
+	call RoomEventFired
+;> hMultiPurpose0 = 0x88
 	ld a, $88
 	ldh [hMultiPurpose0], a
+;> near = abs(hLinkY - 0x30) < 8
 	ldh a, [hLinkY]
 	sub $30
 	add $08
 	cp $10
-	jr nc, jr_002_5c88
+	jr nc, .far
 
+;> near = near and abs(hLinkX - 0x88) < 0x10
 	ldh a, [hLinkX]
 	sub $88
 	add $10
 	cp $20
-	jr nc, jr_002_5c88
+	jr nc, .far
 
+;> if near:
+;>     hMultiPurpose1 = 0x40
 	ld a, $40
-	jr jr_002_5c8a
+	jr .set
 
-jr_002_5c88:
+.far
+;> else:
+;>     hMultiPurpose1 = 0x30
 	ld a, $30
 
-jr_002_5c8a:
+.set
 	ldh [hMultiPurpose1], a
+;> AddTransientVfx(3)
 	ld a, $03
 	call AddTransientVfx
 	ret
 
 
-Call_02_5C92::
+;@ def RevealChest()
+;@ path: world/room_events
+;@ Puts the chest of a room event into the room: object $A0 in the square at x $80 and y $20 (or y $30
+;@ when Link stands near y $30), drawn with ChestTiles.
+;@ test: skip draws through the BG command queue
+RevealChest::
+;> near = abs(hLinkY - 0x30) < 8
 	ldh a, [hLinkY]
 	sub $30
 	add $08
 	cp $10
-	jr nc, jr_002_5caa
+	jr nc, .far
 
+;> near = near and abs(hLinkX - 0x88) < 0x10
 	ldh a, [hLinkX]
 	sub $88
 	add $10
 	cp $20
-	jr nc, jr_002_5caa
+	jr nc, .far
 
+;> if near:
+;>     hBGPosY = 0x30
 	ld a, $30
-	jr jr_002_5cac
+	jr .set
 
-jr_002_5caa:
+.far
+;> else:
+;>     hBGPosY = 0x20
 	ld a, $20
 
-jr_002_5cac:
+.set
 	ldh [hBGPosY], a
+;> hBGPosX = 0x80
 	ld a, $80
 	ldh [hBGPosX], a
+;>@obj wRoomObjects[(hBGPosY & 0xF0) | (hBGPosX >> 4)] = 0xA0
 	swap a
 	and $0f
 	ld e, a
 	ldh a, [hBGPosY]
 	and $f0
 	or e
+;=@obj
 	ld e, a
 	ld d, $00
 	ld hl, wRoomObjects
 	add hl, de
 	ld a, $a0
 	ld [hl], a
+;> GetBGAddress()
 	call GetBGAddress
+;>@cmd cmd = wDrawCommand + wDrawCommandsSize; wDrawCommandsSize += 10
 	ld a, [wDrawCommandsSize]
 	ld e, a
 	ld d, $00
 	ld hl, wDrawCommand
 	add hl, de
 	add $0a
+;=@cmd
 	ld [wDrawCommandsSize], a
-	ld de, $5c65
+;> tiles = ChestTiles
+	ld de, ChestTiles
 
-jr_002_5cdb:
+DrawTwoTileColumns:
+;> mem[cmd:cmd + 3] = (hBGAddrHigh, hBGAddrLow, 0x81)   # 2 tiles down
 	ldh a, [hBGAddrHigh]
 	ld [hli], a
 	ldh a, [hBGAddrLow]
 	ld [hli], a
 	ld a, $81
 	ld [hli], a
+;> mem[cmd + 3:cmd + 5] = tiles[0:2]
 	ld a, [de]
 	inc de
 	ld [hli], a
 	ld a, [de]
 	inc de
 	ld [hli], a
+;>@c2 mem[cmd + 5:cmd + 8] = (hBGAddrHigh, hBGAddrLow + 1, 0x81)
 	ldh a, [hBGAddrHigh]
 	ld [hli], a
 	ldh a, [hBGAddrLow]
 	inc a
 	ld [hli], a
 	ld a, $81
+;=@c2
 	ld [hli], a
+;> mem[cmd + 8:cmd + 10] = tiles[2:4]
 	ld a, [de]
 	inc de
 	ld [hli], a
 	ld a, [de]
 	ld [hli], a
+;> mem[cmd + 10] = 0                            # end of the queue
 	xor a
 	ld [hl], a
 	ret
 
 
-StairsBlockTiles::
+;@ path: world/room_events
+;@ Background tiles of the staircase that a room event makes appear: left column top / bottom, then the
+;@ right column top / bottom. Read by RevealStairs.
+StairsTiles::
 	db $6a, $7a, $6b, $7b
 
-Call_02_5D00::
+;@ def RevealStairs()
+;@ path: world/room_events
+;@ Puts the staircase of a room event into the room: object $BE in the square at x $80, y $10, drawn
+;@ with StairsTiles, and arms the stairs (hStairsState) at x $88, y $20.
+;@ test: skip draws through the BG command queue
+RevealStairs::
+;> hStairsState = 1
 	ld a, $01
 	ldh [hStairsState], a
+;> hBGPosY = 0x10
 	ld a, $10
 	ldh [hBGPosY], a
+;> hStairsY = 0x20
 	add $10
 	ldh [hStairsY], a
+;> hBGPosX = 0x80
 	ld a, $80
 	ldh [hBGPosX], a
+;> hStairsX = 0x88
 	add $08
 	ldh [hStairsX], a
+;>@obj wRoomObjects[(hBGPosY & 0xF0) | (hStairsX >> 4)] = 0xBE
 	swap a
 	and $0f
 	ld e, a
 	ldh a, [hBGPosY]
 	and $f0
 	or e
+;=@obj
 	ld e, a
 	ld d, $00
 	ld hl, wRoomObjects
 	add hl, de
 	ld a, $be
 	ld [hl], a
+;> GetBGAddress()
 	call GetBGAddress
+;>@cmd cmd = wDrawCommand + wDrawCommandsSize; wDrawCommandsSize += 10
 	ld a, [wDrawCommandsSize]
 	ld e, a
 	ld d, $00
 	ld hl, wDrawCommand
 	add hl, de
 	add $0a
+;=@cmd
 	ld [wDrawCommandsSize], a
-	ld de, $5cfc
-	jr jr_002_5cdb
+;> return DrawTwoTileColumns(cmd, StairsTiles)
+	ld de, StairsTiles
+	jr DrawTwoTileColumns
 
-Call_02_5D3F::
+;@ def CheckRoomEventTrigger(event: a)
+;@ path: world/room_events
+;@ Checks the trigger in bits 0-4 of the room event (hMultiPurpose0 keeps it) and calls TriggerRoomEvent
+;@ when it is met: see RoomEventTriggers.
+CheckRoomEventTrigger::
+;> hMultiPurpose0 = event & 0x1F
 	and $1f
 	ldh [hMultiPurpose0], a
+;> return RoomEventTriggers[hMultiPurpose0 - 1]()
 	dec a
 	rst $00
 
-JumpTable_02_5D45::
-	dw Jump_02_5D9C
-	dw Jump_02_5D63
-	dw Jump_02_5D81
-	dw Jump_02_5D63
-	dw Jump_02_5D78
-	dw Jump_02_5D89
-	dw Jump_02_5D63
-	dw Jump_02_5D9C
-	dw Jump_02_5D63
-	dw Jump_02_5D64
-	dw Jump_02_5D63
-	dw Jump_02_5D63
-	dw Jump_02_5D63
-	dw Jump_02_5D63
-	dw Jump_02_5D63
+;@ path: world/room_events
+;@ Room event triggers, by bits 0-4 of wRoomEvent minus 1 (2-byte code addresses): 1 all enemies gone,
+;@ 3 a floor switch pressed, 5 two torches lit (wRoomEventCounter), 6 three enemies beaten in order,
+;@ 8 all enemies gone with extra conditions, 10 status bit 5 of a fixed room; the rest never fire.
+RoomEventTriggers::
+	dw TriggerOnEnemiesGone
+	dw RoomEventNone
+	dw TriggerOnFloorSwitch
+	dw RoomEventNone
+	dw TriggerOnTwoTorches
+	dw TriggerOnEnemiesInOrder
+	dw RoomEventNone
+	dw TriggerOnEnemiesGone
+	dw RoomEventNone
+	dw TriggerOnRoomFlag
+	dw RoomEventNone
+	dw RoomEventNone
+	dw RoomEventNone
+	dw RoomEventNone
+	dw RoomEventNone
 
-Jump_02_5D63::
+;@ def RoomEventNone()
+;@ path: world/room_events
+;@ Empty room event trigger / action.
+RoomEventNone::
+;> return
 	ret
 
 
-Jump_02_5D64::
+;@ def TriggerOnRoomFlag()
+;@ path: world/room_events
+;@ Trigger 10: fires once status bit 5 is set for a fixed room (room $E8 of the second indoor group on
+;@ map $06, else room $FF of the first indoor group).
+TriggerOnRoomFlag::
+;> if hMapId == 0x06:
 	ldh a, [hMapId]
 	cp $06
-	jr nz, jr_002_5d6f
+	jr nz, .other
 
-	ld a, [$dae8]
-	jr jr_002_5d72
+;>     status = wRoomStatus[0x2E8]
+	ld a, [wRoomStatus + $2e8]
+	jr .test
 
-jr_002_5d6f:
-	ld a, [$d9ff]
+.other
+;> else:
+;>     status = wRoomStatus[0x1FF]
+	ld a, [wRoomStatus + $1ff]
 
-jr_002_5d72:
+.test
+;> if status & 0x20:
 	and $20
+;>     return TriggerRoomEvent()
 	jp nz, TriggerRoomEvent
 
 	ret
 
 
-Jump_02_5D78::
-	ld a, [$c1a2]
+;@ def TriggerOnTwoTorches()
+;@ path: world/room_events
+;@ Trigger 5: fires when wRoomEventCounter reaches 2.
+TriggerOnTwoTorches::
+;> if wRoomEventCounter == 2:
+	ld a, [wRoomEventCounter]
 	cp $02
+;>     return TriggerRoomEvent()
 	jp z, TriggerRoomEvent
 
 	ret
 
 
-Jump_02_5D81::
+;@ def TriggerOnFloorSwitch()
+;@ path: world/room_events
+;@ Trigger 3: fires while a floor switch is pressed.
+TriggerOnFloorSwitch::
+;> if wFloorSwitchPressedTimer:
 	ld a, [wFloorSwitchPressedTimer]
 	and a
+;>     return TriggerRoomEvent()
 	jp nz, TriggerRoomEvent
 
 	ret
 
 
-Jump_02_5D89::
+;@ def TriggerOnEnemiesInOrder()
+;@ path: world/room_events
+;@ Trigger 6: fires when the first three entries of wDefeatedEntities are 0, 1, 2 (the enemies were
+;@ beaten in their order).
+TriggerOnEnemiesInOrder::
+;> for c in range(3):
 	ld c, $00
 	ld hl, wDefeatedEntities
 
-jr_002_5d8e:
+.loop
+;>     if wDefeatedEntities[c] != c:
 	ld a, [hli]
 	cp c
-	jr nz, jr_002_5d9b
+;>         return
+	jr nz, .done
 
 	inc c
 	ld a, c
 	cp $03
-	jr nz, jr_002_5d8e
+	jr nz, .loop
 
+;> TriggerRoomEvent()
 	call TriggerRoomEvent
 
-jr_002_5d9b:
+.done
 	ret
 
 
-Jump_02_5D9C::
+;@ def TriggerOnEnemiesGone()
+;@ path: world/room_events
+;@ Triggers 1 and 8: fire when no entity is left that counts as an enemy (bit 1 of wEntityOptions1 marks
+;@ the ones that do not); trigger 8 also needs mem[0xD460] set and mem[0xC113] clear.
+TriggerOnEnemiesGone::
+;> for c in range(15, -1, -1):
 	ld c, $0f
 	ld b, $00
 
-jr_002_5da0:
+.loop
+;>     if wEntityStatus[c]:
 	ld hl, wEntityStatus
 	add hl, bc
 	ld a, [hl]
 	and a
-	jr z, jr_002_5db1
+	jr z, .next
 
+;>         if not (wEntityOptions1[c] & 0x02):  # an enemy is left
 	ld hl, wEntityOptions1
 	add hl, bc
 	ld a, [hl]
 	and $02
-	jr z, jr_002_5dcc
+;>             return
+	jr z, .done
 
-jr_002_5db1:
+.next
 	dec c
 	ld a, c
 	cp $ff
-	jr nz, jr_002_5da0
+	jr nz, .loop
 
+;> if hMultiPurpose0 == 8:
 	ldh a, [hMultiPurpose0]
 	cp $08
-	jr nz, jr_002_5dc9
+	jr nz, .fire
 
+;>     if not mem[0xD460]:
 	ld a, [$d460]
 	and a
-	jr z, jr_002_5dcc
+;>         return
+	jr z, .done
 
+;>     if mem[0xC113]:
 	ld a, [$c113]
 	and a
-	jr nz, jr_002_5dcc
+;>         return
+	jr nz, .done
 
-jr_002_5dc9:
+.fire
+;> return TriggerRoomEvent()
 	jp TriggerRoomEvent
 
 
-jr_002_5dcc:
+.done
 	ret
 
 
-Call_02_5DCD::
+;@ def CapAtMax(count: de, max: hl) -> hl
+;@ path: items/inventory
+;@ Lowers the count at de to the capacity at hl if it is above it, and steps hl to the next capacity.
+;@ test: hl = rand(0xC000, 0xCFFE); de = rand(0xD000, 0xDFFF); mem[hl] = rand(0, 255); mem[de] = rand(0, 255)
+CapAtMax::
+;> if mem[de] >= mem[hl]:
 	ld a, [de]
 	cp [hl]
-	jr c, jr_002_5dd3
+	jr c, .next
 
+;>     mem[de] = mem[hl]
 	ld a, [hl]
 	ld [de], a
 
-jr_002_5dd3:
+.next
+;> return hl + 1
 	inc hl
 	ret
 
 
+;@ def UpdateInventoryAndHud()
+;@ path: items/inventory
+;@ Runs every frame from bank 0: caps magic powder, bombs and arrows at their capacities, opens or
+;@ closes the inventory with Start (not while Select is held, Link is busy or the song menu is busy),
+;@ slides it, runs it while it is shown, and counts the rupees and hearts in the status bar. While the
+;@ inventory is moving or shown it makes its caller return as well (the rest of the frame is skipped).
+UpdateInventoryAndHud::
+;> hl = CapAtMax(wMagicPowderCount, wMaxMagicPowder)
 	ld hl, wMaxMagicPowder
 	ld de, wMagicPowderCount
-	call Call_02_5DCD
+	call CapAtMax
+;> hl = CapAtMax(wBombCount, hl)                # wMaxBombs
 	ld de, wBombCount
-	call Call_02_5DCD
+	call CapAtMax
+;> CapAtMax(wArrowCount, hl)                    # wMaxArrows
 	ld de, wArrowCount
-	call Call_02_5DCD
+	call CapAtMax
+;> if wLinkMotionState >= 2:
 	ld a, [wLinkMotionState]
 	cp $02
+;>     return
 	ret nc
 
+;> if wDialogState:
 	ld a, [wDialogState]
 	and a
-	jp nz, Jump_002_5edc
+;>     return UpdateHud()
+	jp nz, UpdateHud
 
+;> if wRoomTransitionState:
 	ld a, [wRoomTransitionState]
 	and a
-	jp nz, Jump_002_5ef1
+;>     return
+	jp nz, UpdateHud.done
 
+;> if wInventoryAppearing:
 	ld a, [wInventoryAppearing]
 	and a
-	jp nz, Jump_002_5e83
+;>     return InventorySliding()
+	jp nz, InventorySliding
 
+;> if hJoypadHeld & 0x40:                       # Select
 	ldh a, [hJoypadHeld]
 	and $40
-	jp nz, Jump_002_5ec8
+;>     return InventoryShownUpdate()
+	jp nz, InventoryShownUpdate
 
+;> if not (hJoypadPressed & 0x80):              # Start
 	ldh a, [hJoypadPressed]
 	and $80
-	jp z, Jump_002_5ec8
+;>     return InventoryShownUpdate()
+	jp z, InventoryShownUpdate
 
+;> if wWindowY != 0:                            # opening: only when Link is free
 	ld a, [wWindowY]
 	cp $00
-	jr z, jr_002_5e2e
+	jr z, .songMenu
 
+;>     if wLinkFrozen:
 	ld a, [wLinkFrozen]
 	and a
-	jp nz, Jump_002_5ec8
+;>         return InventoryShownUpdate()
+	jp nz, InventoryShownUpdate
 
+;>     if hLinkInteractiveMotionBlocked == 2:
 	ldh a, [hLinkInteractiveMotionBlocked]
 	cp $02
-	jp z, Jump_002_5ec8
+;>         return InventoryShownUpdate()
+	jp z, InventoryShownUpdate
 
+;>     if hLinkAnimationState == 0xFF:
 	ldh a, [hLinkAnimationState]
 	inc a
-	jp z, Jump_002_5ec8
+;>         return InventoryShownUpdate()
+	jp z, InventoryShownUpdate
 
-jr_002_5e2e:
-	ld a, [$c1b5]
-	ld hl, $c1b8
+.songMenu
+;> if wSongMenuShown or wSongMenuOpenTimer or wSongMenuCloseTimer:
+	ld a, [wSongMenuShown]
+	ld hl, wSongMenuOpenTimer
 	or [hl]
-	ld hl, $c1b9
+	ld hl, wSongMenuCloseTimer
 	or [hl]
-	jp nz, Jump_002_5ec8
+;>     return InventoryShownUpdate()
+	jp nz, InventoryShownUpdate
 
-Jump_002_5e3c:
+ToggleInventory:
+;> wInventoryAppearing = 1                      # start the slide in or out
 	ld a, $01
 	ld [wInventoryAppearing], a
-	ld [$c151], a
+;> wInventoryStaticDrawn = 1
+	ld [wInventoryStaticDrawn], a
+;> hJingle = 0x12
 	ld a, $12
 	ldh [hJingle], a
-	ld a, [$c150]
+;> wInventorySlideSpeed = -wInventorySlideSpeed # +8 down (closing), -8 up (opening)
+	ld a, [wInventorySlideSpeed]
 	cpl
 	inc a
-	ld [$c150], a
+	ld [wInventorySlideSpeed], a
+;> if wInventorySlideSpeed & 0x80:              # opening
 	and $80
-	jr z, jr_002_5e79
+	jr z, .closing
 
+;>     hJingle = 0x11
 	ld a, $11
 	ldh [hJingle], a
+;>     wInventoryStaticDrawn = 0
 	xor a
-	ld [$c151], a
+	ld [wInventoryStaticDrawn], a
+;>     wInventoryRowsToDraw = 11
 	ld a, $0b
-	ld [$c154], a
+	ld [wInventoryRowsToDraw], a
+;>     tiles = 7                                # the inventory tiles
 	ld a, [wIsIndoor]
 	and a
 	ld a, $07
-	jr z, jr_002_5e76
+;>     if wIsIndoor:
+	jr z, .loadTiles
 
+;>         if hMapId < 0x08:                    # a dungeon: with the minimap
 	ldh a, [hMapId]
 	cp $08
 	ld a, $07
-	jr nc, jr_002_5e76
+	jr nc, .loadTiles
 
+;>             LoadDungeonMinimap()
 	call Call_02_6A9B
+;>             tiles = 2
 	ld a, $02
 
-jr_002_5e76:
+.loadTiles
+;>     hNeedsUpdatingBGTiles = tiles
 	ldh [hNeedsUpdatingBGTiles], a
 	ret
 
 
-jr_002_5e79:
+.closing
+;> else:
+;>     hVolumeRight = 0x07
 	ld a, $07
 	ldh [hVolumeRight], a
+;>     hVolumeLeft = 0x70                       # full volume again
 	ld a, $70
 	ldh [hVolumeLeft], a
+;>     abort_caller()
 	pop af
 	ret
 
 
-Jump_002_5e83:
-	ld a, [$c151]
+InventorySliding:
+;> if wInventoryStaticDrawn:
+	ld a, [wInventoryStaticDrawn]
 	and a
-	jr nz, jr_002_5ea4
+;>     return SlideInventory()
+	jr nz, SlideInventory
 
+;> if not wDrawCommand:                         # the draw queue is free
 	ld a, [wDrawCommand]
 	and a
-	jr nz, jr_002_5e96
+	jr nz, .wait
 
+;>     DrawInventoryStatic()
 	call Call_02_631F
-	ld hl, $c151
+;>     wInventoryStaticDrawn += 1
+	ld hl, wInventoryStaticDrawn
 	inc [hl]
 
-jr_002_5e96:
+.wait
+;> return UpdateWorldBehindInventory()          # runs on into it; the caller returns too (pop af)
 	pop af
 
-Call_02_5E97::
+;@ def UpdateWorldBehindInventory()
+;@ path: items/inventory
+;@ Keeps the world going while the inventory slides: Link's motion, his item sprites, the camera and
+;@ the entities.
+UpdateWorldBehindInventory::
+;> Call_02_781B()
 	call Call_02_781B
-	call Call_149E
-	call Call_1CCC
+;> DrawLinkItemSprites()
+	call DrawLinkItemSprites
+;> DrawLinkOAM()
+	call DrawLinkOAM
+;> UpdateEntitiesBank2()
 	call UpdateEntitiesBank2
 	ret
 
 
-jr_002_5ea4:
-	call Call_02_5EF2
-	ld a, [$c150]
+;@ def SlideInventory()
+;@ path: items/inventory
+;@ One frame of the inventory sliding: draws its next row, moves the window by wInventorySlideSpeed
+;@ and stops at the top (0, shown: music quieter) or at $80 (hidden). While it is shown the inventory
+;@ reads the joypad and draws its cursor; then the rupee and heart counters run (UpdateHud) when no
+;@ dialog is open (or in dialog states $0C / $0D).
+SlideInventory::
+;> DrawInventoryRow()
+	call DrawInventoryRow
+;> wWindowY += wInventorySlideSpeed
+	ld a, [wInventorySlideSpeed]
 	ld hl, wWindowY
 	add [hl]
 	ld [hl], a
+;> if wWindowY in (0, 0x80):                    # the slide has ended
 	cp $80
-	jr z, jr_002_5ebf
+	jr z, .stop
 
 	cp $00
-	jr nz, jr_002_5ec5
+	jr nz, .moving
 
+;>     if wWindowY == 0:
+;>         hVolumeRight = 0x03
 	ld a, $03
 	ldh [hVolumeRight], a
+;>         hVolumeLeft = 0x30                   # quieter music while the inventory is shown
 	ld a, $30
 	ldh [hVolumeLeft], a
 
-jr_002_5ebf:
+.stop
+;>     wInventoryAppearing = 0
 	xor a
 	ld [wInventoryAppearing], a
-	jr jr_002_5ec8
+	jr InventoryShownUpdate
 
-jr_002_5ec5:
-	call Call_02_5E97
+.moving
+;> else:
+;>     UpdateWorldBehindInventory()
+	call UpdateWorldBehindInventory
 
-Jump_002_5ec8:
-jr_002_5ec8:
+InventoryShownUpdate:
+;> if wWindowY != 0x80:                         # the inventory is shown
 	ld a, [wWindowY]
 	cp $80
-	jr z, jr_002_5edc
+	jr z, UpdateHud
 
+;>     if not wInventoryAppearing:
 	ld a, [wInventoryAppearing]
 	and a
-	jr nz, jr_002_5edb
+	jr nz, .abort
 
+;>         InventoryInput()
 	call Call_02_645E
+;>         DrawInventoryCursor()
 	call Call_02_63F0
 
-jr_002_5edb:
+.abort
+;>     abort_caller()
 	pop af
 
-Jump_002_5edc:
-jr_002_5edc:
+UpdateHud:
+;> state = wDialogState & 0x7F
 	ld a, [wDialogState]
 	and $7f
-	jr z, jr_002_5eeb
+;> if state == 0 or state == 0x0C or state == 0x0D:
+	jr z, .counters
 
 	cp $0c
-	jr z, jr_002_5eeb
+	jr z, .counters
 
 	cp $0d
-	jr nz, jr_002_5ef1
+	jr nz, .done
 
-jr_002_5eeb:
-	call Call_02_5F09
-	call Call_02_601A
+.counters
+;>     UpdateRupeeCounter()
+	call UpdateRupeeCounter
+;>     UpdateHealthCounter()
+	call UpdateHealthCounter
 
-Jump_002_5ef1:
-jr_002_5ef1:
+.done
 	ret
 
 
-Call_02_5EF2::
-	ld a, [$c154]
+;@ def DrawInventoryRow()
+;@ path: items/inventory
+;@ Draws the next row of the inventory while it slides in: wInventoryRowsToDraw counts down from 11 and
+;@ each frame row wInventoryRowsToDraw - 1 is drawn (DrawInventorySlot), until 1 is left.
+;@ test: skip draws through the BG command queue
+DrawInventoryRow::
+;> if wInventoryRowsToDraw != 1:
+	ld a, [wInventoryRowsToDraw]
 	cp $01
-	jr z, jr_002_5f08
+	jr z, .done
 
+;>     Call_02_61ED(c=wInventoryRowsToDraw, e=wInventoryRowsToDraw - 1)
 	ld c, a
 	ld b, $00
 	dec a
 	ld e, a
 	call Call_02_61ED
-	ld a, [$c154]
+;>     wInventoryRowsToDraw -= 1
+	ld a, [wInventoryRowsToDraw]
 	dec a
-	ld [$c154], a
+	ld [wInventoryRowsToDraw], a
 
-jr_002_5f08:
+.done
 	ret
 
 
-Call_02_5F09::
+;@ def UpdateRupeeCounter()
+;@ path: items/rupees
+;@ Every other frame (when the draw queue is free and wRupeeCountDelay has run out) moves rupees from
+;@ the add / subtract buffers into wRupeeCount (BCD, 0-999) in steps of up to 9 with a sound, and
+;@ redraws the count.
+;@ test: skip draws through the BG command queue
+UpdateRupeeCounter::
+;> if (hFrameCounter & 0x01) or wDrawCommandsSize:
 	ld hl, wDrawCommandsSize
 	ldh a, [hFrameCounter]
 	and $01
 	or [hl]
+;>     return
 	ret nz
 
-	ld hl, $c3ce
+;> if wRupeeCountDelay:
+	ld hl, wRupeeCountDelay
 	ld a, [hl]
 	and a
-	jr z, jr_002_5f1b
+	jr z, .add
 
+;>     wRupeeCountDelay -= 1
 	dec [hl]
+;>     return
 	ret
 
 
-jr_002_5f1b:
+.add
+;> if wAddRupeeBuffer:                          # 16 bits, high:low
 	ld hl, wAddRupeeBufferHigh
 	ld a, [wAddRupeeBufferLow]
 	or [hl]
-	jr z, jr_002_5f74
+	jr z, .subtract
 
+;>     hWaveSfx = 0x05
 	ld a, $05
 	ldh [hWaveSfx], a
+;>@s1     step = ((wAddRupeeBuffer >> 5) & 0xFF) + 1
 	ld a, [wAddRupeeBufferLow]
 	ld e, a
 	ld a, [wAddRupeeBufferHigh]
 	sla e
 	rla
 	sla e
+;=@s1
 	rla
 	sla e
 	rla
 	inc a
+;>     step = min(step, 9)
 	cp $0a
-	jr c, jr_002_5f3f
+	jr c, .addStep
 
 	ld a, $09
 
-jr_002_5f3f:
+.addStep
+;>@ab     wAddRupeeBuffer -= step
 	ld e, a
 	ld a, [wAddRupeeBufferLow]
 	sub e
 	ld [wAddRupeeBufferLow], a
 	ld a, [hl]
 	sbc $00
+;=@ab
 	ld [hl], a
+;>@rc     wRupeeCount += step                      # BCD
 	ld a, [wRupeeCountLow]
 	add e
 	daa
 	ld [wRupeeCountLow], a
 	ld a, [wRupeeCountHigh]
 	adc $00
+;=@rc
 	daa
 	ld [wRupeeCountHigh], a
+;>     if wRupeeCount >= 0x1000:
 	cp $10
-	jr c, jr_002_5f71
+	jr c, .drawAdd
 
+;>         wRupeeCount = 0x0999
 	ld a, $09
 	ld [wRupeeCountHigh], a
 	ld a, $99
 	ld [wRupeeCountLow], a
+;>         wAddRupeeBuffer = 0
 	xor a
 	ld [wAddRupeeBufferHigh], a
 	ld [wAddRupeeBufferLow], a
 
-jr_002_5f71:
-	call Call_02_5FD1
+.drawAdd
+;>     DrawRupeeCount()
+	call DrawRupeeCount
 
-jr_002_5f74:
+.subtract
+;> if wSubtractRupeeBuffer:
 	ld hl, wSubtractRupeeBufferHigh
 	ld a, [wSubtractRupeeBufferLow]
 	or [hl]
-	jr z, jr_002_5fd0
+	jr z, .done
 
+;>     hWaveSfx = 0x05
 	ld a, $05
 	ldh [hWaveSfx], a
+;>@s2     step = ((wSubtractRupeeBuffer >> 5) & 0xFF) + 1
 	ld a, [wSubtractRupeeBufferLow]
 	ld e, a
 	ld a, [wSubtractRupeeBufferHigh]
 	sla e
 	rla
 	sla e
+;=@s2
 	rla
 	sla e
 	rla
 	inc a
+;>     step = min(step, 9)
 	cp $0a
-	jr c, jr_002_5f98
+	jr c, .subStep
 
 	ld a, $09
 
-jr_002_5f98:
+.subStep
+;>@sb     wSubtractRupeeBuffer -= step
 	ld e, a
 	ld a, [wSubtractRupeeBufferLow]
 	sub e
 	ld [wSubtractRupeeBufferLow], a
 	ld a, [hl]
 	sbc $00
+;=@sb
 	ld [hl], a
+;>     if not wRupeeCount:
 	ld a, [wRupeeCountLow]
 	ld hl, wRupeeCountHigh
 	or [hl]
-	jr z, jr_002_5fd0
+;>         return
+	jr z, .done
 
+;>@rs     wRupeeCount -= step                      # BCD
 	ld a, [wRupeeCountLow]
 	sub e
 	daa
 	ld [wRupeeCountLow], a
 	ld a, [wRupeeCountHigh]
 	sbc $00
+;=@rs
 	daa
 	ld [wRupeeCountHigh], a
-	jr nc, jr_002_5fcd
+;>     if wRupeeCount < 0:
+	jr nc, .drawSub
 
+;>         wRupeeCount = 0
 	xor a
 	ld [wRupeeCountHigh], a
 	ld [wRupeeCountLow], a
+;>         wSubtractRupeeBuffer = 0
 	ld [wSubtractRupeeBufferHigh], a
 	ld [wSubtractRupeeBufferLow], a
 
-jr_002_5fcd:
-	call Call_02_5FD1
+.drawSub
+;>     DrawRupeeCount()
+	call DrawRupeeCount
 
-jr_002_5fd0:
+.done
 	ret
 
 
-Call_02_5FD1::
+;@ def DrawRupeeCount()
+;@ path: items/rupees
+;@ Queues the three digits of wRupeeCount (tiles $B0-$B9) at $9C2A in the status bar.
+;@ test: skip draws through the BG command queue
+DrawRupeeCount::
+;>@cmd cmd = wDrawCommand + wDrawCommandsSize; wDrawCommandsSize += 6
 	ld a, [wDrawCommandsSize]
 	ld e, a
 	ld d, $00
 	add $06
 	ld [wDrawCommandsSize], a
 	ld hl, wDrawCommand
+;=@cmd
 	add hl, de
+;> mem[cmd:cmd + 3] = (0x9C, 0x2A, 0x02)       # 3 tiles across
 	ld a, $9c
 	ld [hli], a
 	ld a, $2a
 	ld [hli], a
 	ld a, $02
 	ld [hli], a
+;>@d1 mem[cmd + 3] = 0xB0 + (wRupeeCountHigh & 0x0F)
 	push hl
 	ld a, [wRupeeCountHigh]
 	and $0f
 	ld e, a
 	add $b0
 	pop hl
+;=@d1
 	ld [hli], a
+;>@d2 mem[cmd + 4] = 0xB0 + (wRupeeCountLow >> 4)
 	push hl
 	ld a, [wRupeeCountLow]
 	swap a
 	and $0f
 	add $b0
 	pop hl
+;=@d2
 	ld [hli], a
+;> mem[cmd + 5] = 0xB0 + (wRupeeCountLow & 0x0F)
 	push hl
 	ld a, [wRupeeCountLow]
 	and $0f
 	add $b0
 	pop hl
 	ld [hli], a
+;> mem[cmd + 6] = 0                             # end of the queue
 	ld a, $00
 	ld [hli], a
 	ret
 
 
+;@ path: items/health
+;@ Health (in eighths of a heart) below which the low-health beep sounds, by wMaxHearts - 3 (3-14
+;@ hearts): $05 for 3-5 hearts, $09 for 6-8, $11 for 9-11, $19 for 12-14. Read by UpdateHealthCounter.
 LowHealthThresholds::
 	db $05, $05, $05, $09, $09, $09, $11, $11, $11, $19, $19, $19
 
-Call_02_601A::
+;@ def UpdateHealthCounter()
+;@ path: items/health
+;@ Sets wLowHealth (beeping every $30 frames) when health is below LowHealthThresholds; every other
+;@ frame with a free draw queue moves one eighth of a heart from wAddHealthBuffer or
+;@ wSubtractHealthBuffer into wHealth and redraws the hearts. At 0 health a medicine bottle, if any,
+;@ refills the hearts (8, plus $80 added) and makes Link invincible for a while.
+;@ test: skip draws through the BG command queue
+UpdateHealthCounter::
+;> wLowHealth = 0
 	xor a
 	ld [wLowHealth], a
+;>@low if wHealth < LowHealthThresholds[wMaxHearts - 3]:
 	ld a, [wMaxHearts]
 	ld e, a
 	ld d, $00
-	ld hl, $600b
+	ld hl, LowHealthThresholds - 3
 	add hl, de
 	ld a, [wHealth]
+;=@low
 	cp [hl]
-	jr nc, jr_002_6045
+	jr nc, .counters
 
+;>     wLowHealth = 1
 	ld a, $01
 	ld [wLowHealth], a
+;>     t = wLowHealthBeepTimer - 1
 	ld a, [wLowHealthBeepTimer]
 	dec a
+;>     if t == -1:
 	cp $ff
-	jr nz, jr_002_6042
+	jr nz, .timer
 
+;>         t = 0x30
 	ld a, $30
+;>         hWaveSfx = 0x04                      # the beep
 	ld hl, hWaveSfx
 	ld [hl], $04
 
-jr_002_6042:
+.timer
+;>     wLowHealthBeepTimer = t
 	ld [wLowHealthBeepTimer], a
 
-jr_002_6045:
+.counters
+;> if not (hFrameCounter & 0x01):
 	ldh a, [hFrameCounter]
 	and $01
-	jr z, jr_002_60a5
+;>     return
+	jr z, .done
 
+;> if wDrawCommandsSize:
 	ld a, [wDrawCommandsSize]
 	and a
-	jr nz, jr_002_60a5
+;>     return
+	jr nz, .done
 
+;> if wAddHealthBuffer:
 	ld a, [wAddHealthBuffer]
 	and a
-	jr z, jr_002_6088
+	jr z, .subtract
 
+;>     wAddHealthBuffer -= 1
 	dec a
 	ld [wAddHealthBuffer], a
+;>@full     full = min(wMaxHearts, 14) * 8
 	ld a, [wMaxHearts]
 	cp $0f
-	jr c, jr_002_6064
+	jr c, .shift
 
 	ld a, $0e
 
-jr_002_6064:
+.shift
+;=@full
 	sla a
 	sla a
 	sla a
 	ld e, a
+;>     if wHealth == full:
 	ld a, [wHealth]
 	cp e
-	jr nz, jr_002_6077
+	jr nz, .fill
 
+;>         wAddHealthBuffer = 0                 # then on to the subtract buffer below
 	xor a
 	ld [wAddHealthBuffer], a
-	jr jr_002_6088
+	jr .subtract
 
-jr_002_6077:
+.fill
+;>     else:
+;>         wHealth += 1
 	inc a
 	ld [wHealth], a
+;>         if (wHealth & 7) == 6:
 	and $07
 	cp $06
-	jr nz, jr_002_6085
+	jr nz, .draw
 
+;>             hWaveSfx = 0x06
 	ld a, $06
 	ldh [hWaveSfx], a
 
-jr_002_6085:
-	jp Call_02_6117
+.draw
+;>         return DrawHearts()
+	jp DrawHearts
 
 
-jr_002_6088:
+.subtract
+;> if not wSubtractHealthBuffer:
 	ld a, [wSubtractHealthBuffer]
 	and a
-	jr z, jr_002_60a5
+;>     return
+	jr z, .done
 
+;> wSubtractHealthBuffer -= 1
 	dec a
 	ld [wSubtractHealthBuffer], a
+;> if wHealth:
 	ld a, [wHealth]
 	and a
-	jr z, jr_002_609c
+	jr z, .redraw
 
+;>     wHealth -= 1
 	dec a
 	ld [wHealth], a
 
-jr_002_609c:
-	call Call_02_6117
+.redraw
+;> DrawHearts()
+	call DrawHearts
+;> if wHealth == 0:
 	ld a, [wHealth]
 	and a
-	jr z, jr_002_60a6
+;>     return UseMedicine()
+	jr z, .medicine
 
-jr_002_60a5:
+.done
+;> return
 	ret
 
 
-jr_002_60a6:
+.medicine
+;> if not wMedicineCount:                       # a medicine bottle saves Link
 	ld a, [wMedicineCount]
 	and a
-	jr z, jr_002_6101
+;>     return
+	jr z, .noMedicine
 
+;> wMedicineCount -= 1
 	dec a
 	ld [wMedicineCount], a
+;> wHealth = 8
 	ld a, $08
 	ld [wHealth], a
+;> wAddHealthBuffer += 0x80
 	ld a, [wAddHealthBuffer]
 	add $80
 	ld [wAddHealthBuffer], a
+;> wInvincibilityCounter = 0xA0
 	ld a, $a0
 	ld [wInvincibilityCounter], a
+;>@cmd cmd = wDrawCommand + wDrawCommandsSize; wDrawCommandsSize += 4
 	ld a, [wDrawCommandsSize]
 	ld e, a
 	ld d, $00
 	add $04
 	ld [wDrawCommandsSize], a
 	ld hl, wDrawCommand
+;=@cmd
 	add hl, de
+;> mem[cmd:cmd + 3] = (0x9C, 0x93, 0x00)       # 1 tile: the medicine count
 	ld a, $9c
 	ld [hli], a
 	ld a, $93
 	ld [hli], a
 	ld a, $00
 	ld [hli], a
+;> tile = 0xB0 + wMedicineCount
 	ld a, [wMedicineCount]
 	add $b0
+;> if tile != 0xB0:
 	cp $b0
-	jr z, jr_002_60e7
+	jr z, .lastBottle
 
+;>     mem[cmd + 3] = tile
 	ld [hli], a
+;>     mem[cmd + 4] = 0
 	xor a
 	ld [hl], a
 	ret
 
 
-jr_002_60e7:
+.lastBottle
+;> else:                                        # no bottle left: blank the count and the icon
+;>     mem[cmd + 3] = 0x7F
 	ld a, $7f
 	ld [hli], a
+;>     mem[cmd + 4:cmd + 7] = (0x9C, 0x72, 0xC1)   # 2 tiles down, repeated
 	ld a, $9c
 	ld [hli], a
 	ld a, $72
 	ld [hli], a
 	ld a, $c1
 	ld [hli], a
+;>     mem[cmd + 7] = 0x7F
 	ld a, $7f
 	ld [hli], a
+;>     mem[cmd + 8] = 0
 	xor a
 	ld [hl], a
+;>     wDrawCommandsSize += 4
 	ld a, [wDrawCommandsSize]
 	add $04
 	ld [wDrawCommandsSize], a
 	ret
 
 
-jr_002_6101:
+.noMedicine
 	ret
 
 
+;@ path: items/health
+;@ Draw commands that blank both rows of hearts in the status bar (21 bytes): $9C0D, 7 tiles of $7F;
+;@ $9C2D, 7 tiles of $7F; 0 end. Each command is [address high, address low, $06 (7 tiles across),
+;@ 7 tiles]. DrawHearts copies it into the queue and writes the hearts over the blanks.
 HeartRowsBlankCommand::
 	db $9c, $0d, $06, $7f, $7f, $7f, $7f, $7f, $7f, $7f, $9c, $2d, $06, $7f, $7f, $7f
 	db $7f, $7f, $7f, $7f, $00
 
-Call_02_6117::
+;@ def DrawHearts()
+;@ path: items/health
+;@ Queues the hearts of the status bar: wHealth / 8 full hearts (tile $A9), a part heart ($CE) for the
+;@ rest, then empty hearts ($CD) up to wMaxHearts; 7 per row.
+;@ test: skip draws through the BG command queue
+DrawHearts::
+;> start = wDrawCommandsSize; wDrawCommandsSize += 20
 	ld a, [wDrawCommandsSize]
 	ld e, a
 	ld d, $00
 	add $14
 	ld [wDrawCommandsSize], a
+;> hl = wDrawCommand + start
 	ld hl, wDrawCommand
 	add hl, de
+;> src = HeartRowsBlankCommand
 	push de
-	ld bc, $6102
+	ld bc, HeartRowsBlankCommand
 	ld e, $15
 
-jr_002_612c:
+.copy
+;> mem[hl:hl + 21] = mem[src:src + 21]
 	ld a, [bc]
 	inc bc
 	ld [hli], a
 	dec e
-	jr nz, jr_002_612c
+	jr nz, .copy
 
+;> pass                                         # 4 nops
 	nop
 	nop
 	nop
 	nop
+;> hl = wDrawCommand + 3 + start               # the tiles of the first row
 	pop de
-	ld hl, $d604
+	ld hl, wDrawCommand + 3
 	add hl, de
+;> c = 0                                        # hearts written
 	ld c, $00
+;> if wHealth:
 	ld a, [wHealth]
 	and a
-	jr z, jr_002_6165
+	jr z, .empty
 
+;>     hMultiPurpose0 = wHealth
 	ldh [hMultiPurpose0], a
 
-jr_002_6145:
+.full
+;>     while True:
+;>         hMultiPurpose0 -= 8
 	ldh a, [hMultiPurpose0]
 	sub $08
 	ldh [hMultiPurpose0], a
-	jr c, jr_002_615c
+;>         if hMultiPurpose0 < 0: break
+	jr c, .part
 
+;>         mem[hl] = 0xA9; hl += 1              # full heart
 	ld a, $a9
 	ld [hli], a
+;>         c += 1
 	inc c
+;>         if c == 7:
 	ld a, c
 	cp $07
-	jr nz, jr_002_615a
+	jr nz, .fullNext
 
+;>             hl += 3                          # on to the second row
 	ld a, l
 	add $03
 	ld l, a
 
-jr_002_615a:
-	jr jr_002_6145
+.fullNext
+	jr .full
 
-jr_002_615c:
+.part
+;>     if hMultiPurpose0 + 8:
 	add $08
-	jr z, jr_002_6165
+	jr z, .empty
 
+;>         mem[hl] = 0xCE; hl += 1              # part heart; on with c += 1 below
 	ld a, $ce
 	ld [hli], a
-	jr jr_002_616e
+	jr .nextEmpty
 
-jr_002_6165:
+.empty
+;> while c != wMaxHearts:
 	ld a, [wMaxHearts]
 	cp c
-	jr z, jr_002_617a
+	jr z, .done
 
+;>     mem[hl] = 0xCD; hl += 1                  # empty heart
 	ld a, $cd
 	ld [hli], a
 
-jr_002_616e:
+.nextEmpty
+;>     c += 1
 	inc c
+;>     if c == 7:
 	ld a, c
 	cp $07
-	jr nz, jr_002_6178
+	jr nz, .loop
 
+;>         hl += 3
 	ld a, l
 	add $03
 	ld l, a
 
-jr_002_6178:
-	jr jr_002_6165
+.loop
+	jr .empty
 
-jr_002_617a:
+.done
 	ret
 
 
@@ -6720,7 +7595,7 @@ jr_002_633f:
 	jr jr_002_6357
 
 jr_002_6354:
-	ld de, $db11
+	ld de, wKeyItemFlags
 
 jr_002_6357:
 	ld a, [de]
@@ -6767,7 +7642,7 @@ jr_002_637e:
 	ld hl, wDrawCommand
 	ld de, $002c
 	add hl, de
-	ld a, [$db0f]
+	ld a, [wSeashells]
 	and a
 	jr z, jr_002_63a0
 
@@ -6875,7 +7750,7 @@ jr_002_6402:
 	ld d, $00
 	ld hl, $c030
 	add hl, de
-	ld a, [$c1b5]
+	ld a, [wSongMenuShown]
 	and a
 	jr z, jr_002_6431
 
@@ -6897,7 +7772,7 @@ jr_002_6431:
 
 jr_002_6444:
 	ld a, $01
-	call Call_3DD0
+	call ReserveOAMEntriesFar
 	ret
 
 
@@ -6972,13 +7847,13 @@ jr_002_64b8:
 Jump_002_64bb:
 	call Call_02_6505
 	call Call_02_6742
-	ld a, [$c159]
+	ld a, [wInventoryCursorBlink]
 	inc a
-	ld [$c159], a
+	ld [wInventoryCursorBlink], a
 	and $10
 	jr nz, jr_002_64fc
 
-	ld a, [$dba3]
+	ld a, [wInventoryCursor]
 	ld e, a
 	ld d, $00
 	ld hl, $6454
@@ -7011,14 +7886,14 @@ CursorStepY::
 	db $00, $fe, $02, $00
 
 Call_02_6505::
-	ld a, [$dba3]
-	ld [$c1b6], a
-	ld a, [$c1b8]
-	ld hl, $c1b9
+	ld a, [wInventoryCursor]
+	ld [wInventoryCursorPrev], a
+	ld a, [wSongMenuOpenTimer]
+	ld hl, wSongMenuCloseTimer
 	or [hl]
 	jr nz, jr_002_655e
 
-	ld a, [$c1b5]
+	ld a, [wSongMenuShown]
 	and a
 	jr nz, jr_002_653a
 
@@ -7028,9 +7903,9 @@ Call_02_6505::
 	ld d, $00
 	ld hl, $64fd
 	add hl, de
-	ld a, [$dba3]
+	ld a, [wInventoryCursor]
 	add [hl]
-	ld [$dba3], a
+	ld [wInventoryCursor], a
 	cp $0a
 	jr c, jr_002_653a
 
@@ -7041,7 +7916,7 @@ Call_02_6505::
 	ld a, $09
 
 jr_002_6537:
-	ld [$dba3], a
+	ld [wInventoryCursor], a
 
 jr_002_653a:
 	ldh a, [hJoypadPressed]
@@ -7052,9 +7927,9 @@ jr_002_653a:
 	ld d, $00
 	ld hl, $6501
 	add hl, de
-	ld a, [$dba3]
+	ld a, [wInventoryCursor]
 	add [hl]
-	ld [$dba3], a
+	ld [wInventoryCursor], a
 	cp $0a
 	jr c, jr_002_655e
 
@@ -7065,27 +7940,27 @@ jr_002_653a:
 	ld a, $09
 
 jr_002_655b:
-	ld [$dba3], a
+	ld [wInventoryCursor], a
 
 jr_002_655e:
 	ldh a, [hJoypadHeld]
 	and $0f
 	jr z, jr_002_656e
 
-	ld a, [$c1b5]
+	ld a, [wSongMenuShown]
 	and a
 	jr nz, jr_002_656e
 
 	xor a
-	ld [$c159], a
+	ld [wInventoryCursorBlink], a
 
 jr_002_656e:
-	ld a, [$c1b5]
+	ld a, [wSongMenuShown]
 	and a
 	jr z, jr_002_658a
 
-	ld a, [$c1b8]
-	ld hl, $c1b9
+	ld a, [wSongMenuOpenTimer]
+	ld hl, wSongMenuCloseTimer
 	or [hl]
 	jr nz, jr_002_658a
 
@@ -7094,12 +7969,12 @@ jr_002_656e:
 	jr z, jr_002_658a
 
 	ld a, $01
-	ld [$c1ba], a
+	ld [wCloseInventoryAfterSongMenu], a
 	jr jr_002_65b7
 
 jr_002_658a:
-	ld a, [$dba3]
-	ld hl, $c1b6
+	ld a, [wInventoryCursor]
+	ld hl, wInventoryCursorPrev
 	cp [hl]
 	jr z, jr_002_65c6
 
@@ -7107,7 +7982,7 @@ jr_002_658a:
 	ld [hl], $0a
 	ld e, a
 	ld d, $00
-	ld hl, $db02
+	ld hl, wInventoryItems
 	add hl, de
 	ld a, [hl]
 	cp $09
@@ -7120,25 +7995,25 @@ jr_002_658a:
 	ld a, $08
 	ldh [hNeedsUpdatingBGTiles], a
 	ld a, $10
-	ld [$c1b8], a
+	ld [wSongMenuOpenTimer], a
 	ld a, $01
 	jr jr_002_65c3
 
 jr_002_65b7:
-	ld a, [$c1b5]
+	ld a, [wSongMenuShown]
 	and a
 	jr z, jr_002_65c6
 
 	ld a, $10
-	ld [$c1b9], a
+	ld [wSongMenuCloseTimer], a
 	xor a
 
 jr_002_65c3:
-	ld [$c1b5], a
+	ld [wSongMenuShown], a
 
 jr_002_65c6:
-	ld hl, $c1b9
-	ld a, [$c1b8]
+	ld hl, wSongMenuCloseTimer
+	ld a, [wSongMenuOpenTimer]
 	or [hl]
 	jp nz, Jump_002_667b
 
@@ -7148,8 +8023,8 @@ jr_002_65c6:
 
 	ld a, [wItemA]
 	push af
-	ld hl, $db02
-	ld a, [$dba3]
+	ld hl, wInventoryItems
+	ld a, [wInventoryCursor]
 	ld c, a
 	ld b, $00
 	add hl, bc
@@ -7167,20 +8042,20 @@ jr_002_65c6:
 	ld a, $08
 	ldh [hNeedsUpdatingBGTiles], a
 	ld a, $10
-	ld [$c1b8], a
+	ld [wSongMenuOpenTimer], a
 	ld a, $01
-	ld [$c1b5], a
+	ld [wSongMenuShown], a
 	jr jr_002_6613
 
 jr_002_6604:
-	ld a, [$c1b5]
+	ld a, [wSongMenuShown]
 	and a
 	jr z, jr_002_6613
 
 	xor a
-	ld [$c1b5], a
+	ld [wSongMenuShown], a
 	ld a, $10
-	ld [$c1b9], a
+	ld [wSongMenuCloseTimer], a
 
 jr_002_6613:
 	ld c, $01
@@ -7196,8 +8071,8 @@ jr_002_661e:
 
 	ld a, [wItemB]
 	push af
-	ld hl, $db02
-	ld a, [$dba3]
+	ld hl, wInventoryItems
+	ld a, [wInventoryCursor]
 	ld c, a
 	ld b, $00
 	add hl, bc
@@ -7213,22 +8088,22 @@ jr_002_661e:
 	jr z, jr_002_6652
 
 	ld a, $10
-	ld [$c1b8], a
+	ld [wSongMenuOpenTimer], a
 	ld a, $08
 	ldh [hNeedsUpdatingBGTiles], a
 	ld a, $01
-	ld [$c1b5], a
+	ld [wSongMenuShown], a
 	jr jr_002_6661
 
 jr_002_6652:
-	ld a, [$c1b5]
+	ld a, [wSongMenuShown]
 	and a
 	jr z, jr_002_6661
 
 	xor a
-	ld [$c1b5], a
+	ld [wSongMenuShown], a
 	ld a, $10
-	ld [$c1b9], a
+	ld [wSongMenuCloseTimer], a
 
 jr_002_6661:
 	ld c, $00
@@ -7239,7 +8114,7 @@ jr_002_6661:
 Call_02_666A::
 	ld a, $13
 	ldh [hJingle], a
-	ld a, [$dba3]
+	ld a, [wInventoryCursor]
 	add $02
 	ld c, a
 	ld b, $00
@@ -7272,23 +8147,23 @@ SongMenuSongBits::
 	db $04, $02, $01
 
 Call_02_6742::
-	ld a, [$c1b9]
+	ld a, [wSongMenuCloseTimer]
 	and a
 	jr z, jr_002_6764
 
 	dec a
-	ld [$c1b9], a
+	ld [wSongMenuCloseTimer], a
 	jr nz, jr_002_6761
 
 	ld hl, hNeedsUpdatingBGTiles
 	ld [hl], $0b
-	ld a, [$c1ba]
+	ld a, [wCloseInventoryAfterSongMenu]
 	and a
 	jr z, jr_002_6760
 
 	xor a
-	ld [$c1ba], a
-	jp Jump_002_5e3c
+	ld [wCloseInventoryAfterSongMenu], a
+	jp ToggleInventory
 
 
 jr_002_6760:
@@ -7300,12 +8175,12 @@ jr_002_6761:
 	jr jr_002_676e
 
 jr_002_6764:
-	ld a, [$c1b8]
+	ld a, [wSongMenuOpenTimer]
 	and a
 	jr z, jr_002_6774
 
 	dec a
-	ld [$c1b8], a
+	ld [wSongMenuOpenTimer], a
 
 jr_002_676e:
 	rra
@@ -7314,7 +8189,7 @@ jr_002_676e:
 	jr jr_002_677d
 
 jr_002_6774:
-	ld a, [$c1b5]
+	ld a, [wSongMenuShown]
 	and a
 	jp z, Jump_002_684a
 
@@ -8049,7 +8924,7 @@ jr_002_6d5d:
 	ld a, [wLinkWalkingFrameCount]
 	add $02
 	ld [wLinkWalkingFrameCount], a
-	call Call_145D
+	call AddDashDustVfx
 	jp Jump_002_6e14
 
 
@@ -8210,7 +9085,7 @@ jr_002_6e35:
 	jr nz, jr_002_6e58
 
 	ld a, $02
-	call Call_02_571B
+	call AddSplashAtLink
 
 jr_002_6e58:
 	ld a, $04
@@ -8734,7 +9609,7 @@ jr_002_7142:
 
 Jump_002_7146:
 jr_002_7146:
-	call Call_1495
+	call StopLinkSpeed
 	ld [wLinkPushedTimer], a
 	call Call_02_7180
 
@@ -9049,7 +9924,7 @@ jr_002_7312:
 
 jr_002_7315:
 	ld a, $28
-	call Call_3C01
+	call SpawnEntity
 	ld hl, wEntityPrivate2
 	add hl, de
 	inc [hl]
@@ -9066,7 +9941,7 @@ jr_002_7321:
 
 	call ResetSoundEngine
 	ld a, $5f
-	call Call_3C01
+	call SpawnEntity
 	ld hl, wEntityPrivate4
 	add hl, de
 	dec [hl]
@@ -9084,7 +9959,7 @@ jr_002_733c:
 	jr jr_002_7353
 
 jr_002_734b:
-	ld a, [$db11]
+	ld a, [wKeyItemFlags]
 	and a
 	ld e, $30
 	jr z, jr_002_737c
@@ -9255,7 +10130,7 @@ jr_002_7441:
 	jp nc, Jump_002_75b1
 
 jr_002_7450:
-	ld a, [$c188]
+	ld a, [wDoorAnimation]
 	and a
 	jp nz, Jump_002_75b1
 
@@ -9295,11 +10170,11 @@ jr_002_7477:
 jr_002_7485:
 	ldh a, [hMultiPurposeD]
 	sub $90
-	ld [$c189], a
+	ld [wDoorAnimIndex], a
 	xor a
-	ld [$dbac], a
+	ld [wDoorAnimFrame], a
 	inc a
-	ld [$c188], a
+	ld [wDoorAnimation], a
 	call SaveDungeonItemFlags
 	call PlayUnlockSound
 	jp Jump_002_75b1
@@ -9569,7 +10444,7 @@ jr_002_760b:
 	cp $03
 	jr z, jr_002_7634
 
-	ld a, [$db66]
+	ld a, [wHasInstrument2]
 	and $02
 	jr nz, jr_002_7634
 
@@ -9655,7 +10530,7 @@ jr_002_7689:
 	ld d, $00
 	call RemoveRoomObject
 	ld a, $05
-	call Call_3C01
+	call SpawnEntity
 	jr c, jr_002_770f
 
 	ld hl, wEntityX
@@ -9762,7 +10637,7 @@ jr_002_772d:
 	ldh [hJingle], a
 	ld a, $05
 	ld [wLinkMotionState], a
-	call Call_1495
+	call StopLinkSpeed
 	ld [wInvincibilityCounter], a
 	ld [wLinkMotionCounter], a
 	ldh [hLinkPositionZ], a
@@ -9839,7 +10714,7 @@ jr_002_7788:
 	ld [wBumpShakeAxis], a
 	ld a, $0b
 	ldh [hJingle], a
-	call Call_1594
+	call SetDashBumpPoint
 
 jr_002_77bd:
 	ret
@@ -9847,12 +10722,12 @@ jr_002_77bd:
 
 Call_02_77BE::
 	call OpenDialog
-	jp Call_1495
+	jp StopLinkSpeed
 
 
 Call_02_77C4::
 	call OpenDialogTable2
-	jp Call_1495
+	jp StopLinkSpeed
 
 
 SwimEntrySpeedX::
@@ -9907,7 +10782,7 @@ jr_002_7809:
 	or [hl]
 	jr nz, Call_02_781B
 
-	call Call_1495
+	call StopLinkSpeed
 
 Call_02_781B::
 	call Call_02_77D2
@@ -10203,7 +11078,7 @@ jr_002_79b4:
 
 	ldh a, [hLinkY]
 	add $fe
-	call Call_02_571D
+	call AddSplashAtLinkY
 	ldh a, [hRoomObjectType]
 	cp $06
 	jr z, Call_02_79D9
@@ -10232,7 +11107,7 @@ jr_002_79f2:
 	ld [wLinkMotionState], a
 	xor a
 	ldh [hLinkMotionStep], a
-	call Call_1495
+	call StopLinkSpeed
 	ldh a, [hLinkDirection]
 	ld e, a
 	ld d, b
@@ -10538,7 +11413,7 @@ Call_02_7B74::
 	ldh [hNextDefaultMusicTrack], a
 
 jr_002_7bc9:
-	call Call_1495
+	call StopLinkSpeed
 	ldh [hLinkSpeedZ], a
 	ld [wRoomTransitionState], a
 	ldh a, [hLinkX]
@@ -10583,7 +11458,7 @@ jr_002_7c06:
 	ld [wJingleAfterTransition], a
 
 jr_002_7c12:
-	call Call_3819
+	call OnRoomEnteredBank1
 	ld a, $ff
 	ldh [hAnimatedTilesFrameCount], a
 	ld a, [wIsIndoor]
@@ -10769,8 +11644,8 @@ Jump_002_7d25:
 jr_002_7d25:
 	call LoadRoom
 	call LoadRoomEntities
-	call Call_1CCC
-	call Call_149B
+	call DrawLinkOAM
+	call UpdateLinkItemSprites
 	ld a, [wRestoreMusicAfterTransition]
 	and a
 	jr z, jr_002_7d4c

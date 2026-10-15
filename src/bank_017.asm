@@ -344,6 +344,7 @@ CreditsRollWait::
 ;> wEntityWorkRAM = 0
 	xor a
 	ld [wEntityWorkRAM], a
+;> return CreditsRollNextStep()          # falls through
 
 ;@ def CreditsRollNextStep() -> hl
 ;@ path: ending/roll
@@ -435,9 +436,9 @@ CreditsRollFadeOut::
 ;@ $10: the bird that crosses the screen at the very end, see EndingLastBird) just off the left edge
 ;@ (x $E0, y $10), flying to the right.
 CreditsRollSendBird::
-;> slot = Call_3C01(0xE8)               # spawn an ending object
+;> slot = SpawnEntity(0xE8)               # spawn an ending object
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0xE0
 	ld hl, wEntityX
 	add hl, de
@@ -1413,9 +1414,9 @@ EndingSpawnStairway::
 ;> wBGMapToLoad = 0x16
 	ld a, $16
 	ld [wBGMapToLoad], a
-;> slot = Call_3C01(0xE8)               # ending object, part 0
+;> slot = SpawnEntity(0xE8)               # ending object, part 0
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x40
 	ld hl, wEntityX
 	add hl, de
@@ -1424,9 +1425,9 @@ EndingSpawnStairway::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $e0
-;> slot = Call_3C01(0xE8)
+;> slot = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityPrivate1[slot] += 1           # part 1
 	ld hl, wEntityPrivate1
 	add hl, de
@@ -2238,9 +2239,9 @@ EndingSpawnInstruments::
 
 ;>@each while True:
 .spawn
-;>     slot = Call_3C01(0xE8)           # ending object
+;>     slot = SpawnEntity(0xE8)           # ending object
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
 ;>     i = wEntityWorkRAM
 	ld a, [wEntityWorkRAM]
 	ld c, a
@@ -2519,9 +2520,9 @@ MemoryScene1::
 ;> wBGMapToLoad = 0x20
 	ld a, $20
 	ld [wBGMapToLoad], a
-;> slot = Call_3C01(0x6D)
+;> slot = SpawnEntity(0x6D)
 	ld a, $6d
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x48
 	ld hl, wEntityX
 	add hl, de
@@ -2530,9 +2531,9 @@ MemoryScene1::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $50
-;> slot = Call_3C01(0x6F)
+;> slot = SpawnEntity(0x6F)
 	ld a, $6f
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x68
 	ld hl, wEntityX
 	add hl, de
@@ -2541,9 +2542,9 @@ MemoryScene1::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $30
-;> slot = Call_3C01(0x78)
+;> slot = SpawnEntity(0x78)
 	ld a, $78
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x2C
 	ld hl, wEntityX
 	add hl, de
@@ -2552,9 +2553,9 @@ MemoryScene1::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $58
-;> slot = Call_3C01(0x78)
+;> slot = SpawnEntity(0x78)
 	ld a, $78
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x60
 	ld hl, wEntityX
 	add hl, de
@@ -2630,9 +2631,9 @@ MemoryScene2::
 	ld [wBGMapToLoad], a
 ;> ClearAllEntities()
 	call ClearAllEntities
-;> slot = Call_3C01(0x71)
+;> slot = SpawnEntity(0x71)
 	ld a, $71
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x48
 	ld hl, wEntityX
 	add hl, de
@@ -2653,9 +2654,9 @@ MemoryScene2::
 	ld hl, wEntityDirection
 	add hl, de
 	ld [hl], $02
-;> slot = Call_3C01(0x72)
+;> slot = SpawnEntity(0x72)
 	ld a, $72
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x78
 	ld hl, wEntityX
 	add hl, de
@@ -2714,9 +2715,9 @@ MemoryScene3::
 	ld [wBGMapToLoad], a
 ;> ClearAllEntities()
 	call ClearAllEntities
-;> slot = Call_3C01(0xC5)
+;> slot = SpawnEntity(0xC5)
 	ld a, $c5
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x28
 	ld hl, wEntityX
 	add hl, de
@@ -2725,9 +2726,9 @@ MemoryScene3::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $40
-;> slot = Call_3C01(0x09)
+;> slot = SpawnEntity(0x09)
 	ld a, $09
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x48
 	ld hl, wEntityX
 	add hl, de
@@ -2736,9 +2737,9 @@ MemoryScene3::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $50
-;> slot = Call_3C01(0x09)
+;> slot = SpawnEntity(0x09)
 	ld a, $09
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x68
 	ld hl, wEntityX
 	add hl, de
@@ -2797,9 +2798,9 @@ MemoryScene4::
 	ld [wBGMapToLoad], a
 ;> ClearAllEntities()
 	call ClearAllEntities
-;> slot = Call_3C01(0x3F)
+;> slot = SpawnEntity(0x3F)
 	ld a, $3f
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x78
 	ld hl, wEntityX
 	add hl, de
@@ -2859,9 +2860,9 @@ MemoryScene5::
 	ld [wBGMapToLoad], a
 ;> ClearAllEntities()
 	call ClearAllEntities
-;> slot = Call_3C01(0x3E)
+;> slot = SpawnEntity(0x3E)
 	ld a, $3e
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x28
 	ld hl, wEntityX
 	add hl, de
@@ -2870,9 +2871,9 @@ MemoryScene5::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $50
-;> slot = Call_3C01(0x6E)
+;> slot = SpawnEntity(0x6E)
 	ld a, $6e
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x18
 	ld hl, wEntityX
 	add hl, de
@@ -2881,9 +2882,9 @@ MemoryScene5::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $4c
-;> slot = Call_3C01(0x6E)
+;> slot = SpawnEntity(0x6E)
 	ld a, $6e
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x38
 	ld hl, wEntityX
 	add hl, de
@@ -2892,9 +2893,9 @@ MemoryScene5::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $54
-;> slot = Call_3C01(0x6E)
+;> slot = SpawnEntity(0x6E)
 	ld a, $6e
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x28
 	ld hl, wEntityX
 	add hl, de
@@ -2903,9 +2904,9 @@ MemoryScene5::
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $30
-;> slot = Call_3C01(0x6F)
+;> slot = SpawnEntity(0x6F)
 	ld a, $6f
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x78
 	ld hl, wEntityX
 	add hl, de
@@ -3294,9 +3295,9 @@ MemoryShowPillar::
 ;> wTileMapToLoad = 0x15
 	ld a, $15
 	ld [wTileMapToLoad], a
-;> slot = Call_3C01(0xE8)               # ending object, part 0
+;> slot = SpawnEntity(0xE8)               # ending object, part 0
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x40
 	ld hl, wEntityX
 	add hl, de
@@ -3309,9 +3310,9 @@ MemoryShowPillar::
 	ld hl, wEntityState
 	add hl, de
 	ld [hl], $02
-;> slot = Call_3C01(0xE8)
+;> slot = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityPrivate1[slot] += 1           # part 1: the stars
 	ld hl, wEntityPrivate1
 	add hl, de
@@ -3829,9 +3830,9 @@ FarLogSpawn::
 ;> wBGMapToLoad = 0x17
 	ld a, $17
 	ld [wBGMapToLoad], a
-;> slot = Call_3C01(0xE8)
+;> slot = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x48
 	ld hl, wEntityX
 	add hl, de
@@ -3844,9 +3845,9 @@ FarLogSpawn::
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $04
-;> slot = Call_3C01(0xE8)
+;> slot = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x28
 	ld hl, wEntityX
 	add hl, de
@@ -3859,9 +3860,9 @@ FarLogSpawn::
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $05
-;> slot = Call_3C01(0xE8)
+;> slot = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x78
 	ld hl, wEntityX
 	add hl, de
@@ -3993,9 +3994,9 @@ SkyViewSpawn::
 ;> wBGMapToLoad = 0x18
 	ld a, $18
 	ld [wBGMapToLoad], a
-;> slot = Call_3C01(0xE8)
+;> slot = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x18
 	ld hl, wEntityX
 	add hl, de
@@ -4012,9 +4013,9 @@ SkyViewSpawn::
 	ld hl, wEntitySpeedX
 	add hl, de
 	ld [hl], $03
-;> slot = Call_3C01(0xE8)
+;> slot = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x78
 	ld hl, wEntityX
 	add hl, de
@@ -4035,9 +4036,9 @@ SkyViewSpawn::
 	ld hl, wEntitySpriteVariant
 	add hl, de
 	ld [hl], $03
-;> slot = Call_3C01(0xE8)
+;> slot = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x68
 	ld hl, wEntityX
 	add hl, de
@@ -4257,9 +4258,9 @@ LinkWakesSpawn::
 ;> rLYC = 0x42
 	ld a, $42
 	ldh [rLYC], a
-;> slot = Call_3C01(0xE8)
+;> slot = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x18
 	ld hl, wEntityX
 	add hl, de
@@ -4276,9 +4277,9 @@ LinkWakesSpawn::
 	ld hl, wEntitySpriteVariant
 	add hl, de
 	ld [hl], $02
-;> slot = Call_3C01(0xE8)
+;> slot = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x68
 	ld hl, wEntityX
 	add hl, de
@@ -4295,9 +4296,9 @@ LinkWakesSpawn::
 	ld hl, wEntitySpriteVariant
 	add hl, de
 	inc [hl]
-;> slot = Call_3C01(0xE8)
+;> slot = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x88
 	ld hl, wEntityX
 	add hl, de
@@ -4310,9 +4311,9 @@ LinkWakesSpawn::
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $08
-;> slot = Call_3C01(0xE8)
+;> slot = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
 ;> wEntityX[slot] = 0x08
 	ld hl, wEntityX
 	add hl, de
@@ -4765,11 +4766,20 @@ DrawLinkWakingFrame::
 	ret
 
 
+;@ def CreditsWindFishFlies()
+;@ path: ending/windfish_flies
+;@ Ending part 6: Link sits on his log and looks up; the view tilts up from the sea into the sky,
+;@ where the Wind Fish flies. Runs WindFishFliesSteps.
+;@ test: skip runs the entities (bank 3)
 CreditsWindFishFlies::
+;> UpdateEntitiesBank17()
 	call UpdateEntitiesBank17
+;> WindFishFliesSteps[wSceneStep]()
 	ld a, [wSceneStep]
 	rst $00
 
+;@ path: ending/windfish_flies
+;@ The steps of ending part 6 (9 words), indexed by wSceneStep.
 WindFishFliesSteps::
 	dw WindFishFliesInit
 	dw WindFishFliesSpawn
@@ -4781,166 +4791,245 @@ WindFishFliesSteps::
 	dw WindFishFliesTiltUp
 	dw WindFishFliesFadeOut
 
+;@ def WindFishFliesInit()
+;@ path: ending/windfish_flies
+;@ Step 0 of ending part 6: requests tile set $19.
 WindFishFliesInit::
+;> wTileMapToLoad = 0x19
 	ld a, $19
 	ld [wTileMapToLoad], a
+;> EndingNextStep()
 	jp EndingNextStep
 
 
+;@ def WindFishFliesSpawn()
+;@ path: ending/windfish_flies
+;@ Step 1 of ending part 6: requests screen layout $1A (Link sitting on his log) and spawns the Wind
+;@ Fish high in the sky (ending object part $0A) at x $40, y $4E. It is spawned into slot 0, whose x
+;@ position WindFishFliesTiltUp later uses as the vertical scroll.
 WindFishFliesSpawn::
+;> wBGMapToLoad = 0x1A
 	ld a, $1a
 	ld [wBGMapToLoad], a
+;> slot = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
+;> wEntityX[slot] = 0x40
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], $40
+;> wEntityY[slot] = 0x4E
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $4e
+;> wEntityPrivate1[slot] = 0x0A         # the Wind Fish in the sky
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $0a
+;> EndingNextStep()
 	jp EndingNextStep
 
 
+;@ def WindFishFliesFadeIn()
+;@ path: ending/windfish_flies
+;@ Step 2 of ending part 6: the water rows at $9960 roll; fades the picture in, a step every 4 frames
+;@ (12 steps); it then stays $60 x 4 frames.
 WindFishFliesFadeIn::
+;> AnimateWaterRows(0x9960)
 	ld de, $9960
 	call AnimateWaterRows
+;> if hFrameCounter & 3 == 0:
 	ldh a, [hFrameCounter]
 	and $03
-	jr nz, jr_017_5f80
+	jr nz, .palette
 
+;>     if wSceneFadeStep == 12:
 	ld a, [wSceneFadeStep]
 	cp $0c
-	jr nz, jr_017_5f7c
+	jr nz, .step
 
+;>         ResetSceneVars()
 	call ResetSceneVars
+;>         wSceneSlowTimer = 0x60
 	ld a, $60
 	ld [wSceneSlowTimer], a
+;>         return EndingNextStep()
 	jp EndingNextStep
 
 
-jr_017_5f7c:
+;>     wSceneFadeStep += 1
+.step
 	inc a
 	ld [wSceneFadeStep], a
 
-jr_017_5f80:
+;> i = wSceneFadeStep + (hFrameCounter & 3)
+.palette
 	ldh a, [hFrameCounter]
 	and $03
 	ld e, a
 	ld a, [wSceneFadeStep]
 	add e
 	ld e, a
+;> wBGPalette = SeaFadeInPalettes[i]
 	ld d, $00
-	ld hl, $590b
+	ld hl, SeaFadeInPalettes
 	add hl, de
 	ld a, [hl]
 	ld [wBGPalette], a
+;> wOBJ0Palette = SeaFadeInPalettes[i]  # (written twice)
 	ld [wOBJ0Palette], a
-	ld hl, $590b
+	ld hl, SeaFadeInPalettes
 	add hl, de
 	ld a, [hl]
 	ld [wOBJ0Palette], a
-	ld hl, $591b
+;> wOBJ1Palette = SeaFadeInOBP1[i]
+	ld hl, SeaFadeInOBP1
 	add hl, de
 	ld a, [hl]
 	ld [wOBJ1Palette], a
+;> return
 	ret
 
 
+;@ def WindFishFliesWait()
+;@ path: ending/windfish_flies
+;@ Step 3 of ending part 6: the water rolls until wSceneSlowTimer runs out.
 WindFishFliesWait::
+;> AnimateWaterRows(0x9960)
 	ld de, $9960
 	call AnimateWaterRows
+;> if wSceneSlowTimer == 0:
 	ld a, [wSceneSlowTimer]
 	and a
-	jr nz, jr_017_5fba
+	jr nz, .done
 
+;>     ResetSceneVars()
 	call ResetSceneVars
+;>     EndingNextStep()
 	jp EndingNextStep
 
 
-jr_017_5fba:
+.done
 	ret
 
 
+;@ path: ending/windfish_flies
+;@ Sprite palette 0 for step 4 of ending part 6: 12 bytes, levels $1E, $2E, $6E (read at
+;@ step + (frame & 3), step 0-8).
 SittingFadeInOBP0::
 	db $1e, $1e, $1e, $1e, $2e, $2e, $2e, $2e, $6e, $6e, $6e, $6e
 
+;@ def WindFishFliesFadeInOBP0()
+;@ path: ending/windfish_flies
+;@ Step 4 of ending part 6: changes sprite palette 0 through SittingFadeInOBP0, a step every 8
+;@ frames (8 steps); the next step follows $20 frames later.
 WindFishFliesFadeInOBP0::
+;> AnimateWaterRows(0x9960)
 	ld de, $9960
 	call AnimateWaterRows
+;> if hFrameCounter & 7 == 0:
 	ldh a, [hFrameCounter]
 	and $07
-	jr nz, jr_017_5fe9
+	jr nz, .palette
 
+;>     if wSceneFadeStep == 8:
 	ld a, [wSceneFadeStep]
 	cp $08
-	jr nz, jr_017_5fe5
+	jr nz, .step
 
+;>         ResetSceneVars()
 	call ResetSceneVars
+;>         wSceneTimer = 0x20
 	ld a, $20
 	ld [wSceneTimer], a
+;>         return EndingNextStep()
 	jp EndingNextStep
 
 
-jr_017_5fe5:
+;>     wSceneFadeStep += 1
+.step
 	inc a
 	ld [wSceneFadeStep], a
 
-jr_017_5fe9:
+;> i = wSceneFadeStep + (hFrameCounter & 3)
+.palette
 	ldh a, [hFrameCounter]
 	and $03
 	ld e, a
 	ld a, [wSceneFadeStep]
 	add e
 	ld e, a
+;> wOBJ0Palette = SittingFadeInOBP0[i]
 	ld d, $00
-	ld hl, $5fbb
+	ld hl, SittingFadeInOBP0
 	add hl, de
 	ld a, [hl]
 	ld [wOBJ0Palette], a
+;> return
 	ret
 
 
+;@ def WindFishFliesCount()
+;@ path: ending/windfish_flies
+;@ Step 5 of ending part 6: every $0A frames the Wind Fish shows its next frame (wEntityWorkRAM, read
+;@ by EndingWindFishHigh) up to frame 2; the next step follows $20 frames later.
 WindFishFliesCount::
+;> AnimateWaterRows(0x9960)
 	ld de, $9960
 	call AnimateWaterRows
+;> if wSceneTimer:
 	ld a, [wSceneTimer]
 	and a
-	jr nz, jr_017_6022
+;>     return
+	jr nz, .done
 
+;> wSceneTimer = 0x0A
 	ld a, $0a
 	ld [wSceneTimer], a
+;> wEntityWorkRAM += 1
 	ld a, [wEntityWorkRAM]
 	inc a
 	ld [wEntityWorkRAM], a
+;> if wEntityWorkRAM == 2:
 	cp $02
-	jr nz, jr_017_6022
+	jr nz, .done
 
+;>     wSceneTimer = 0x20
 	ld a, $20
 	ld [wSceneTimer], a
+;>     EndingNextStep()
 	jp EndingNextStep
 
 
-jr_017_6022:
+.done
 	ret
 
 
+;@ def WindFishFliesWait2()
+;@ path: ending/windfish_flies
+;@ Step 6 of ending part 6: the water rolls until wSceneTimer runs out.
 WindFishFliesWait2::
+;> AnimateWaterRows(0x9960)
 	ld de, $9960
 	call AnimateWaterRows
+;> if wSceneTimer == 0:
 	ld a, [wSceneTimer]
 	and a
-	jr nz, jr_017_6032
+	jr nz, .done
 
+;>     EndingNextStep()
 	jp EndingNextStep
 
 
-jr_017_6032:
+.done
 	ret
 
 
+;@ path: ending/windfish_flies
+;@ The sky above Link, drawn row by row upwards as the view tilts up in ending part 6: 90 background
+;@ draw commands of 24 bytes (BG map address, $13 = 20 tiles, the tiles, 0), row n at $9BE0 - n * $20
+;@ (wrapping around the 32-row map). Tile $AC is empty sky, $AE solid cloud, the others cloud edges.
+;@ Command n is copied by WindFishFliesTiltUp when the view has moved on by one tile row.
 SkyRowCommands::
 	db $9b, $e0, $13, $ac, $ac, $ac, $ac, $ac, $ac, $ac, $ac, $ac, $ac, $ac, $ac, $ac
 	db $ac, $ac, $ac, $ac, $ac, $ac, $ac, $00, $9b, $c0, $13, $ac, $ac, $ac, $ac, $ac
@@ -5077,6 +5166,10 @@ SkyRowCommands::
 	db $98, $e0, $13, $ae, $ae, $ae, $ae, $ae, $75, $ac, $ac, $ac, $ac, $ac, $ac, $78
 	db $79, $ae, $ae, $ae, $ae, $3c, $ac, $00, $98, $c0, $13, $ae, $ae, $ae, $ae, $74
 	db $67, $ac, $ac, $ac, $ac, $ac, $ac, $45, $ae, $ae, $ae, $ae, $ae, $2c, $2d, $00
+;@ path: ending/windfish_flies
+;@ The speed of the tilt for each row of SkyRowCommands: 96 bytes (90 used), in 1/32 pixel per frame
+;@ (WindFishFliesTiltUp doubles them into a speed in 1/16 pixel): it speeds up from 2 to $28, holds,
+;@ slows down to 4.
 SkyScrollSpeeds::
 	db $02, $04, $06, $08, $0a, $0c, $0e, $10, $12, $14, $16, $18, $1a, $1c, $1e, $20
 	db $22, $24, $26, $28, $28, $28, $28, $28, $28, $28, $28, $28, $28, $28, $28, $28
@@ -5084,6 +5177,9 @@ SkyScrollSpeeds::
 	db $28, $28, $28, $27, $26, $25, $24, $23, $22, $21, $20, $1f, $1e, $1d, $1c, $1b
 	db $1a, $19, $18, $17, $16, $15, $14, $13, $12, $11, $10, $0f, $0e, $0d, $0c, $0b
 	db $0a, $09, $08, $07, $06, $05, $04, $04, $04, $04, $04, $04, $00, $00, $00, $00
+;@ path: ending/windfish_flies
+;@ The step into SkyFadeBGP for each row of the tilt: 96 bytes, 0 for the first 22 rows, then 1, 2,
+;@ 3 and 4: the sky changes its shades as the view rises.
 SkyFadeSteps::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	db $00, $00, $00, $00, $00, $00, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01
@@ -5091,205 +5187,284 @@ SkyFadeSteps::
 	db $03, $03, $03, $03, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
 	db $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
 	db $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04, $04
+;@ path: ending/windfish_flies
+;@ Background palettes of the sky in ending part 6: 40 bytes, read at step + (frame & 3). Steps 0-4
+;@ (during the tilt, from SkyFadeSteps): $1E, $1F, $1A, $15, $10; WindFishFliesFadeOut then counts the
+;@ step on to 36 through $10, $15, $19/$1A and back to $1E.
 SkyFadeBGP::
 	db $1e, $1e, $1e, $1e, $1f, $1f, $1f, $1f, $1a, $1a, $1a, $1a, $15, $15, $15, $15
 	db $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $10, $15, $15, $15, $15
 	db $19, $19, $1a, $1a, $1e, $1e, $1e, $1e
 
+;@ def WindFishFliesTiltUp()
+;@ path: ending/windfish_flies
+;@ Step 7 of ending part 6: the view tilts up into the sky. The vertical scroll is the x position of
+;@ entity slot 0 (the Wind Fish), moved by UpdateEntityPosX with the speed of the current row; each
+;@ time it crosses a tile row the next sky row is drawn (wSceneVarD counts the rows, 89 in all). At
+;@ row $44 the glow (part $0B) appears and sprite palette 1 becomes $E3. The water rows roll for the
+;@ first 14 rows. Ends with the view at $30 after the last row: then $FF frames of rest before the
+;@ fade-out.
 WindFishFliesTiltUp::
+;> if wSceneVarD < 0x0E:
 	ld a, [wSceneVarD]
 	cp $0e
-	jr nc, jr_017_6998
+	jr nc, .palette
 
+;>     AnimateWaterRows(0x9960)
 	ld de, $9960
 	call AnimateWaterRows
 
-jr_017_6998:
+;>@step wSceneVarC = SkyFadeSteps[wSceneVarD]
+.palette
 	ld a, [wSceneVarD]
 	ld e, a
 	ld d, $00
-	ld hl, $6903
+	ld hl, SkyFadeSteps
 	add hl, de
 	ld a, [hl]
+;=@step
 	ld [wSceneVarC], a
+;> i = wSceneVarC + (hFrameCounter & 3)
 	ldh a, [hFrameCounter]
 	and $03
 	ld e, a
 	ld a, [wSceneVarC]
 	add e
 	ld e, a
+;> wBGPalette = SkyFadeBGP[i]
 	ld d, $00
-	ld hl, $6963
+	ld hl, SkyFadeBGP
 	add hl, de
 	ld a, [hl]
 	ld [wBGPalette], a
+;> row = wSceneVarD
 	ld a, [wSceneVarD]
 	ld e, a
 	ld d, $00
+;> if row == 0x59 and hBaseScrollY == 0x30:
 	cp $59
-	jr nz, jr_017_69d7
+	jr nz, .move
 
 	ldh a, [hBaseScrollY]
 	cp $30
-	jr nz, jr_017_69d7
+	jr nz, .move
 
+;>     wSceneTimer3 = 0xFF
 	ld a, $ff
 	ld [wSceneTimer3], a
+;>     wSceneSlowTimer = 0xA8
 	ld a, $a8
 	ld [wSceneSlowTimer], a
+;>     return EndingNextStep()
 	jp EndingNextStep
 
 
-jr_017_69d7:
-	ld hl, $68a3
+;>@speed wEntitySpeedX[0] = u8(-SkyScrollSpeeds[row] * 2)
+.move
+	ld hl, SkyScrollSpeeds
 	add hl, de
 	ld a, [hl]
 	cpl
 	inc a
 	sla a
+;=@speed
 	ld [wEntitySpeedX], a
+;> before = wEntityX[0]
 	ld bc, $0000
 	ld a, [wEntityX]
 	push af
+;> UpdateEntityPosX(0)
 	call UpdateEntityPosX
+;> hBaseScrollY = wEntityX[0]
 	ld a, [wEntityX]
 	ldh [hBaseScrollY], a
+;> if wEntityX[0] & 0xF8 == before & 0xF8:     # still in the same tile row
 	and $f8
 	ld e, a
 	pop af
 	and $f8
 	cp e
-	jr z, jr_017_6a5a
+;>     return
+	jr z, .done
 
+;> if wSceneVarD == 0x59:
 	ld a, [wSceneVarD]
 	cp $59
-	jr z, jr_017_6a5a
+;>     return
+	jr z, .done
 
+;> wSceneVarD += 1
 	inc a
 	ld [wSceneVarD], a
+;> if wSceneVarD == 0x44:
 	cp $44
-	jr nz, jr_017_6a2c
+	jr nz, .draw
 
+;>     wOBJ1Palette = 0xE3
 	ld a, $e3
 	ld [wOBJ1Palette], a
+;>     slot = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
+;>     wEntityX[slot] = 0x50
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], $50
+;>     wEntityY[slot] = 0x80
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $80
+;>     wEntityPrivate1[slot] = 0x0B     # the glow
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $0b
+;>     wEntityTimer[slot] = 0xA8
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $a8
 
-jr_017_6a2c:
+;> n = wSceneVarD
+.draw
 	ld a, [wSceneVarD]
 	ld e, a
 	ld d, $00
+;>@mul offset = n * 8
 	sla e
 	rl d
 	sla e
 	rl d
 	sla e
 	rl d
+;=@mul
 	ld a, e
 	ld l, d
+;>@add offset += offset * 2                 # 24 bytes per row
 	sla e
 	rl d
 	add e
 	ld e, a
 	ld a, d
 	adc $00
+;=@add
 	add l
 	ld d, a
-	ld hl, $6033
+;> src = SkyRowCommands + offset
+	ld hl, SkyRowCommands
 	add hl, de
+;>@copy copy(addr(wDrawCommand), src, 24)
 	ld de, wDrawCommand
 	ld c, $18
 
-jr_017_6a54:
+.copy
 	ld a, [hli]
 	ld [de], a
 	inc de
+;=@copy
 	dec c
-	jr nz, jr_017_6a54
+	jr nz, .copy
 
-jr_017_6a5a:
+.done
 	ret
 
 
+;@ def WindFishFliesFadeOut()
+;@ path: ending/windfish_flies
+;@ Step 8 of ending part 6: after $FF frames the sky's palette steps on every 8 frames (SkyFadeBGP up
+;@ to step 36); at step 5 the streak of light (part $0C) appears at ($62, $5A) and sprite palette 0
+;@ becomes $1E. When wSceneSlowTimer has run out the background goes white and the next part follows.
 WindFishFliesFadeOut::
+;> if wSceneSlowTimer == 0:
 	ld a, [wSceneSlowTimer]
 	and a
-	jr nz, jr_017_6a68
+	jr nz, .palette
 
+;>     wBGPalette = 0
 	xor a
 	ld [wBGPalette], a
+;>     return CreditsNextScene()
 	jp CreditsNextScene
 
 
-jr_017_6a68:
+;> i = wSceneVarC + (hFrameCounter & 3)
+.palette
 	ldh a, [hFrameCounter]
 	and $03
 	ld e, a
 	ld a, [wSceneVarC]
 	add e
 	ld e, a
+;> wBGPalette = SkyFadeBGP[i]
 	ld d, $00
-	ld hl, $6963
+	ld hl, SkyFadeBGP
 	add hl, de
 	ld a, [hl]
 	ld [wBGPalette], a
+;> if wSceneTimer3:
 	ld a, [wSceneTimer3]
 	and a
-	jr nz, jr_017_6abe
+;>     return
+	jr nz, .done
 
+;> wSceneVarB += 1
 	ld a, [wSceneVarB]
 	inc a
 	ld [wSceneVarB], a
+;> if wSceneVarB & 7 or wSceneVarC == 0x24:
+;>     return
 	and $07
-	jr nz, jr_017_6abe
+	jr nz, .done
 
 	ld a, [wSceneVarC]
 	cp $24
-	jr z, jr_017_6abe
+	jr z, .done
 
+;> wSceneVarC += 1
 	inc a
 	ld [wSceneVarC], a
+;> if wSceneVarC == 5:
 	cp $05
-	jr nz, jr_017_6abe
+	jr nz, .done
 
+;>     wOBJ0Palette = 0x1E
 	ld a, $1e
 	ld [wOBJ0Palette], a
+;>     slot = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
+;>     wEntityX[slot] = 0x62
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], $62
+;>     wEntityY[slot] = 0x5A
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $5a
+;>     wEntityPrivate1[slot] = 0x0C     # the streak
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $0c
+;>     wEntityTimer[slot] = 0x60
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $60
 
-jr_017_6abe:
+.done
 	ret
 
 
+;@ def CreditsLinkPortrait()
+;@ path: ending/portrait
+;@ Ending part 7: a large portrait of Link against the sky; he smiles. Runs PortraitSteps.
+;@ test: skip runs the entities (bank 3)
 CreditsLinkPortrait::
+;> UpdateEntitiesBank17()
 	call UpdateEntitiesBank17
+;> PortraitSteps[wSceneStep]()
 	ld a, [wSceneStep]
 	rst $00
 
+;@ path: ending/portrait
+;@ The steps of ending part 7 (7 words), indexed by wSceneStep.
 PortraitSteps::
 	dw PortraitInit
 	dw PortraitSpawn
@@ -5299,194 +5474,289 @@ PortraitSteps::
 	dw PortraitFadeOut
 	dw PortraitDone
 
+;@ def PortraitInit()
+;@ path: ending/portrait
+;@ Step 0 of ending part 7: requests tile set $1A.
 PortraitInit::
+;> wTileMapToLoad = 0x1A
 	ld a, $1a
 	ld [wTileMapToLoad], a
+;> EndingNextStep()
 	jp EndingNextStep
 
 
+;@ def PortraitSpawn()
+;@ path: ending/portrait
+;@ Step 1 of ending part 7: requests screen layout $1B (the sky), sets the palettes ($1E, sprite
+;@ palette 0 $6E: the portrait still pale) and spawns the portrait (ending object part $0D) at
+;@ ($38, $50).
 PortraitSpawn::
+;> wBGMapToLoad = 0x1B
 	ld a, $1b
 	ld [wBGMapToLoad], a
+;> ResetSceneVars()
 	call ResetSceneVars
+;> wBGPalette = 0x1E
 	ld a, $1e
 	ld [wBGPalette], a
+;> wOBJ0Palette = 0x6E
 	ld a, $6e
 	ld [wOBJ0Palette], a
+;> slot = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
+;> wEntityX[slot] = 0x38
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], $38
+;> wEntityY[slot] = 0x50
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $50
+;> wEntityPrivate1[slot] = 0x0D         # Link's portrait
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $0d
+;> wSceneTimer = 0x20
 	ld a, $20
 	ld [wSceneTimer], a
+;> EndingNextStep()
 	jp EndingNextStep
 
 
+;@ def PortraitWait()
+;@ path: ending/portrait
+;@ Step 2 of ending part 7: the sky bobs (BobPortraitScroll) until wSceneTimer runs out.
 PortraitWait::
+;> if wSceneTimer == 0:
 	ld a, [wSceneTimer]
 	and a
 	jr nz, BobPortraitScroll
 
+;>     EndingNextStep()
 	call EndingNextStep
 
+;> BobPortraitScroll()                  # falls through
+
+;@ def BobPortraitScroll()
+;@ path: ending/portrait
+;@ The slow up-and-down of the sky behind the portrait: every 4 frames the next of the 49 values of
+;@ SeaBobOffsets (wSceneVarF), halved, becomes the vertical scroll.
+;@ test: wSceneVarF = rand(0, 48)
 BobPortraitScroll::
+;> if hFrameCounter & 3 == 0:
 	ldh a, [hFrameCounter]
 	and $03
-	jr nz, jr_017_6b28
+	jr nz, .scroll
 
+;>     wSceneVarF = (wSceneVarF + 1) % 49
 	ld a, [wSceneVarF]
 	inc a
 	cp $31
-	jr nz, jr_017_6b25
+	jr nz, .store
 
 	xor a
 
-jr_017_6b25:
+.store
 	ld [wSceneVarF], a
 
-jr_017_6b28:
+;>@scroll hBaseScrollY = SeaBobOffsets[wSceneVarF] >> 1           # (b is 0 here)
+.scroll
 	ld a, [wSceneVarF]
 	ld e, a
 	ld d, b
-	ld hl, $7267
+	ld hl, SeaBobOffsets
 	add hl, de
 	ld a, [hl]
+;=@scroll
 	sra a
 	ldh [hBaseScrollY], a
+;> return
 	ret
 
 
+;@ path: ending/portrait
+;@ Sprite palette 0 bringing the portrait to full strength: 8 bytes, $6E then $1E (read at step +
+;@ (frame & 3), step 0-4).
 PortraitFadeInOBP0::
 	db $6e, $6e, $6e, $6e, $1e, $1e, $1e, $1e
 
+;@ def PortraitFadeIn()
+;@ path: ending/portrait
+;@ Step 3 of ending part 7: the portrait's palette changes to $1E, a step every 8 frames (4 steps);
+;@ then the portrait stays for $FF frames.
 PortraitFadeIn::
+;> BobPortraitScroll()
 	call BobPortraitScroll
+;> if hFrameCounter & 7 == 0:
 	ldh a, [hFrameCounter]
 	and $07
-	jr nz, jr_017_6b5b
+	jr nz, .palette
 
+;>     wSceneFadeStep += 1
 	ld a, [wSceneFadeStep]
 	inc a
 	ld [wSceneFadeStep], a
+;>     if wSceneFadeStep == 4:
 	cp $04
-	jr nz, jr_017_6b5b
+	jr nz, .palette
 
+;>         wSceneTimer = 0xFF
 	ld a, $ff
 	ld [wSceneTimer], a
+;>         return EndingNextStep()
 	jp EndingNextStep
 
 
-jr_017_6b5b:
+;> i = wSceneFadeStep + (hFrameCounter & 3)
+.palette
 	ldh a, [hFrameCounter]
 	and $03
 	ld e, a
 	ld a, [wSceneFadeStep]
 	add e
 	ld e, a
+;> wOBJ0Palette = PortraitFadeInOBP0[i]
 	ld d, $00
-	ld hl, $6b37
+	ld hl, PortraitFadeInOBP0
 	add hl, de
 	ld a, [hl]
 	ld [wOBJ0Palette], a
+;> return
 	ret
 
 
+;@ def PortraitSmile()
+;@ path: ending/portrait
+;@ Step 4 of ending part 7: while wSceneTimer runs down from $FF, Link's face changes twice (at $50
+;@ and $44: wSceneVar3, the frame of LinkFaceSprites); then the fade-out starts $E0 frames later.
 PortraitSmile::
+;> BobPortraitScroll()
 	call BobPortraitScroll
+;> if wSceneTimer == 0:
 	ld a, [wSceneTimer]
 	and a
-	jr nz, jr_017_6b82
+	jr nz, .face
 
+;>     wSceneTimer = 0xE0
 	ld a, $e0
 	ld [wSceneTimer], a
+;>     return EndingNextStep()
 	jp EndingNextStep
 
 
-	db $c9
+	db $c9                              ; a ret that is never reached
 
-jr_017_6b82:
+;> if wSceneTimer == 0x44 or wSceneTimer == 0x50:
+.face
 	cp $44
-	jr z, jr_017_6b8a
+	jr z, .next
 
 	cp $50
-	jr nz, jr_017_6b8e
+	jr nz, .done
 
-jr_017_6b8a:
+;>     wSceneVar3 += 1                  # next expression
+.next
 	ld hl, wSceneVar3
 	inc [hl]
 
-jr_017_6b8e:
+.done
 	ret
 
 
+;@ def PortraitFadeOut()
+;@ path: ending/portrait
+;@ Step 5 of ending part 7: after the wait, fades to white with SceneFadeOutPalettes, a step every
+;@ 8 frames (12 steps); the next part follows $40 frames later.
 PortraitFadeOut::
+;> BobPortraitScroll()
 	call BobPortraitScroll
+;> if hFrameCounter & 7 == 0 and wSceneTimer == 0:
 	ld hl, wSceneTimer
 	ldh a, [hFrameCounter]
 	and $07
 	or [hl]
-	jr nz, jr_017_6baf
+	jr nz, .palette
 
+;>     wSceneVar2 += 1
 	ld a, [wSceneVar2]
 	inc a
 	ld [wSceneVar2], a
+;>     if wSceneVar2 == 12:
 	cp $0c
-	jr nz, jr_017_6baf
+	jr nz, .palette
 
+;>         wSceneTimer = 0x40
 	ld a, $40
 	ld [wSceneTimer], a
+;>         EndingNextStep()
 	call EndingNextStep
 
-jr_017_6baf:
+;> i = wSceneVar2 + (hFrameCounter & 3)
+.palette
 	ldh a, [hFrameCounter]
 	and $03
 	ld e, a
 	ld a, [wSceneVar2]
 	add e
 	ld e, a
+;> wBGPalette = SceneFadeOutPalettes[i]
 	ld d, $00
-	ld hl, $5c53
+	ld hl, SceneFadeOutPalettes
 	add hl, de
 	ld a, [hl]
 	ld [wBGPalette], a
-	ld hl, $5c53
+;> wOBJ0Palette = SceneFadeOutPalettes[i]
+	ld hl, SceneFadeOutPalettes
 	add hl, de
 	ld a, [hl]
 	ld [wOBJ0Palette], a
-	ld hl, $5c63
+;> wOBJ1Palette = SceneFadeOutOBP1[i]
+	ld hl, SceneFadeOutOBP1
 	add hl, de
 	ld a, [hl]
 	ld [wOBJ1Palette], a
+;> return
 	ret
 
 
+;@ def PortraitDone()
+;@ path: ending/portrait
+;@ Step 6 of ending part 7: after the wait, goes on to the last part.
 PortraitDone::
+;> if wSceneTimer == 0:
 	ld a, [wSceneTimer]
 	and a
-	jr nz, jr_017_6bdd
+	jr nz, .done
 
+;>     return CreditsNextScene()
 	jp CreditsNextScene
 
 
-jr_017_6bdd:
+.done
 	ret
 
 
+;@ def CreditsFinalScene()
+;@ path: ending/final
+;@ Ending part 8, the last: Link drifts far away on his log, the staff credits roll over the sea
+;@ (CreditsRoll), then the view rises into the sky where the Wind Fish flies off, and THE END. Runs
+;@ FinalSteps; the water rows at $99A0 keep rolling.
+;@ test: skip runs the entities (bank 3)
 CreditsFinalScene::
+;> AnimateWaterRows(0x99A0)
 	ld de, $99a0
 	call AnimateWaterRows
+;> CreditsRoll()
 	call CreditsRoll
+;> UpdateEntitiesBank17()
 	call UpdateEntitiesBank17
+;> FinalSteps[wSceneStep]()
 	ld a, [wSceneStep]
 	rst $00
 
+;@ path: ending/final
+;@ The steps of ending part 8 (6 words), indexed by wSceneStep; the last two do nothing.
 FinalSteps::
 	dw FinalInit
 	dw FinalSpawn
@@ -5495,152 +5765,238 @@ FinalSteps::
 	dw FinalEnd
 	dw FinalUnusedStep
 
+;@ def FinalInit()
+;@ path: ending/final
+;@ Step 0 of ending part 8: requests tile set $1B and selects 8x8 sprites (for the credits letters).
 FinalInit::
+;> wTileMapToLoad = 0x1B
 	ld a, $1b
 	ld [wTileMapToLoad], a
+;> wLCDControl &= ~0x04                 # 8x8 sprites
 	ld hl, wLCDControl
 	res 2, [hl]
+;> EndingNextStep()
 	jp EndingNextStep
 
 
+;@ def FinalSpawn()
+;@ path: ending/final
+;@ Step 1 of ending part 8: requests screen layout $1C (sea and clouds), spawns Link on his log (ending
+;@ object part $0E) at ($50, $78) and prepares the credits roll (step 0, no title yet), which starts
+;@ $B0 x 4 frames later. Restarts the frame counter.
 FinalSpawn::
+;> wBGMapToLoad = 0x1C
 	ld a, $1c
 	ld [wBGMapToLoad], a
+;> ResetSceneVars()
 	call ResetSceneVars
+;> slot = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
+;> wEntityX[slot] = 0x50
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], $50
+;> wEntityY[slot] = 0x78
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $78
+;> wEntityPrivate1[slot] = 0x0E         # Link on his log
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $0e
+;> wCreditsRollStep = 0
 	xor a
 	ld [wCreditsRollStep], a
+;> wCreditsRole = 0xFF
 	dec a
 	ld [wCreditsRole], a
+;> wSceneSlowTimer = 0xB0
 	ld a, $b0
 	ld [wSceneSlowTimer], a
+;> hFrameCounter = 0
 	xor a
 	ldh [hFrameCounter], a
+;> wOBJ1Palette = 0
 	ld [wOBJ1Palette], a
+;> EndingNextStep()
 	jp EndingNextStep
 
 
+;@ path: ending/final
+;@ Background palette and sprite palette 0 fading in from white: 16 bytes, levels $00, $04, $19, $1E
+;@ (read at step + (frame & 3)). Used by FinalSceneFadeIn and FadeInIsland.
 FinalFadeIn::
 	db $00, $00, $00, $00, $04, $04, $04, $04, $19, $19, $19, $19, $1e, $1e, $1e, $1e
 
+;@ def FinalSceneFadeIn()
+;@ path: ending/final
+;@ Step 2 of ending part 8: fades the scene in, a step every 8 frames (12 steps); then the view stays
+;@ on the sea for $FF x 16 frames while the credits roll.
 FinalSceneFadeIn::
+;> if hFrameCounter & 7 == 0:
 	ldh a, [hFrameCounter]
 	and $07
-	jr nz, jr_017_6c68
+	jr nz, .palette
 
+;>     wSceneVar2 += 1
 	ld a, [wSceneVar2]
 	inc a
 	ld [wSceneVar2], a
+;>     if wSceneVar2 == 12:
 	cp $0c
-	jr nz, jr_017_6c68
+	jr nz, .palette
 
+;>         wSceneVerySlowTimer = 0xFF
 	ld a, $ff
 	ld [wSceneVerySlowTimer], a
+;>         hFrameCounter = 0
 	xor a
 	ldh [hFrameCounter], a
+;>         EndingNextStep()
 	call EndingNextStep
 
-jr_017_6c68:
+;> i = wSceneVar2 + (hFrameCounter & 3)
+.palette
 	ldh a, [hFrameCounter]
 	and $03
 	ld e, a
 	ld a, [wSceneVar2]
 	add e
 	ld e, a
+;> wBGPalette = FinalFadeIn[i]
 	ld d, $00
-	ld hl, $6c3c
+	ld hl, FinalFadeIn
 	add hl, de
 	ld a, [hl]
 	ld [wBGPalette], a
+;> wOBJ0Palette = FinalFadeIn[i]
 	ld [wOBJ0Palette], a
+;> return
 	ret
 
 
+;@ def FinalScrollUp()
+;@ path: ending/final
+;@ Step 3 of ending part 8: after the long wait the view rises by 1 pixel every 8 frames. At map y
+;@ $C0 the Wind Fish appears flying off (part $0F) at ($18, $B0); at $A0 Link's log (slot 15) is gone
+;@ and a patch of clouds is drawn (DrawFinalPatch); at $70 the view stops (step 4).
 FinalScrollUp::
+;> if wSceneVerySlowTimer or hFrameCounter & 7:
+;>     return
 	ld a, [wSceneVerySlowTimer]
 	and a
-	jr nz, jr_017_6cbf
+	jr nz, .done
 
 	ldh a, [hFrameCounter]
 	and $07
-	jr nz, jr_017_6cbf
+	jr nz, .done
 
+;> hBaseScrollY -= 1
 	ld hl, hBaseScrollY
 	dec [hl]
+;> if hBaseScrollY == 0x70:
 	ld a, [hl]
 	cp $70
-	jr nz, jr_017_6c98
+	jr nz, .notTop
 
+;>     return EndingNextStep()
 	jp EndingNextStep
 
 
-jr_017_6c98:
+;> if hBaseScrollY == 0xA0:
+.notTop
 	cp $a0
-	jr nz, jr_017_6ca4
+	jr nz, .notPatch
 
-	ld hl, $c28f
+;>     wEntityStatus[15] = 0
+	ld hl, wEntityStatus + 15
 	ld [hl], $00
+;>     return DrawFinalPatch()
 	jp DrawFinalPatch
 
 
-jr_017_6ca4:
+;> if hBaseScrollY == 0xC0:
+.notPatch
 	cp $c0
-	jr nz, jr_017_6cbf
+	jr nz, .done
 
+;>     slot = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
+;>     wEntityX[slot] = 0x18
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], $18
+;>     wEntityY[slot] = 0xB0
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $b0
+;>     wEntityPrivate1[slot] = 0x0F     # the Wind Fish flying away
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $0f
 
-jr_017_6cbf:
+.done
 	ret
 
 
+;@ def FinalEnd()
+;@ path: ending/final
+;@ Step 4 of ending part 8: the end; nothing more happens (THE END stays until the power is turned
+;@ off).
 FinalEnd::
+;> return
 	ret
 
 
+;@ def FinalUnusedStep()
+;@ path: ending/final
+;@ Step 5 of ending part 8: never reached, does nothing.
 FinalUnusedStep::
+;> return
 	ret
 
 
+;@ path: ending/final
+;@ Background draw commands (36 bytes, 0 at the end) that patch a group of cloud tiles into the sky
+;@ when the view has risen: $99C1 6 tiles ($58-$5D), $99E1 6 tiles ($68-$6D), $99F1 3 tiles
+;@ ($58-$5A), $9A11 3 tiles ($68-$6A), $9A20 2 tiles ($5C-$5D). Each command: BG map address (big
+;@ endian), count - 1, the tiles.
 FinalPatchCommands::
-	db $99, $c1, $05, $58, $59, $5a, $5b, $5c, $5d, $99, $e1, $05, $68, $69, $6a, $6b
-	db $6c, $6d, $99, $f1, $02, $58, $59, $5a, $9a, $11, $02, $68, $69, $6a, $9a, $20
-	db $01, $5c, $5d, $00
+	db $99, $c1, $05, $58, $59, $5a, $5b, $5c, $5d
+	db $99, $e1, $05, $68, $69, $6a, $6b, $6c, $6d
+	db $99, $f1, $02, $58, $59, $5a
+	db $9a, $11, $02, $68, $69, $6a
+	db $9a, $20, $01, $5c, $5d
+	db $00
 
+;@ def DrawFinalPatch()
+;@ path: ending/final
+;@ Queues FinalPatchCommands (36 bytes) as the background draw commands.
 DrawFinalPatch::
-	ld hl, $6cc2
+;>@copy copy(addr(wDrawCommand), FinalPatchCommands, 36)
+	ld hl, FinalPatchCommands
 	ld de, wDrawCommand
 	ld c, $24
 
-jr_017_6cee:
+.copy
 	ld a, [hli]
 	ld [de], a
 	inc de
+;=@copy
 	dec c
-	jr nz, jr_017_6cee
+	jr nz, .copy
 
+;> return
 	ret
 
 
+;@ path: ending/objects
+;@ The Wind Fish flying away at the very end (ending object part $0F): 4 frames of 10 sprites, each
+;@ sprite 4 bytes (y offset, x offset, tile, attributes) relative to the object's position; frame n at
+;@ offset n * 40. 8x8 sprites (the last part uses them for the credits).
+;@ asset: oam length=$A0
 WindFishAwaySprites::
 	db $08, $00, $5c, $00, $10, $00, $5d, $00, $00, $08, $c0, $00, $08, $08, $c1, $00
 	db $00, $10, $ce, $00, $08, $10, $cf, $00, $00, $18, $de, $00, $08, $18, $df, $00
@@ -5653,61 +6009,87 @@ WindFishAwaySprites::
 	db $00, $08, $d0, $00, $08, $08, $d1, $00, $00, $10, $ce, $00, $08, $10, $cf, $00
 	db $00, $18, $de, $00, $08, $18, $df, $00, $00, $20, $ea, $00, $08, $20, $eb, $00
 
+;@ def EndingWindFishAway(slot: bc)
+;@ path: ending/objects
+;@ Ending object part $0F: the small Wind Fish that flies away over the clouds after the credits,
+;@ drawn relative to the view, flapping (a frame every 32 frames). Every other frame it moves right
+;@ and up (speed 4, -1); once past x $A8 it ends the scene (EndingNextStep) and removes itself.
 EndingWindFishAway::
+;> wOAMNextIndex = 0x3C
 	ld a, $3c
 	ld [wOAMNextIndex], a
+;> hActiveEntityDrawY = u8(hActiveEntityDrawY - hBaseScrollY)
 	ldh a, [hBaseScrollY]
 	ld e, a
 	ldh a, [hActiveEntityDrawY]
 	sub e
 	ldh [hActiveEntityDrawY], a
+;>@frame frame = (hFrameCounter >> 5) & 3
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	rra
+;=@frame
 	rra
 	and $03
+;> offset = frame * 8
 	rla
 	rla
 	rla
 	and $f8
 	ld e, a
+;> offset += frame * 32                 # 40 bytes per frame
 	rla
 	rla
 	and $e0
 	add e
 	ld e, a
+;> DrawEntitySpritesAtOAMStart(WindFishAwaySprites + offset, 10)     # draw 10 sprites at the start of the OAM buffer
 	ld d, b
-	ld hl, $6cf5
+	ld hl, WindFishAwaySprites
 	add hl, de
 	ld c, $0a
-	call Call_3D20
+	call DrawEntitySpritesAtOAMStart
+;> ReserveOAMEntriesFar(10)                        # reserve the OAM entries
 	ld a, $0a
-	call Call_3DD0
+	call ReserveOAMEntriesFar
+;> if hFrameCounter & 1:
 	ldh a, [hFrameCounter]
 	and $01
-	jr nz, jr_017_6de6
+;>     return
+	jr nz, .done
 
+;> wEntitySpeedX[slot] = 4
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], $04
+;> wEntitySpeedY[slot] = 0xFF
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], $ff
+;> UpdateEntityPosition(slot)
 	call UpdateEntityPosition
+;> if hActiveEntityX < 0xA8:
 	ldh a, [hActiveEntityX]
 	cp $a8
+;>     return
 	ret c
 
+;> EndingNextStep()
 	call EndingNextStep
+;> return RemoveEndingObject(slot)
 	jp RemoveEndingObject
 
 
-jr_017_6de6:
+.done
 	ret
 
 
+;@ path: ending/objects
+;@ The seagull of the very end (ending object part $10): 4 frames of 8 sprites (y offset, x offset,
+;@ tile, attributes), frame n at offset n * 32.
+;@ asset: oam length=$80
 LastSeagullSprites::
 	db $00, $00, $00, $00, $08, $00, $01, $00, $00, $08, $02, $00, $08, $08, $03, $00
 	db $00, $fa, $10, $00, $08, $fa, $11, $00, $00, $0e, $10, $20, $08, $0e, $11, $20
@@ -5718,70 +6100,95 @@ LastSeagullSprites::
 	db $00, $08, $00, $20, $08, $08, $01, $20, $00, $00, $02, $20, $08, $00, $03, $20
 	db $08, $fa, $10, $40, $00, $fa, $11, $40, $08, $0e, $10, $60, $00, $0e, $11, $60
 
+;@ def EndingLastSeagull(slot: bc)
+;@ path: ending/objects
+;@ Ending object part $10, sent after THE END (CreditsRollSendBird): a seagull that flies across the
+;@ sky, rising more and more steeply, and cries every 128 frames. It is only drawn when wDeathCount is
+;@ 0 - a reward for finishing the game without dying; otherwise only its cries are heard.
 EndingLastSeagull::
+;> if wDeathCount == 0:
 	ld hl, wDeathCount
 	ld a, [hli]
 	or [hl]
-	jr nz, jr_017_6e96
+	jr nz, .move
 
+;>     wOBJ0Palette = 0x1C
 	ld a, $1c
 	ld [wOBJ0Palette], a
+;>     wOAMNextIndex = 0x3C
 	ld a, $3c
 	ld [wOAMNextIndex], a
+;>     frame = (hFrameCounter >> 3) & 3
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $03
+;>     offset = frame * 32
 	rla
 	rla
 	rla
 	rla
 	rla
 	and $e0
+;>     DrawEntitySpritesAtOAMStart(LastSeagullSprites + offset, 8)
 	ld e, a
 	ld d, b
-	ld hl, $6de7
+	ld hl, LastSeagullSprites
 	add hl, de
 	ld c, $08
-	call Call_3D20
+	call DrawEntitySpritesAtOAMStart
+;>     ReserveOAMEntriesFar(8)
 	ld a, $08
-	call Call_3DD0
+	call ReserveOAMEntriesFar
 
-jr_017_6e96:
+;> UpdateEntityPosition(slot)
+.move
 	call UpdateEntityPosition
+;>@cond if hFrameCounter & 0x0F == 0 and wEntitySpeedY[slot] != 0xFC:
 	ldh a, [hFrameCounter]
 	and $0f
-	jr nz, jr_017_6ea9
+	jr nz, .edge
 
+;=@cond
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
 	cp $fc
-	jr z, jr_017_6ea9
+	jr z, .edge
 
+;>     wEntitySpeedY[slot] -= 1         # rise faster
 	dec [hl]
 
-jr_017_6ea9:
+;> if hActiveEntityX == 0xA8:
+.edge
 	ldh a, [hActiveEntityX]
 	cp $a8
+;>     return RemoveEndingObject(slot)
 	jp z, RemoveEndingObject
 
+;> wEntityPrivateCounter[slot] += 1
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	inc a
 	ld [hl], a
+;> if wEntityPrivateCounter[slot] & 0x7F == 0:
 	and $7f
-	jr nz, jr_017_6ebf
+	jr nz, .done
 
+;>     hJingle = 0x21                   # the seagull cries
 	ld a, $21
 	ldh [hJingle], a
 
-jr_017_6ebf:
+.done
 	ret
 
 
+;@ path: ending/objects
+;@ Link on his log, far away on the sea, during the credits (ending object part $0E): 4 frames of
+;@ 12 sprites (y offset, x offset, tile, attributes), frame n at offset n * 48.
+;@ asset: oam length=$C0
 LinkOnLogSprites::
 	db $00, $00, $4c, $00, $08, $00, $4d, $00, $00, $08, $4e, $00, $08, $08, $4f, $00
 	db $10, $f8, $60, $00, $18, $f8, $61, $00, $10, $00, $62, $00, $18, $00, $63, $00
@@ -5796,63 +6203,83 @@ LinkOnLogSprites::
 	db $10, $f8, $78, $00, $18, $f8, $79, $00, $10, $00, $7a, $00, $18, $00, $7b, $00
 	db $10, $08, $7c, $00, $18, $08, $7d, $00, $10, $10, $7e, $00, $18, $10, $7f, $00
 
+;@ def EndingLinkOnLog(slot: bc)
+;@ path: ending/objects
+;@ Ending object part $0E: Link on his log during the credits, bobbing with the waves (SeaBobOffsets,
+;@ a step every 4 frames), drawn relative to the view, 4 frames of animation (one every 8 frames).
 EndingLinkOnLog::
+;> wOAMNextIndex = 0x3C
 	ld a, $3c
 	ld [wOAMNextIndex], a
+;> if hFrameCounter & 3 == 0:
 	ldh a, [hFrameCounter]
 	and $03
-	jr nz, jr_017_6f97
+	jr nz, .draw
 
+;>     wSceneVarF = (wSceneVarF + 1) % 49
 	ld a, [wSceneVarF]
 	inc a
 	cp $31
-	jr c, jr_017_6f94
+	jr c, .store
 
 	xor a
 
-jr_017_6f94:
+.store
 	ld [wSceneVarF], a
 
-jr_017_6f97:
+;>@bob bob = SeaBobOffsets[wSceneVarF] >> 1
+.draw
 	ld a, [wSceneVarF]
 	ld e, a
 	ld d, b
-	ld hl, $7267
+	ld hl, SeaBobOffsets
 	add hl, de
+;=@bob
 	ldh a, [hBaseScrollY]
 	ld d, a
 	ld a, [hl]
 	sra a
+;> hActiveEntityDrawY = u8(hActiveEntityDrawY + bob - hBaseScrollY)
 	ld e, a
 	ldh a, [hActiveEntityDrawY]
 	add e
 	sub d
 	ldh [hActiveEntityDrawY], a
+;> frame = (hFrameCounter >> 3) & 3
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $03
+;> offset = frame * 16
 	rla
 	rla
 	rla
 	rla
 	and $f0
 	ld e, a
+;> offset += frame * 32                 # 48 bytes per frame
 	rla
 	and $e0
 	add e
 	ld e, a
+;> DrawEntitySpritesAtOAMStart(LinkOnLogSprites + offset, 12)
 	ld d, b
-	ld hl, $6ec0
+	ld hl, LinkOnLogSprites
 	add hl, de
 	ld c, $0c
-	call Call_3D20
+	call DrawEntitySpritesAtOAMStart
+;> ReserveOAMEntriesFar(12)
 	ld a, $0c
-	call Call_3DD0
+	call ReserveOAMEntriesFar
+;> return
 	ret
 
 
+;@ path: ending/objects
+;@ Link's portrait in ending part 7 (ending object part $0D): 27 sprites of 8x16 (y offset, x offset,
+;@ tile, attributes) forming the picture, 108 bytes; the face is drawn on top from LinkFaceSprites.
+;@ asset: oam length=$6C
 LinkPortraitSprites::
 	db $00, $00, $00, $00, $00, $08, $02, $00, $00, $10, $04, $00, $00, $18, $06, $00
 	db $00, $20, $08, $00, $00, $28, $0a, $00, $10, $20, $14, $00, $10, $28, $16, $00
@@ -5862,6 +6289,10 @@ LinkPortraitSprites::
 	db $40, $10, $34, $00, $40, $18, $36, $00, $40, $20, $38, $00, $40, $28, $3a, $00
 	db $40, $30, $3c, $00, $40, $38, $3e, $00, $40, $40, $40, $00
 
+;@ path: ending/objects
+;@ The face of Link's portrait: 3 expressions of 7 sprites (y offset, x offset, tile, attributes) plus
+;@ 4 unused bytes ($FF), 32 bytes each; wSceneVar3 picks the expression (PortraitSmile).
+;@ asset: oam length=$60
 LinkFaceSprites::
 	db $10, $00, $0c, $00
 	db $10, $08, $0e, $00, $10, $10, $10, $00, $10, $18, $12, $00, $20, $08, $18, $00
@@ -5871,120 +6302,175 @@ LinkFaceSprites::
 	db $10, $08, $52, $00, $10, $10, $54, $00, $10, $18, $56, $00, $20, $08, $18, $00
 	db $20, $10, $58, $00, $20, $18, $5a, $00, $ff, $ff, $ff, $ff
 
+;@ def EndingLinkPortrait(slot: bc)
+;@ path: ending/objects
+;@ Ending object part $0D: Link's portrait, bobbing like the sky behind it (SeaBobOffsets[wSceneVarF]
+;@ halved): the 27 picture sprites at the start of the OAM buffer and the 7 face sprites of expression
+;@ wSceneVar3 from OAM offset $40.
 EndingLinkPortrait::
+;>@bob bob = SeaBobOffsets[wSceneVarF] >> 1
 	ld a, [wSceneVarF]
 	ld e, a
 	ld d, b
-	ld hl, $7267
+	ld hl, SeaBobOffsets
 	add hl, de
 	ld a, [hl]
+;=@bob
 	sra a
+;> hActiveEntityDrawY = u8(hActiveEntityDrawY + bob)
 	ld e, a
 	ldh a, [hActiveEntityDrawY]
 	add e
 	ldh [hActiveEntityDrawY], a
-	ld hl, $6fd0
+;> DrawEntitySpritesAtOAMStart(LinkPortraitSprites, 27)
+	ld hl, LinkPortraitSprites
 	ld c, $1b
-	call Call_3D20
+	call DrawEntitySpritesAtOAMStart
+;> ReserveOAMEntriesFar(27)
 	ld a, $1b
-	call Call_3DD0
+	call ReserveOAMEntriesFar
+;>@face offset = wSceneVar3 * 32
 	ld a, [wSceneVar3]
 	rla
 	rla
 	rla
 	rla
 	rla
+;=@face
 	and $e0
+;> list = LinkFaceSprites + offset
 	ld e, a
 	ld d, b
-	ld hl, $703c
+	ld hl, LinkFaceSprites
 	add hl, de
+;> wOAMNextIndex = 0x40
 	ld c, $07
 	ld a, $40
 	ld [wOAMNextIndex], a
-	call Call_3D26
+;> DrawEntitySprites(list, 7)                   # draw 7 sprites at wOAMNextIndex
+	call DrawEntitySprites
+;> ReserveOAMEntriesFar(7)
 	ld a, $07
-	call Call_3DD0
+	call ReserveOAMEntriesFar
+;> return
 	ret
 
 
+;@ path: ending/objects
+;@ The streak of light (ending object part $0C): 3 frames of 3 sprites (y offset, x offset, tile,
+;@ attributes), 12 bytes each, by sprite variant.
+;@ asset: oam length=$24
 StreakSprites::
 	db $00, $00, $70, $00, $00, $00, $70, $00, $00, $00, $70, $00, $00, $00, $70, $00
 	db $08, $08, $5c, $00, $08, $08, $5c, $00, $00, $00, $70, $00, $08, $08, $5e, $00
 	db $08, $10, $60, $00
 
+;@ def EndingStreak(slot: bc)
+;@ path: ending/objects
+;@ Ending object part $0C, the streak of light at the end of ending part 6: draws its 3 sprites of the
+;@ current variant and moves on to the next frame when its timer reads $30 and 1.
 EndingStreak::
+;> wEntityPhysicsFlags[slot] = 0xC3     # 3 sprites
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $c3
+;>@offset offset = hActiveEntitySpriteVariant * 12
 	ldh a, [hActiveEntitySpriteVariant]
 	rla
 	rla
 	and $fc
 	ld e, a
 	rla
+;=@offset
 	and $f8
 	add e
 	ld e, a
+;> DrawEntitySprites(StreakSprites + offset, 3)
 	ld d, b
-	ld hl, $70db
+	ld hl, StreakSprites
 	add hl, de
 	ld c, $03
-	call Call_3D26
+	call DrawEntitySprites
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
+;> if t == 1 or t == 0x30:
 	cp $01
-	jr z, jr_017_7126
+	jr z, .next
 
 	cp $30
-	jr nz, jr_017_712b
+	jr nz, .done
 
-jr_017_7126:
+;>     wEntitySpriteVariant[slot] += 1
+.next
 	ld hl, wEntitySpriteVariant
 	add hl, bc
 	inc [hl]
 
-jr_017_712b:
+.done
 	ret
 
 
+;@ path: ending/objects
+;@ The ring of light (ending object part $0B): 14 sprites (y offset, x offset, tile, attributes),
+;@ 56 bytes.
+;@ asset: oam length=$38
 GlowRingSprites::
 	db $00, $00, $62, $10, $00, $08, $62, $30, $10, $f0, $64, $10, $10, $f8, $66, $10
 	db $10, $00, $68, $10, $10, $08, $68, $30, $10, $10, $66, $30, $10, $18, $64, $30
 	db $20, $00, $6a, $10, $20, $08, $6a, $30, $30, $f8, $6c, $10, $30, $00, $6e, $10
 	db $30, $08, $6e, $30, $30, $10, $6c, $30
 
+;@ def EndingGlowRing(slot: bc)
+;@ path: ending/objects
+;@ Ending object part $0B: the ring of light that rises into the sky during the tilt of ending part 6,
+;@ drawn relative to the view from the start of the entity OAM area, moving up 2/16 pixel per frame.
+;@ When its timer first runs out the wave sound $17 plays (state 1 -> 2, then $C0 more frames).
 EndingGlowRing::
+;> wOAMNextIndex = 0
 	xor a
 	ld [wOAMNextIndex], a
+;> hActiveEntityDrawY = u8(hActiveEntityDrawY - hBaseScrollY)
 	ld hl, hBaseScrollY
 	ldh a, [hActiveEntityDrawY]
 	sub [hl]
 	ldh [hActiveEntityDrawY], a
-	ld hl, $712c
+;> DrawEntitySprites(GlowRingSprites, 14)
+	ld hl, GlowRingSprites
 	ld c, $0e
-	call Call_3D26
+	call DrawEntitySprites
+;> ReserveOAMEntriesFar(14)
 	ld a, $0e
-	call Call_3DD0
+	call ReserveOAMEntriesFar
+;> wEntitySpeedY[slot] = 0xFE
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], $fe
+;> UpdateEntityPosY(slot)
 	call UpdateEntityPosY
+;> if hActiveEntityState < 2 and GetEntityTimer(slot) == 0:
 	ldh a, [hActiveEntityState]
 	cp $02
-	jr nc, jr_017_719a
+	jr nc, .done
 
 	call GetEntityTimer
-	jr nz, jr_017_719a
+	jr nz, .done
 
+;>     wEntityTimer[slot] = 0xC0
 	ld [hl], $c0
-	call Call_3B8D
+;>     IncrementEntityState(slot)                  # next state
+	call IncrementEntityState
+;>     hWaveSfx = 0x17
 	ld a, $17
 	ldh [hWaveSfx], a
 
-jr_017_719a:
+.done
 	ret
 
 
+;@ path: ending/objects
+;@ The Wind Fish high in the sky in ending part 6 (ending object part $0A): 3 frames of 17 sprites of
+;@ 8x16 (y offset, x offset, tile, attributes), 68 bytes each; wEntityWorkRAM picks the frame.
+;@ asset: oam length=$CC
 WindFishSprites::
 	db $00, $08, $b2, $00, $00, $10, $b4, $00, $00, $18, $b6, $00, $00, $20, $b8, $00
 	db $10, $10, $ba, $00, $10, $18, $bc, $00, $10, $20, $86, $00, $20, $00, $88, $00
@@ -6000,425 +6486,613 @@ WindFishSprites::
 	db $20, $18, $8e, $00, $20, $20, $94, $00, $30, $00, $98, $00, $30, $08, $9a, $00
 	db $30, $10, $a4, $00, $30, $18, $a8, $00, $30, $20, $aa, $00
 
+;@ path: ending/objects
+;@ The rocking of the sea: 49 bytes (0 rising to 8 and back), one step every 4 frames
+;@ (wSceneVarF). Used by the objects on the sea and the bobbing sky of the portrait.
 SeaBobOffsets::
 	db $00, $00, $00, $00
 	db $00, $00, $01, $01, $01, $01, $02, $02, $02, $03, $03, $04, $05, $05, $06, $06
 	db $06, $07, $07, $07, $07, $08, $08, $08, $08, $08, $08, $07, $07, $07, $07, $06
 	db $06, $06, $05, $05, $04, $03, $02, $02, $02, $01, $01, $01, $01
 
+;@ def EndingWindFishHigh(slot: bc)
+;@ path: ending/objects
+;@ Ending object part $0A: the Wind Fish high above Link in ending part 6. It moves with the view at
+;@ 1.5 times its speed (so it seems farther away) and bobs; it is removed once below the screen.
+;@ wEntityWorkRAM (0-2) is its frame.
 EndingWindFishHigh::
+;> wOAMNextIndex = 0
 	ld a, $00
 	ld [wOAMNextIndex], a
+;> hMultiPurpose0 = u8(hBaseScrollY + (((hBaseScrollY ^ 0x80) - 0x80) >> 1))     # 1.5 x the scroll
 	ldh a, [hBaseScrollY]
 	ld d, a
 	sra a
 	add d
 	ldh [hMultiPurpose0], a
+;> if hFrameCounter & 3 == 0:
 	ldh a, [hFrameCounter]
 	and $03
-	jr nz, jr_017_72b7
+	jr nz, .draw
 
+;>     wSceneVarF = (wSceneVarF + 1) % 49
 	ld a, [wSceneVarF]
 	inc a
 	cp $31
-	jr c, jr_017_72b4
+	jr c, .store
 
 	xor a
 
-jr_017_72b4:
+.store
 	ld [wSceneVarF], a
 
-jr_017_72b7:
+;>@y y = u8(hActiveEntityDrawY + SeaBobOffsets[wSceneVarF] - hMultiPurpose0)
+.draw
 	ld a, [wSceneVarF]
 	ld e, a
 	ld d, b
-	ld hl, $7267
+	ld hl, SeaBobOffsets
 	add hl, de
+;=@y
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
 	ld hl, hMultiPurpose0
 	sub [hl]
+;> hActiveEntityDrawY = y
 	ldh [hActiveEntityDrawY], a
+;> if y >= 0xA8:
 	cp $a8
+;>     return RemoveEndingObject(slot)
 	jp nc, RemoveEndingObject
 
+;> offset = wEntityWorkRAM * 4
 	ld a, [wEntityWorkRAM]
 	rla
 	rla
 	and $fc
 	ld e, a
+;> offset += wEntityWorkRAM * 64        # 68 bytes per frame
 	rla
 	rla
 	rla
 	rla
 	and $c0
 	add e
+;> DrawEntitySprites(WindFishSprites + offset, 17)
 	ld e, a
 	ld d, b
-	ld hl, $719b
+	ld hl, WindFishSprites
 	add hl, de
 	ld c, $11
-	call Call_3D26
+	call DrawEntitySprites
+;> ReserveOAMEntriesFar(17)
 	ld a, $11
-	call Call_3DD0
+	call ReserveOAMEntriesFar
+;> return
 	ret
 
 
+;@ path: ending/objects
+;@ The gleam on the sea in ending part 3 (ending object part 7): 3 sprites (y offset, x offset, tile,
+;@ attributes), 12 bytes.
+;@ asset: oam length=$0C
 SkyStreakSprites::
 	db $00, $00, $70, $00, $08, $08, $5e, $00, $08, $10, $60, $00
 
+;@ def EndingSkyStreak(slot: bc)
+;@ path: ending/objects
+;@ Ending object part 7: the gleam of light in the sky view of ending part 3; draws its 3 sprites.
 EndingSkyStreak::
+;> wEntityPhysicsFlags[slot] = 0xC3     # 3 sprites
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $c3
-	ld hl, $72ee
+;> DrawEntitySprites(SkyStreakSprites, 3)
+	ld hl, SkyStreakSprites
 	ld c, $03
-	call Call_3D26
+	call DrawEntitySprites
+;> return
 	ret
 
 
+;@ path: ending/objects
+;@ The seagull of the sky view (ending object part 6): 6 frames of one 8x16 sprite, 2 bytes each (tile,
+;@ attributes), by sprite variant; drawn by DrawEntity8x16.
 SeagullFrames::
 	db $50, $00, $52, $00, $54, $00, $56, $00, $57, $00, $5a, $00
 
+;@ def EndingSeagull(slot: bc)
+;@ path: ending/objects
+;@ Ending object part 6: a seagull gliding across the sky view of ending part 3, flapping through its
+;@ 6 frames (one every 8 frames), mirrored when it flies to the left; removed past x $B0.
 EndingSeagull::
+;> if hFrameCounter & 7 == 0:
 	ldh a, [hFrameCounter]
 	and $07
-	jr nz, jr_017_7327
+	jr nz, .draw
 
+;>@var     wEntitySpriteVariant[slot] = (wEntitySpriteVariant[slot] + 1) % 6
 	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	inc a
 	cp $06
-	jr nz, jr_017_7326
+	jr nz, .store
 
+;=@var
 	xor a
 
-jr_017_7326:
+.store
 	ld [hl], a
 
-jr_017_7327:
+;> wEntityPhysicsFlags[slot] = 0xC1     # 1 sprite
+.draw
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $c1
+;> if wEntitySpeedX[slot] & 0x80:       # flying left
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
 	and $80
-	jr z, jr_017_733b
+	jr z, .sprite
 
+;>     hActiveEntityFlipAttribute |= 0x20                  # mirror it
 	ld hl, hActiveEntityFlipAttribute
 	set 5, [hl]
 
-jr_017_733b:
-	ld de, $7309
-	call Call_3CD0
+;> DrawEntity8x16(SeagullFrames)             # draw one sprite of the variant
+.sprite
+	ld de, SeagullFrames
+	call DrawEntity8x16
+;> UpdateEntityPosX(slot)
 	call UpdateEntityPosX
+;> if hActiveEntityX >= 0xB0:
 	ldh a, [hActiveEntityX]
 	cp $b0
+;>     return RemoveEndingObject(slot)
 	jp nc, RemoveEndingObject
 
+;> return
 	ret
 
 
+;@ path: ending/objects
+;@ Link on his log far out at sea (ending object part 4), first frame: 7 sprites (y offset, x offset,
+;@ tile, attributes), 28 bytes. Alternates with FarLogSpritesB every 16 frames.
+;@ asset: oam length=$1C
 FarLogSpritesA::
 	db $00, $08, $0e, $00, $00, $10, $1e, $00, $00, $18, $2e, $00, $10, $00, $50, $00
 	db $10, $08, $52, $00, $10, $10, $54, $00, $10, $18, $58, $00
 
+;@ path: ending/objects
+;@ The second frame of Link on his log far out at sea: 7 sprites, 28 bytes (the log differs).
+;@ asset: oam length=$1C
 FarLogSpritesB::
 	db $00, $08, $0e, $00
 	db $00, $10, $1e, $00, $00, $18, $2e, $00, $10, $00, $60, $00, $10, $08, $62, $00
 	db $10, $10, $64, $00, $10, $18, $68, $00
 
+;@ path: ending/objects
+;@ The bobbing of Link's log far out at sea: 8 bytes (0-2 pixels down), one step every 16 frames.
 FarLogBobOffsets::
 	db $00, $00, $00, $01, $02, $02, $02, $01
+;@ path: ending/objects
+;@ The bobbing of the driftwood far out at sea: 8 bytes (0 or 1 pixel down), one step every
+;@ 16 frames, each piece with its own phase.
 DebrisBobOffsets::
 	db $00, $00, $00, $00, $01, $01, $01, $01
 
+;@ def EndingFarLog(slot: bc)
+;@ path: ending/objects
+;@ Ending object part 4: Link on his log far out at sea (ending part 4), bobbing gently; the log's two
+;@ frames alternate every 16 frames. Its 7 sprites start at the beginning of the entity OAM area.
 EndingFarLog::
+;> wEntityPhysicsFlags[slot] = 0xC7     # 7 sprites
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $c7
+;> wOAMNextIndex = 0
 	ld a, $00
 	ld [wOAMNextIndex], a
+;> i = (hFrameCounter >> 4) & 7
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	rra
 	and $07
+;>@bob hActiveEntityDrawY = u8(hActiveEntityDrawY + FarLogBobOffsets[i])
 	ld e, a
 	ld d, b
-	ld hl, $7384
+	ld hl, FarLogBobOffsets
 	add hl, de
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
+;=@bob
 	ldh [hActiveEntityDrawY], a
-	ld hl, $734c
+;> sprites = FarLogSpritesA
+	ld hl, FarLogSpritesA
+;> if hFrameCounter & 0x10:
 	ldh a, [hFrameCounter]
 	and $10
-	jr z, jr_017_73be
+	jr z, .draw
 
-	ld hl, $7368
+;>     sprites = FarLogSpritesB
+	ld hl, FarLogSpritesB
 
-jr_017_73be:
+;> DrawEntitySprites(sprites, 7)
+.draw
 	ld c, $07
-	call Call_3D26
+	call DrawEntitySprites
+;> return
 	ret
 
 
+;@ path: ending/objects
+;@ The driftwood far out at sea (ending object part 5): 2 sprite variants of one 8x16 sprite (tile,
+;@ attributes): tile $5A or $6A.
 DebrisFrames::
 	db $5a, $00, $6a, $00
 
+;@ def EndingDebris(slot: bc)
+;@ path: ending/objects
+;@ Ending object part 5: a piece of driftwood floating near Link's log in ending part 4, bobbing with
+;@ a phase that depends on its slot.
 EndingDebris::
+;> wEntityPhysicsFlags[slot] = 0xC1     # 1 sprite
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $c1
+;>@phase i = ((slot * 2) & 6) + (hFrameCounter >> 4) & 7
 	ld a, c
 	rla
 	and $06
 	ld e, a
 	ldh a, [hFrameCounter]
 	rra
+;=@phase
 	rra
 	rra
 	rra
 	add e
 	and $07
+;>@bob hActiveEntityDrawY = u8(hActiveEntityDrawY + DebrisBobOffsets[i])
 	ld e, a
 	ld d, b
-	ld hl, $738c
+	ld hl, DebrisBobOffsets
 	add hl, de
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
+;=@bob
 	ldh [hActiveEntityDrawY], a
-	ld de, $73c4
-	call Call_3CD0
+;> DrawEntity8x16(DebrisFrames)
+	ld de, DebrisFrames
+	call DrawEntity8x16
+;> return
 	ret
 
 
+;@ path: ending/objects
+;@ The driftwood riding the waves in ending part 5 (ending object part 8): 3 sprite variants of two
+;@ 8x8-wide sprite halves, 4 bytes each (tile and attributes of the left half, then of the right
+;@ half; attribute $20 = mirrored), drawn by DrawEntity16x16.
 WaveDebrisFrames::
 	db $54, $00, $64, $00, $64, $20, $54, $20, $4e, $00, $7e, $00
 
+;@ def EndingWaveDebris(slot: bc)
+;@ path: ending/objects
+;@ Ending object part 8: a piece of driftwood that rides the heaving sea of ending part 5: it follows
+;@ WaveRasterScroll (the scroll of the lower screen) with a phase by variant (0: the current step,
+;@ 1: 6 steps ahead, 2: $18 steps ahead and half as high), moving half (or a quarter) as far as the
+;@ water.
 EndingWaveDebris::
+;> wEntityPhysicsFlags[slot] = 0xC2     # 2 sprites
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $c2
+;> if hActiveEntitySpriteVariant == 1:
 	ldh a, [hActiveEntitySpriteVariant]
 	cp $01
-	jr z, jr_017_7427
+	jr z, .ahead6
 
+;>@ahead6     step = (wSceneFadeStep + 6) % 43
+;> elif hActiveEntitySpriteVariant == 2:
 	cp $02
-	jr z, jr_017_7434
+	jr z, .ahead24
 
+;>@ahead24     step = (wSceneFadeStep + 0x18) % 43
+;> else:
+;>     step = wSceneFadeStep
 	ld a, [wSceneFadeStep]
 
-jr_017_740d:
+;>@h h = (((WaveRasterScroll[step] - 4) & 0xFF) ^ 0x80) - 0x80   # signed height of the water
+.look
 	ld e, a
 	ld d, b
-	ld hl, $5b49
+	ld hl, WaveRasterScroll
 	add hl, de
 	ld a, [hl]
 	sub $04
 
-jr_017_7416:
+;>@high if hActiveEntitySpriteVariant == 2: h >>= 1
+;>@y hActiveEntityDrawY = u8(hActiveEntityDrawY + ((-h) >> 1))
+.move
 	cpl
 	inc a
 	sra a
 	ld e, a
 	ldh a, [hActiveEntityDrawY]
 	add e
+;=@y
 	ldh [hActiveEntityDrawY], a
-	ld de, $73ee
-	call Call_3C3B
+;> DrawEntity16x16(WaveDebrisFrames)          # draw the two halves
+	ld de, WaveDebrisFrames
+	call DrawEntity16x16
+;> return
 	ret
 
 
-jr_017_7427:
+.ahead6
+;=@ahead6
 	ld a, [wSceneFadeStep]
 	add $06
 	cp $2b
-	jr c, jr_017_7432
+	jr c, .wrapped6
 
 	sub $2b
 
-jr_017_7432:
-	jr jr_017_740d
+.wrapped6
+	jr .look
 
-jr_017_7434:
+.ahead24
+;=@ahead24
 	ld a, [wSceneFadeStep]
 	add $18
 	cp $2b
-	jr c, jr_017_743f
+	jr c, .wrapped24
 
 	sub $2b
 
-jr_017_743f:
+.wrapped24
+;=@h
 	ld e, a
 	ld d, $00
-	ld hl, $5b49
+	ld hl, WaveRasterScroll
 	add hl, de
 	ld a, [hl]
 	sub $04
+;=@high
 	sra a
-	jr jr_017_7416
+	jr .move
 
+;@ path: ending/objects
+;@ The seagull flying up out of ending part 5 (ending object part 9): 6 sprite variants of two
+;@ halves, 4 bytes each (tile and attributes of the left half, then of the right half; $20 =
+;@ mirrored, so each frame is symmetric), drawn by DrawEntity16x16.
 FlyingBirdFrames::
 	db $72, $00, $72, $20, $74, $00, $74, $20, $76, $00, $76, $20, $78, $00, $78, $20
 	db $7a, $00, $7a, $20, $7c, $00, $7c, $20
 
+;@ path: ending/objects
+;@ How many frames each wing beat of FlyingBirdFrames lasts (6 bytes).
 FlyingBirdDurations::
 	db $08, $06, $06, $06, $06, $08
 
+;@ def EndingFlyingSeagull(slot: bc)
+;@ path: ending/objects
+;@ Ending object part 9: a seagull that flies up and away to the right in ending part 5, beating its
+;@ wings (FlyingBirdDurations) and levelling off a little every 32 frames; removed past x $B0.
 EndingFlyingSeagull::
+;> wEntityPhysicsFlags[slot] = 0xC2     # 2 sprites
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $c2
-	ld de, $744d
-	call Call_3C3B
+;> DrawEntity16x16(FlyingBirdFrames)
+	ld de, FlyingBirdFrames
+	call DrawEntity16x16
+;> if GetEntityTimer(slot) == 0:
 	call GetEntityTimer
-	jr nz, jr_017_7492
+	jr nz, .rise
 
+;>@var     wEntitySpriteVariant[slot] = (wEntitySpriteVariant[slot] + 1) % 6
 	push hl
 	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	inc a
+;=@var
 	cp $06
-	jr nz, jr_017_7488
+	jr nz, .store
 
 	xor a
 
-jr_017_7488:
+.store
 	ld [hl], a
+;>@timer     wEntityTimer[slot] = FlyingBirdDurations[wEntitySpriteVariant[slot]]
 	ld e, a
 	ld d, b
-	ld hl, $7465
+	ld hl, FlyingBirdDurations
 	add hl, de
 	ld a, [hl]
 	pop hl
+;=@timer
 	ld [hl], a
 
-jr_017_7492:
+;> wEntityPrivateCounter[slot] += 1
+.rise
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	inc a
 	ld [hl], a
+;>@level if wEntityPrivateCounter[slot] & 0x1F == 0 and wEntitySpeedY[slot] != 0xFF:
 	and $1f
-	jr nz, jr_017_74a7
+	jr nz, .move
 
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
+;=@level
 	cp $ff
-	jr z, jr_017_74a7
+	jr z, .move
 
+;>     wEntitySpeedY[slot] += 1
 	inc [hl]
 
-jr_017_74a7:
+;> UpdateEntityPosition(slot)
+.move
 	call UpdateEntityPosition
+;> if hActiveEntityX >= 0xB0:
 	ldh a, [hActiveEntityX]
 	cp $b0
+;>     return RemoveEndingObject(slot)
 	jp nc, RemoveEndingObject
 
+;> return
 	ret
 
 
+;@ path: ending/instruments
+;@ The eight instruments (ending object part 3, by sprite variant 0-7): 4 bytes each, tile and
+;@ attributes of the left and the right 8x16 half. Tiles $D0-$EE, copied there by
+;@ EndingCopyInstrumentTiles.
 InstrumentFrames::
 	db $d0, $00, $d2, $00, $d4, $00, $d6, $00, $d8, $00, $da, $00, $dc, $00, $de, $00
 	db $e0, $00, $e2, $00, $e4, $00, $e6, $00, $e8, $00, $ea, $00, $ec, $00, $ee, $00
 
+;@ def EndingInstrument(slot: bc)
+;@ path: ending/instruments
+;@ Ending object part 3: one of the eight instruments around Link. Draws itself at its own OAM
+;@ entries (wEntityPrivate2 + $50) and moves outwards while its drop timer runs.
 EndingInstrument::
+;> hMultiPurpose0 = wEntityPrivate2[slot] + 0x50                       # its OAM offset
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
 	add $50
 	ldh [hMultiPurpose0], a
-	ld de, $74b2
+;> DrawInstrumentSprites(InstrumentFrames)
+	ld de, InstrumentFrames
 	call DrawInstrumentSprites
+;> if GetEntityDropTimer(slot) == 0:
 	call GetEntityDropTimer
+;>     return
 	ret z
 
+;> UpdateEntityPosition(slot)
 	call UpdateEntityPosition
+;> return
 	ret
 
 
+;@ def DrawInstrumentSprites(frames: de)
+;@ path: ending/instruments
+;@ Writes the two 8x16 sprites of the active ending object straight into the OAM buffer at offset
+;@ hMultiPurpose0: frame = the sprite variant (4 bytes: tile, attributes of each half), at the
+;@ object's position minus the screen shake; with x flip the halves change sides.
 DrawInstrumentSprites::
+;>@oam oam = addr(wOAMBuffer) + hMultiPurpose0
 	push bc
 	push de
 	ldh a, [hMultiPurpose0]
 	ld e, a
 	ld d, b
 	ld hl, wOAMBuffer
+;=@oam
 	add hl, de
 	push hl
 	pop de
+;> mem[oam] = hActiveEntityDrawY
 	ldh a, [hActiveEntityDrawY]
 	ld [de], a
 	inc de
+;> flip = (hActiveEntityFlipAttribute & 0x20) >> 2                     # 8 when mirrored
 	ld a, [wScreenShakeX]
 	ld c, a
 	ldh a, [hActiveEntityFlipAttribute]
 	and $20
 	rra
 	rra
+;> mem[oam + 1] = u8(hActiveEntityX + flip - wScreenShakeX)
 	ld hl, hActiveEntityX
 	add [hl]
 	sub c
 	ld [de], a
 	inc de
+;>@frame frame = frames + hActiveEntitySpriteVariant * 4
 	ldh a, [hActiveEntitySpriteVariant]
 	ld c, a
 	ld b, $00
 	sla c
 	rl b
 	sla c
+;=@frame
 	rl b
 	pop hl
 	add hl, bc
+;> mem[oam + 2] = mem[frame]
 	ld a, [hli]
 	ld [de], a
 	inc de
+;> mem[oam + 3] = mem[frame + 1] ^ hActiveEntityFlipAttribute
 	ld a, [hli]
 	push hl
 	ld hl, hActiveEntityFlipAttribute
 	xor [hl]
 	ld [de], a
 	inc de
+;> mem[oam + 4] = hActiveEntityDrawY
 	ldh a, [hActiveEntityDrawY]
 	ld [de], a
 	inc de
+;>@flip2 flip2 = ((hActiveEntityFlipAttribute & 0x20) ^ 0x20) >> 2           # 8 when not mirrored
 	ld a, [wScreenShakeX]
 	ld c, a
 	ldh a, [hActiveEntityFlipAttribute]
 	and $20
 	xor $20
 	rra
+;=@flip2
 	rra
+;> mem[oam + 5] = u8(hActiveEntityX + flip2 - wScreenShakeX)
 	ld hl, hActiveEntityX
 	sub c
 	add [hl]
 	ld [de], a
 	inc de
+;> mem[oam + 6] = mem[frame + 2]
 	pop hl
 	ld a, [hli]
 	ld [de], a
 	inc de
+;> mem[oam + 7] = mem[frame + 3] ^ hActiveEntityFlipAttribute
 	ld a, [hl]
 	ld hl, hActiveEntityFlipAttribute
 	xor [hl]
 	ld [de], a
+;> return
 	pop bc
 	ret
 
 
+;@ def EndingObjectHandler(slot: bc)
+;@ path: ending/objects
+;@ Entity handler of entity type $E8, the ending object: every figure of the ending scenes that moves
+;@ is one of these, its part chosen by wEntityPrivate1 (EndingObjectParts).
 EndingObjectHandler::
+;> EndingObjectParts[wEntityPrivate1[slot]](slot)
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld a, [hl]
 	rst $00
 
+;@ path: ending/objects
+;@ The parts of the ending object (17 words), indexed by wEntityPrivate1: 0 the stairway with Link,
+;@ 1 the stars, 2 the owl, 3 an instrument, 4 Link's log far away, 5 driftwood, 6 a seagull, 7 the
+;@ gleam, 8 driftwood on the waves, 9 a flying seagull, $0A the Wind Fish in the sky, $0B the ring of
+;@ light, $0C the streak of light, $0D Link's portrait, $0E Link on his log, $0F the Wind Fish flying
+;@ away, $10 the last seagull.
 EndingObjectParts::
 	dw EndingStairway
 	dw EndingStars
@@ -6438,11 +7112,19 @@ EndingObjectParts::
 	dw EndingWindFishAway
 	dw EndingLastSeagull
 
+;@ def EndingStairway(slot: bc)
+;@ path: ending/stairway
+;@ Ending object part 0: the stairway on which Link rises from the egg into the night sky, and Link
+;@ himself. Draws the stairway, then runs its state (StairwayStates).
 EndingStairway::
+;> DrawStairway()
 	call DrawStairway
+;> StairwayStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
+;@ path: ending/stairway
+;@ The states of the stairway object (5 words).
 StairwayStates::
 	dw StairwayDescend
 	dw StairwayLinkClimbs
@@ -6450,122 +7132,201 @@ StairwayStates::
 	dw StairwayFade
 	dw StairwayGone
 
+;@ def StairwayDescend(slot: bc)
+;@ path: ending/stairway
+;@ State 0: the top of the stairway comes down from above the screen (speed 8/16 pixel per frame). It
+;@ runs 8 times from y $E0 to $F0 before going on, so the stairway reaches far up; once its top is
+;@ drawn at y $60 the next state follows. Link floats up slowly meanwhile.
 StairwayDescend::
+;> if hActiveEntityDrawY == 0x60:
 	ldh a, [hActiveEntityDrawY]
 	cp $60
-	jp z, Call_3B8D
+;>     return IncrementEntityState(slot)           # next state
+	jp z, IncrementEntityState
 
+;> wEntitySpeedY[slot] = 8
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], $08
+;> UpdateEntityPosY(slot)
 	call UpdateEntityPosY
+;>@loop if wEntityY[slot] == 0xF0 and wEntityPrivate2[slot] < 8:
 	ld hl, wEntityY
 	add hl, bc
 	ld a, [hl]
 	cp $f0
-	jr nz, jr_017_75a9
+	jr nz, .link
 
+;=@loop
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
 	cp $08
-	jr nc, jr_017_75a9
+	jr nc, .link
 
+;>     wEntityPrivate2[slot] += 1
 	inc a
 	ld [hl], a
+;>     wEntityY[slot] = 0xE0            # once more from the top
 	ld hl, wEntityY
 	add hl, bc
 	ld [hl], $e0
 
-jr_017_75a9:
+;> hLinkSpeedY = 0xFF
+.link
 	ld a, $ff
 	ldh [hLinkSpeedY], a
+;> AnimateLinkOnStairway()              # falls through
 
+;@ def AnimateLinkOnStairway()
+;@ path: ending/stairway
+;@ Link's pose alternates between 0 and 1 every 8 frames; then he moves and is drawn
+;@ (DrawLinkForEnding).
 AnimateLinkOnStairway::
+;>@pose hLinkAnimationState = (hFrameCounter >> 3) & 1
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $01
 	add $00
+;=@pose
 	ldh [hLinkAnimationState], a
+;> DrawLinkForEnding()                  # falls through
 
+;@ def DrawLinkForEnding()
+;@ path: ending/stairway
+;@ Moves Link by his vertical speed (no horizontal speed) and draws him (DrawLinkSprites).
+;@ test: skip moves Link through bank 0
 DrawLinkForEnding::
+;> hLinkSpeedX = 0
 	push bc
 	xor a
 	ldh [hLinkSpeedX], a
+;> ApplyLinkSpeed()
 	call ApplyLinkSpeed
+;> DrawLinkSprites()
 	call DrawLinkSprites
+;> return
 	pop bc
 	ret
 
 
+;@ def StairwayLinkClimbs(slot: bc)
+;@ path: ending/stairway
+;@ State 1: Link climbs up (speed -8) until he stands at y $5C; then he takes pose 2 and the owl
+;@ (ending object part 2) flies in from the top at x $50 (speed $14 downwards, timer $30).
 StairwayLinkClimbs::
+;> hLinkSpeedY = 0xF8
 	ld a, $f8
 	ldh [hLinkSpeedY], a
+;> AnimateLinkOnStairway()
 	call AnimateLinkOnStairway
+;> if hLinkY != 0x5C:
 	ldh a, [hLinkY]
 	cp $5c
-	jr nz, jr_017_75fe
+;>     return
+	jr nz, .done
 
+;> hLinkSpeedY = 0
 	xor a
 	ldh [hLinkSpeedY], a
+;> hLinkAnimationState = 2
 	ld a, $02
 	ldh [hLinkAnimationState], a
+;> owl = SpawnEntity(0xE8)
 	ld a, $e8
-	call Call_3C01
+	call SpawnEntity
+;> wEntityPrivate1[owl] = 2             # the owl
 	ld hl, wEntityPrivate1
 	add hl, de
 	ld [hl], $02
+;> wEntityX[owl] = 0x50
 	ld hl, wEntityX
 	add hl, de
 	ld [hl], $50
+;> wEntityY[owl] = 0
 	ld hl, wEntityY
 	add hl, de
 	ld [hl], $00
+;> wEntitySpeedY[owl] = 0x14
 	ld hl, wEntitySpeedY
 	add hl, de
 	ld [hl], $14
+;> wEntityTimer[owl] = 0x30
 	ld hl, wEntityTimer
 	add hl, de
 	ld [hl], $30
-	call Call_3B8D
+;> IncrementEntityState(slot)                      # next state
+	call IncrementEntityState
 
-jr_017_75fe:
+.done
 	ret
 
 
+;@ def StairwayIdle()
+;@ path: ending/stairway
+;@ State 2: Link stands on the stairway.
+;@ test: skip moves Link through bank 0
 StairwayIdle::
+;> DrawLinkForEnding()
 	call DrawLinkForEnding
+;> return
 	ret
 
 
+;@ def StairwayFade(slot: bc)
+;@ path: ending/stairway
+;@ State 3 (started by EndingPillarScroll): the stairway disappears in 5 steps of 8 frames (its sprite
+;@ variant 0-4, 5 = not drawn), then state 4. Link is moved and drawn twice per frame here.
 StairwayFade::
+;> DrawLinkForEnding()
 	call DrawLinkForEnding
+;> if GetEntityTimer(slot) == 0:
 	call GetEntityTimer
-	jr nz, jr_017_761b
+	jr nz, .draw
 
+;>     wEntityTimer[slot] = 8
 	ld [hl], $08
+;>     wEntitySpriteVariant[slot] += 1
 	ld hl, wEntitySpriteVariant
 	add hl, bc
 	ld a, [hl]
 	inc a
 	ld [hl], a
+;>     if wEntitySpriteVariant[slot] == 5:
 	cp $05
-	jr nz, jr_017_761b
+	jr nz, .draw
 
-	call Call_3B8D
+;>         IncrementEntityState(slot)              # next state
+	call IncrementEntityState
 
-jr_017_761b:
+;> DrawLinkForEnding()
+.draw
 	call DrawLinkForEnding
+;> return
 	ret
 
 
+;@ def StairwayGone()
+;@ path: ending/stairway
+;@ State 4: only Link is left.
+;@ test: skip moves Link through bank 0
 StairwayGone::
+;> DrawLinkForEnding()
 	call DrawLinkForEnding
+;> return
 	ret
 
 
+;@ path: ending/stairway
+;@ The stairway of light that Link climbs into the night sky: 5 sprite lists of 32 sprites (128 bytes
+;@ each, 4 bytes per sprite: y offset, x offset, tile, attributes), one per sprite variant 0-4; the
+;@ variants are the steps of its fading away (StairwayFade). Each list: sprites 0-11 are the wide top
+;@ (6 sprites side by side at y 0 and $10, x 0-$28, the right half mirrored with attribute $30), sprites
+;@ 12-31 the shaft below, 2 sprites wide (x $10 and $18) from y $20 down to $B0. All use palette OBP1.
+;@ Drawn by DrawStairway, which copies only as many bytes as StairwaySpriteBytes allows.
+;@ asset: oam length=$80
 StairwaySprites::
 	db $00, $00, $10, $10, $00, $08, $04, $10, $00, $10, $06, $10, $00, $18, $06, $30
 	db $00, $20, $04, $30, $00, $28, $10, $30, $10, $00, $08, $10, $10, $08, $0a, $10
@@ -6607,431 +7368,789 @@ StairwaySprites::
 	db $60, $10, $56, $10, $60, $18, $66, $10, $70, $10, $56, $10, $70, $18, $66, $10
 	db $80, $10, $56, $10, $80, $18, $66, $10, $90, $10, $56, $10, $90, $18, $66, $10
 	db $a0, $10, $56, $10, $a0, $18, $66, $10, $b0, $10, $56, $10, $b0, $18, $66, $10
+;@ path: ending/stairway
+;@ How many bytes of the stairway's sprite list DrawStairway copies, by the top's screen y / 16
+;@ (16 bytes): $70 (28 sprites) at y $00-$0F, 2 sprites less per 16 pixels down to $30 (the 12 sprites
+;@ of the top) from y $80 on; y $E0-$EF (top above the screen) $80 = all 32 sprites, y $F0-$FF $78.
+;@ This keeps the shaft from wrapping around to the top of the screen.
 StairwaySpriteBytes::
 	db $70, $68, $60, $58, $50, $48, $40, $38, $30, $30, $30, $30, $30, $30, $80, $78
 
+;@ def DrawStairway()
+;@ path: ending/stairway
+;@ Draws the stairway object: copies its sprite list for the current variant (5 = nothing) into the
+;@ sprite table from sprite 3 on, adding hActiveEntityDrawY to each y and the object's x (minus
+;@ the screen shake) to each x.
 DrawStairway::
+;> i = hActiveEntityDrawY >> 4
 	push bc
 	ldh a, [hActiveEntityDrawY]
 	swap a
 	and $0f
 	ld e, a
 	ld d, b
-	ld hl, $78a3
+;> count = StairwaySpriteBytes[i]        # bytes to copy
+	ld hl, StairwaySpriteBytes
 	add hl, de
 	ld b, [hl]
-	ld hl, $7623
+;> if hActiveEntitySpriteVariant == 5:   # faded away
+	ld hl, StairwaySprites
 	ldh a, [hActiveEntitySpriteVariant]
 	cp $05
-	jr z, jr_017_790a
+;>     return
+	jr z, .done
 
+;>@list sprites = StairwaySprites + hActiveEntitySpriteVariant * 0x80
 	and a
-	jr z, jr_017_78e2
+	jr z, .copy
 
-	ld hl, $76a3
+	ld hl, StairwaySprites + $80
 	dec a
-	jr z, jr_017_78e2
+	jr z, .copy
 
-	ld hl, $7723
+;=@list
+	ld hl, StairwaySprites + $100
 	dec a
-	jr z, jr_017_78e2
+	jr z, .copy
 
-	ld hl, $77a3
+;=@list
+	ld hl, StairwaySprites + $180
 	dec a
-	jr z, jr_017_78e2
+	jr z, .copy
 
-	ld hl, $7823
+	ld hl, StairwaySprites + $200
 
-jr_017_78e2:
-	ld de, $c00c
+;>@loop for c in range(count):
+.copy
+	ld de, wOAMBuffer + $0C
 	ld c, $00
 
-jr_017_78e7:
+;>     if c & 3 == 0:                   # y
+.loop
 	ld a, c
 	and $03
 	cp $00
-	jr nz, jr_017_78f2
+	jr nz, .notY
 
+;>         v = u8(hActiveEntityDrawY + sprites[c])
 	ldh a, [hActiveEntityDrawY]
-	jr jr_017_78fe
+	jr .add
 
-jr_017_78f2:
+;>     elif c & 3 == 1:                 # x
+.notY
 	cp $01
-	jr nz, jr_017_7901
+	jr nz, .byte
 
+;>@x         v = u8(hActiveEntityX - wScreenShakeX + sprites[c])
 	push hl
 	ld hl, wScreenShakeX
 	ldh a, [hActiveEntityX]
 	sub [hl]
 	pop hl
 
-jr_017_78fe:
+.add
+;=@x
 	add [hl]
-	jr jr_017_7902
+	jr .store
 
-jr_017_7901:
+;>     else:                            # tile, attributes
+;>         v = sprites[c]
+.byte
 	ld a, [hl]
 
-jr_017_7902:
+;>     wOAMBuffer[0x0C + c] = v
+.store
 	ld [de], a
 	inc hl
 	inc de
 	inc c
+;=@loop
 	ld a, c
 	cp b
-	jr nz, jr_017_78e7
+	jr nz, .loop
 
-jr_017_790a:
+;> return
+.done
 	pop bc
 	ret
 
 
+;@ def EndingStars(slot: bc)
+;@ path: ending/objects
+;@ Ending object part 1: the twinkling stars of the night sky (DrawStars).
 EndingStars::
+;> DrawStars()
 	call DrawStars
+;> return
 	ret
 
 
+;@ path: ending/objects
+;@ The x positions of the 16 stars of the night sky: 16 bytes, read by DrawStars.
 StarsX::
 	db $20, $40, $60, $78, $10, $48, $68, $90, $30, $50, $80, $90, $18, $38, $68, $78
+;@ path: ending/objects
+;@ The y positions of the 16 stars, relative to the star object's y: 16 bytes, read by DrawStars
+;@ (a y of $98 or more wraps to the top by subtracting $88).
 StarsY::
 	db $28, $08, $28, $00, $48, $40, $4c, $38, $68, $70, $58, $68, $78, $88, $98, $80
+;@ path: ending/objects
+;@ The twinkle cycle of a star: 8 tiles ($1E, $2E or $3E, three sizes of star), one step every 16
+;@ frames, each star with its own phase. Read by DrawStars.
 StarsTiles::
 	db $1e, $1e, $1e, $2e, $2e, $3e, $2e, $2e
 
+;@ def DrawStars()
+;@ path: ending/objects
+;@ Draws the stars of the night sky as 8 sprites from sprite 36 on: on even frames the stars with
+;@ even numbers, on odd frames the others, so all 16 flicker in turn. They move with the object's y.
 DrawStars::
-	ld de, $c090
+;> o = 0x90                             # sprite 36
+	ld de, wOAMBuffer + $90
 	push bc
+;>@loop for c in range(hFrameCounter & 1, 16, 2):
 	ldh a, [hFrameCounter]
 	and $01
 	ld c, a
 
-jr_017_7941:
-	ld hl, $7920
+;>     y = u8(hActiveEntityDrawY + StarsY[c])
+.loop
+	ld hl, StarsY
 	add hl, bc
 	ldh a, [hActiveEntityDrawY]
 	add [hl]
+;>     if y >= 0x98:
 	cp $98
-	jr c, jr_017_794e
+	jr c, .storeY
 
+;>         y -= 0x88                    # wrap to the top
 	sub $88
 
-jr_017_794e:
+;>     wOAMBuffer[o] = y
+.storeY
 	ld [de], a
 	inc de
-	ld hl, $7910
+;>     wOAMBuffer[o + 1] = StarsX[c]
+	ld hl, StarsX
 	add hl, bc
 	ld a, [hl]
 	ld [de], a
 	inc de
+;>@t     t = ((hFrameCounter >> 4) ^ c) & 7
 	push bc
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	rra
+;=@t
 	nop
 	xor c
 	and $07
 	ld c, a
 	ld b, $00
-	ld hl, $7930
+;>     wOAMBuffer[o + 2] = StarsTiles[t]
+	ld hl, StarsTiles
 	add hl, bc
 	ld a, [hl]
 	ld [de], a
 	inc de
 	pop bc
+;>     wOAMBuffer[o + 3] = 0x90         # behind the background, palette OBP1
 	ld a, $90
 	ld [de], a
 	inc de
+;>     o += 4
+;=@loop
 	inc c
 	inc c
 	ld a, c
 	cp $10
-	jr c, jr_017_7941
+	jr c, .loop
 
+;> return
 	pop bc
 	ret
 
 
+;@ path: ending/owl
+;@ The owl of the ending, 4 frames of its wing beat: 4 sprites each (16 bytes per frame, 4 bytes per
+;@ sprite: y offset, x offset, tile, attributes), x offsets -8, 0, 8, $10, the right half mirrored.
+;@ Indexed by sprite variant, drawn by EndingOwl.
+;@ asset: oam length=$10
 OwlSprites::
 	db $00, $f8, $58, $00, $00, $00, $68, $00, $00, $08, $68, $20, $00, $10, $58, $20
 	db $00, $f8, $5a, $00, $00, $00, $6a, $00, $00, $08, $6a, $20, $00, $10, $5a, $20
 	db $00, $f8, $5c, $00, $00, $00, $6c, $00, $00, $08, $6c, $20, $00, $10, $5c, $20
 	db $00, $f8, $5e, $00, $00, $00, $6e, $00, $00, $08, $6e, $20, $00, $10, $5e, $20
 
+;@ def EndingOwl(slot: bc)
+;@ path: ending/owl
+;@ Ending object part 2: the owl that flies down to Link on the stairway, says farewell (dialog $CF)
+;@ and flies away. Draws it from sprite 20 on (wing beat: a new frame every 8 frames), then runs its
+;@ state (OwlStates).
 EndingOwl::
+;> wOAMNextIndex = 0x50                 # sprite 20
 	ld a, $50
 	ld [wOAMNextIndex], a
-	ld hl, $797a
+;>@f sprites = OwlSprites + (hActiveEntitySpriteVariant & 0x0F) * 16
+	ld hl, OwlSprites
 	ldh a, [hActiveEntitySpriteVariant]
 	rla
 	rla
 	rla
 	rla
+;=@f
 	and $f0
 	ld e, a
 	ld d, b
 	add hl, de
+;> DrawEntitySprites(sprites, 4)
 	ld c, $04
-	call Call_3D26
+	call DrawEntitySprites
+;> ReserveOAMEntriesFar(4)
 	ld a, $04
-	call Call_3DD0
+	call ReserveOAMEntriesFar
+;> SetEntitySpriteVariant(slot, (hFrameCounter >> 3) & 3)    # wing beat
 	ldh a, [hFrameCounter]
 	rra
 	rra
 	rra
 	and $03
-	call Call_3B87
+	call SetEntitySpriteVariant
+;> OwlStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
 	rst $00
 
+;@ path: ending/owl
+;@ The states of the owl (4 words).
 OwlStates::
 	dw OwlDescend
 	dw OwlTalk
 	dw OwlWaitDialog
 	dw OwlFlyAway
 
+;@ def OwlDescend(slot: bc)
+;@ path: ending/owl
+;@ State 0: after its start timer the owl flies down, slowing down by 1 every 4 frames; when its speed
+;@ reaches 0 it hovers in front of Link (timer $80, next state).
 OwlDescend::
+;> if GetEntityTimer(slot):
 	call GetEntityTimer
-	jr nz, jr_017_7a09
+;>     return
+	jr nz, .done
 
+;> UpdateEntityPosY(slot)
 	call UpdateEntityPosY
+;> if hFrameCounter & 3:
 	ldh a, [hFrameCounter]
 	and $03
-	jr nz, jr_017_7a09
+;>     return
+	jr nz, .done
 
+;> wEntitySpeedY[slot] = u8(wEntitySpeedY[slot] - 1)
 	ld hl, wEntitySpeedY
 	add hl, bc
 	dec [hl]
-	jr nz, jr_017_7a09
+;> if wEntitySpeedY[slot] != 0:
+;>     return
+	jr nz, .done
 
+;> wEntityTimer[slot] = 0x80
 	call GetEntityTimer
 	ld [hl], $80
-	call Call_3B8D
+;> IncrementEntityState(slot)           # next state
+	call IncrementEntityState
 
-jr_017_7a09:
+;> return
+.done
 	ret
 
 
+;@ path: ending/owl
+;@ The owl's hovering: 16 heights above the ground (0-4 pixels, wEntityZ), one step every 4 frames.
+;@ Read by OwlHover.
 OwlHoverHeights::
 	db $00, $00, $00, $01, $01, $02, $03, $03, $04, $04, $04, $03, $03, $02, $01, $01
 
+;@ def OwlTalk(slot: bc)
+;@ path: ending/owl
+;@ State 1: the owl hovers; when its timer runs out it opens its farewell dialog ($CF) and the next
+;@ state follows.
 OwlTalk::
+;> if GetEntityTimer(slot):
 	call GetEntityTimer
+;>     return OwlHover(slot)
 	jr nz, OwlHover
 
+;> OpenEndingDialog(0xCF)
 	ld a, $cf
 	call OpenEndingDialog
+;> wDialogSfx = 0x19
 	ld a, $19
 	ld [wDialogSfx], a
-	call Call_3B8D
+;> IncrementEntityState(slot)           # next state
+	call IncrementEntityState
+;> return OwlHover(slot)                # falls through
 
+;@ def OwlHover(slot: bc)
+;@ path: ending/owl
+;@ Makes the owl bob up and down: its height wEntityZ follows OwlHoverHeights, driven by its
+;@ private counter.
 OwlHover::
+;> t = wEntityPrivateCounter[slot]
 	ld hl, wEntityPrivateCounter
 	add hl, bc
 	ld a, [hl]
 	ld a, [hl]
+;> wEntityPrivateCounter[slot] = u8(t + 1)
 	inc [hl]
+;>@z wEntityZ[slot] = OwlHoverHeights[(t >> 2) & 15]
 	rra
 	rra
 	and $0f
 	ld e, a
 	ld d, b
-	ld hl, $7a0a
+	ld hl, OwlHoverHeights
+;=@z
 	add hl, de
 	ld a, [hl]
 	ld hl, wEntityZ
 	add hl, bc
 	ld [hl], a
+;> return
 	ret
 
 
+;@ def OwlWaitDialog(slot: bc)
+;@ path: ending/owl
+;@ State 2: the owl hovers while its dialog is open; once it is closed, timer $FF and the next state.
 OwlWaitDialog::
+;> OwlHover(slot)
 	call OwlHover
+;> if wDialogState:
 	ld a, [wDialogState]
 	and a
-	jr nz, jr_017_7a55
+;>     return
+	jr nz, .done
 
+;> wEntityTimer[slot] = 0xFF
 	call GetEntityTimer
 	ld [hl], $ff
-	call Call_3B8D
+;> IncrementEntityState(slot)           # next state
+	call IncrementEntityState
 
-jr_017_7a55:
+;> return
+.done
 	ret
 
 
+;@ def OwlFlyAway(slot: bc)
+;@ path: ending/owl
+;@ State 3: the owl hovers and then flickers away (OwlFlyAwayFade). When the timer runs out the
+;@ ending moves on to its next step and the owl is removed.
 OwlFlyAway::
+;> OwlHover(slot)
 	call OwlHover
+;> t = GetEntityTimer(slot)
 	call GetEntityTimer
-	jr nz, jr_017_7a67
+;> if t:
+;>     return OwlFlyAwayFade(slot, t)
+	jr nz, OwlFlyAwayFade
 
-jr_017_7a5e:
+;> EndingNextStep()
+OwlFlyAwayEnd:
 	call EndingNextStep
+;> return RemoveEndingObject(slot)      # falls through
 
+;@ def RemoveEndingObject(slot: bc)
+;@ path: ending/objects
+;@ Removes an ending object (its entity slot becomes free).
 RemoveEndingObject::
+;> wEntityStatus[slot] = 0
 	ld hl, wEntityStatus
 	add hl, bc
 	ld [hl], b
+;> return
 	ret
 
 
-jr_017_7a67:
+;@ def OwlFlyAwayFade(slot: bc, t: a)
+;@ path: ending/owl
+;@ The owl's farewell (timer t from $FF down): it hovers for 32 frames, then a jingle ($26) plays and
+;@ it starts to vanish: an accumulator grows by a speed that rises by 2 per frame, and on every frame
+;@ the accumulator overflows the owl is not drawn, so it flickers more and more until it is gone
+;@ (speed $FC or more); then the ending moves on and the owl is removed.
+OwlFlyAwayFade::
+;> if t >= 0xE0:
 	cp $e0
-	jr nc, jr_017_7a8e
+;>     return
+	jr nc, .done
 
+;> if t == 0xDF:
 	cp $df
-	jr nz, jr_017_7a73
+	jr nz, .fade
 
+;>     hJingle = 0x26
 	ld a, $26
 	ldh [hJingle], a
 
-jr_017_7a73:
+;> speed = wEntityPrivate3[slot]
+.fade
 	ld hl, wEntityPrivate3
 	add hl, bc
 	ld e, [hl]
 	ld a, [hl]
+;> if speed >= 0xFC:
 	cp $fc
-	jr nc, jr_017_7a5e
+;>     EndingNextStep()
+;>     return RemoveEndingObject(slot)
+	jr nc, OwlFlyAwayEnd
 
+;> wEntityPrivate3[slot] = speed + 2
 	add $02
 	ld [hl], a
+;> acc = wEntityPrivate4[slot] + speed
+;> wEntityPrivate4[slot] = acc & 0xFF
 	ld hl, wEntityPrivate4
 	add hl, bc
 	ld a, [hl]
 	add e
 	ld [hl], a
-	jr nc, jr_017_7a8e
+;> if acc > 0xFF:
+	jr nc, .done
 
+;>     SetEntitySpriteVariant(slot, 0xFF)   # not drawn this frame
 	ld a, $ff
-	call Call_3B87
+	call SetEntitySpriteVariant
 
-jr_017_7a8e:
+;> return
+.done
 	ret
 
 
+;@ def OpenEndingDialog(dialog: a)
+;@ path: ending/objects
+;@ Opens a dialog during the ending with the box at the bottom of the screen: Link's y is set to $10
+;@ (the top) for the call, so OpenDialog puts the box below him, and restored afterwards.
 OpenEndingDialog::
+;> y = hLinkY
 	ld e, a
 	ldh a, [hLinkY]
 	push af
+;> hLinkY = 0x10
 	ld a, $10
 	ldh [hLinkY], a
+;> OpenDialog(dialog)
 	ld a, e
 	call OpenDialog
+;> hLinkY = y
 	pop af
 	ldh [hLinkY], a
+;> return
 	ret
 
 
+;@ path: ending/stairway
+;@ Link's poses in the ending, by hLinkAnimationState: 13 poses of two 8x16 sprites, 4 bytes each
+;@ (tile and attributes of the left sprite, tile and attributes of the right sprite; attribute $20 =
+;@ mirrored). Poses 0-1 standing (tiles $00/$02), 2-4 climbing and looking up ($44-$4C), 5-12 sitting
+;@ and turning ($D4-$E2). Drawn by DrawLinkSprites.
 LinkCreditsPoses::
 	db $00, $00, $02, $00, $02, $20, $00, $20, $44, $00, $46, $00, $48, $00, $4a, $00
 	db $4c, $00, $4c, $20, $d8, $20, $d6, $20, $d4, $00, $d4, $20, $d6, $00, $d8, $00
 	db $da, $00, $dc, $00, $de, $00, $e0, $00, $e2, $00, $e2, $20, $e0, $20, $de, $20
 	db $dc, $20, $da, $20
 
+;@ def DrawLinkSprites()
+;@ path: ending/stairway
+;@ Draws Link as sprites 1 and 2 (8x16 each, side by side) at (hLinkX - screen shake, hLinkY) in the
+;@ pose hLinkAnimationState (LinkCreditsPoses).
 DrawLinkSprites::
+;>@p pose = LinkCreditsPoses + hLinkAnimationState * 4
 	ldh a, [hLinkAnimationState]
 	rla
 	rla
 	and $fc
 	ld e, a
 	ld d, $00
-	ld hl, $7a9f
+;=@p
+	ld hl, LinkCreditsPoses
 	add hl, de
 	push hl
 	pop de
-	ld hl, $c004
+;> wOAMBuffer[4] = hLinkY
+	ld hl, wOAMBuffer + 4
 	ldh a, [hLinkY]
 	ld [hli], a
+;> x = u8(hLinkX - wScreenShakeX)
 	ld a, [wScreenShakeX]
 	ld c, a
 	ldh a, [hLinkX]
 	sub c
+;> wOAMBuffer[5] = x
 	ld [hli], a
+;> wOAMBuffer[6] = mem[pose]
 	ld a, [de]
 	inc de
 	ld [hli], a
+;> wOAMBuffer[7] = mem[pose + 1]
 	ld a, [de]
 	inc de
 	ld [hli], a
+;> wOAMBuffer[8] = hLinkY
 	ldh a, [hLinkY]
 	ld [hli], a
+;> wOAMBuffer[9] = u8(x + 8)
 	ldh a, [hLinkX]
 	sub c
 	add $08
 	ld [hli], a
+;> wOAMBuffer[10] = mem[pose + 2]
 	ld a, [de]
 	inc de
 	ld [hli], a
+;> wOAMBuffer[11] = mem[pose + 3]
 	ld a, [de]
 	ld [hl], a
+;> return
 	ret
 
 
+;@ path: text/dialog
+;@ The y of the dialog's "more text" arrow sprite: 2 bytes, for the box at the top ($37) and at the
+;@ bottom ($7F) of the screen. Read by DrawDialogArrow.
 DialogArrowY::
 	db $37, $7f
 
+;@ def DrawDialogArrow()
+;@ path: text/dialog
+;@ Draws the blinking arrow at the bottom right of a dialog box that waits for a button (shown 16
+;@ frames, hidden 16). Called from the dialog code in bank 0. During the ending it uses sprite 0, tile
+;@ $FE and corrects for the background scroll; otherwise sprite 6 with tile $A2. x is $97 either way.
 DrawDialogArrow::
-	db $f0, $e7, $e6, $10, $c0, $1e, $00, $fa, $9f, $c1, $e6, $80, $28, $01, $1c, $16
-	db $00, $fa, $95, $db, $fe, $01, $28, $18, $21, $05, $7b, $19, $7e, $ea, $18, $c0
-	db $3e, $97, $ea, $19, $c0, $3e, $a2, $ea, $1a, $c0, $3e, $40, $ea, $1b, $c0, $c9
-	db $21, $05, $7b, $19, $7e, $21, $97, $ff, $96, $ea, $00, $c0, $3e, $97, $ea, $01
-	db $c0, $3e, $fe, $ea, $02, $c0, $3e, $40, $ea, $03, $c0, $c9
+;> if hFrameCounter & 0x10:
+	ldh a, [hFrameCounter]
+	and $10
+;>     return                           # blink
+	ret nz
+;> box = 0
+	ld e, $00
+;> if wDialogState & 0x80:              # box at the bottom
+	ld a, [wDialogState]
+	and $80
+	jr z, .type
+
+;>     box = 1
+	inc e
+
+;> if wGameplayType != 1:               # not the ending
+.type
+	ld d, $00
+	ld a, [wGameplayType]
+	cp $01
+	jr z, .ending
+
+;>     wOAMBuffer[0x18] = DialogArrowY[box]
+	ld hl, DialogArrowY
+	add hl, de
+	ld a, [hl]
+	ld [wOAMBuffer + $18], a
+;>     wOAMBuffer[0x19] = 0x97
+	ld a, $97
+	ld [wOAMBuffer + $19], a
+;>     wOAMBuffer[0x1A] = 0xA2          # tile
+	ld a, $a2
+	ld [wOAMBuffer + $1A], a
+;>     wOAMBuffer[0x1B] = 0x40          # attributes: palette OBP0, bit 6
+	ld a, $40
+	ld [wOAMBuffer + $1B], a
+;>     return
+	ret
+
+;> wOAMBuffer[0] = u8(DialogArrowY[box] - hBaseScrollY)
+.ending
+	ld hl, DialogArrowY
+	add hl, de
+	ld a, [hl]
+	ld hl, hBaseScrollY
+	sub [hl]
+	ld [wOAMBuffer], a
+;> wOAMBuffer[1] = 0x97
+	ld a, $97
+	ld [wOAMBuffer + 1], a
+;> wOAMBuffer[2] = 0xFE                 # tile
+	ld a, $fe
+	ld [wOAMBuffer + 2], a
+;> wOAMBuffer[3] = 0x40
+	ld a, $40
+	ld [wOAMBuffer + 3], a
+;> return
+	ret
 
 
+;@ path: text/dialog
+;@ The y of the answer cursor of a question dialog: 2 bytes, for the box at the top ($30) and at the
+;@ bottom ($78). Read by DrawDialogChoiceCursor.
 DialogChoiceY::
 	db $30, $78
 
+;@ path: text/dialog
+;@ The x of the answer cursor: 2 bytes, for the first ($30) and the second ($58) answer. Read by
+;@ DrawDialogChoiceCursor.
 DialogChoiceX::
 	db $30, $58
 
+;@ def DrawDialogChoiceCursor()
+;@ path: text/dialog
+;@ Draws the cursor in front of the chosen answer (wDialogAnswer) of a question dialog. Called from
+;@ the dialog code in bank 0. During the ending it uses sprite 0 and tile $9E and corrects for the
+;@ background scroll; otherwise sprite 6 with tile $3E.
 DrawDialogChoiceCursor::
-	db $1e, $00, $fa, $9f, $c1, $e6, $80, $28, $01, $1c, $16, $00, $fa, $95, $db, $fe
-	db $01, $28, $25, $21, $53, $7b, $19, $7e, $ea, $18, $c0, $1e, $00, $fa, $77, $c1
-	db $e6, $01, $28, $01, $1c, $21, $55, $7b, $19, $7e, $ea, $19, $c0, $3e, $3e, $ea
-	db $1a, $c0, $3e, $00, $ea, $1b, $c0, $c9, $21, $53, $7b, $19, $7e, $21, $97, $ff
-	db $96, $ea, $00, $c0, $1e, $00, $fa, $77, $c1, $e6, $01, $28, $01, $1c, $21, $55
-	db $7b, $19, $7e, $ea, $01, $c0, $3e, $9e, $ea, $02, $c0, $3e, $00, $ea, $03, $c0
-	db $c9
+;> box = 0
+	ld e, $00
+;> if wDialogState & 0x80:              # box at the bottom
+	ld a, [wDialogState]
+	and $80
+	jr z, .type
+
+;>     box = 1
+	inc e
+
+;> if wGameplayType != 1:               # not the ending
+.type
+	ld d, $00
+	ld a, [wGameplayType]
+	cp $01
+	jr z, .ending
+
+;>     wOAMBuffer[0x18] = DialogChoiceY[box]
+	ld hl, DialogChoiceY
+	add hl, de
+	ld a, [hl]
+	ld [wOAMBuffer + $18], a
+;>     answer = 0
+	ld e, $00
+;>     if wDialogAnswer & 1:
+	ld a, [wDialogAnswer]
+	and $01
+	jr z, .x
+
+;>         answer = 1
+	inc e
+
+;>     wOAMBuffer[0x19] = DialogChoiceX[answer]
+.x
+	ld hl, DialogChoiceX
+	add hl, de
+	ld a, [hl]
+	ld [wOAMBuffer + $19], a
+;>     wOAMBuffer[0x1A] = 0x3E          # tile
+	ld a, $3e
+	ld [wOAMBuffer + $1A], a
+;>     wOAMBuffer[0x1B] = 0
+	ld a, $00
+	ld [wOAMBuffer + $1B], a
+;>     return
+	ret
+
+;> wOAMBuffer[0] = u8(DialogChoiceY[box] - hBaseScrollY)
+.ending
+	ld hl, DialogChoiceY
+	add hl, de
+	ld a, [hl]
+	ld hl, hBaseScrollY
+	sub [hl]
+	ld [wOAMBuffer], a
+;> answer = 0
+	ld e, $00
+;> if wDialogAnswer & 1:
+	ld a, [wDialogAnswer]
+	and $01
+	jr z, .x2
+
+;>     answer = 1
+	inc e
+
+;> wOAMBuffer[1] = DialogChoiceX[answer]
+.x2
+	ld hl, DialogChoiceX
+	add hl, de
+	ld a, [hl]
+	ld [wOAMBuffer + 1], a
+;> wOAMBuffer[2] = 0x9E                 # tile
+	ld a, $9e
+	ld [wOAMBuffer + 2], a
+;> wOAMBuffer[3] = 0
+	ld a, $00
+	ld [wOAMBuffer + 3], a
+;> return
+	ret
 
 
+;@ def UpdateEntityPosition(slot: bc)
+;@ path: ending/objects
+;@ Moves an ending object by its x and y speeds (UpdateEntityPosX, UpdateEntityPosY).
 UpdateEntityPosition::
+;> UpdateEntityPosX(slot)
 	call UpdateEntityPosX
+;> return UpdateEntityPosY(slot)        # falls through
 
+;@ def UpdateEntityPosY(slot: bc)
+;@ path: ending/objects
+;@ Moves an ending object by its y speed: UpdateEntityPosX on slot + 16, since the y arrays (wEntityY,
+;@ wEntitySpeedY, wEntitySpeedYAcc) lie 16 bytes after the x arrays.
 UpdateEntityPosY::
+;> UpdateEntityPosX(slot + 16)
 	push bc
 	ld a, c
 	add $10
 	ld c, a
 	call UpdateEntityPosX
 	pop bc
+;> return
 	ret
 
 
+;@ def UpdateEntityPosX(slot: bc)
+;@ path: ending/objects
+;@ Moves an ending object by its x speed (signed, in 1/16 pixel per frame): the low 4 bits go into the
+;@ fraction accumulator wEntitySpeedXAcc, the high 4 bits (sign-extended) plus the accumulator's
+;@ carry are added to wEntityX.
 UpdateEntityPosX::
+;> speed = wEntitySpeedX[slot]
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
+;> if speed == 0:
 	and a
-	jr z, jr_017_7bf0
+;>     return
+	jr z, UpdateEntityPosDone
 
+;> acc = wEntitySpeedXAcc[slot] + ((speed & 0x0F) << 4)
 	push af
 	swap a
 	and $f0
 	ld hl, wEntitySpeedXAcc
 	add hl, bc
 	add [hl]
+;> wEntitySpeedXAcc[slot] = acc & 0xFF
 	ld [hl], a
 	rl d
+;>@pos wEntityX[slot] = u8(wEntityX[slot] + ((speed >> 4) | (0xF0 if speed & 0x80 else 0)) + (acc >> 8))
 	ld hl, wEntityX
+UpdateEntityPosAdd:
 	add hl, bc
 	pop af
 	ld e, $00
 	bit 7, a
-	jr z, jr_017_7be7
+	jr z, .positive
 
+;=@pos
 	ld e, $f0
 
-jr_017_7be7:
+.positive
+;=@pos
 	swap a
 	and $0f
 	or e
@@ -7039,14 +8158,41 @@ jr_017_7be7:
 	adc [hl]
 	ld [hl], a
 
-jr_017_7bf0:
+;> return
+UpdateEntityPosDone:
 	ret
 
 
+;@ def UnusedUpdateEntityPosZ(slot: bc)
+;@ path: unused/ending
+;@ Never called: the same movement for the height (wEntitySpeedZ, wEntitySpeedZAcc, wEntityZ); it
+;@ shares the end of UpdateEntityPosX.
 UnusedUpdateEntityPosZ::
-	db $21, $20, $c3, $09, $7e, $a7, $28, $f7, $f5, $cb, $37, $e6, $f0, $21, $30, $c3
-	db $09, $86, $77, $cb, $12, $21, $10, $c3, $18, $d2
+;> speed = wEntitySpeedZ[slot]
+	ld hl, wEntitySpeedZ
+	add hl, bc
+	ld a, [hl]
+;> if speed == 0:
+	and a
+;>     return
+	jr z, UpdateEntityPosDone
 
+;> acc = wEntitySpeedZAcc[slot] + ((speed & 0x0F) << 4)
+	push af
+	swap a
+	and $f0
+	ld hl, wEntitySpeedZAcc
+	add hl, bc
+	add [hl]
+;> wEntitySpeedZAcc[slot] = acc & 0xFF
+	ld [hl], a
+	rl d
+;> wEntityZ[slot] = u8(wEntityZ[slot] + ((speed >> 4) | (0xF0 if speed & 0x80 else 0)) + (acc >> 8))
+	ld hl, wEntityZ
+	jr UpdateEntityPosAdd
+
+;@ path: unused
+;@ Unused space at the end of bank $17: $3F5 bytes of $FF up to $7FFF.
 Bank17Padding::
 	db $ff, $ff, $ff, $ff, $ff, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff

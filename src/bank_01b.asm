@@ -230,7 +230,7 @@ SilenceNoiseSfx_1B::
 ;> wNoiseSfxLocked = 0
 	ld [wNoiseSfxLocked], a
 ;> mem[0xD3A3] = 0
-	ld [$d3a3], a
+	ld [wSoundUnusedA3], a
 ;> rNR42 = 0x08                              # volume 0
 	ld a, $08
 	ldh [rNR42], a
@@ -901,7 +901,6 @@ SustainNote_1B::
 ;@ Nothing more to do for this channel this frame.
 ;@ test: skip runs the remaining channels
 SkipChannel_1B::
-jr_01b_43cd:
 ;> return NextChannel_1B(timer - 2)
 	dec l
 	dec l
@@ -1187,7 +1186,6 @@ NextNote_1B::
 ;@ $02 = C2); on the noise channel the byte picks a drum of DrumSounds_1B ($FF: the two-step drum).
 ;@ test: skip runs the rest of the music frame
 ReadPattern_1B::
-jr_01b_44a3:
 ;> ch = ptr - 4
 ;> b = ReadPointer_1B(ptr)
 	call ReadPointer_1B
@@ -1524,7 +1522,6 @@ NoiseNote_1B::
 ;@ effect holds the channel) and uses its level byte (+8) with length 0.
 ;@ test: skip the note timer reload pops the pointer pushed here
 PlayNote_1B::
-jr_01b_45ec:
 ;> if wMusicChannel == 1:
 	push hl
 	ld b, $00
@@ -2665,65 +2662,140 @@ Music37::
 	db $20, $99, $a7, $4a, $4a, $46, $46, $46, $46, $42, $42, $42, $42, $40, $40, $3e
 	db $3e, $44, $4a, $00
 
+;@ def SilenceMusicAndNoise_1B()
+;@ path: sound/music/engine
+;@ Entry $4003 (not used by the game): ends any noise effect, silences the noise channel and stops the
+;@ music (EndMusic_1B).
+;@ test: skip resets the whole music state
 SilenceMusicAndNoise_1B::
-	db $af, $ea, $79, $d3, $ea, $4f
-	db $d3, $ea, $98, $d3, $ea, $93, $d3, $ea, $c9, $d3, $ea, $a3, $d3, $ea, $e5, $d3
-	db $3e, $08, $e0, $21, $3e, $80, $e0, $23
+;> wActiveNoiseSfx = 0
+	xor a
+	ld [wActiveNoiseSfx], a
+;> wMusicChannel4[0x0F] = 0
+	ld [wMusicChannel4 + $0F], a
+;> wNoiseSfxStep = 0
+	ld [wNoiseSfxStep], a
+;> wNoiseSfxTimer = 0
+	ld [wNoiseSfxTimer], a
+;> wNoiseSfxLocked = 0
+	ld [wNoiseSfxLocked], a
+;> mem[0xD3A3] = 0
+	ld [wSoundUnusedA3], a
+;> mem[0xD3E5] = 0
+	ld [wSoundUnusedE5], a
+;> rNR42 = 0x08                              # volume 0
+	ld a, $08
+	ldh [rNR42], a
+;> rNR44 = 0x80
+	ld a, $80
+	ldh [rNR44], a
+;> return EndMusic_1B()                      # falls through
 
+;@ def EndMusic_1B()
+;@ path: sound/music/engine
+;@ The music is over: all channels on both sides again, no song playing, and the music state reset.
+;@ test: skip resets the whole music state
 EndMusic_1B::
+;> rNR51 = 0xFF
 	ld a, $ff
 	ldh [rNR51], a
+;> wMusicPanMode = 3
 	ld a, $03
 	ld [wMusicPanMode], a
+;> wActiveMusicTrack = 0
 	xor a
 	ld [wActiveMusicTrack], a
+;> return ResetMusicState_1B()               # falls through
 
+;@ def ResetMusicState_1B()
+;@ path: sound/music/engine
+;@ Clears the effect flags of the music channels and the state of the square- and wave-channel sound
+;@ effects (they stop too), the wave and pitch effects, and silences square channels 1-2, the sweep and
+;@ the wave channel. The noise channel is left alone.
 ResetMusicState_1B::
+;> wActiveJingle = 0
 	xor a
 	ld [wActiveJingle], a
+;> wActiveWaveSfx = 0
 	ld [wActiveWaveSfx], a
-	ld [$d31f], a
-	ld [$d32f], a
-	ld [$d33f], a
+;> wMusicChannel1[0x0F] = 0                     # the channels belong to the music again
+	ld [wMusicChannel1 + $0F], a
+;> wMusicChannel2[0x0F] = 0
+	ld [wMusicChannel2 + $0F], a
+;> wMusicChannel3[0x0F] = 0
+	ld [wMusicChannel3 + $0F], a
+;> wMusicWaveDecay = 0
 	ld [wMusicWaveDecay], a
+;> wMusicWaveDecayFrame = 0
 	ld [wMusicWaveDecayFrame], a
+;> wMusicWaveSwell = 0
 	ld [wMusicWaveSwell], a
+;> wMusicWaveSwellFrame = 0
 	ld [wMusicWaveSwellFrame], a
+;>@pd for i in range(6): wMusicPitchDrop[i] = 0
 	ld [wMusicPitchDrop], a
-	ld [$d3b7], a
-	ld [$d3b8], a
-	ld [$d3b9], a
-	ld [$d3ba], a
-	ld [$d3bb], a
+	ld [wMusicPitchDrop + 1], a
+	ld [wMusicPitchDrop + 2], a
+;=@pd
+	ld [wMusicPitchDrop + 3], a
+	ld [wMusicPitchDrop + 4], a
+	ld [wMusicPitchDrop + 5], a
+;> wJingleStep = 0
 	ld [wJingleStep], a
-	ld [$d395], a
+;> mem[0xD395] = 0
+	ld [wUnusedSfxStep], a
+;> wWaveSfxStep = 0
 	ld [wWaveSfxStep], a
+;> wJingleTimer = 0
 	ld [wJingleTimer], a
-	ld [$d391], a
+;> mem[0xD391] = 0
+	ld [wUnusedSfxTimer], a
+;> wWaveSfxTimer = 0
 	ld [wWaveSfxTimer], a
+;> wJingleLocked = 0
 	ld [wJingleLocked], a
-	ld [$d3c7], a
+;> mem[0xD3C7] = 0
+	ld [wUnusedSfxLocked], a
+;> wWaveSfxLocked = 0
 	ld [wWaveSfxLocked], a
-	ld [$d3a0], a
-	ld [$d3a1], a
-	ld [$d3a2], a
+;> mem[0xD3A0] = 0
+	ld [wSoundUnusedA0], a
+;> mem[0xD3A1] = 0
+	ld [wSoundUnusedA1], a
+;> mem[0xD3A2] = 0
+	ld [wSoundUnusedA2], a
+;> wMusicBlocksWaveSfx = 0
 	ld [wMusicBlocksWaveSfx], a
-	ld [$d3d6], a
-	ld [$d3d7], a
-	ld [$d3d8], a
-	ld [$d3dc], a
+;> mem[0xD3D6] = 0
+	ld [wSfxFastVariant], a
+;> mem[0xD3D7] = 0
+	ld [wJingle22Count], a
+;> mem[0xD3D8] = 0
+	ld [wSoundUnusedD8], a
+;> mem[0xD3DC] = 0
+	ld [wWaveSfx1ECount], a
+;> wWaveRamDirty = 0
 	ld [wWaveRamDirty], a
-	ld [$d3e2], a
-	ld [$d3e3], a
-	ld [$d3e4], a
+;> mem[0xD3E2] = 0
+	ld [wJingleSubStep], a
+;> mem[0xD3E3] = 0
+	ld [wSoundUnusedE3], a
+;> mem[0xD3E4] = 0
+	ld [wSoundUnusedE4], a
+;> rNR12 = 0x08                              # square channels: volume 0
 	ld a, $08
 	ldh [rNR12], a
+;> rNR22 = 0x08
 	ldh [rNR22], a
+;> rNR14 = 0x80                              # restarted: silent
 	ld a, $80
 	ldh [rNR14], a
+;> rNR24 = 0x80
 	ldh [rNR24], a
+;> rNR10 = 0                                 # no sweep
 	xor a
 	ldh [rNR10], a
+;> rNR30 = 0                                 # wave DAC off
 	ldh [rNR30], a
 	ret
 

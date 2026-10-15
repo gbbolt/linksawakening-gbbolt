@@ -5,6 +5,10 @@
 
 SECTION "ROM Bank $00c", ROMX[$4000], BANK[$c]
 
+;@ path: gfx/tiles/common
+;@ Sprite tiles (8 x 16 pairs) of Link's items and effects; LoadTileset03 copies $4000-$43FF to $8000 for the menus (tile set requests 3 and 4). 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+MenuSpriteTiles::
 	db $07, $00, $0b, $07, $1b, $04, $3f, $13, $3f, $14, $3f, $10, $27, $18, $1f, $0d
 	db $17, $0d, $2b, $17, $6f, $30, $78, $27, $37, $0f, $1e, $01, $37, $0e, $1f, $00
 	db $c0, $00, $20, $c0, $18, $e0, $dc, $e8, $fc, $28, $fc, $08, $e4, $18, $f8, $b0
@@ -37,6 +41,10 @@ SECTION "ROM Bank $00c", ROMX[$4000], BANK[$c]
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	db $00, $00, $00, $00, $00, $00, $00, $00, $07, $00, $08, $07, $11, $0f, $13, $0f
 	db $0b, $07, $09, $07, $08, $07, $04, $03, $03, $00, $00, $00, $00, $00, $00, $00
+;@ path: gfx/tiles/common
+;@ Sprite tiles every world map has at $8200 (LoadCommonWorldTiles, tile set requests 5-7) and that the menus get with MenuSpriteTiles; LoadTileset1B (the ending) copies $4220-$423F to $8100. 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+WorldSpriteTiles::
 	db $00, $00, $4c, $00, $50, $00, $70, $00, $88, $70, $e4, $18, $f6, $68, $f7, $6a
 	db $7f, $06, $4e, $30, $76, $38, $4c, $30, $3e, $0c, $1e, $00, $00, $00, $00, $00
 	db $e0, $00, $f0, $60, $f8, $70, $bc, $78, $7e, $3c, $5e, $3c, $2f, $1e, $1f, $06
@@ -53,6 +61,10 @@ SECTION "ROM Bank $00c", ROMX[$4000], BANK[$c]
 	db $fc, $5b, $7f, $20, $38, $10, $18, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $fe, $00, $01, $fe
 	db $01, $fe, $fe, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+;@ path: gfx/tiles/common
+;@ The last $100 bytes of the menus' copy to $8000 (LoadTileset03: $8300-$83FF). 16 tiles.
+;@ asset: tiles bpp=2 length=$100
+MenuSpriteTiles2::
 	db $03, $00, $04, $03, $0b, $07, $14, $0f, $14, $0f, $63, $1f, $b7, $7f, $e7, $7f
 	db $e3, $7f, $ab, $77, $48, $37, $34, $0b, $13, $0c, $18, $07, $0c, $03, $03, $00
 	db $00, $00, $60, $00, $90, $60, $f0, $60, $61, $00, $06, $01, $09, $07, $0b, $07
@@ -69,6 +81,10 @@ SECTION "ROM Bank $00c", ROMX[$4000], BANK[$c]
 	db $00, $00, $00, $00, $00, $00, $18, $00, $28, $10, $70, $20, $e0, $40, $c0, $00
 	db $00, $00, $3c, $00, $5a, $3c, $7e, $3c, $7e, $3c, $5a, $3c, $3c, $00, $00, $00
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+;@ path: gfx/tiles/common
+;@ Sprite tiles at $4400-$479F that no whole-set loader copies: pieces the game copies on its own when they are needed (items and effects). 58 tiles.
+;@ asset: tiles bpp=2 length=$3A0
+ItemSpriteTiles::
 	db $00, $00, $00, $00, $00, $00, $78, $78, $ff, $87, $ff, $84, $7f, $44, $6d, $5e
 	db $7e, $43, $7f, $41, $fe, $82, $fc, $84, $78, $48, $30, $30, $00, $00, $00, $00
 	db $1c, $1c, $3e, $22, $7e, $42, $fc, $84, $ec, $94, $de, $e2, $bf, $c1, $ff, $81
@@ -127,12 +143,24 @@ SECTION "ROM Bank $00c", ROMX[$4000], BANK[$c]
 	db $e0, $08, $e0, $08, $d0, $08, $20, $10, $00, $e0, $00, $00, $00, $00, $00, $00
 	db $00, $00, $00, $00, $44, $00, $28, $00, $10, $00, $28, $00, $44, $00, $00, $00
 	db $00, $00, $00, $00, $44, $00, $28, $00, $10, $00, $28, $00, $44, $00, $00, $00
+;@ path: gfx/tiles/common
+;@ Two tiles that LoadTileset03 copies to $8E00 (the menus). 2 tiles.
+;@ asset: tiles bpp=2 length=$20
+MenuArrowTiles::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $ff, $ff, $ff, $ff
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+;@ path: gfx/tiles/common
+;@ Four tiles that LoadTileset06 copies to $DCC0 in RAM (indoor maps), for later copies into VRAM. 4 tiles.
+;@ asset: tiles bpp=2 length=$40
+WorldRAMTiles::
 	db $00, $00, $41, $00, $63, $00, $77, $00, $3e, $00, $1c, $00, $08, $00, $00, $00
 	db $00, $00, $08, $00, $1c, $00, $3e, $00, $77, $00, $63, $00, $41, $00, $00, $00
 	db $0e, $00, $1c, $00, $38, $00, $70, $00, $38, $00, $1c, $00, $0e, $00, $00, $00
 	db $70, $00, $38, $00, $1c, $00, $0e, $00, $1c, $00, $38, $00, $70, $00, $00, $00
+;@ path: gfx/tiles/common
+;@ Background tiles every world map has at $8800-$8BFF (LoadCommonWorldTiles copies $4800-$4FFF to $8800); the menus get them too (LoadTileset03 copies $4800-$57FF to $8800). 64 tiles.
+;@ asset: tiles bpp=2 length=$400
+CommonWorldTiles::
 	db $00, $00, $06, $06, $0c, $0c, $08, $08, $18, $18, $34, $2c, $7e, $7e, $6e, $9f
 	db $ef, $9f, $8d, $ff, $fd, $ff, $7a, $ff, $66, $7e, $18, $3c, $00, $00, $00, $00
 	db $00, $00, $1c, $1c, $22, $22, $5f, $41, $ff, $ed, $df, $bd, $ab, $9b, $a8, $98
@@ -197,6 +225,10 @@ SECTION "ROM Bank $00c", ROMX[$4000], BANK[$c]
 	db $00, $00, $73, $73, $4a, $4a, $4a, $4a, $72, $72, $4a, $4a, $4a, $4a, $72, $72
 	db $00, $00, $c0, $c0, $40, $40, $40, $40, $40, $40, $40, $40, $40, $40, $40, $40
 	db $40, $40, $40, $40, $40, $40, $40, $40, $40, $40, $40, $40, $c0, $c0, $00, $00
+;@ path: gfx/tiles/common
+;@ Tiles at $8C00 of the world maps: the second half of LoadCommonWorldTiles' copy, and copied again by LoadTileset05 (the overworld, $400 bytes) and LoadTileset06 (indoor maps that are not dungeons, $300). 64 tiles.
+;@ asset: tiles bpp=2 length=$400
+WorldTiles8C00::
 	db $00, $00, $60, $60, $fc, $9c, $fe, $92, $6f, $69, $0f, $09, $7f, $7d, $fe, $82
 	db $fe, $aa, $fe, $82, $7c, $7c, $38, $28, $38, $28, $3e, $2e, $3e, $2a, $3e, $3e
 	db $00, $00, $0f, $0f, $1f, $11, $3f, $25, $3f, $21, $3f, $21, $fe, $e2, $fc, $9c
@@ -261,6 +293,10 @@ SECTION "ROM Bank $00c", ROMX[$4000], BANK[$c]
 	db $fe, $f1, $eb, $1c, $f5, $0e, $f6, $0f, $e6, $1f, $0d, $fb, $1d, $f3, $f1, $ff
 	db $bc, $c3, $be, $c1, $9c, $e3, $81, $ff, $41, $ff, $43, $ff, $7c, $ff, $83, $fc
 	db $ff, $ff, $bb, $c6, $fd, $83, $7d, $83, $01, $ff, $01, $ff, $86, $ff, $79, $ff
+;@ path: gfx/tiles/common
+;@ LoadTileset0B copies $5000-$50FF to $8200; LoadTileset1D (the ending) copies $5000-$57FF to $9000; part of the menus' copy to $8800. 32 tiles.
+;@ asset: tiles bpp=2 length=$200
+Tiles0C5000::
 	db $ff, $e3, $f3, $ec, $f8, $e7, $fc, $eb, $fe, $dd, $ff, $d8, $fe, $d9, $ef, $de
 	db $f7, $cd, $df, $a1, $d6, $ad, $d7, $ae, $cb, $b7, $fc, $c3, $f7, $dc, $ff, $c0
 	db $ff, $c7, $cf, $37, $1f, $e7, $3f, $d7, $7f, $bb, $ff, $1b, $7f, $9b, $f7, $7b
@@ -293,6 +329,10 @@ SECTION "ROM Bank $00c", ROMX[$4000], BANK[$c]
 	db $c0, $00, $38, $c0, $07, $f8, $40, $3f, $08, $07, $80, $00, $a2, $00, $78, $00
 	db $ff, $00, $ff, $00, $ff, $00, $ff, $00, $f8, $00, $c0, $00, $09, $00, $3f, $00
 	db $ff, $00, $ff, $00, $ff, $00, $ff, $00, $1f, $00, $07, $00, $80, $00, $d8, $00
+;@ path: gfx/tiles/overworld
+;@ The overworld's background tiles at $9200-$97FF (LoadTileset05, tile set requests 5 and 7: $600 bytes); the tile at $57E0 is also copied to $97F0 by LoadTileset15 (the ending). 96 tiles.
+;@ asset: tiles bpp=2 length=$600
+OverworldTiles9200::
 	db $01, $00, $07, $03, $0d, $0e, $17, $18, $2f, $30, $6e, $31, $5c, $63, $dc, $63
 	db $ff, $ff, $7f, $80, $f8, $00, $b0, $40, $30, $c0, $38, $c0, $3f, $c0, $1f, $e0
 	db $ff, $ff, $e0, $1f, $f3, $0c, $79, $06, $78, $07, $f8, $07, $f8, $07, $f0, $0f
@@ -389,6 +429,10 @@ SECTION "ROM Bank $00c", ROMX[$4000], BANK[$c]
 	db $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+;@ path: gfx/sprites/link
+;@ Link's sprite tiles: 8 x 16 pairs that the game copies to $8000-$80FF frame by frame as he moves (the copy loops around $1C95 read them in 32- and 64-byte pieces). 256 tiles.
+;@ asset: tiles bpp=2 length=$1000
+LinkSpriteTiles::
 	db $07, $00, $0b, $07, $1b, $04, $3f, $13, $3f, $14, $3f, $10, $27, $18, $1f, $0d
 	db $17, $0d, $2b, $17, $6f, $30, $78, $27, $37, $0f, $1e, $01, $37, $0e, $1f, $00
 	db $c0, $00, $20, $c0, $18, $e0, $dc, $e8, $fc, $28, $fc, $08, $e4, $18, $f8, $b0
@@ -645,6 +689,10 @@ SECTION "ROM Bank $00c", ROMX[$4000], BANK[$c]
 	db $e8, $70, $70, $80, $f0, $60, $f0, $e0, $f0, $00, $78, $80, $bc, $78, $fc, $00
 	db $1b, $00, $3d, $1b, $3f, $18, $3f, $00, $2f, $11, $2f, $15, $2f, $17, $2b, $16
 	db $2b, $16, $15, $0b, $1b, $04, $18, $0f, $27, $1f, $78, $27, $f7, $78, $7f, $00
+;@ path: gfx/tiles/animated
+;@ Frames of the animated background tiles (water, flowers, torches, conveyor belts...) that the VBlank handler copies into the background tiles in turn, chosen by the room's animated-tiles set. 256 tiles.
+;@ asset: tiles bpp=2 length=$1000
+AnimatedTiles::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $1f, $0f, $10, $0f, $10, $0f, $10
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $fc, $f8, $04, $f8, $04, $f8, $04
 	db $0f, $10, $0f, $10, $0f, $10, $0f, $10, $0f, $10, $00, $1f, $00, $00, $00, $00
@@ -901,6 +949,10 @@ SECTION "ROM Bank $00c", ROMX[$4000], BANK[$c]
 	db $f7, $15, $ff, $df, $f5, $d5, $f5, $f5, $95, $95, $27, $25, $c3, $c3, $40, $40
 	db $00, $00, $38, $00, $44, $00, $c6, $00, $c6, $00, $ba, $00, $38, $00, $00, $00
 	db $00, $00, $38, $00, $ba, $00, $c6, $00, $c6, $00, $44, $00, $38, $00, $00, $00
+;@ path: gfx/tiles/common
+;@ LoadTileset0B (tile set request $0B) copies $7800-$7FFF to $8F00. 128 tiles.
+;@ asset: tiles bpp=2 length=$800
+Tiles0C7800::
 	db $3f, $3f, $7f, $61, $ff, $c1, $ff, $8f, $f0, $90, $f0, $90, $f0, $90, $f0, $f0
 	db $f0, $f0, $f0, $90, $f0, $90, $f0, $90, $ff, $8f, $ff, $c1, $7f, $61, $3f, $3f
 	db $00, $00, $1f, $1f, $3f, $20, $7f, $40, $7f, $4c, $7f, $4c, $7f, $40, $7f, $41
