@@ -1,0 +1,29 @@
+{
+  "_doc": "Facts about this game that the gbbolt tools need. Names are labels / RAM names of the disassembly.",
+  "id": "linksawakening",
+  "rom": "la.gb",
+  "sha1": "5ab63def958728933571c3b4f6af54db14f3f8b2",
+  "title": "THE LEGEND OF ZELDA: LINK'S AWAKENING",
+  "publisher": "Nintendo",
+  "year": 1993,
+  "main": "game.asm",
+  "link_flags": [],
+  "fix_flags": [],
+  "entry": "Boot",
+  "jump_table_rst": "0x00",
+  "bank_writes": true,
+  "trace_entries": {},
+  "objects": [
+    "game.asm"
+  ],
+  "asm_flags": [
+    "-E"
+  ],
+  "bank_tables": [
+    {
+      "table": "0x3953",
+      "banks": "0xC000",
+      "count": 233
+    }
+  ]
+}
