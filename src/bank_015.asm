@@ -141,7 +141,7 @@ ResetEntityVariables::
 	ret
 
 
-;@ def CastleGateSwitchHandler(slot: c)
+;@ def CastleGateSwitchHandler(slot: bc)
 ;@ path: object/castle_gate_switch
 ;@ Handler of entity $E7, the unseen watcher of the floor switch that opens Kanalet Castle's
 ;@ gate: once Link has pressed the switch, he is held still for $20 frames, then the screen
@@ -166,7 +166,7 @@ CastleGateSwitchStates::
 	dw CastleGateSwitchPause
 	dw CastleGateSwitchQuake
 
-;@ def CastleGateSwitchWait(slot: c)
+;@ def CastleGateSwitchWait(slot: bc)
 ;@ path: object/castle_gate_switch
 ;@ State 0: waits until Link has pressed the floor switch, then holds him for $20 frames.
 ;@ test: skip calls routines in other banks
@@ -185,7 +185,7 @@ CastleGateSwitchWait::
 	ret
 
 
-;@ def CastleGateSwitchPause(slot: c)
+;@ def CastleGateSwitchPause(slot: bc)
 ;@ path: object/castle_gate_switch
 ;@ State 1: Link stands frozen; after the pause the rumble starts ($30 frames).
 ;@ test: skip calls routines in other banks
@@ -210,7 +210,7 @@ CastleGateSwitchPause::
 	ret
 
 
-;@ def CastleGateSwitchQuake(slot: c)
+;@ def CastleGateSwitchQuake(slot: bc)
 ;@ path: object/castle_gate_switch
 ;@ State 2: the screen shakes sideways (one pixel left and right, switching every 4 frames);
 ;@ at the end Link is released, text $39 opens, the room flag is set and the watcher is removed.
@@ -256,7 +256,7 @@ CastleGateSwitchQuake::
 LeverBlockSprites::
 	db $f8, $10, $fa, $10
 
-;@ def LeverBlockDownHandler(slot: c)
+;@ def LeverBlockDownHandler(slot: bc)
 ;@ path: object/lever_block
 ;@ Handler of entity $46, a solid block tied to the lever (entity $69). Left alone it creeps up to
 ;@ 16 pixels down from where it was placed, one pixel every 14 frames. Each frame Link pulls the
@@ -282,7 +282,7 @@ LeverBlockDownStates::
 	dw LeverBlockDownInit
 	dw LeverBlockDownSlide
 
-;@ def LeverBlockDownInit(slot: c)
+;@ def LeverBlockDownInit(slot: bc)
 ;@ path: object/lever_block
 ;@ State 0: remembers the starting y (wEntityPrivate2) and the end y 16 pixels lower
 ;@ (wEntityPrivate1).
@@ -304,7 +304,7 @@ LeverBlockDownInit::
 	jp IncrementEntityState
 
 
-;@ def LeverBlockDownSlide(slot: c)
+;@ def LeverBlockDownSlide(slot: bc)
 ;@ path: object/lever_block
 ;@ State 1: moves the block by the lever's state (see LeverBlockDownHandler) and keeps Link out.
 ;@ test: skip calls routines in other banks
@@ -381,7 +381,7 @@ LeverBlockDownSlide::
 	inc [hl]
 ;> PushLinkOutOfLeverBlock(slot)              # falls through
 
-;@ def PushLinkOutOfLeverBlock(slot: c)
+;@ def PushLinkOutOfLeverBlock(slot: bc)
 ;@ path: object/lever_block
 ;@ Makes a lever block solid: when Link overlaps it (closer than 12 pixels sideways and from 16
 ;@ above to 12 below), his dash and speed stop and he is put just outside the side he is on.
@@ -471,7 +471,7 @@ PushLinkOutOfLeverBlock::
 	ret
 
 
-;@ def LeverBlockUpHandler(slot: c)
+;@ def LeverBlockUpHandler(slot: bc)
 ;@ path: object/lever_block
 ;@ Handler of entity $47: the lever block that creeps up to 16 pixels up (see
 ;@ LeverBlockDownHandler; pulling the lever moves it back down).
@@ -495,7 +495,7 @@ LeverBlockUpStates::
 	dw LeverBlockUpInit
 	dw LeverBlockUpSlide
 
-;@ def LeverBlockUpInit(slot: c)
+;@ def LeverBlockUpInit(slot: bc)
 ;@ path: object/lever_block
 ;@ State 0: remembers the starting y (wEntityPrivate2) and the end y 16 pixels higher
 ;@ (wEntityPrivate1).
@@ -517,7 +517,7 @@ LeverBlockUpInit::
 	jp IncrementEntityState
 
 
-;@ def LeverBlockUpSlide(slot: c)
+;@ def LeverBlockUpSlide(slot: bc)
 ;@ path: object/lever_block
 ;@ State 1: moves the block by the lever's state and keeps Link out (as LeverBlockDownSlide,
 ;@ the other way round).
@@ -600,7 +600,7 @@ LeverBlockUpSlide::
 	ret
 
 
-;@ def LeverBlockRightHandler(slot: c)
+;@ def LeverBlockRightHandler(slot: bc)
 ;@ path: object/lever_block
 ;@ Handler of entity $48: the lever block that creeps up to 16 pixels to the right (see
 ;@ LeverBlockDownHandler; pulling the lever moves it back left).
@@ -624,7 +624,7 @@ LeverBlockRightStates::
 	dw LeverBlockRightInit
 	dw LeverBlockRightSlide
 
-;@ def LeverBlockRightInit(slot: c)
+;@ def LeverBlockRightInit(slot: bc)
 ;@ path: object/lever_block
 ;@ State 0: remembers the starting x (wEntityPrivate2) and the end x 16 pixels to the right
 ;@ (wEntityPrivate1).
@@ -646,7 +646,7 @@ LeverBlockRightInit::
 	jp IncrementEntityState
 
 
-;@ def LeverBlockRightSlide(slot: c)
+;@ def LeverBlockRightSlide(slot: bc)
 ;@ path: object/lever_block
 ;@ State 1: moves the block by the lever's state and keeps Link out (as LeverBlockDownSlide,
 ;@ sideways).
@@ -729,7 +729,7 @@ LeverBlockRightSlide::
 	ret
 
 
-;@ def LeverBlockLeftHandler(slot: c)
+;@ def LeverBlockLeftHandler(slot: bc)
 ;@ path: object/lever_block
 ;@ Handler of entity $49: the lever block that creeps up to 16 pixels to the left (see
 ;@ LeverBlockDownHandler; pulling the lever moves it back right).
@@ -753,7 +753,7 @@ LeverBlockLeftStates::
 	dw LeverBlockLeftInit
 	dw LeverBlockLeftSlide
 
-;@ def LeverBlockLeftInit(slot: c)
+;@ def LeverBlockLeftInit(slot: bc)
 ;@ path: object/lever_block
 ;@ State 0: remembers the starting x (wEntityPrivate2) and the end x 16 pixels to the left
 ;@ (wEntityPrivate1).
@@ -775,7 +775,7 @@ LeverBlockLeftInit::
 	jp IncrementEntityState
 
 
-;@ def LeverBlockLeftSlide(slot: c)
+;@ def LeverBlockLeftSlide(slot: bc)
 ;@ path: object/lever_block
 ;@ State 1: moves the block by the lever's state and keeps Link out (as LeverBlockDownSlide,
 ;@ sideways).
@@ -864,7 +864,7 @@ LeverBlockLeftSlide::
 CrystalSwitchSprites::
 	db $58, $00, $58, $20
 
-;@ def CrystalSwitchHandler(slot: c)
+;@ def CrystalSwitchHandler(slot: bc)
 ;@ path: object/crystal_switch
 ;@ Handler of entity $66, the crystal switch: it cannot be destroyed (health refilled every
 ;@ frame) and is solid. When a weapon hits it while no raise / lower animation runs, it starts
@@ -919,7 +919,7 @@ CrystalSwitchHandler::
 	ret
 
 
-;@ def BouldersHandler(slot: c)
+;@ def BouldersHandler(slot: bc)
 ;@ path: enemy/boulder
 ;@ Handler of entity $45, the falling boulders of the mountain slopes. The placed entity (state 0)
 ;@ is an invisible spawner: every 48-111 frames, if Link is below the top 24 pixels, it drops a
@@ -1006,7 +1006,7 @@ BoulderBounceSpeedY::
 BoulderBounceSpeedZ::
 	db $18, $20, $1c, $28
 
-;@ def BoulderBouncing(slot: c)
+;@ def BoulderBouncing(slot: bc)
 ;@ path: enemy/boulder
 ;@ A falling boulder (entity $45, state 1): rolls (animation every 8 frames), hurts Link on
 ;@ touch, and bounces down the screen; on each landing it picks a random new bounce from the
@@ -1099,7 +1099,7 @@ BoulderBouncing::
 	ret
 
 
-;@ def TalkingBonesHandler(slot: c)
+;@ def TalkingBonesHandler(slot: bc)
 ;@ path: npc/talking_bones
 ;@ Handler of entity $44, bones that speak when Magic Powder is sprinkled on them: it looks for
 ;@ a powder cloud (entity 8, active, at timer value 8) within 8 pixels of itself and then shows
@@ -1178,7 +1178,7 @@ TalkingBonesHandler::
 	ret
 
 
-;@ def SeashellMansionTreesHandler(slot: c)
+;@ def SeashellMansionTreesHandler(slot: bc)
 ;@ path: npc/seashell_mansion_trees
 ;@ Handler of entity $43, an unseen spot by the trees near the Seashell Mansion: when Link faces
 ;@ it and presses A, text $12 is shown.
@@ -1210,7 +1210,7 @@ FishSpritesPair::
 FishSpritesSingle::
 	db $5c, $00, $5c, $20, $5e, $00, $5e, $00
 
-;@ def FishHandler(slot: c)
+;@ def FishHandler(slot: bc)
 ;@ path: enemy/fish
 ;@ Handler of entity $CC, the fish that swims under the water surface and now and then leaps out
 ;@ in an arc (hurting Link it touches), with a splash at both ends of the jump. Variants below 5
@@ -1259,7 +1259,7 @@ FishStates::
 	dw FishSwim
 	dw FishLeap
 
-;@ def FishInit(slot: c)
+;@ def FishInit(slot: bc)
 ;@ path: enemy/fish
 ;@ State 0: starts swimming to the right; the first leap comes after 64-191 frames.
 ;@ test: skip calls routines in other banks
@@ -1278,7 +1278,7 @@ FishInit::
 	jp IncrementEntityState
 
 
-;@ def FishSwim(slot: c)
+;@ def FishSwim(slot: bc)
 ;@ path: enemy/fish
 ;@ State 1: swims under water (touching Link still hurts him). When the timer runs out it leaps:
 ;@ twice as fast sideways, upward speed $18, drawn with a shadow, with a splash.
@@ -1326,7 +1326,7 @@ FishSplash::
 	ret
 
 
-;@ def FishSwimTurn(slot: c)
+;@ def FishSwimTurn(slot: bc)
 ;@ path: enemy/fish
 ;@ The rest of state 1 while the timer runs: turns around at walls and shows the fin sprite
 ;@ facing the way it swims (variant 5 left, 6 right).
@@ -1369,7 +1369,7 @@ FishSwimTurn::
 FishStrayRet::
 	db $c9
 
-;@ def FishLeap(slot: c)
+;@ def FishLeap(slot: bc)
 ;@ path: enemy/fish
 ;@ State 2: the fish flies in an arc (gravity 1 per frame) and hurts Link on touch, or is hit by
 ;@ his weapons. Rising and falling frames face the way it moves. Back in the water: splash, the
@@ -1453,7 +1453,7 @@ FinalNightmareLightColumnSprites::
 	db $e0, $00, $46, $00, $e0, $08, $7e, $00, $d0, $00, $46, $00, $d0, $08, $7e, $00
 	db $c0, $00, $46, $00, $c0, $08, $7e, $00
 
-;@ def FinalNightmareExit(slot: c)
+;@ def FinalNightmareExit(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ What the final boss entity becomes once beaten (wEntityPrivate5 = 2): a column of light,
 ;@ text $D7, and when Link steps into the light he floats up out of the room and the credits
@@ -1492,7 +1492,7 @@ FinalNightmareExitSteps::
 	dw FinalNightmareExitWaitEnter
 	dw FinalNightmareExitRise
 
-;@ def FinalNightmareExitStart(slot: c)
+;@ def FinalNightmareExitStart(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ Step 0: waits $C0 frames.
 ;@ test: skip calls routines in other banks
@@ -1504,7 +1504,7 @@ FinalNightmareExitStart::
 	jp IncrementEntityState
 
 
-;@ def FinalNightmareExitTalk(slot: c)
+;@ def FinalNightmareExitTalk(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ Step 1: $80 frames in, text $D7 is shown; at the end of the wait the light appears at
 ;@ ($50, $30) with a burst and a chime.
@@ -1572,7 +1572,7 @@ FinalNightmareExitWaitAway::
 	ret
 
 
-;@ def FinalNightmareExitWaitEnter(slot: c)
+;@ def FinalNightmareExitWaitEnter(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ Step 3: waits until Link stands in the light (within 8 pixels of ($50, $30)) on the ground,
 ;@ then starts the rise from y $30.
@@ -1605,7 +1605,7 @@ FinalNightmareExitWaitEnter::
 	ret
 
 
-;@ def FinalNightmareExitRise(slot: c)
+;@ def FinalNightmareExitRise(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ Step 4: Link, held in the light facing up and walking on the spot, floats up one pixel every 4
 ;@ frames while the column grows a row every 8 frames; above y $12 the credits begin.
@@ -1681,7 +1681,7 @@ FinalNightmareExitRise::
 	ret
 
 
-;@ def MoblinKingHandler(slot: c)
+;@ def MoblinKingHandler(slot: bc)
 ;@ path: boss/moblin_king
 ;@ Handler of entity $E4, the big Moblin chief in the Moblins' cave, present only while BowWow is
 ;@ held there. After a word with Link he hops around him keeping some distance and throws spears,
@@ -1789,7 +1789,7 @@ MoblinKingStates::
 	dw MoblinKingRamLink
 	dw MoblinKingGloat
 
-;@ def MoblinKingInit(slot: c)
+;@ def MoblinKingInit(slot: bc)
 ;@ path: boss/moblin_king
 ;@ State 0: stands still for $20 frames, facing Link.
 ;@ test: skip calls routines in other banks
@@ -1823,7 +1823,7 @@ MoblinKingFaceLink::
 	ret
 
 
-;@ def MoblinKingIntro(slot: c)
+;@ def MoblinKingIntro(slot: bc)
 ;@ path: boss/moblin_king
 ;@ State 1: after the pause he speaks (text $191), then the fight begins: first throw after $30
 ;@ frames, option flags $84.
@@ -1886,7 +1886,7 @@ MoblinKingSpearSpeedY::
 MoblinKingHopAim::
 	db $d0, $30
 
-;@ def MoblinKingHop(slot: c)
+;@ def MoblinKingHop(slot: bc)
 ;@ path: boss/moblin_king
 ;@ State 2: hops towards a spot 48 pixels to the side of Link (speed $0C, hop $10 each landing),
 ;@ bobbing his head and facing Link. Every 48-111 frames he throws a spear (entity $0C) at frame
@@ -2053,7 +2053,7 @@ MoblinKingHop::
 MoblinKingChargeSpeed::
 	db $28, $d8
 
-;@ def MoblinKingWindUp(slot: c)
+;@ def MoblinKingWindUp(slot: bc)
 ;@ path: boss/moblin_king
 ;@ State 3: stamps on the spot (stamp sound every 8 frames, poses 2/3), then charges sideways in
 ;@ the direction he faces for up to $22 frames.
@@ -2107,7 +2107,7 @@ MoblinKingWindUp::
 	ret
 
 
-;@ def MoblinKingCharge(slot: c)
+;@ def MoblinKingCharge(slot: bc)
 ;@ path: boss/moblin_king
 ;@ State 4: the charge. Hitting a wall shakes the screen with a crash: he bounces back at a
 ;@ quarter of his speed with a hop ($28) and is dazed for $60 frames (state 5). If the charge
@@ -2191,7 +2191,7 @@ MoblinKingStarY::
 MoblinKingStarX::
 	db $00, $04, $08, $0c, $10, $0c, $08, $04
 
-;@ def MoblinKingStunned(slot: c)
+;@ def MoblinKingStunned(slot: bc)
 ;@ path: boss/moblin_king
 ;@ State 5: dazed after ramming the wall: while it lasts ($60 frames) he can be hurt, stands
 ;@ swaying (poses 12/13) and two stars circle over his head. Then he looks around ($40 frames).
@@ -2313,7 +2313,7 @@ MoblinKingDrawStar::
 	ret
 
 
-;@ def MoblinKingSlowDown(slot: c)
+;@ def MoblinKingSlowDown(slot: bc)
 ;@ path: boss/moblin_king
 ;@ State 6: the charge ended without hitting the wall: he brakes by 2 per frame; once nearly
 ;@ stopped he looks around for $40 frames.
@@ -2359,7 +2359,7 @@ MoblinKingSlowDown::
 	ret
 
 
-;@ def MoblinKingLookAround(slot: c)
+;@ def MoblinKingLookAround(slot: bc)
 ;@ path: boss/moblin_king
 ;@ State 7: stands still turning his head left and right every 16 frames, then goes back to
 ;@ hopping (MoblinKingResumeHopping).
@@ -2372,7 +2372,7 @@ MoblinKingLookAround::
 	jr nz, MoblinKingTurnHead
 ;> MoblinKingResumeHopping(slot)              # falls through
 
-;@ def MoblinKingResumeHopping(slot: c)
+;@ def MoblinKingResumeHopping(slot: bc)
 ;@ path: boss/moblin_king
 ;@ Back to state 2 (hopping); the next charge comes after 32-63 frames of wEntityDropTimer.
 ;@ test: skip calls routines in other banks
@@ -2406,7 +2406,7 @@ MoblinKingTurnHead::
 	ret
 
 
-;@ def MoblinKingRamLink(slot: c)
+;@ def MoblinKingRamLink(slot: bc)
 ;@ path: boss/moblin_king
 ;@ State 8, entered when his charge hits Link: Link is knocked away with the king's speed ($28
 ;@ frames), invincible for $40 frames and loses one heart; then the king gloats ($60 frames).
@@ -2438,7 +2438,7 @@ MoblinKingRamLink::
 	ret
 
 
-;@ def MoblinKingGloat(slot: c)
+;@ def MoblinKingGloat(slot: bc)
 ;@ path: boss/moblin_king
 ;@ State 9: stands facing Link; for the last $40 frames he bobs (poses 0/1 every 32 frames).
 ;@ Then back to hopping.
@@ -2511,7 +2511,7 @@ MoblinKingShadowSprites::
 	db $0c, $ff, $26, $00, $0c, $04, $26, $00
 	db $0c, $09, $26, $00
 
-;@ def MoblinKingDraw(slot: c)
+;@ def MoblinKingDraw(slot: bc)
 ;@ path: boss/moblin_king
 ;@ Draws the Moblin King: his head (unless wMoblinKingHeadFrame is $FF), his body pose and,
 ;@ while he is in the air, his shadow at his ground position.
@@ -2619,7 +2619,7 @@ PokeySpeedY::
 PokeySpeedX::
 	db $00, $04, $06, $04, $00, $fc, $fa, $fc
 
-;@ def PokeyHandler(slot: c)
+;@ def PokeyHandler(slot: bc)
 ;@ path: enemy/pokey
 ;@ Handler of entity $E3, Pokey, the cactus stack of the desert. It wanders in one of 8 random
 ;@ directions for 48-111 frames at a time. Each of the first two hits knocks off a body part:
@@ -2754,7 +2754,7 @@ PokeyHandler::
 	ret
 
 
-;@ def PokeyDraw(slot: c)
+;@ def PokeyDraw(slot: bc)
 ;@ path: enemy/pokey
 ;@ Draws Pokey with as many body parts as it has left (wEntityPrivateCounter = parts lost),
 ;@ and reserves the OAM entries beyond the first two.
@@ -2833,7 +2833,7 @@ PokeyDraw::
 PokeySegmentSprites::
 	db $76, $00, $76, $20
 
-;@ def PokeySegment(slot: c)
+;@ def PokeySegment(slot: bc)
 ;@ path: enemy/pokey
 ;@ A knocked-off Pokey body part: flies straight on, harmless for its first $18 frames, then
 ;@ hurts Link (and can be hit). It bounces off walls; at the third bounce it bursts.
@@ -2877,7 +2877,7 @@ PokeySegment::
 ;>     PokeySegmentBounce(wEntitySpeedY, slot)   # falls through
 	ld hl, wEntitySpeedY
 
-;@ def PokeySegmentBounce(speeds: hl, slot: c) -> carry
+;@ def PokeySegmentBounce(speeds: hl, slot: bc) -> carry
 ;@ path: enemy/pokey
 ;@ Reverses the body part's speed in the array `speeds` (wEntitySpeedX or wEntitySpeedY) with a
 ;@ bump sound and counts the bounce; at the third one it bursts (explosion effect, sound $2F,
@@ -2932,7 +2932,7 @@ PokeySegmentBounce::
 FlameShooterSprites::
 	db $70, $00, $70, $20, $72, $00, $72, $20
 
-;@ def FlameShooterHandler(slot: c)
+;@ def FlameShooterHandler(slot: bc)
 ;@ path: enemy/flame_shooter
 ;@ Handler of entity $E2, the flame shooter. The placed entity spits a flame (another $E2 with
 ;@ wEntityPrivate1 = 1, see FlameShooterFlame) downwards every 16 frames, showing its firing
@@ -3031,7 +3031,7 @@ SmallFlameOffsetX::
 SmallFlameSpeedX::
 	db $f4, $0c
 
-;@ def FlameShooterFlame(slot: c, kind: a)
+;@ def FlameShooterFlame(slot: bc, kind: a)
 ;@ path: enemy/flame_shooter
 ;@ A flame (wEntityPrivate1 = 1) falling from the shooter: it flickers, grows at $20 and $10
 ;@ frames before its end and vanishes after $30 frames. When it touches Link, his invincibility
@@ -3177,7 +3177,7 @@ FlameShooterFlame::
 	ret
 
 
-;@ def FlameShooterSmallFlame(slot: c)
+;@ def FlameShooterSmallFlame(slot: bc)
 ;@ path: enemy/flame_shooter
 ;@ A small flame from a split flame (wEntityPrivate1 = 2): flickers and flies on for $20 frames.
 ;@ test: skip calls routines in other banks
@@ -3222,7 +3222,7 @@ EvasiveStalfosWalkSpeeds::
 EvasiveStalfosBoneSprites::
 	db $48, $00, $48, $60, $48, $40, $48, $20
 
-;@ def EvasiveStalfosHandler(slot: c)
+;@ def EvasiveStalfosHandler(slot: bc)
 ;@ path: enemy/stalfos_evasive
 ;@ Handler of entity $1E, the Stalfos that jumps away from Link's attacks. It walks about,
 ;@ turning at random; when Link presses A or B within 36 pixels it leaps away from him
@@ -3385,7 +3385,7 @@ EvasiveStalfosSteps::
 	dw EvasiveStalfosWalk
 	dw EvasiveStalfosDodgeJump
 
-;@ def EvasiveStalfosWalk(slot: c)
+;@ def EvasiveStalfosWalk(slot: bc)
 ;@ path: enemy/stalfos_evasive
 ;@ Step 0: walks. If Link presses A or B within 36 pixels, it leaps away from him (upward speed
 ;@ $15, speed $12 away, jump sound). Against a wall it turns back (the high nibble of that speed
@@ -3548,7 +3548,7 @@ EvasiveStalfosWalk::
 	ret
 
 
-;@ def EvasiveStalfosDodgeJump(slot: c)
+;@ def EvasiveStalfosDodgeJump(slot: bc)
 ;@ path: enemy/stalfos_evasive
 ;@ Step 1: the leap (gravity 1 per frame; walls checked with the ignore-hits timer briefly set
 ;@ to 1, then left at 0). On landing it walks on at speed (8, 8) and throws a bone 15 frames
@@ -3642,7 +3642,7 @@ LoadFinalNightmareFormTiles::
 	ret
 
 
-;@ def FinalNightmareHandler(slot: c)
+;@ def FinalNightmareHandler(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ Handler of entity $E6, the final boss: a shadow that takes its forms one after the other
 ;@ (wFinalNightmareForm: 0 it rises out of Link's shadow, 1 a giant gel, 2 Agahnim's shadow,
@@ -3711,7 +3711,7 @@ NightmareIntroStates::
 	dw NightmareIntroPulse
 	dw NightmareIntroShrink
 
-;@ def NightmareIntroStart(slot: c)
+;@ def NightmareIntroStart(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ State 0: once Link stands on the ground, the boss music starts, text $F5 is shown and the
 ;@ shadow takes Link's place; its trail of past positions (wEntityWorkRAM x, wEntityWorkRAM2 y,
@@ -3789,7 +3789,7 @@ NightmareIntroStart::
 	ret
 
 
-;@ def NightmareIntroWait(slot: c)
+;@ def NightmareIntroWait(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ State 1: the shadow trail is drawn while the text runs; $30 frames before the end the fight
 ;@ music ($23) starts, at the end a jingle.
@@ -3835,7 +3835,7 @@ NightmareIntroCueMusic::
 	ret
 
 
-;@ def NightmareIntroRise(slot: c)
+;@ def NightmareIntroRise(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ State 2: the shadow shoots upwards, faster every frame, until its speed reaches -24.
 ;@ test: skip calls routines in other banks
@@ -3864,7 +3864,7 @@ NightmareIntroRise::
 	ret
 
 
-;@ def NightmareIntroSlow(slot: c)
+;@ def NightmareIntroSlow(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ State 3: after 8 more frames it brakes by 1 per frame until it stops, then waits $80 frames.
 ;@ test: skip calls routines in other banks
@@ -3894,7 +3894,7 @@ NightmareIntroSlow::
 	ret
 
 
-;@ def NightmareIntroGrow(slot: c)
+;@ def NightmareIntroGrow(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ State 4: the shadow grows one size every 8 frames up to body frame 5, then pulses for $C0
 ;@ frames.
@@ -3937,7 +3937,7 @@ NightmareIntroGrow::
 NightmareShadowPulseFrames::
 	db $06, $05, $07, $05
 
-;@ def NightmareIntroPulse(slot: c)
+;@ def NightmareIntroPulse(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ State 5: the big shadow pulses (NightmareShadowPulseFrames), then shrinks for $2F frames.
 ;@ test: skip calls routines in other banks
@@ -3976,7 +3976,7 @@ NightmareIntroPulse::
 NightmareShadowShrinkFrames::
 	db $08, $00, $01, $02, $03, $04
 
-;@ def NightmareIntroShrink(slot: c)
+;@ def NightmareIntroShrink(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ State 6: the shadow shrinks to a dot; then the next form, the giant gel, begins (state 0) and
 ;@ it becomes harmful to touch.
@@ -4021,7 +4021,7 @@ NightmareIntroShrink::
 	ret
 
 
-;@ def NightmareGel(slot: c)
+;@ def NightmareGel(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ Form 1, the giant gel: it hops at Link. A sword hit makes it burst into 8 pieces and come
 ;@ back elsewhere; Magic Powder hurts it - after 3 powder hits it bursts for good and the next
@@ -4054,7 +4054,7 @@ NightmareGelStates::
 	dw NightmareGelSink
 	dw NightmareGelHidden
 
-;@ def NightmareGelInit(slot: c)
+;@ def NightmareGelInit(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ State 0: waits $80 frames, the hop counter cleared.
 ;@ test: skip calls routines in other banks
@@ -4070,7 +4070,7 @@ NightmareGelInit::
 	jp IncrementEntityState
 
 
-;@ def NightmareGelCrouch(slot: c)
+;@ def NightmareGelCrouch(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ State 1: after the wait the gel rises through its frames 0-3 (one every 8 frames), then jumps
 ;@ at Link (upward speed $28, speed 8 towards him).
@@ -4104,7 +4104,7 @@ NightmareGelCrouch::
 	ret
 
 
-;@ def NightmareGelJump(slot: c)
+;@ def NightmareGelJump(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ State 2: in the air (gravity 2, frame 3 low or 4 high). On every landing the hop counter
 ;@ goes up; after an even hop, at random, it sinks into the floor (state 8, $1F frames),
@@ -4187,7 +4187,7 @@ NightmareGelJump::
 	ret
 
 
-;@ def NightmareGelLanded(slot: c)
+;@ def NightmareGelLanded(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ State 3: squats (frame 5) for a while, then jumps at Link again (speed $0C, upward $20,
 ;@ state 2).
@@ -4219,7 +4219,7 @@ NightmareGelLanded::
 	ret
 
 
-;@ def NightmareGelWaitReappear(slot: c)
+;@ def NightmareGelWaitReappear(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ State 4: after a sword burst the gel is gone for $80 frames, then reappears at a random spot.
 ;@ test: skip calls routines in other banks
@@ -4245,7 +4245,7 @@ PlayNightmareFormSfx::
 	ret
 
 
-;@ def NightmareGelTransform(slot: c)
+;@ def NightmareGelTransform(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ State 5: after the final burst the gel shrinks away (NightmareGelTransformAnim), then the next
 ;@ form begins.
@@ -4257,7 +4257,7 @@ NightmareGelTransform::
 	jr nz, NightmareGelTransformAnim
 ;> NightmareNextForm(slot)                    # falls through
 
-;@ def NightmareNextForm(slot: c)
+;@ def NightmareNextForm(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ Switches the final boss to its next form: requests the form's tiles (into entity tile slots
 ;@ 2 and 3), clears the boss variables, puts it back on the ground, harmless and unseen (sprite
@@ -4345,7 +4345,7 @@ NightmareGelTransformAnim::
 NightmareGelSinkFrames::
 	db $ff, $00, $01, $02
 
-;@ def NightmareGelSink(slot: c)
+;@ def NightmareGelSink(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ State 8: the gel sinks into the floor (NightmareGelSinkFrames), then stays hidden $80 frames.
 ;@ test: skip calls routines in other banks
@@ -4376,7 +4376,7 @@ NightmareGelSink::
 	ret
 
 
-;@ def NightmareGelHidden(slot: c)
+;@ def NightmareGelHidden(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ State 9: hidden under the floor until the timer runs out, then NightmareGelReappear.
 ;@ test: skip calls routines in other banks
@@ -4386,7 +4386,7 @@ NightmareGelHidden::
 	jr nz, NightmareGelReappear.done
 ;> NightmareGelReappear(slot)                 # falls through
 
-;@ def NightmareGelReappear(slot: c)
+;@ def NightmareGelReappear(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ The gel comes back at one of 8 spots of the room (NightmareTeleportX / Y, picked at random)
 ;@ and crouches for the next jump (state 1).
@@ -4439,7 +4439,7 @@ NightmareGelPieceSpeedY::
 NightmareGelPieceSpeedX::
 	db $20, $18, $00, $e8, $e0, $e8, $00, $18
 
-;@ def NightmareGelSplit(slot: c)
+;@ def NightmareGelSplit(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ State 6, entered when Link's sword strikes the gel: it vanishes, bursting into 8 pieces with
 ;@ a splash sound, and is gone for $80 frames (state 4).
@@ -4543,7 +4543,7 @@ SpawnNightmareGelPieces::
 NightmareGelWobbleFrames::
 	db $05, $03, $04, $03
 
-;@ def NightmareGelPowdered(slot: c)
+;@ def NightmareGelPowdered(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ State 7: hit by Magic Powder, the gel quivers ($80 frames) and drops to the ground. Then the
 ;@ powder hit is counted: under 3 it jumps on (state 2); at the third it bursts into pieces for
@@ -4628,7 +4628,7 @@ NightmareBurstIntoPieces::
 	jp SpawnNightmareGelPieces
 
 
-;@ def CheckNightmareGelPowdered(slot: c)
+;@ def CheckNightmareGelPowdered(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ Looks for a Magic Powder cloud (entity 8, active, at timer value 8) within 12 pixels of the
 ;@ gel. If one touches it, the gel flashes, two sounds play, it goes to state 7 for $80 frames
@@ -4726,7 +4726,7 @@ NightmareGelPieceFrames::
 NightmareGelPieceMoveMasks::
 	db $0f, $07, $03, $01, $00, $00
 
-;@ def NightmareGelPiece(slot: c)
+;@ def NightmareGelPiece(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ A piece of the burst gel (entity $E6 with wEntityPrivate5 = 1): flies out, slowing down and
 ;@ shrinking, and vanishes after $2F frames.
@@ -4810,7 +4810,7 @@ NightmareTrailLeadSprites::
 NightmareTrailDelays::
 	db $28, $23, $1e, $19, $14, $0f, $0a, $05
 
-;@ def DrawNightmareShadowTrail(slot: c)
+;@ def DrawNightmareShadowTrail(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ Draws the opening shadow with its trail: 8 small copies at the places it was
 ;@ NightmareTrailDelays frames ago (from the 128-frame position history in wEntityWorkRAM /
@@ -4910,7 +4910,7 @@ DrawNightmareShadowTrail::
 	ret
 
 
-;@ def DrawNightmareShadowBody(slot: c)
+;@ def DrawNightmareShadowBody(slot: bc)
 ;@ path: boss/final_nightmare
 ;@ Draws the opening shadow's body: frame wEntitySpriteVariant of NightmareShadowBodySprites
 ;@ (8 OAM entries) and reserves them.
@@ -4980,7 +4980,7 @@ DrawNightmareGel::
 	ret
 
 
-;@ def NightmareAgahnim(slot: c)
+;@ def NightmareAgahnim(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ Form 2 of the final boss: Agahnim's shadow. It appears at a spot, turns towards Link, charges
 ;@ an energy ball in its hand and throws it, then vanishes and glides as a dark blob to another
@@ -5034,7 +5034,7 @@ NightmareAgahnimStates::
 	dw NightmareAgahnimShrink
 	dw NightmareAgahnimLeave
 
-;@ def NightmareAgahnimCenter(slot: c)
+;@ def NightmareAgahnimCenter(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ State 0: as a dark blob, glides at speed $10 to the spot (X $50, Y $30) at the top of the
 ;@ room; when it is within 3 pixels it starts to appear there (state 1, timer $50).
@@ -5099,7 +5099,7 @@ NightmareAgahnimCenter::
 AgahnimAppearFrames::
 	db $04, $03, $02, $01, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
-;@ def NightmareAgahnimAppear(slot: c)
+;@ def NightmareAgahnimAppear(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ State 1: the blob gathers (AgahnimAppearFrames); when the timer runs out Agahnim's shadow
 ;@ shows itself facing Link, 8 pixels higher, and watches him (state 2, timer $40). The first
@@ -5162,7 +5162,7 @@ NightmareAgahnimAppear::
 AgahnimFacingBase::
 	db $0f, $0a, $05, $00
 
-;@ def NightmareAgahnimWatch(slot: c)
+;@ def NightmareAgahnimWatch(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ State 2: keeps turning towards Link until the timer runs out, then starts to charge a ball
 ;@ (state 3, timer $C0, wave sound $22).
@@ -5180,7 +5180,7 @@ NightmareAgahnimWatch::
 	jp IncrementEntityState
 
 
-;@ def NightmareAgahnimFaceLink(slot: c)
+;@ def NightmareAgahnimFaceLink(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ Turns Agahnim's shadow towards Link: stores the direction in wNightmareFacing, the first frame
 ;@ of that direction (AgahnimFacingBase) in wEntityDirection, and falls through into
@@ -5245,7 +5245,7 @@ AgahnimBallOffsetX::
 AgahnimBallOffsetY::
 	db $00, $00, $f0, $00
 
-;@ def NightmareAgahnimCharge(slot: c)
+;@ def NightmareAgahnimCharge(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ State 3: raises its arms in a 4-step cycle while a ball grows in its hand; until the timer
 ;@ falls below $40 it turns to Link again every 32 frames. When the timer runs out it throws an
@@ -5370,7 +5370,7 @@ NightmareAgahnimCharge::
 	jp NightmareAgahnimSetFrame
 
 
-;@ def NightmareAgahnimVanish(slot: c)
+;@ def NightmareAgahnimVanish(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ State 4: holds the throwing pose (step 4) until the timer runs out, then vanishes into a
 ;@ blob 8 pixels lower (jingle $35) and goes on to pick a new spot (state 5, timer $27).
@@ -5422,7 +5422,7 @@ NightmareTeleportY::
 AgahnimVanishFrames::
 	db $00, $01, $02, $03, $04
 
-;@ def NightmareAgahnimPickSpot(slot: c)
+;@ def NightmareAgahnimPickSpot(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ State 5: the blob sinks (AgahnimVanishFrames); when the timer runs out it picks one of the 8
 ;@ spots at random (NightmareTeleportX/Y) and glides there (state 6, timer $1F).
@@ -5476,7 +5476,7 @@ NightmareAgahnimPickSpot::
 AgahnimTeleportSpeeds::
 	db $18, $14, $10, $0c, $08, $05, $02, $01
 
-;@ def NightmareAgahnimGlide(slot: c)
+;@ def NightmareAgahnimGlide(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ State 6: the blob glides towards the picked spot, faster and faster (AgahnimTeleportSpeeds);
 ;@ within 3 pixels of it, it appears again (state 1, timer $50).
@@ -5551,7 +5551,7 @@ NightmareAgahnimGlide::
 AgahnimSpinFacings::
 	db $00, $0a, $0f, $05
 
-;@ def NightmareAgahnimDefeated(slot: c)
+;@ def NightmareAgahnimDefeated(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ State 7 (set by the fourth ball that hits it, timer $C0): spins faster and faster - the spin
 ;@ speed in $D221 grows to $80, is added up in $D222, and every overflow turns it a quarter
@@ -5586,7 +5586,8 @@ NightmareAgahnimDefeated::
 	ld [wEntityWorkRAM3 + $21], a
 
 .turn
-;> wEntityWorkRAM3[0x22], carry = add(wEntityWorkRAM3[0x22], wEntityWorkRAM3[0x21])
+;> carry = wEntityWorkRAM3[0x22] + wEntityWorkRAM3[0x21] > 0xFF
+;> wEntityWorkRAM3[0x22] = u8(wEntityWorkRAM3[0x22] + wEntityWorkRAM3[0x21])
 	ld a, [wEntityWorkRAM3 + $21]
 	ld hl, wEntityWorkRAM3 + $22
 	add [hl]
@@ -5618,7 +5619,7 @@ NightmareAgahnimDefeated::
 	ret
 
 
-;@ def NightmareAgahnimShrink(slot: c)
+;@ def NightmareAgahnimShrink(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ State 8: the remains shrink (blob frames 2, 1, 0 during the last $18 frames, variant 6
 ;@ before); when the timer runs out the boss jingle plays and it glides off (state 9).
@@ -5650,7 +5651,7 @@ NightmareAgahnimShrink::
 	ret
 
 
-;@ def NightmareAgahnimLeave(slot: c)
+;@ def NightmareAgahnimLeave(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ State 9: glides to the top of the room (X $50, Y $30) at speed $10; there the next form
 ;@ begins (NightmareNextForm, timer $31, full health $FF, wEntityWorkRAM2 cleared for the next
@@ -5712,7 +5713,7 @@ NightmareAgahnimLeave::
 	ret
 
 
-;@ def DrawNightmareAgahnim(slot: c)
+;@ def DrawNightmareAgahnim(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ Draws Agahnim's shadow: the ball charging in its hand, its two hands, then the body.
 ;@ test: skip calls routines in other banks
@@ -5778,7 +5779,7 @@ AgahnimHandBY::
 	db $ed, $ed, $f1, $f1, $fd, $ed, $ed, $f1, $f1, $fd, $eb, $ec
 	db $ed, $ec, $f2, $eb, $ec, $ed, $ec, $f2
 
-;@ def DrawAgahnimHandB(slot: c)
+;@ def DrawAgahnimHandB(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ Draws the second hand of Agahnim's shadow: moves the draw position by AgahnimHandBX/BY for
 ;@ the current sprite variant and goes on into DrawAgahnimHandA's drawing part with the frame
@@ -5809,7 +5810,7 @@ DrawAgahnimHandB::
 	add hl, de
 	jr DrawAgahnimHandA.draw
 
-;@ def DrawAgahnimHandA(slot: c)
+;@ def DrawAgahnimHandA(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ Draws the first hand of Agahnim's shadow at its offset (AgahnimHandAX/AY) for the current
 ;@ sprite variant: frames 0-3 as a 16x16 pair, frames 4-5 as two loose 8x16 sprites; then
@@ -5919,7 +5920,7 @@ AgahnimBodyFrames::
 	db $00, $01, $02, $03, $04, $05, $06, $07, $08, $09, $0a, $0a, $0a, $0a, $0b, $0c
 	db $0c, $0c, $0c, $0d
 
-;@ def DrawAgahnimBody(slot: c)
+;@ def DrawAgahnimBody(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ Draws the body of Agahnim's shadow (8 sprites of the frame AgahnimBodyFrames gives for the
 ;@ current sprite variant) and reserves 8 OAM entries.
@@ -5977,7 +5978,7 @@ AgahnimChargeOffsetX::
 AgahnimChargeOffsetY::
 	db $00, $00, $f0, $04
 
-;@ def DrawAgahnimChargeBall(slot: c)
+;@ def DrawAgahnimChargeBall(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ Draws the charging ball, keeping the shadow's own sprite attributes.
 ;@ test: skip calls routines in other banks
@@ -5993,7 +5994,7 @@ DrawAgahnimChargeBall::
 	ret
 
 
-;@ def DrawAgahnimChargeBallSprite(slot: c)
+;@ def DrawAgahnimChargeBallSprite(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ While a ball is charging (wNightmareChargeFrame), draws it in the hand on the side Agahnim's
 ;@ shadow faces, flickering between palettes and flipped every 8 frames.
@@ -6066,7 +6067,7 @@ AgahnimBallSprites::
 	db $7e, $00, $7e, $20, $7c, $00, $7c, $20, $1e, $00, $1e, $60, $58, $00, $58, $20
 	db $5a, $00, $5a, $20
 
-;@ def AgahnimBall(slot: c)
+;@ def AgahnimBall(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ An energy ball of Agahnim's shadow (entity $E6, wEntityPrivate4 = 1), drawn flickering.
 ;@ States: 0 flying at Link, 1 struck back by the sword, 2 flying back (hurts the shadow),
@@ -6134,7 +6135,7 @@ AgahnimBallStates::
 	dw AgahnimBallReturn
 	dw AgahnimSplitBall
 
-;@ def AgahnimBallFly(slot: c)
+;@ def AgahnimBallFly(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ Ball state 0: flies at Link and can be struck by his sword (which sends it into state 1);
 ;@ leaves a trail and falls through into AgahnimBallTrail.
@@ -6144,7 +6145,7 @@ AgahnimBallFly::
 	call EntityCheckHits
 ;> AgahnimBallTrail(slot)                     # falls through
 
-;@ def AgahnimBallTrail(slot: c)
+;@ def AgahnimBallTrail(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ Every 4th frame leaves a spark behind the ball (entity $E6, wEntityPrivate4 = 1, state 4,
 ;@ variant 1, timer1 $0F, physics flags $C2); the ball is removed when it hits a wall.
@@ -6213,7 +6214,7 @@ AgahnimBallTrail::
 	ret
 
 
-;@ def AgahnimBallReflected(slot: c)
+;@ def AgahnimBallReflected(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ Ball state 1, after Link's sword struck the ball: it flies straight back away from Link at
 ;@ speed $18 while Link is pushed back the other way for $10 frames; then state 2.
@@ -6251,7 +6252,7 @@ AgahnimBallReflected::
 	ret
 
 
-;@ def AgahnimBallReturn(slot: c)
+;@ def AgahnimBallReturn(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ Ball state 2: the struck ball flies on with its trail; if it comes within 16 pixels across
 ;@ and 12 down of the visible shadow (slot in wEntityScratch1) it vanishes and knocks the
@@ -6353,7 +6354,7 @@ AgahnimBallBurstSpeedX::
 AgahnimBallBurstSpeedY::
 	db $20, $e0, $20, $e0
 
-;@ def AgahnimSplitBall(slot: c)
+;@ def AgahnimSplitBall(slot: bc)
 ;@ path: boss/final_nightmare/agahnim
 ;@ Ball state 3: a ball that cannot be struck back. It hurts Link on contact, pulses between two
 ;@ frames every 8 frames, homes in on Link (speed $18, on every second frame while its $1C-frame
@@ -6503,7 +6504,7 @@ NightmareMoldormSpeedX::
 NightmareMoldormBodyFrames::
 	db $06, $07, $00, $01, $02, $03, $04, $05
 
-;@ def NightmareCheckHitsIfActive(slot: c)
+;@ def NightmareCheckHitsIfActive(slot: bc)
 ;@ path: boss/final_nightmare/moldorm
 ;@ Checks the weapons hitting the final boss, unless the game is paused or in a cutscene.
 ;@ test: skip calls routines in other banks
@@ -6553,7 +6554,7 @@ NightmareMoldormFormSprites::
 NightmareMoldormAppearFrames::
 	db $03, $03, $02, $01, $00, $00, $00, $00
 
-;@ def NightmareMoldormAppear(slot: c)
+;@ def NightmareMoldormAppear(slot: bc)
 ;@ path: boss/final_nightmare/moldorm
 ;@ State 0: the shadow grows from a dot into the coiled Moldorm (NightmareMoldormAppearFrames);
 ;@ at timer $20 the sound of a new form plays; when the timer runs out it starts to crawl.
@@ -6620,7 +6621,7 @@ NightmareMoldormAppear::
 NightmareMoldormVanishFrames::
 	db $00, $00, $01, $01, $02, $02, $03, $03
 
-;@ def NightmareMoldormVanish(slot: c)
+;@ def NightmareMoldormVanish(slot: bc)
 ;@ path: boss/final_nightmare/moldorm
 ;@ State 3: the remains shrink to a dot (NightmareMoldormVanishFrames); when the timer runs out
 ;@ the next form begins with full health $FF and the hitbox and flags of Ganon's shadow
@@ -6672,7 +6673,7 @@ NightmareMoldormVanish::
 ;> NightmareMoldormAppear.draw(frames)
 	jr NightmareMoldormAppear.draw
 
-;@ def NightmareMoldormDying(slot: c)
+;@ def NightmareMoldormDying(slot: bc)
 ;@ path: boss/final_nightmare/moldorm
 ;@ State 2: the beaten Moldorm crawls on (NightmareMoldormActive) until its dying timer runs
 ;@ out; then it bursts into pieces and vanishes (state 3, timer $1F).
@@ -6693,7 +6694,7 @@ NightmareMoldormDying::
 	jp IncrementEntityState
 
 
-;@ def NightmareMoldormActive(slot: c)
+;@ def NightmareMoldormActive(slot: bc)
 ;@ path: boss/final_nightmare/moldorm
 ;@ State 1: checks weapon hits, draws the Moldorm and crawls one step. For a while after being
 ;@ hurt (wEntityTimer2) it crawls two steps a frame and its sounds play in their fast variant
@@ -6746,7 +6747,7 @@ NightmareMoldormActive::
 	ldh [hJingle], a
 ;> NightmareMoldormStep(slot)                 # falls through
 
-;@ def NightmareMoldormStep(slot: c)
+;@ def NightmareMoldormStep(slot: bc)
 ;@ path: boss/final_nightmare/moldorm
 ;@ One step of the Moldorm: records the head's position in the 128-entry history
 ;@ (wEntityWorkRAM x, wEntityWorkRAM2 y, at wEntityPrivateCounter) the body follows, moves the
@@ -6819,7 +6820,7 @@ NightmareMoldormHeadSprites::
 NightmareMoldormTailSprites::
 	db $70, $00, $70, $20, $72, $00, $72, $20, $74, $00, $74, $20, $76, $00, $76, $20
 
-;@ def DrawNightmareMoldorm(slot: c)
+;@ def DrawNightmareMoldorm(slot: bc)
 ;@ path: boss/final_nightmare/moldorm
 ;@ Draws the Moldorm: the head (8 sprites), then from the position history the body segments
 ;@ $0C, $18 and $24 steps back and the tail $2E steps back (wiggling every 8 frames and
@@ -6999,7 +7000,7 @@ DrawNightmareMoldorm::
 	ret
 
 
-;@ def NightmareMoldormMove(slot: c)
+;@ def NightmareMoldormMove(slot: bc)
 ;@ path: boss/final_nightmare/moldorm
 ;@ Moves the Moldorm's head in curves: wEntityPrivate1 is its direction (0-15, 0 = right,
 ;@ clockwise), wEntityPrivate2 the turn (+1 or -1) added every 6 frames. Every $10-$2F frames
@@ -7130,7 +7131,7 @@ NightmareMoldormMove::
 	ret
 
 
-;@ def NightmareGanon(slot: c)
+;@ def NightmareGanon(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ Form 4 of the final boss: Ganon's shadow. It raises its trident, sends out six fire bats,
 ;@ throws the spinning trident at Link and glides to another spot while the trident flies back
@@ -7252,7 +7253,7 @@ GanonFormSprites::
 	db $00, $fc, $6a, $00, $00, $04, $6c, $20, $00, $0c, $6a, $20, $f3, $fc, $50, $00
 	db $f3, $04, $52, $00, $f3, $0c, $6e, $00
 
-;@ def NightmareGanonCenter(slot: c)
+;@ def NightmareGanonCenter(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ State 0: as a blob (gel frame 0), glides at speed $10 to the top of the room (X $50, Y $30);
 ;@ within 3 pixels it takes shape (state 1, timer $60).
@@ -7319,7 +7320,7 @@ NightmareGanonCenter::
 GanonAppearFrames::
 	db $04, $03, $02, $01, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
-;@ def NightmareGanonAppear(slot: c)
+;@ def NightmareGanonAppear(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ State 1: the shadow takes Ganon's shape (GanonAppearFrames); when the timer runs out Ganon's
 ;@ shadow stands there 8 pixels higher (variant 4, no trident), the sound of a new form plays
@@ -7383,7 +7384,7 @@ NightmareGanonAppear::
 	ret
 
 
-;@ def NightmareGanonWait(slot: c)
+;@ def NightmareGanonWait(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ State 2: waits for the timer, then raises the trident (state 3, timer $7F).
 ;@ test: skip calls routines in other banks
@@ -7434,7 +7435,7 @@ GanonRaiseTridentFrames::
 	db $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05
 	db $02, $07, $08, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 
-;@ def NightmareGanonRaiseTrident(slot: c)
+;@ def NightmareGanonRaiseTrident(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ State 3: facing right, Ganon's shadow raises its trident (GanonRaiseFrames,
 ;@ GanonRaiseTridentFrames; the trident sits higher while held up), with a noise at timer $58
@@ -7534,7 +7535,7 @@ GanonBatOffsetY::
 GanonBatOffsetX::
 	db $10, $18, $10, $f0, $e8, $f0, $10, $18
 
-;@ def NightmareGanonSpawnBats(slot: c)
+;@ def NightmareGanonSpawnBats(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ State 4: spins the trident in its hand (two-frame body animation) and every 32 frames sends
 ;@ out one of six fire bats (entity $E6 with wEntityPrivate1 = 2, timer $30) in a ring around
@@ -7682,7 +7683,7 @@ NightmareGanonSpawnBats::
 GanonTwirlFrames::
 	db $0b, $0a, $02, $0a
 
-;@ def NightmareGanonThrowTrident(slot: c)
+;@ def NightmareGanonThrowTrident(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ State 5: twirls the trident over its head (GanonTwirlFrames); when the timer runs out it
 ;@ throws it (entity $E6 with wEntityPrivate1 = 1, 8 pixels to the side it faces and 16 higher,
@@ -7794,7 +7795,7 @@ NightmareGanonThrowTrident::
 	ret
 
 
-;@ def NightmareGanonAfterThrow(slot: c)
+;@ def NightmareGanonAfterThrow(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ State 6: holds frame 3 until the timer runs out, then picks one of 8 spots at random
 ;@ (wEntityPrivate2), plays the boss jingle and glides there (state 7, timer $1F).
@@ -7839,7 +7840,7 @@ GanonSpotY::
 GanonGlideSpeeds::
 	db $20, $1e, $1c, $1a, $18, $16, $14, $12, $10, $0e, $0c, $0a, $08, $06, $04, $02
 
-;@ def NightmareGanonGlide(slot: c)
+;@ def NightmareGanonGlide(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ State 7: glides (frame 4) to the spot picked in wEntityPrivate2, faster and faster
 ;@ (GanonGlideSpeeds); within 3 pixels of it it waits for the trident (state 8).
@@ -7919,7 +7920,7 @@ NightmareGanonWaitTrident::
 	ret
 
 
-;@ def NightmareGanonDefeated(slot: c)
+;@ def NightmareGanonDefeated(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ State 9 (after 24 points of damage, timer $80, flashing): when the timer runs out it bursts
 ;@ into pieces, drops the trident and turns into the Lanmola shadow (state 10, timer $40).
@@ -7945,7 +7946,7 @@ NightmareGanonDefeated::
 	ret
 
 
-;@ def NightmareLanmolaAppear(slot: c)
+;@ def NightmareLanmolaAppear(slot: bc)
 ;@ path: boss/final_nightmare/lanmola
 ;@ State 10 of Ganon's shadow: shows the Lanmola's head (gel frame 6 in this form's tiles) until
 ;@ the timer runs out, then clears physics flag bit 6, stops and starts chasing Link (state 11).
@@ -7972,7 +7973,7 @@ NightmareLanmolaAppear::
 	ret
 
 
-;@ def NightmareLanmola(slot: c)
+;@ def NightmareLanmola(slot: bc)
 ;@ path: boss/final_nightmare/lanmola
 ;@ State 11: the Lanmola shadow chases Link, steering its speed by 1 every other frame towards a
 ;@ speed of $18 aimed at him, and leaves a trail segment (entity $E6 with wEntityPrivate1 = 3)
@@ -8088,7 +8089,7 @@ NightmareLanmola::
 	ret
 
 
-;@ def NightmareGanonLeave(slot: c)
+;@ def NightmareGanonLeave(slot: bc)
 ;@ path: boss/final_nightmare/lanmola
 ;@ State 12: after the timer (the boss jingle plays at its end) the beaten Lanmola shadow glides
 ;@ at speed $0C to the top of the room (X $50, Y $30); there it shrinks (state 13, timer $5F).
@@ -8161,7 +8162,7 @@ NightmareGanonLeave::
 GanonShrinkFrames::
 	db $00, $00, $00, $01, $01, $01, $02, $02
 
-;@ def NightmareGanonShrink(slot: c)
+;@ def NightmareGanonShrink(slot: bc)
 ;@ path: boss/final_nightmare/lanmola
 ;@ State 13: the shadow shrinks (GanonShrinkFrames); when the timer runs out DethI begins:
 ;@ it stops, gets full health $FF, physics flags 0, options $C0, drop timer $90 and timer2 $3F,
@@ -8224,7 +8225,7 @@ NightmareGanonShrink::
 	ret
 
 
-;@ def DrawNightmareGanon(slot: c)
+;@ def DrawNightmareGanon(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ Draws Ganon's shadow (states below 10, unless hidden by variant $FF): head and body, arms,
 ;@ then the trident. Facing left (wNightmareFacing = 1) uses variants 5-9 instead of 0-4.
@@ -8277,7 +8278,7 @@ GanonHeadSprites::
 GanonHeadFrames::
 	db $00, $00, $02, $01, $00, $02, $02, $00, $03, $02
 
-;@ def DrawGanonHead(slot: c)
+;@ def DrawGanonHead(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ Draws the head and body of Ganon's shadow (7 sprites of the frame GanonHeadFrames gives for
 ;@ the sprite variant).
@@ -8325,7 +8326,7 @@ GanonArmSprites::
 	db $ff, $ff, $ff, $ff, $fb, $f0, $62, $20, $fb, $f8, $60, $20, $fe, $f8, $66, $00
 	db $00, $10, $66, $20, $ff, $ff, $ff, $ff
 
-;@ def DrawGanonArms(slot: c)
+;@ def DrawGanonArms(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ Draws the arms of Ganon's shadow (3 sprites of GanonArmSprites for the sprite variant).
 ;@ test: skip calls routines in other banks
@@ -8389,7 +8390,7 @@ GanonTridentSprites::
 GanonTridentSpriteCounts::
 	db $08, $06, $06, $06, $04, $04, $04, $04, $04, $04, $04, $04
 
-;@ def DrawGanonTrident(slot: c)
+;@ def DrawGanonTrident(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ If wNightmareTridentFrame is set, draws that trident frame offset by (wNightmareTridentX,
 ;@ wNightmareTridentY) from the entity, reserves its OAM entries and restores the draw
@@ -8461,7 +8462,7 @@ GanonTridentSpinRight::
 GanonTridentSpinLeft::
 	db $00, $01, $02, $03
 
-;@ def GanonTrident(slot: c)
+;@ def GanonTrident(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ The thrown trident (entity $E6 with wEntityPrivate1 = 1): spins with a whirring noise every
 ;@ 16 frames and hurts Link on contact. It flies straight for its $30-frame timer, then homes
@@ -8649,7 +8650,7 @@ NightmareLanmolaTrailSprites::
 NightmareLanmolaTrailFrames::
 	db $00, $00, $01, $01
 
-;@ def NightmareLanmolaTrail(slot: c)
+;@ def NightmareLanmolaTrail(slot: bc)
 ;@ path: boss/final_nightmare/lanmola
 ;@ A segment of the trail the Lanmola shadow leaves (entity $E6 with wEntityPrivate1 = 3):
 ;@ shrinks (NightmareLanmolaTrailFrames) and vanishes when its timer runs out.
@@ -8686,7 +8687,7 @@ NightmareLanmolaTrail::
 GanonBatSprites::
 	db $1e, $00, $1e, $60, $34, $00, $34, $20, $54, $00, $54, $20, $56, $00, $56, $20
 
-;@ def GanonBat(slot: c)
+;@ def GanonBat(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ A fire bat of Ganon's shadow (entity $E6 with wEntityPrivate1 = 2), drawn with its palette
 ;@ flickering every 4 frames. States: 0 a spark that bursts into flame, 1 a flapping bat.
@@ -8713,7 +8714,7 @@ GanonBatStates::
 	dw GanonBatSpark
 	dw GanonBatFly
 
-;@ def GanonBatSpark(slot: c)
+;@ def GanonBatSpark(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ Bat state 0: a spark for $18 frames, then a flame; when its timer runs out it becomes a bat
 ;@ (state 1, timer $20).
@@ -8742,7 +8743,7 @@ GanonBatSpark::
 	ret
 
 
-;@ def GanonBatFly(slot: c)
+;@ def GanonBatFly(slot: bc)
 ;@ path: boss/final_nightmare/ganon
 ;@ Bat state 1: flaps its wings; when its timer gets to 1 it shrieks (noise $28) and aims at
 ;@ Link once with speed $30. It moves on every other frame (alternating by slot), hurts Link on
@@ -8823,7 +8824,7 @@ DethIHeartbeatPeriods::
 DethIAppearFrames::
 	db $03, $02, $01, $00, $00, $00, $00, $00
 
-;@ def NightmareDethI(slot: c)
+;@ def NightmareDethI(slot: bc)
 ;@ path: boss/final_nightmare/dethi
 ;@ Form 5, the last form of the final boss: DethI, a giant eye with two arms of balls that swing
 ;@ around it. While wEntityTimer2 runs the shadow takes its shape (the sound of a new form at
@@ -8880,7 +8881,7 @@ NightmareDethIStates::
 	dw NightmareDethIDefeated
 	dw NightmareDethIRetractArms
 
-;@ def NightmareDethIFight(slot: c)
+;@ def NightmareDethIFight(slot: bc)
 ;@ path: boss/final_nightmare/dethi
 ;@ State 0: DethI hovers 32 pixels above Link (steering its speed by 1 every 16 frames, every 8
 ;@ once it has taken 8 points of damage, towards a speed of 8), its two arms swinging around it
@@ -9144,7 +9145,7 @@ NightmareDethIFight::
 	ret
 
 
-;@ def NightmareDethIDefeated(slot: c)
+;@ def NightmareDethIDefeated(slot: bc)
 ;@ path: boss/final_nightmare/dethi
 ;@ State 1: waits while its last words are shown and it flashes; at timer 2 music $5F starts.
 ;@ When the timer runs out: noise $3D, wave sound $10, and the arms pull in (state 2, timer
@@ -9178,7 +9179,7 @@ NightmareDethIDefeated::
 	ret
 
 
-;@ def NightmareDethIRetractArms(slot: c)
+;@ def NightmareDethIRetractArms(slot: bc)
 ;@ path: boss/final_nightmare/dethi
 ;@ State 2: every 16 frames one ball of the arms disappears ($D223); when none is left DethI
 ;@ bursts into gel pieces with a clink and leaves the light that ends the fight (entity $E6 with
@@ -9249,7 +9250,7 @@ DethIEyeSprites::
 	db $00, $04, $72, $00, $00, $0c, $70, $20, $00, $fc, $74, $00, $00, $04, $76, $00
 	db $00, $0c, $74, $20, $00, $fc, $78, $00, $00, $04, $7a, $00, $00, $0c, $78, $20
 
-;@ def DrawNightmareDethI(slot: c)
+;@ def DrawNightmareDethI(slot: bc)
 ;@ path: boss/final_nightmare/dethi
 ;@ Draws DethI: the pulsing top, the eye (sprite variant), then the arms around a point 8
 ;@ pixels above its position.
@@ -9381,7 +9382,7 @@ DethIArmBallSprites::
 	db $4e, $00, $4e, $20, $4c, $00, $4c, $20
 	db $7c, $00, $7c, $20
 
-;@ def DrawDethIArms(slot: c)
+;@ def DrawDethIArms(slot: bc)
 ;@ path: boss/final_nightmare/dethi
 ;@ Draws DethI's two arms as straight lines of balls at the angles in $D221 (first arm) and
 ;@ $D222 (second arm): with $D223 balls per arm, from the outer ring (variant 2) inwards. The
@@ -9636,7 +9637,7 @@ DrawDethIArms::
 	ret
 
 
-;@ def DrawDethIArmBall(slot: c, variant: a)
+;@ def DrawDethIArmBall(slot: bc, variant: a)
 ;@ path: boss/final_nightmare/dethi
 ;@ Draws one ball of DethI's arms at the current draw position and, if it is within 8 pixels of
 ;@ Link while he is neither invincible nor in the air, hurts him for 8 and knocks him away at
@@ -9715,7 +9716,7 @@ SandCrabSpeedX::
 SandCrabSpeedY::
 	db $00, $00, $fb, $05
 
-;@ def SandCrabHandler(slot: c)
+;@ def SandCrabHandler(slot: bc)
 ;@ path: enemy/sand_crab
 ;@ Handler of entity $C6, the sand crab of the beach: scuttles fast sideways or slowly up and
 ;@ down, picking a new direction at random every 48-175 frames or when it walks into something.
@@ -9803,7 +9804,7 @@ UrchinPushSpeedX::
 UrchinPushSpeedY::
 	db $00, $00, $03, $fd
 
-;@ def UrchinHandler(slot: c)
+;@ def UrchinHandler(slot: bc)
 ;@ path: enemy/urchin
 ;@ Handler of entity $C5, the sea urchin: it does not move by itself and hurts Link on touch,
 ;@ except while he holds up his shield towards it: then the touch is harmless (physics flag bit
@@ -9926,7 +9927,7 @@ UrchinHandler::
 RollingBridgeSpeedY::
 	db $30, $d0
 
-;@ def RollingBridgeHandler(slot: c)
+;@ def RollingBridgeHandler(slot: bc)
 ;@ path: object/rolling_bridge
 ;@ Handler of entity $68, the bridge that unrolls when the hookshot hits a rolled-up bridge
 ;@ (object $9F rolls down, $9E up). The invisible entity moves 3 pixels per frame and turns every
@@ -10107,7 +10108,7 @@ RollingBridgeHandler::
 	ret
 
 
-;@ def BeetleSpawnerHandler(slot: c)
+;@ def BeetleSpawnerHandler(slot: bc)
 ;@ path: enemy/beetle_spawner
 ;@ Handler of entity $B2, a nest that lets small beetles crawl out. The placed entity is
 ;@ invisible: while Link is within 32 pixels it releases a beetle every 64 frames (another $B2
@@ -10205,7 +10206,7 @@ BeetleSpeedY::
 BeetleSprites::
 	db $70, $00, $72, $00, $72, $20, $70, $20
 
-;@ def BeetleSpawnerBeetle(slot: c)
+;@ def BeetleSpawnerBeetle(slot: bc)
 ;@ path: enemy/beetle_spawner
 ;@ A beetle from the nest: crawls (2 frames), passes through walls for its first $20 frames,
 ;@ hurts Link on touch, and turns to a random one of 4 directions every 32-63 frames.
@@ -10284,7 +10285,7 @@ LaserBeamPushLinkX::
 LaserBeamPushLinkY::
 	db $00, $00, $08, $f8
 
-;@ def LaserBeamHandler(slot: c)
+;@ def LaserBeamHandler(slot: bc)
 ;@ path: enemy/laser_beam
 ;@ Handler of entity $2B, a laser shot: it flies straight on leaving a trail (effect 6), hurts
 ;@ Link while not yet reflected, and ends in a spark (effect 5) when it hits something. If
@@ -10398,7 +10399,7 @@ MonkeySprites::
 	db $00, $00, $76, $00, $00, $08, $78, $00, $f0, $00, $7a, $20, $00, $00, $78, $20
 	db $00, $08, $76, $20, $00, $00, $74, $40, $00, $08, $74, $60, $00, $00, $ff, $00
 
-;@ def MonkeyHandler(slot: c)
+;@ def MonkeyHandler(slot: bc)
 ;@ path: enemy/monkey
 ;@ Handler of entity $E0, the monkey sitting in a tree: it throws coconuts at Link (every 16th
 ;@ throw a bomb instead). If Link dashes into its tree with the Pegasus Boots, it tumbles down
@@ -10502,7 +10503,7 @@ MonkeyStates::
 	dw MonkeyFall
 	dw MonkeyRunAway
 
-;@ def MonkeyInit(slot: c)
+;@ def MonkeyInit(slot: bc)
 ;@ path: enemy/monkey
 ;@ State 0: moves 8 pixels right (into its tree) and waits $80 frames.
 ;@ test: skip calls routines in other banks
@@ -10520,7 +10521,7 @@ MonkeyInit::
 	jp IncrementEntityState
 
 
-;@ def MonkeyThrow(slot: c)
+;@ def MonkeyThrow(slot: bc)
 ;@ path: enemy/monkey
 ;@ State 1: every $50 frames the monkey changes pose: sitting, throwing to the left, throwing to
 ;@ the right. With each throwing pose (then $28 frames until the next) it throws a coconut, or
@@ -10639,7 +10640,7 @@ MonkeyThrow::
 	ret
 
 
-;@ def MonkeyFall(slot: c)
+;@ def MonkeyFall(slot: bc)
 ;@ path: enemy/monkey
 ;@ State 2: the monkey tumbles out of the tree (upside-down pose, gravity 2); on landing it
 ;@ hops ($20) and runs away (state 3) with a hop sound.
@@ -10688,7 +10689,7 @@ MonkeyHopSound::
 	ret
 
 
-;@ def MonkeyRunAway(slot: c)
+;@ def MonkeyRunAway(slot: bc)
 ;@ path: enemy/monkey
 ;@ State 3: the monkey runs off, hopping away from Link (each hop 8-23 high, speed $10), with a
 ;@ hop sound every 16 frames, until it leaves the screen.
@@ -10775,7 +10776,7 @@ CoconutBounceSpeedX::
 	db $10, $0c, $00, $f4, $f0, $f4
 	db $00, $0c
 
-;@ def MonkeyCoconut(slot: c)
+;@ def MonkeyCoconut(slot: bc)
 ;@ path: enemy/monkey
 ;@ A thrown coconut: spins, hurts Link on touch, falls with gravity 2 and bounces off the ground
 ;@ in a random direction (height 16-31); the fourth landing ends it.
@@ -10866,7 +10867,7 @@ MonkeyCoconut::
 RatSprites::
 	db $50, $00, $52, $00, $54, $00, $56, $00, $52, $20, $50, $20, $56, $20, $54, $20
 
-;@ def RatHandler(slot: c)
+;@ def RatHandler(slot: bc)
 ;@ path: enemy/rat
 ;@ Handler of entity $E1, a small rat that hops about in random directions, stopping in between
 ;@ to look left and right. Gravity 2 per frame.
@@ -10929,7 +10930,7 @@ RatStates::
 RatSpeeds::
 	db $02, $08, $0c, $08, $fe, $f8, $f4, $f8
 
-;@ def RatPause(slot: c)
+;@ def RatPause(slot: bc)
 ;@ path: enemy/rat
 ;@ State 0: stands still, turning its head every 32 frames; when the pause is over it picks a
 ;@ random speed for x (and facing) and for y and hops for 48-79 frames.
@@ -10996,7 +10997,7 @@ RatPause::
 	ret
 
 
-;@ def RatHop(slot: c)
+;@ def RatHop(slot: bc)
 ;@ path: enemy/rat
 ;@ State 1: hops along (each landing: a new hop of 8 at once), until the hop time is over; then
 ;@ it pauses for $48 frames.
@@ -11109,7 +11110,7 @@ ReserveOAMEntries_15::
 	ret
 
 
-;@ def DrawEntityShadow_15(slot: c)
+;@ def DrawEntityShadow_15(slot: bc)
 ;@ path: entity/draw
 ;@ Draws what goes under an entity after its own sprites: in shallow water (ground status 2) a
 ;@ ripple, in tall grass (ground status 3) grass blades over its feet, and while it is in the air
@@ -11254,7 +11255,7 @@ DrawEntityWaterRipple_15::
 	ret
 
 
-;@ def DrawEntityGrassOverlay_15(slot: c)
+;@ def DrawEntityGrassOverlay_15(slot: bc)
 ;@ path: entity/draw
 ;@ Draws tall-grass blades (tile $1A, two sprites) over the feet of the entity being drawn. While
 ;@ the entity moves, both halves flip with bit 3 of its private counter, so the grass sways.
@@ -11325,7 +11326,7 @@ DrawEntityGrassOverlay_15::
 	ret
 
 
-;@ def CheckLinkBumpsEntity_15(slot: c) -> (carry, a)
+;@ def CheckLinkBumpsEntity_15(slot: bc) -> (carry, a)
 ;@ path: entity/collision
 ;@ For solid characters and objects: if Link walks into the entity, he is put back where he came
 ;@ from, a hookshot chain on its way is set back to its first state and his Pegasus Boots dash stops. Returns carry
@@ -11381,7 +11382,7 @@ CheckLinkBumpsEntity_15::
 DirectionSpriteVariants_15::
 	db $06, $04, $02, $00
 
-;@ def UnusedAnimateByDirection_15(slot: c)
+;@ def UnusedAnimateByDirection_15(slot: bc)
 ;@ path: unused
 ;@ Unused walking animation: the sprite variant is the facing direction's entry of
 ;@ DirectionSpriteVariants_15 plus a frame bit that flips every 16 counts of the private counter.
@@ -11518,7 +11519,7 @@ ReturnIfGameFrozen_15::
 	ret
 
 
-;@ def ApplyRecoilIfNeeded_15(slot: c)
+;@ def ApplyRecoilIfNeeded_15(slot: bc)
 ;@ path: entity/engine
 ;@ While the entity is being knocked back after a hit (wEntityIgnoreHitsTimer running), moves it
 ;@ by its recoil speed instead of its own (stopped by walls unless option bit 5 says otherwise)
@@ -11826,7 +11827,7 @@ ClearEntityStatus_15::
 	ret
 
 
-;@ def BossDefeated_15(slot: c)
+;@ def BossDefeated_15(slot: bc)
 ;@ path: boss/defeat
 ;@ Run every frame by a defeated boss of this bank instead of its fight: the steps of
 ;@ BossDefeatSteps_15, chosen by wEntityPrivate2 (flash, then explode, then leave the reward).
@@ -11845,7 +11846,7 @@ BossDefeatSteps_15::
 	dw BossDefeatFlash_15
 	dw BossDefeatExplode_15
 
-;@ def BossDefeatStart_15(slot: c)
+;@ def BossDefeatStart_15(slot: bc)
 ;@ path: boss/defeat
 ;@ First defeat step: the boss flashes for $A0 frames.
 ;@ test: skip calls routines in other banks
@@ -11871,7 +11872,7 @@ IncrementBossDefeatStep_15::
 	ret
 
 
-;@ def BossDefeatFlash_15(slot: c)
+;@ def BossDefeatFlash_15(slot: bc)
 ;@ path: boss/defeat
 ;@ Second defeat step: when the flashing time is over, $C0 more frames of flashing with
 ;@ explosions follow.
@@ -11893,7 +11894,7 @@ BossDefeatFlash_15::
 	ret
 
 
-;@ def BossDefeatExplode_15(slot: c)
+;@ def BossDefeatExplode_15(slot: bc)
 ;@ path: boss/defeat
 ;@ Last defeat step: explosions burst around the boss every 8 frames; at the end the
 ;@ boss-defeated sound plays and the entity is replaced by its reward (DefeatEntityWithDrop).
@@ -11972,7 +11973,7 @@ SpawnExplosionAtEntity_15::
 	ret
 
 
-;@ def UnusedSpawnType36Drop_15(slot: c)
+;@ def UnusedSpawnType36Drop_15(slot: bc)
 ;@ path: unused
 ;@ Unused: replaces the entity with an entity of type $36 at its place, which pops up out of it
 ;@ (in the side-view areas the speed is set on the old entity instead - a slip in the code).

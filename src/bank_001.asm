@@ -5389,7 +5389,8 @@ ScrollShiftYHigh::
 ;@ For an entity loaded while the screen scrolls into a new room: gives it the next load order number
 ;@ (hMultiPurposeD) and moves it by the scroll's width (ScrollShift tables), so that it sits in the
 ;@ new room as it scrolls in. Keeps bc.
-;@ test: skip 16-bit position arithmetic through the carry
+;@ test: slot = rand(0, 15)
+;@ test: wCurrentBank = $01
 PlaceEntityForRoomScroll::
 ;> wEntityLoadOrder[slot] = hMultiPurposeD
 	ld hl, wEntityLoadOrder
@@ -5424,7 +5425,7 @@ PlaceEntityForRoomScroll::
 	add hl, bc
 	ld a, [hl]
 	ldh [hMultiPurpose3], a
-;>@x x = (wEntityPosXHigh[slot] << 8 | wEntityX[slot]) + (hMultiPurpose1 << 8 | hMultiPurpose0)
+;>@x x = ((wEntityPosXHigh[slot] << 8) | wEntityX[slot]) + ((hMultiPurpose1 << 8) | hMultiPurpose0); wEntityX[slot] = lo(x); wEntityPosXHigh[slot] = hi(x)
 	ld hl, wEntityX
 	add hl, de
 	ldh a, [hMultiPurpose0]
@@ -5438,7 +5439,7 @@ PlaceEntityForRoomScroll::
 	rl c
 	adc [hl]
 	ld [hl], a
-;>@y y = (wEntityPosYHigh[slot] << 8 | wEntityY[slot]) + (hMultiPurpose3 << 8 | hMultiPurpose2)
+;>@y y = ((wEntityPosYHigh[slot] << 8) | wEntityY[slot]) + ((hMultiPurpose3 << 8) | hMultiPurpose2); wEntityY[slot] = lo(y); wEntityPosYHigh[slot] = hi(y)
 	ld hl, wEntityY
 	add hl, de
 	ldh a, [hMultiPurpose2]
@@ -6901,7 +6902,7 @@ BeachSeagullFrameSequence::
 	db $02, $03, $04, $05, $00, $01, $02, $03, $04, $05, $00, $01, $02, $03, $04, $05
 	db $00, $01, $02, $03, $04, $05, $00, $01, $02, $03, $04, $05
 
-;@ def UpdateSeagull(slot: c)
+;@ def UpdateSeagull(slot: bc)
 ;@ path: event/marin_beach
 ;@ Effect type 1, a seagull flying past: waits while its timer runs; then goes on to the next entry of
 ;@ BeachSeagullFrameSequence every 6 frames (wEntityWorkRAM3[slot] is the entry, wEntityWorkRAM3[$10 +
@@ -7023,7 +7024,7 @@ SeaBirdRandomSpeeds::
 ;@ indexed by slot). Their home y is $48.
 SeaBirdHomeX::
 	db $4c, $52, $58, $5c, $60
-;@ def UpdateSeaBird(slot: c)
+;@ def UpdateSeaBird(slot: bc)
 ;@ path: event/marin_beach
 ;@ Effect type 2, a bird hovering above the sea: beats its wings (frames 0-3, one step every 8 frames)
 ;@ while rising and holds them still (frame 3) while sinking; draws its two sprites at OAM entry
@@ -7172,7 +7173,7 @@ UpdateSeaBird::
 .done
 	ret
 
-;@ def MoveSceneObject(slot: c)
+;@ def MoveSceneObject(slot: bc)
 ;@ path: event/marin_beach
 ;@ Moves a scene sprite by its x and y speeds (MoveSceneObjectAxis; the y arrays lie $10 bytes after the
 ;@ x arrays).
@@ -8283,7 +8284,6 @@ IntroLoadTiles::
 ;@ Subtype 2: asks for the storm screen ($0E), sets the palettes, turns on the LCD interrupt for the
 ;@ parallax bands of the sea (rIE 3, rLYC 0), clears the scene variables wEntityWorkRAM[0-$10] and
 ;@ puts Link's boat (entity 2, status 5) at x $C0, y $4E.
-;@ test: skip
 IntroStormInit::
 ;> UpdateIntroStormScroll()
 	call UpdateIntroStormScroll
@@ -8369,7 +8369,6 @@ IntroFlashOBJ0Palettes::
 ;@ storm screen (subtype 4, screen $0F); otherwise scrolls the view by one pixel every 8 frames (the
 ;@ entities keep their place on the sea, so they move left) and at six scroll positions starts a
 ;@ lightning bolt in entity slot 1 or 0.
-;@ test: skip
 IntroStorm::
 ;> DrawIntroRain()
 	call DrawIntroRain
@@ -8592,7 +8591,6 @@ IntroLightningFlash::
 ;@ Subtype 4, the second storm screen (screen $0F) for $A0 frames (wSceneVar1 counts): at $80 changes a
 ;@ block of 2x4 tiles (DrawStormView2Tiles), at $90 and every 128 frames a lightning flash; at $A0 back
 ;@ to the storm screen (subtype 3, screen $0E) with the lightning striking the boat (wSceneVar2 = 1).
-;@ test: skip
 IntroStormView2::
 ;> DrawIntroRain()
 	call DrawIntroRain
@@ -8943,7 +8941,6 @@ IntroSparkleY::
 ;@ Subtype 11, the title screen: every 64 frames a sparkle (status 8, $3F frames) appears at the next of
 ;@ the eight places in a free entity slot (1 or 0). After $A0 x 16 frames the music fades out and the
 ;@ intro goes on to start over.
-;@ test: skip
 IntroTitle::
 ;> UpdateIntroEntities()
 	call UpdateIntroEntities
@@ -9215,7 +9212,7 @@ UpdateIntroEntities::
 	ret
 
 
-;@ def UpdateIntroEntity(slot: c)
+;@ def UpdateIntroEntity(slot: bc)
 ;@ path: title/entities
 ;@ Runs one intro entity by its status: 5 Link's boat (IntroBoat), 6 Marin (IntroMarin), 7 Link on the
 ;@ beach (IntroLink), 8 a sparkle on the title screen (IntroSparkle); 1-4 a lightning bolt of that shape
@@ -9277,12 +9274,12 @@ IntroBoatBoltSprites::
 IntroBoatBob::
 	db $02, $01, $00, $00, $00, $01, $02, $02
 
-;@ def IntroBoat(slot: c)
+;@ def IntroBoat(slot: bc)
 ;@ path: title/storm
 ;@ Status 5, Link's boat: bobs on the waves (IntroBoatBob by the frame counter; still once the lightning
 ;@ has struck) and writes its six sprites straight into OAM entries 0-5; from $10 frames after the strike
 ;@ also the bolt hitting it (entries 6-9).
-;@ test: skip
+;@ test: slot = rand(0, 15)
 IntroBoat::
 ;>@b bob = 0 if wSceneVar2 else (((hFrameCounter + 0xD0) & 0xFF) >> 4) & 7
 	ld a, [wSceneVar2]
@@ -9396,7 +9393,7 @@ IntroLightningSprites::
 	db $18, $08, $30, $20, $18, $00, $2c, $00
 	db $28, $f8, $2e, $00, $28, $f8, $2e, $00
 
-;@ def DrawIntroLightning(slot: c)
+;@ def DrawIntroLightning(slot: bc)
 ;@ path: title/storm
 ;@ Draws a lightning bolt of the shape given by its status (1-4): the 6 sprites at IntroLightningSprites
 ;@ + 24 * (status - 1) at the entity's position; then moves wOAMNextIndex on by 24 bytes.
@@ -9438,7 +9435,7 @@ IntroMarinFrames::
 	db $08, $00, $0a, $00
 	db $0c, $00, $0e, $00
 
-;@ def IntroMarin(slot: c)
+;@ def IntroMarin(slot: bc)
 ;@ path: title/beach
 ;@ Status 6, Marin: keeps the waves sounding, draws her (DrawEntity16x16, IntroMarinFrames) and runs her
 ;@ state from IntroMarinStates.
@@ -9469,12 +9466,13 @@ IntroMarinStates::
 	dw IntroMarinPanSlow       ; 3
 	dw IntroMarinKneel         ; 4
 
-;@ def IntroMarinWalk(slot: c)
+;@ def IntroMarinWalk(slot: bc)
 ;@ path: title/beach
 ;@ State 0: Marin walks left along the beach, one pixel every 4 frames (wEntityPrivateCounter counts),
 ;@ changing her walking frame every 8 frames, while the bands of the view scroll (ScrollIntroBeachFast).
 ;@ Left of x $48 she stops for $40 frames.
-;@ test: skip
+;@ test: slot = rand(0, 15)
+;@ test: wCurrentBank = $01
 IntroMarinWalk::
 ;> ScrollIntroBeachFast()
 	call ScrollIntroBeachFast
@@ -9511,11 +9509,12 @@ IntroMarinWalk::
 	ret
 
 
-;@ def IntroMarinStop(slot: c)
+;@ def IntroMarinStop(slot: bc)
 ;@ path: title/beach
 ;@ State 1: Marin stands still for $40 frames; then Link appears lying on the sand to the right, outside
 ;@ the view (entity 1, status 7, x $FE, y $6E), and the frame counter starts from 0.
-;@ test: skip
+;@ test: slot = rand(0, 15)
+;@ test: wCurrentBank = $01
 IntroMarinStop::
 ;> AnimateIntroSeaTiles()
 	call AnimateIntroSeaTiles
@@ -9551,12 +9550,12 @@ IntroMarinStop::
 	ret
 
 
-;@ def IntroMarinPan(slot: c)
+;@ def IntroMarinPan(slot: bc)
 ;@ path: title/beach
 ;@ State 2: Marin walks on (frame every 4 frames) and the view pans right towards Link: one pixel every
 ;@ second frame, while Link's entity moves left by one pixel a frame. At scroll $20 and $22 the left
 ;@ columns of the background are redrawn (DrawBeachColumn1 / 2); at $30 the pan pauses for $40 frames.
-;@ test: skip
+;@ test: slot = rand(0, 15)
 IntroMarinPan::
 ;> ScrollIntroBeachFast()
 	call ScrollIntroBeachFast
@@ -9604,13 +9603,14 @@ IntroMarinPan::
 	ret
 
 
-;@ def IntroMarinPanSlow(slot: c)
+;@ def IntroMarinPanSlow(slot: bc)
 ;@ path: title/beach
 ;@ State 3: after the pause, the pan goes on more slowly (one pixel every 4 frames, Link's entity one
 ;@ pixel every 2 frames, ScrollIntroBeachSlow), with pauses of $30 frames at scroll $3A and $50 frames at
 ;@ $40. At $56 the scroll jumps to $A0, the band interrupt is switched off (rIE 1) and Marin goes on to
 ;@ kneel by Link ($E0 frames). The background columns are redrawn at $20 / $22 as before.
-;@ test: skip
+;@ test: slot = rand(0, 15)
+;@ test: wCurrentBank = $01
 IntroMarinPanSlow::
 ;> if GetEntityTimer(slot):
 	call GetEntityTimer
@@ -9704,11 +9704,12 @@ IntroMarinPanSlow::
 	jp SetEntitySpriteVariant
 
 
-;@ def IntroMarinKneel(slot: c)
+;@ def IntroMarinKneel(slot: bc)
 ;@ path: title/beach
 ;@ State 4: Marin kneels by Link (frame 2). Every second frame her timer counts down; while it is in
 ;@ $90-$9F, $4A-$4F or $36-$3B she shows frame 3 and Link's entity frame 1.
-;@ test: skip
+;@ test: slot = rand(0, 15)
+;@ test: wCurrentBank = $01
 IntroMarinKneel::
 ;> AnimateIntroSeaTiles()
 	call AnimateIntroSeaTiles
@@ -9762,7 +9763,7 @@ IntroSparkleFrames::
 	db $38, $00, $38, $20,  $3a, $00, $3a, $20,  $3a, $00, $3a, $20,  $3c, $00, $3e, $00
 	db $3c, $00, $3e, $00,  $3a, $00, $3a, $20,  $3a, $00, $3a, $20,  $38, $00, $38, $20
 
-;@ def IntroSparkle(slot: c)
+;@ def IntroSparkle(slot: bc)
 ;@ path: title/screen
 ;@ Status 8, a sparkle on the title screen: counts its timer down, then frees its slot; draws frame
 ;@ (timer >> 3) & 7 of IntroSparkleFrames.
@@ -9860,7 +9861,7 @@ IntroLinkFrames::
 	db $10, $00, $12, $00
 	db $14, $00, $16, $00
 
-;@ def IntroLink(slot: c)
+;@ def IntroLink(slot: bc)
 ;@ path: title/beach
 ;@ Status 7, Link lying on the beach: drawn (DrawEntity16x16, IntroLinkFrames) while on screen
 ;@ (x < $F0); runs his state from IntroLinkStates.
@@ -9893,10 +9894,11 @@ IntroLinkStates::
 	dw IntroScrollToSky        ; 2
 	dw IntroSkyWait            ; 3
 
-;@ def IntroLinkWait(slot: c)
+;@ def IntroLinkWait(slot: bc)
 ;@ path: title/beach
 ;@ State 0: counts the timer down (from 0, so 256 frames), then sets it to $90 for the next state.
-;@ test: skip
+;@ test: slot = rand(0, 15)
+;@ test: wCurrentBank = $01
 IntroLinkWait::
 ;> wEntityTimer[slot] = (wEntityTimer[slot] - 1) & 0xFF
 	call GetEntityTimer
@@ -9911,10 +9913,10 @@ IntroLinkWait::
 	ret
 
 
-;@ def IntroLinkWait2(slot: c)
+;@ def IntroLinkWait2(slot: bc)
 ;@ path: title/beach
 ;@ State 1: counts the timer down once every 4 frames, then goes on.
-;@ test: skip
+;@ test: slot = rand(0, 15)
 IntroLinkWait2::
 ;> if hFrameCounter & 3 == 0:
 	ldh a, [hFrameCounter]
@@ -9934,13 +9936,15 @@ IntroLinkWait2::
 	jp IncrementEntityState
 
 
-;@ def IntroScrollToSky(slot: c)
+;@ def IntroScrollToSky(slot: bc)
 ;@ path: title/beach
 ;@ State 2: the view rises from the beach to the sky. Every 4 frames (wSceneStep counts) Marin and Link
 ;@ move down one pixel (to y $A0 at most) and the view scrolls up one line; every 8 lines the next row of
 ;@ the sky is drawn above it (DrawIntroSkyRow, rows counted in wSceneFadeStep). At row $0B the title music
 ;@ (1) starts. After row $13 the music volume is set to 7 / $70 and Link's timer to $17 for the last wait.
-;@ test: skip
+;@ test: slot = rand(0, 15)
+;@ test: wCurrentBank = $01
+;@ test: wSceneFadeStep = rand(0, 0x13)
 IntroScrollToSky::
 ;> if wSceneFadeStep == 0x13:
 	ld a, [wSceneFadeStep]
@@ -10015,11 +10019,12 @@ IntroScrollToSky::
 	ret
 
 
-;@ def IntroSkyWait(slot: c)
+;@ def IntroSkyWait(slot: bc)
 ;@ path: title/beach
 ;@ State 3: counts the timer down once every 4 frames; then the intro goes on to the title logo (next
 ;@ subtype) and the scene variables and entities 0 and 1 are cleared.
-;@ test: skip
+;@ test: slot = rand(0, 15)
+;@ test: wCurrentBank = $01
 IntroSkyWait::
 ;> if hFrameCounter & 3 == 0:
 	ldh a, [hFrameCounter]
@@ -10537,7 +10542,6 @@ DrawInstruments5To8::
 ;@ Draws the 2x2 tile slots of instruments 1-4 into BG map 1 ($9Dxx; DrawInstruments5To8 does 5-8): an
 ;@ obtained instrument (wDungeonFlags bit 1) shows its picture, a missing one three blank tiles ($7C) and
 ;@ its number in the bottom right corner.
-;@ test: skip
 DrawInstruments1To4::
 ;> end = 4
 	ld c, $04
@@ -10714,9 +10718,9 @@ RoomBorderObjects::
 ;@ path: world/rooms
 ;@ Sets the border around the room's objects in wRoomObjectsArea to $FF (RoomBorderObjects), the end of
 ;@ tile set request 1 (drawing a room).
-;@ test: skip walks a list
+;@ test: wCurrentBank = $01
 FillRoomObjectsBorder::
-;>@l for index in RoomBorderObjects:  # up to the 0xFF
+;>@l for index in mem[RoomBorderObjects:RoomBorderObjects + mem[RoomBorderObjects:RoomBorderObjects + 0x100].index(0xFF)]:   # the list, up to its $FF
 	ld bc, RoomBorderObjects
 .loop
 	ld a, [bc]

@@ -29,8 +29,8 @@ OverworldMusicTracks::
 	db $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05, $05
 ;@ path: sound/music
 ;@ Music track of every indoor map, one byte per map ($00-$1F, index = hMapId): $00-$07 the eight
-;@ dungeons ($14 $15 $16 $17 $4B $58 $5B $5A), $08 and later the houses, caves and special areas ($26 is
-;@ the common house theme). $00 = no track of its own. Read by SelectAreaMusic.
+;@ dungeons ($14 $15 $16 $17 $4B $58 $5B $5A), $08 and later the houses, caves and special areas ($0A the houses,
+;@ $26 the caves). $00 = no track of its own. Read by SelectAreaMusic.
 IndoorMusicTracks::
 	db $14, $15, $16, $17, $4b, $58, $5b, $5a, $12, $26, $26, $26, $26, $26, $07, $02
 	db $0a, $26, $0a, $53, $13, $3e, $1f, $00, $00, $00, $00, $00, $00, $0a, $48, $26
@@ -1479,9 +1479,9 @@ UpdateSword::
 ;@ Sets everything that depends on Link's direction and the sword state (index direction * 6 + state):
 ;@ the sword sprite frame and offsets, Link's pose and sprite offsets, and the sword hitbox (none in
 ;@ some states; with the shield up only on every other frame). Then the sword hits the room's objects.
-;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
+;@ test: wCurrentBank = $02
 UpdateSwordPose::
-;>@i6 i = hLinkDirection * 6 + wSwordAnimationState
+;>@i6 i = u8(hLinkDirection * 6 + wSwordAnimationState)
 	ld hl, wSwordAnimationState
 	ldh a, [hLinkDirection]
 	ld e, a
@@ -1801,6 +1801,7 @@ OcarinaNoteSpeedX::
 ;@ a player without songs gets a message, and Manbo's Mambo starts the warp effect. State $FF is the
 ;@ long performance with a listening character (until $08D0 frames, or A / B), after which that
 ;@ character's state is reset and the area music returns.
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 LinkPlayingOcarina::
 ;> if wOcarinaSongState == 0:
 	ld a, [wOcarinaSongState]
@@ -2420,7 +2421,7 @@ FindDigSpot::
 ;> hMultiPurpose0 = wRoomObjects[square]
 	ld a, [hl]
 	ldh [hMultiPurpose0], a
-;> if GetObjectPhysics(wIsIndoor, hMultiPurpose0) != 0:   # collision type of the object: 0 = floor
+;> if GetObjectPhysics(hMultiPurpose0, wIsIndoor) != 0:   # collision type of the object: 0 = floor
 	ld e, a
 	ld a, [wIsIndoor]
 	ld d, a
@@ -2776,7 +2777,7 @@ LinkMotionSwimming::
 	ld hl, SwimFastSpeedX
 
 .slowX
-;>     diff = table[e] - hLinkSpeedX
+;>     diff = mem[table + e] - hLinkSpeedX
 	add hl, de
 	ld a, [hl]
 	ld hl, hLinkSpeedX
@@ -2802,7 +2803,7 @@ LinkMotionSwimming::
 	ld hl, SwimFastSpeedY
 
 .slowY
-;>     diff = table[e] - hLinkSpeedY
+;>     diff = mem[table + e] - hLinkSpeedY
 	add hl, de
 	ld a, [hl]
 	ld hl, hLinkSpeedY
@@ -3546,9 +3547,9 @@ MagicRodSpriteAttrs::
 ;@ def DrawMagicRod()
 ;@ path: item/magic-rod
 ;@ Draws the magic rod in Link's hand (OAM $C010 and $C014) while he swings it (called from bank 0).
-;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
+;@ test: wCurrentBank = $02
 DrawMagicRod::
-;> e = hLinkDirection + (4 if (wItemUsePoseTimer & 0x7F) >= 8 else 0)
+;> e = u8(hLinkDirection + (4 if (wItemUsePoseTimer & 0x7F) >= 8 else 0))
 	ld a, [wItemUsePoseTimer]
 	and $7f
 	cp $08
@@ -3570,21 +3571,21 @@ DrawMagicRod::
 	add hl, de
 	ld a, [hl]
 	ldh [hMultiPurpose1], a
-;> hMultiPurpose2 = mem[MagicRodSpriteTiles + (e * 2)]
+;> hMultiPurpose2 = mem[MagicRodSpriteTiles + u8(e * 2)]
 	sla e
 	ld hl, MagicRodSpriteTiles
 	add hl, de
 	ld a, [hli]
 	ldh [hMultiPurpose2], a
-;> hMultiPurpose3 = mem[MagicRodSpriteTiles + (e * 2 + 1)]
+;> hMultiPurpose3 = mem[MagicRodSpriteTiles + u8(e * 2) + 1]
 	ld a, [hl]
 	ldh [hMultiPurpose3], a
-;> hMultiPurpose4 = mem[MagicRodSpriteAttrs + (e * 2)]
+;> hMultiPurpose4 = mem[MagicRodSpriteAttrs + u8(e * 2)]
 	ld hl, MagicRodSpriteAttrs
 	add hl, de
 	ld a, [hli]
 	ldh [hMultiPurpose4], a
-;> hMultiPurpose5 = mem[MagicRodSpriteAttrs + (e * 2 + 1)]
+;> hMultiPurpose5 = mem[MagicRodSpriteAttrs + u8(e * 2) + 1]
 	ld a, [hl]
 	ldh [hMultiPurpose5], a
 ;>@y hMultiPurpose0 += wLinkDrawY + wLinkSpriteDY  # sprite y
@@ -3695,13 +3696,14 @@ PlaceMagicRodFireball::
 	jp SetArrowSpeed
 
 
-;@ def OpenLockedOrPushBlock(kind: hMultiPurposeG)
+;@ def OpenLockedOrPushBlock()
 ;@ path: object/blocks
 ;@ Link has pushed long enough against a key block or a movable block (called from the wall check with
 ;@ $20 or $40 in hMultiPurposeG, used here as a scratch byte; the square's probe point in
 ;@ hMultiPurpose4 / 5). $40: the block starts sliding (entity $06 spawned on its square). $20: if Link has
 ;@ a small key of this dungeon, one is used, the block disappears in a puff of smoke and the room
 ;@ remembers it (room status bit 6).
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 OpenLockedOrPushBlock::
 ;> if hMultiPurposeG == 0x40:             # movable block
 	push bc
@@ -3867,6 +3869,7 @@ DebugWarpMaps::
 ;@ staircase that appeared: once Link has stepped off it, stepping back on it (on the ground, carrying
 ;@ nothing) starts a warp. The B + Select debug warp is disabled (its jump is unconditional).
 ;@ test: wCurrentBank = $02
+;@ test: for i in range(16): mem[wVfxType + i] = rand(0, 13)
 UpdateVfxAndStairs::
 ;> wRoomStatus[0x100] = 0
 	xor a
@@ -4070,7 +4073,7 @@ RunTransientVfx::
 	call FreeVfxSlot
 
 .run
-;> TransientVfxHandlers[type - 1]()                # the type's handler
+;> TransientVfxHandlers[type - 1](c)                # the type's handler
 	pop af
 	dec a
 	rst $00
@@ -4861,13 +4864,13 @@ VfxOAMStartOffsets::
 ;@ After an effect drew `count` sprites: moves wOAMNextIndex on by count * 4 (wrapping at $60) and adds
 ;@ them to wOAMEntriesUsed; once $60 bytes have been handed out the next effect starts at a rotating
 ;@ offset (VfxOAMStartOffsets), so that too many sprites flicker instead of vanishing.
-;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
+;@ test: wCurrentBank = $02
 AdvanceVfxOAM::
 ;> n = count * 4
 	sla a
 	sla a
 	ld e, a
-;> wOAMNextIndex = (wOAMNextIndex + n) % 0x60
+;> i = u8(wOAMNextIndex + n); wOAMNextIndex = i - 0x60 if i >= 0x60 else i   # wraps at $60
 	ld a, [wOAMNextIndex]
 	add e
 	cp $60
@@ -5410,7 +5413,7 @@ OpenDoorRows:
 	ret
 
 
-;@ def GetRoomStatusAddress() -> hl
+;@ def GetRoomStatusAddress_02() -> hl
 ;@ path: world/rooms
 ;@ Address of the current room's byte in wRoomStatus: the overworld group, or for indoor maps the first
 ;@ indoor group (maps $00-$05 and $1A-$1F) or the second (maps $06-$19).
@@ -5869,6 +5872,7 @@ RoomEventFired::
 ;@ path: world/room_events
 ;@ Event action 7: entity $2F drops into the room at (x $88, y $30) in a puff of smoke, and the room
 ;@ records its event as done.
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 RoomEventDropEntity::
 ;> RoomEventFired()
 	call RoomEventFired
@@ -6971,7 +6975,7 @@ UpdateRupeeCounter::
 ;@ def DrawRupeeCount()
 ;@ path: menu/status_bar
 ;@ Queues the three digits of wRupeeCount (tiles $B0-$B9) at $9C2A in the status bar.
-;@ test: skip draws through the BG command queue
+;@ test: wCurrentBank = $02
 DrawRupeeCount::
 ;>@cmd cmd = wDrawCommand + wDrawCommandsSize; wDrawCommandsSize += 6
 	ld a, [wDrawCommandsSize]
@@ -7032,8 +7036,26 @@ LowHealthThresholds::
 ;@ frame with a free draw queue moves one eighth of a heart from wAddHealthBuffer or
 ;@ wSubtractHealthBuffer into wHealth and redraws the hearts. At 0 health a medicine bottle, if any,
 ;@ refills the hearts (8, plus $80 added) and makes Link invincible for a while.
-;@ test: skip jumps to its own block .medicine, named UseMedicine in the pseudo-code
 UpdateHealthCounter::
+;>@med1 def medicine():
+;>@med2     if not wMedicineCount:                       # a medicine bottle saves Link
+;>@med3         return
+;>@med4     wMedicineCount -= 1
+;>@med5     wHealth = 8
+;>@med6     wAddHealthBuffer += 0x80
+;>@med7     wInvincibilityCounter = 0xA0
+;>@cmd     cmd = wDrawCommand + wDrawCommandsSize; wDrawCommandsSize += 4
+;>@med8     mem[cmd:cmd + 3] = (0x9C, 0x93, 0x00)       # 1 tile: the medicine count
+;>@med9     tile = 0xB0 + wMedicineCount
+;>@med10     if tile != 0xB0:
+;>@med11         mem[cmd + 3] = tile
+;>@med12         mem[cmd + 4] = 0
+;>@med13     else:                                        # no bottle left: blank the count and the icon
+;>@med14         mem[cmd + 3] = 0x7F
+;>@med15         mem[cmd + 4:cmd + 7] = (0x9C, 0x72, 0xC1)   # 2 tiles down, repeated
+;>@med16         mem[cmd + 7] = 0x7F
+;>@med17         mem[cmd + 8] = 0
+;>@med18         wDrawCommandsSize += 4
 ;> wLowHealth = 0
 	xor a
 	ld [wLowHealth], a
@@ -7156,7 +7178,7 @@ UpdateHealthCounter::
 ;> if wHealth == 0:
 	ld a, [wHealth]
 	and a
-;>     return UseMedicine()
+;>     return medicine()
 	jr z, .medicine
 
 .done
@@ -7165,26 +7187,27 @@ UpdateHealthCounter::
 
 
 .medicine
-;> if not wMedicineCount:                       # a medicine bottle saves Link
+;=@med1
+;=@med2
 	ld a, [wMedicineCount]
 	and a
-;>     return
+;=@med3
 	jr z, .noMedicine
 
-;> wMedicineCount -= 1
+;=@med4
 	dec a
 	ld [wMedicineCount], a
-;> wHealth = 8
+;=@med5
 	ld a, $08
 	ld [wHealth], a
-;> wAddHealthBuffer += 0x80
+;=@med6
 	ld a, [wAddHealthBuffer]
 	add $80
 	ld [wAddHealthBuffer], a
-;> wInvincibilityCounter = 0xA0
+;=@med7
 	ld a, $a0
 	ld [wInvincibilityCounter], a
-;>@cmd cmd = wDrawCommand + wDrawCommandsSize; wDrawCommandsSize += 4
+;=@cmd
 	ld a, [wDrawCommandsSize]
 	ld e, a
 	ld d, $00
@@ -7193,47 +7216,47 @@ UpdateHealthCounter::
 	ld hl, wDrawCommand
 ;=@cmd
 	add hl, de
-;> mem[cmd:cmd + 3] = (0x9C, 0x93, 0x00)       # 1 tile: the medicine count
+;=@med8
 	ld a, $9c
 	ld [hli], a
 	ld a, $93
 	ld [hli], a
 	ld a, $00
 	ld [hli], a
-;> tile = 0xB0 + wMedicineCount
+;=@med9
 	ld a, [wMedicineCount]
 	add $b0
-;> if tile != 0xB0:
+;=@med10
 	cp $b0
 	jr z, .lastBottle
 
-;>     mem[cmd + 3] = tile
+;=@med11
 	ld [hli], a
-;>     mem[cmd + 4] = 0
+;=@med12
 	xor a
 	ld [hl], a
 	ret
 
 
 .lastBottle
-;> else:                                        # no bottle left: blank the count and the icon
-;>     mem[cmd + 3] = 0x7F
+;=@med13
+;=@med14
 	ld a, $7f
 	ld [hli], a
-;>     mem[cmd + 4:cmd + 7] = (0x9C, 0x72, 0xC1)   # 2 tiles down, repeated
+;=@med15
 	ld a, $9c
 	ld [hli], a
 	ld a, $72
 	ld [hli], a
 	ld a, $c1
 	ld [hli], a
-;>     mem[cmd + 7] = 0x7F
+;=@med16
 	ld a, $7f
 	ld [hli], a
-;>     mem[cmd + 8] = 0
+;=@med17
 	xor a
 	ld [hl], a
-;>     wDrawCommandsSize += 4
+;=@med18
 	ld a, [wDrawCommandsSize]
 	add $04
 	ld [wDrawCommandsSize], a
@@ -7256,7 +7279,7 @@ HeartRowsBlankCommand::
 ;@ path: menu/status_bar
 ;@ Queues the hearts of the status bar: wHealth / 8 full hearts (tile $A9), a part heart ($CE) for the
 ;@ rest, then empty hearts ($CD) up to wMaxHearts; 7 per row.
-;@ test: skip draws through the BG command queue
+;@ test: wCurrentBank = $02
 DrawHearts::
 ;> start = wDrawCommandsSize; wDrawCommandsSize += 20
 	ld a, [wDrawCommandsSize]
@@ -7289,7 +7312,7 @@ DrawHearts::
 	pop de
 	ld hl, wDrawCommand + 3
 	add hl, de
-;> c = 0                                        # hearts written
+;> c, part = 0, False                           # hearts written
 	ld c, $00
 ;> if wHealth:
 	ld a, [wHealth]
@@ -7305,20 +7328,20 @@ DrawHearts::
 	ldh a, [hMultiPurpose0]
 	sub $08
 	ldh [hMultiPurpose0], a
-;>         if hMultiPurpose0 < 0: break
+;>         if hMultiPurpose0 >= 0xF8: break     # went below 0: what is left + 8 is the last heart
 	jr c, .part
 
 ;>         mem[hl] = 0xA9; hl += 1              # full heart
 	ld a, $a9
 	ld [hli], a
-;>         c += 1
+;>         c = u8(c + 1)                       # (c is a byte: it wraps)
 	inc c
 ;>         if c == 7:
 	ld a, c
 	cp $07
 	jr nz, .fullNext
 
-;>             hl += 3                          # on to the second row
+;>             hl = (hl & 0xFF00) | u8(hl + 3)  # on to the second row (within the page)
 	ld a, l
 	add $03
 	ld l, a
@@ -7327,34 +7350,36 @@ DrawHearts::
 	jr .full
 
 .part
-;>     if hMultiPurpose0 + 8:
+;>     part = u8(hMultiPurpose0 + 8) != 0
 	add $08
 	jr z, .empty
 
-;>         mem[hl] = 0xCE; hl += 1              # part heart; on with c += 1 below
+;>     if part:
+;>         mem[hl] = 0xCE; hl += 1              # a part heart
 	ld a, $ce
 	ld [hli], a
 	jr .nextEmpty
 
 .empty
-;> while c != wMaxHearts:
+;> while part or c != wMaxHearts:
 	ld a, [wMaxHearts]
 	cp c
 	jr z, .done
 
-;>     mem[hl] = 0xCD; hl += 1                  # empty heart
+;>     if not part: mem[hl] = 0xCD; hl += 1     # an empty heart
 	ld a, $cd
 	ld [hli], a
 
 .nextEmpty
-;>     c += 1
+;>     part = False
+;>     c = u8(c + 1)
 	inc c
 ;>     if c == 7:
 	ld a, c
 	cp $07
 	jr nz, .loop
 
-;>         hl += 3
+;>         hl = (hl & 0xFF00) | u8(hl + 3)
 	ld a, l
 	add $03
 	ld l, a
@@ -7395,11 +7420,13 @@ DrawItemSlotsAB::
 	ld b, $00
 	ld e, $ff
 
-;@ def DrawItemSlots(slot: c, stop: e)
+;@ def DrawItemSlots(slot: bc, stop: e)
 ;@ path: menu/inventory
 ;@ Queues the item slots from slot c down to (not including) stop: per slot two commands of 3 tiles
 ;@ (top and bottom row of the item in wItemB[slot]), the bottom row ending in the item's level or count.
-;@ test: skip draws through the BG command queue
+;@ test: wCurrentBank = $02
+;@ test: slot = rand(1, 11)
+;@ test: stop = rand(0, slot - 1)
 DrawItemSlots::
 ;> if mem[0x0004]:                              # a ROM byte that is 0: never
 	ld a, [$0004]
@@ -7407,7 +7434,7 @@ DrawItemSlots::
 ;>     return
 	ret nz
 
-;> hMultiPurpose1 = wItemB[slot]                # the item (wItemB, wItemA, then the inventory)
+;> hMultiPurpose1 = mem[addr(wItemB) + slot]                # the item (wItemB, wItemA, then the inventory)
 	push de
 	push bc
 	ld hl, wItemB
@@ -7486,7 +7513,7 @@ DrawItemSlots::
 	ld a, [de]
 	add $20
 	ld [hl], a
-;>@hi mem[cmd + 6] = mem[address] + carry
+;>@hi mem[cmd + 6] = mem[address] + ((mem[address + 1] + 0x20) >> 8)   # with the carry
 	dec de
 	dec hl
 	ld a, [de]
@@ -7536,79 +7563,99 @@ DrawItemSlots::
 ;@ Writes the last two bottom tiles of an item slot (item hMultiPurpose1): the sword, shield and power
 ;@ bracelet show their level as the second tile, bombs, arrows (bow) and magic powder their count,
 ;@ the ocarina the number of the selected song; other items (and the toadstool) their own two tiles.
-;@ test: skip its pseudo-code names local parts of the unit as functions
+;@ test: dest = rand(0xC000, 0xCFF0)
+;@ test: tiles = rand(0xC000, 0xCFF0)
+;@ test: hMultiPurpose1 = rand(0, 15)
+;@ test: wCurrentBank = $02
 DrawItemSlotLevel::
+;>@ow1 def own_tiles():                          # .ownTiles: the item's own two tiles
+;>@ow2     mem[dest] = mem[tiles]; mem[dest + 1] = mem[tiles + 1]
+;>@ow3     return dest + 2
+;>@lv1 def show_level(level):                    # .level: the first tile, then the level digit
+;>@lv2     mem[dest] = mem[tiles]
+;>@lv3     mem[dest + 1] = 0xB0 + level; return dest + 2
+;>@pw1 def powder():                             # .powder
+;>@pw2     if wHasToadstool: return own_tiles()     # the toadstool's tiles
+;>@pw3     return DrawTwoDigits(wMagicPowderCount, dest)
+;>@oc1 def ocarina():                            # .ocarina
+;>@oc2     if not wOcarinaSongFlags: return own_tiles()
+;>@oc3     s = u8(wSelectedSong + 1)
+;>@oc4     p = DrawTwoDigits(((s << 4) | (s >> 4)) & 0xFF, dest)
+;>@oc5     mem[p - 1] = 0x7F; return p              # just the song number
 ;> item = hMultiPurpose1
 	ldh a, [hMultiPurpose1]
 ;> if item == 0x09:                             # ocarina
 	cp $09
-;>     return show_song_number()
+;>     return ocarina()
 	jr z, .ocarina
 
 ;> if item == 0x0C:                             # magic powder
 	cp $0c
-;>     return show_powder_count()
+;>     return powder()
 	jr z, .powder
 
 ;> if item == 0x01:                             # sword
 	dec a
-;>     return show_level(wSwordLevel)
+;>@sw     return show_level(wSwordLevel)
 	jr z, .sword
 
 ;> if item == 0x02:                             # bombs
 	dec a
-;>     return DrawTwoDigits(wBombCount)
+;>@bo     return DrawTwoDigits(wBombCount, dest)
 	jr z, .bombs
 
 ;> if item == 0x03:                             # power bracelet
 	dec a
-;>     return show_level(wPowerBraceletLevel)
+;>@br     return show_level(wPowerBraceletLevel)
 	jr z, .bracelet
 
 ;> if item == 0x04:                             # shield
 	dec a
-;>     return show_level(wShieldLevel)
+;>@sh     return show_level(wShieldLevel)
 	jr z, .shield
 
 ;> if item == 0x05:                             # bow
 	dec a
-;>     return DrawTwoDigits(wArrowCount)
+;>@ar     return DrawTwoDigits(wArrowCount, dest)
 	jr z, .arrows
+;> return own_tiles()
 
 .ownTiles
-;> mem[hl:hl + 2] = mem[de:de + 2]              # the item's own tiles
+;=@ow1
+;=@ow2
 	ld a, [de]
 	inc de
 	ld [hli], a
 	ld a, [de]
 	inc de
 	ld [hli], a
-;> return
+;=@ow3
 	ret
 
 
 .bracelet
-;> level = wPowerBraceletLevel
+;=@br
 	ld a, [wPowerBraceletLevel]
 	jr .level
 
 .shield
-;> level = wShieldLevel
+;=@sh
 	ld a, [wShieldLevel]
 	jr .level
 
 .sword
-;> level = wSwordLevel
+;=@sw
 	ld a, [wSwordLevel]
 
 .level
-;> mem[hl] = mem[de]                            # first tile, then the level digit
+;=@lv1
+;=@lv2
 	add $b0
 	ld c, a
 	ld a, [de]
 	inc de
 	ld [hli], a
-;> mem[hl + 1] = 0xB0 + level
+;=@lv3
 	ld a, c
 	inc de
 	ld [hli], a
@@ -7616,29 +7663,30 @@ DrawItemSlotLevel::
 
 
 .powder
-;> if wHasToadstool:
+;=@pw1
+;=@pw2
 	ld a, [wHasToadstool]
 	and a
-;>     return own_tiles()                       # the toadstool's tiles
 	jr nz, .ownTiles
 
-;> return DrawTwoDigits(wMagicPowderCount)
+;=@pw3
 	ld a, [wMagicPowderCount]
 	jr DrawTwoDigits
 
 .ocarina
-;> if not wOcarinaSongFlags:
+;=@oc1
+;=@oc2
 	ld a, [wOcarinaSongFlags]
 	and a
-;>     return own_tiles()
 	jp z, .ownTiles
 
-;> DrawTwoDigits((wSelectedSong + 1) << 4)
+;=@oc3
 	ld a, [wSelectedSong]
 	inc a
+;=@oc4
 	swap a
 	call DrawTwoDigits
-;> mem[hl - 1] = 0x7F                           # just the song number
+;=@oc5
 	dec hl
 	ld [hl], $7f
 	inc hl
@@ -7646,12 +7694,12 @@ DrawItemSlotLevel::
 
 
 .arrows
-;> return DrawTwoDigits(wArrowCount)
+;=@ar
 	ld a, [wArrowCount]
 	jr DrawTwoDigits
 
 .bombs
-;> value = wBombCount                           # on into DrawTwoDigits
+;=@bo
 	ld a, [wBombCount]
 
 ;@ def DrawTwoDigits(value: a, hl: hl) -> hl
@@ -7911,7 +7959,7 @@ DrawSwordPowerSparkle::
 	ld e, $00
 
 .find
-;>     if wItemB[e] == 0x01:                    # the sword
+;>     if mem[addr(wItemB) + e] == 0x01:                    # the sword
 	ld a, [hli]
 	cp $01
 ;>         break
@@ -8305,7 +8353,7 @@ MoveInventoryCursor::
 	ld hl, wSongMenuCloseTimer
 	ld a, [wSongMenuOpenTimer]
 	or [hl]
-;>     return DrawSelectedInventorySlot.return()
+;>     return                                   # (DrawSelectedInventorySlot.return is its ret)
 	jp nz, DrawSelectedInventorySlot.return
 
 ;> if hJoypadPressed & 0x10:                    # A: swap the selected item onto A
@@ -8373,7 +8421,7 @@ MoveInventoryCursor::
 ;> if not (hJoypadPressed & 0x20):              # B: swap the selected item onto B
 	ldh a, [hJoypadPressed]
 	and $20
-;>     return DrawSelectedInventorySlot.return()
+;>     return                                   # (DrawSelectedInventorySlot.return is its ret)
 	jr z, DrawSelectedInventorySlot.return
 
 ;> old = wItemB
@@ -8424,7 +8472,8 @@ MoveInventoryCursor::
 	ld [wSongMenuCloseTimer], a
 
 .drawB
-;> DrawItemSlots(slot=0, stop=-1)               # the B slot; then on into DrawSelectedInventorySlot
+;> DrawItemSlots(slot=0, stop=-1)               # the B slot
+;> return DrawSelectedInventorySlot()           # runs on into it
 	ld c, $00
 	ld b, $00
 	ld e, $ff
@@ -9839,6 +9888,7 @@ SideViewApplyMotion:
 .fall
 ;> hLinkSpeedY += 1
 	inc [hl]
+;> return SideViewMotionDone()    # (runs on into it)
 
 ;@ def SideViewMotionDone()
 ;@ path: link/side_view
@@ -10072,7 +10122,7 @@ SideViewProbe::
 	or e
 	ld e, a
 	ld d, $00
-;>@obj hRoomObjectType = wRoomObjects[square]      # (the address wraps within its page)
+;>@obj hRoomObjectType = mem[0xD700 | u8(addr(wRoomObjects) + square)]   # wRoomObjects[square], the address wrapping within its page
 	ld hl, wRoomObjects
 	ld a, h
 	add hl, de
@@ -10116,8 +10166,89 @@ SetSideViewBlocked::
 ;@ while the D-pad points that way, unless he dashes, swims or is in a side-view room) or is stopped;
 ;@ some side-view rooms instead leave the side view through their edges (warps). Then the walls are
 ;@ checked (CollideLinkWithWalls).
-;@ test: skip its pseudo-code names local parts of the unit as functions
 CollideLinkWithRoom::
+;>@edge1 def edgeY():                                   # .edgeY
+;>@edge2     if hIsSideScrolling: return sideViewY()      # the top or bottom edge
+;>@edge3     if hMapId != 0x1F:
+;>@edge4         return transition()
+;>@edge5     if hMapRoom not in (0xF5, 0xF2):         # (those two warp out)
+;>@edge6         return transition()
+;>@edge7     return StartWarpFadeOutWithNoise()
+;>@side1 def sideViewY():                               # .sideViewY
+;>@side2     if hMapRoom in (0xE8, 0xF8):
+;>@side3         return transition()
+;>@side4     if hMapRoom == 0xFD:
+;>@side5         return blockY()
+;>@side6     if hMapRoom in (0xA3, 0xC0, 0xC1):
+;>@side7         return StartWarpFadeOutWithNoise()
+;>@side8     if hMapRoom != 0xFF: return otherRoom()
+;>@side9     if hLinkY < 0x50 and not wEntityStatus[0]:
+;>@side10         return transition()
+;>@side11     return blockY()
+;>@bloc1 def blockY():                                  # .blockY
+;>@bloc2         hLinkY = hLinkPrevY                      # .blockY: stopped at the edge
+;>@bloc3         hLinkSpeedY = 0
+;>@bloc4         return walls()
+;>@othe1 def otherRoom():                               # .otherRoom
+;>@othe2     if hLinkMotionStep == 2:                     # swimming
+;>@othe3         return transition()
+;>@othe4     return StartWarpFadeOutWithNoise()           # out of the side view
+;>@edge8 def edgeX():                                   # .edgeX
+;>@edge9     hLinkX = hLinkPrevX                          # left / right edge
+;>@edge10     hLinkSpeedX = 0
+;>@edge11     if not hIsSideScrolling:
+;>@edge12         return transition()
+;>@edge13     if hMapRoom in (0xF5, 0xFD):
+;>@edge14         return StartWarpFadeOutMusic()
+;>@edge15     if hMapRoom == 0xE9:
+;>@edge16         return StartWarpFadeOutWithNoise()
+;>@cs     if hMapRoom in (0xE8, 0xF8, 0xEF, 0xFF):    # closed sides
+;>@edge17         return walls()
+;>@edge18     if hMapRoom == 0xC0:
+;>@edge19         return walls() if hLinkX < 0x30 else transition()
+;>@edge20     if hMapRoom == 0xC1 and hLinkX >= 0x50:
+;>@edge21         return walls()
+;>@edge22     return transition()
+;>@tran1 def transition():                              # .transition
+;>@tran2     RestoreLinkPosition()                        # .transition: scroll into the next room?
+;>@tran3     if wLinkGroundType in (0x50, 0x51):
+;>@tran4         return stop()
+;>@tran5     if wLinkGroundVfx == 0x07:
+;>@tran6         return stop()
+;>@tran7     if wLinkMotionState == 0x06:                 # falling
+;>@tran8         return stop()
+;>@tran9     if not hIsSideScrolling and wIsLinkInTheAir:
+;>@tran10         return stop()
+;>@tran11     if not wIsUsingPegasusBoots and wSwordPokeTimer:
+;>@tran12         return stop()
+;>@tran13     if wLinkPushedTimer or wBumpShakeTimer:
+;>@tran14         return stop()
+;>@pad     if hLinkY < 0x88 and not (wIsUsingPegasusBoots or hIsSideScrolling or hLinkInWater):
+;>@tran15         if not (hJoypadHeld & 0x0F):            # the D-pad must point at the edge
+;>@tran16             return stop()
+;>@tran17         if not (hJoypadHeld & 0x03) or (hJoypadHeld & 0x03) - 1 != edge:
+;>@tran18             v = (hJoypadHeld >> 2) & 0x03
+;>@tran19             if not v or v + 1 != edge:
+;>@tran20                 return stop()
+;>@e8     if hMapRoom == 0xE8 and hMapId != 0x1F and wIsIndoor:
+;>@tran21         wScrollXOffset = 0
+;>@tran22         rSCX = 0
+;>@tran23     wRoomTransitionDirection = edge
+;>@tran24     wRoomTransitionState = 1
+;>@tran25     wPegasusBootsChargeMeter = 0
+;>@tran26     wSpinAttackTimer = 0
+;>@tran27     wIsUsingPegasusBoots = 0
+;>@tran28     if hLinkY >= 0x88:                           # through the bottom: arrive in the air
+;>@tran29         wIsLinkInTheAir = 2
+;>@tran30         hLinkPositionZ = 8
+;>@tran31     return walls()
+;>@wall1 def walls():                                   # .walls
+;>@wall2     CollideLinkWithWalls()                       # .walls
+;>@wall3     return
+;>@stop1 def stop():                                    # .stop
+;>@stop2     wLinkPushedTimer = StopLinkSpeed()           # .stop: no transition
+;>@stop3     CollideLinkWithWalls()
+;>@stop4     return
 ;> if wDialogState or wInventoryAppearing:
 	ld a, [wDialogState]
 	ld hl, wInventoryAppearing
@@ -10154,26 +10285,26 @@ CollideLinkWithRoom::
 	ld e, $02
 	ldh a, [hLinkY]
 	cp $0c
-;>     edge = 2                                 # top
+;>     edge = 2; return edgeY()                 # top
 	jr c, .edgeY
 
 ;> elif hLinkY >= 0x84:
 	inc e
 	cp $84
-;>     edge = 3                                 # bottom
+;>     edge = 3; return edgeY()                 # bottom
 	jr nc, .edgeY
 
 ;> elif hLinkX < 0x04:
 	ld e, $01
 	ldh a, [hLinkX]
 	cp $04
-;>     edge = 1                                 # left
+;>     edge = 1; return edgeX()                 # left
 	jr c, .edgeX
 
 ;> elif hLinkX >= 0x9C:
 	dec e
 	cp $9c
-;>     edge = 0                                 # right
+;>     edge = 0; return edgeX()                 # right
 	jr nc, .edgeX
 
 ;> else:
@@ -10182,46 +10313,48 @@ CollideLinkWithRoom::
 
 
 .edgeY
-;> if edge in (2, 3) and not hIsSideScrolling:
+;=@edge1
+;=@edge2
 	ldh a, [hIsSideScrolling]
 	and a
 	jr nz, .sideViewY
 
-;>     if hMapId != 0x1F:
+;=@edge3
 	ldh a, [hMapId]
 	cp $1f
-;>         return transition()
+;=@edge4
 	jp nz, .transition
 
-;>     if hMapRoom in (0xF5, 0xF2):
+;=@edge5
 	ldh a, [hMapRoom]
 	cp $f5
 	jp z, StartWarpFadeOutWithNoise
 
 	cp $f2
-;>         return transition()
+;=@edge6
 	jp nz, .transition
 
-;>     return StartWarpFadeOutWithNoise()
+;=@edge7
 	jp StartWarpFadeOutWithNoise
 
 
 .sideViewY
-;> if edge in (2, 3) and hMapRoom in (0xE8, 0xF8):
+;=@side1
+;=@side2
 	ldh a, [hMapRoom]
 	cp $e8
 	jp z, .transition
 
 	cp $f8
-;>     return transition()
+;=@side3
 	jp z, .transition
 
-;> if hMapRoom == 0xFD:
+;=@side4
 	cp $fd
-;>     return blockY()
+;=@side5
 	jr z, .blockY
 
-;> if hMapRoom in (0xA3, 0xC0, 0xC1):
+;=@side6
 	cp $a3
 	jp z, StartWarpFadeOutWithNoise
 
@@ -10229,73 +10362,77 @@ CollideLinkWithRoom::
 	jp z, StartWarpFadeOutWithNoise
 
 	cp $c1
-;>     return StartWarpFadeOutWithNoise()
+;=@side7
 	jp z, StartWarpFadeOutWithNoise
 
-;> if hMapRoom == 0xFF:
+;=@side8
 	cp $ff
 	jr nz, .otherRoom
 
-;>     if hLinkY < 0x50 and not wEntityStatus[0]:
+;=@side9
 	ldh a, [hLinkY]
 	cp $50
 	jr nc, .blockY
 
 	ld a, [wEntityStatus]
 	and a
-;>         return transition()
+;=@side10
 	jr z, .transition
+;=@side11
 
 .blockY
-;>     hLinkY = hLinkPrevY                      # .blockY: stopped at the edge
+;=@bloc1
+;=@bloc2
 	ldh a, [hLinkPrevY]
 	ldh [hLinkY], a
-;>     hLinkSpeedY = 0
+;=@bloc3
 	xor a
 	ldh [hLinkSpeedY], a
-;>     return walls()
+;=@bloc4
 	jp .walls
 
 
 .otherRoom
-;> if hLinkMotionStep == 2:                     # swimming
+;=@othe1
+;=@othe2
 	ldh a, [hLinkMotionStep]
 	cp $02
-;>     return transition()
+;=@othe3
 	jr z, .transition
 
-;> return StartWarpFadeOutWithNoise()           # out of the side view
+;=@othe4
 	jp StartWarpFadeOutWithNoise
 
 
 .edgeX
-;> hLinkX = hLinkPrevX                          # left / right edge
+;=@edge8
+;=@edge9
 	ldh a, [hLinkPrevX]
 	ldh [hLinkX], a
-;> hLinkSpeedX = 0
+;=@edge10
 	xor a
 	ldh [hLinkSpeedX], a
-;> if not hIsSideScrolling:
+;=@edge11
 	ldh a, [hIsSideScrolling]
 	and a
-;>     return transition()
+;=@edge12
 	jr z, .transition
 
-;> if hMapRoom in (0xF5, 0xFD):
+;=@edge13
 	ldh a, [hMapRoom]
 	cp $f5
 	jp z, StartWarpFadeOutMusic
 
 	cp $fd
-;>     return StartWarpFadeOutMusic()
+;=@edge14
 	jp z, StartWarpFadeOutMusic
 
-;> if hMapRoom == 0xE9:
+;=@edge15
 	cp $e9
-;>     return StartWarpFadeOutWithNoise()
+;=@edge16
 	jp z, StartWarpFadeOutWithNoise
 
-;>@cs if hMapRoom in (0xE8, 0xF8, 0xEF, 0xFF):    # closed sides
+;=@cs
 	cp $e8
 	jp z, .walls
 
@@ -10307,14 +10444,14 @@ CollideLinkWithRoom::
 
 ;=@cs
 	cp $ff
-;>     return walls()
+;=@edge17
 	jp z, .walls
 
-;> if hMapRoom == 0xC0:
+;=@edge18
 	cp $c0
 	jr nz, .roomC1
 
-;>     return walls() if hLinkX < 0x30 else transition()
+;=@edge19
 	ldh a, [hLinkX]
 	cp $30
 	jp c, .walls
@@ -10322,69 +10459,71 @@ CollideLinkWithRoom::
 	jr .transition
 
 .roomC1
-;> if hMapRoom == 0xC1 and hLinkX >= 0x50:
+;=@edge20
 	cp $c1
 	jr nz, .transition
 
 	ldh a, [hLinkX]
 	cp $50
-;>     return walls()
+;=@edge21
 	jp nc, .walls
+;=@edge22
 
 .transition
-;> RestoreLinkPosition()                        # .transition: scroll into the next room?
+;=@tran1
+;=@tran2
 	call RestoreLinkPosition
-;> if wLinkGroundType in (0x50, 0x51):
+;=@tran3
 	ld a, [wLinkGroundType]
 	cp $50
 	jp z, .stop
 
 	cp $51
-;>     return stop()
+;=@tran4
 	jp z, .stop
 
-;> if wLinkGroundVfx == 0x07:
+;=@tran5
 	ld a, [wLinkGroundVfx]
 	cp $07
-;>     return stop()
+;=@tran6
 	jp z, .stop
 
-;> if wLinkMotionState == 0x06:                 # falling
+;=@tran7
 	ld a, [wLinkMotionState]
 	cp $06
-;>     return stop()
+;=@tran8
 	jp z, .stop
 
-;> if not hIsSideScrolling and wIsLinkInTheAir:
+;=@tran9
 	ldh a, [hIsSideScrolling]
 	and a
 	jr nz, .checkPoke
 
 	ld a, [wIsLinkInTheAir]
 	and a
-;>     return stop()
+;=@tran10
 	jp nz, .stop
 
 .checkPoke
-;> if not wIsUsingPegasusBoots and wSwordPokeTimer:
+;=@tran11
 	ld a, [wIsUsingPegasusBoots]
 	and a
 	jr nz, .checkPushed
 
 	ld a, [wSwordPokeTimer]
 	and a
-;>     return stop()
+;=@tran12
 	jr nz, .stop
 
 .checkPushed
-;> if wLinkPushedTimer or wBumpShakeTimer:
+;=@tran13
 	ld a, [wLinkPushedTimer]
 	ld hl, wBumpShakeTimer
 	or [hl]
-;>     return stop()
+;=@tran14
 	jr nz, .stop
 
-;>@pad if hLinkY < 0x88 and not (wIsUsingPegasusBoots or hIsSideScrolling or hLinkInWater):
+;=@pad
 	ldh a, [hLinkY]
 	cp $88
 	jr nc, .go
@@ -10397,13 +10536,13 @@ CollideLinkWithRoom::
 	or [hl]
 	jr nz, .go
 
-;>     if not (hJoypadHeld & 0x0F):            # the D-pad must point at the edge
+;=@tran15
 	ldh a, [hJoypadHeld]
 	and $0f
-;>         return stop()
+;=@tran16
 	jr z, .stop
 
-;>     if not (hJoypadHeld & 0x03) or (hJoypadHeld & 0x03) - 1 != edge:
+;=@tran17
 	and $03
 	jr z, .vertical
 
@@ -10412,22 +10551,22 @@ CollideLinkWithRoom::
 	jr z, .go
 
 .vertical
-;>         v = (hJoypadHeld >> 2) & 0x03
+;=@tran18
 	ldh a, [hJoypadHeld]
 	rra
 	rra
 	and $03
-;>         if not v or v + 1 != edge:
+;=@tran19
 	jr z, .stop
 
 	dec a
 	add $02
 	cp e
-;>             return stop()
+;=@tran20
 	jr nz, .stop
 
 .go
-;>@e8 if hMapRoom == 0xE8 and hMapId != 0x1F and wIsIndoor:
+;=@e8
 	ldh a, [hMapRoom]
 	cp $e8
 	jr nz, .scroll
@@ -10441,54 +10580,57 @@ CollideLinkWithRoom::
 	and a
 	jr z, .scroll
 
-;>     wScrollXOffset = 0
+;=@tran21
 	xor a
 	ld [wScrollXOffset], a
-;>     rSCX = 0
+;=@tran22
 	ldh [rSCX], a
 
 .scroll
-;> wRoomTransitionDirection = edge
+;=@tran23
 	ld a, e
 	ld [wRoomTransitionDirection], a
-;> wRoomTransitionState = 1
+;=@tran24
 	ld a, $01
 	ld [wRoomTransitionState], a
-;> wPegasusBootsChargeMeter = 0
+;=@tran25
 	xor a
 	ld [wPegasusBootsChargeMeter], a
-;> wSpinAttackTimer = 0
+;=@tran26
 	ld [wSpinAttackTimer], a
-;> wIsUsingPegasusBoots = 0
+;=@tran27
 	ld [wIsUsingPegasusBoots], a
-;> if hLinkY >= 0x88:                           # through the bottom: arrive in the air
+;=@tran28
 	ldh a, [hLinkY]
 	cp $88
 	jr c, .walls
 
-;>     wIsLinkInTheAir = 2
+;=@tran29
 	ld a, $02
 	ld [wIsLinkInTheAir], a
-;>     hLinkPositionZ = 8
+;=@tran30
 	ld a, $08
 	ldh [hLinkPositionZ], a
+;=@tran31
 
 .walls
-;> CollideLinkWithWalls()                       # .walls
+;=@wall1
+;=@wall2
 	call CollideLinkWithWalls
-;> return
+;=@wall3
 	ret
 
 
 .stop
-;> wLinkPushedTimer = StopLinkSpeed()           # .stop: no transition
+;=@stop1
+;=@stop2
 	call StopLinkSpeed
 	ld [wLinkPushedTimer], a
-;> CollideLinkWithWalls()
+;=@stop3
 	call CollideLinkWithWalls
 
 .return
-;> return
+;=@stop4
 	ret
 
 
@@ -10770,7 +10912,7 @@ WallChecksDone:
 DirectionJoypadBits::
 	db $01, $02, $04, $08
 
-;@ def ProbeWall(probe: c) -> carry
+;@ def ProbeWall(probe: bc) -> carry
 ;@ path: link/collision
 ;@ Looks at the room object under wall probe point c (WallProbeDX / DY) and acts on its physics: free
 ;@ floor; walls; half-solid objects (HalfSolidObjectQuadrants); keyholes that open with the right key;
@@ -10779,8 +10921,191 @@ DirectionJoypadBits::
 ;@ blocks. Pushing into a wall shows a hint for some objects, pokes it with the sword, breaks crystal
 ;@ blocks with the dash and moves push blocks. A blocked point sets its WallBlockedBits bit.
 ;@ Returns carry set when the point blocks Link.
-;@ test: skip its pseudo-code names local parts of the unit as functions
+;@ test: probe = rand(0, 7)
+;@ test: wCurrentBank = $02
+;@ test: wIsIndoor = rand(0, 1)
 ProbeWall::
+;>@open1 def opened():                                  # .opened
+;>@op     wRoomStatus[hMapRoom] |= 0x10                # .opened: the keyhole is open for good
+;>@open2     hRoomStatus = wRoomStatus[hMapRoom]
+;>@open3     return solid()
+;>@noKe1 def noKey(hint):                               # .noKey
+;>@noKe2     OpenDialogTable2AndStop(hint)                           # .noKey: a hint about the missing key
+;>@noKe3     return solid()
+;>@othe1 def other():                                   # .other
+;>@othe2     if hRoomObjectType == 0xDB and wLinkMotionState == 1:   # .other
+;>@othe3         return solid()
+;>@othe4     if 0xD0 <= phys < 0xD4:                      # a ledge; side = phys - 0xD0 (right, left, up, down)
+;>@othe5         side = phys - 0xD0
+;>@lr         if not wIsIndoor and side == 0 and (hMultiPurpose4 & 0x0F) < 8:
+;>@othe6             return free()                     # only the right half of the square
+;>@othe7         if not wIsIndoor and side == 1 and (hMultiPurpose4 & 0x0F) >= 8:
+;>@othe8             return free()
+;>@lp         if hLinkDirection == side and not (wLinkPushedTimer or wSpinAttackTimer or wLinkPulledByDevice):
+;>@othe9             if not wIsUsingPegasusBoots:
+;>@othe10                 if not (hJoypadHeld & mem[DirectionJoypadBits + side]):
+;>@othe11                     wLinkPushCounter = 0; return solid()   # .resetPush
+;>@othe12                 wLinkPushCounter += 1
+;>@othe13                 if wLinkPushCounter < 0x0C:
+;>@othe14                     return solid()
+;>@othe15             ResetPegasusBoots()                  # jump down the ledge
+;>@othe16             hLinkSpeedX = mem[LedgeJumpSpeedX + side]
+;>@othe17             hLinkSpeedY = mem[LedgeJumpSpeedY + side]
+;>@othe18             hLinkSpeedZ = 0x1C
+;>@othe19             wIsLinkInTheAir = 1
+;>@othe20             wIsJumpingDownLedge = 1
+;>@othe21             hJingle = 0x08
+;>@othe22         wLinkPushCounter = 0                     # .resetPush
+;>@othe23         return solid()
+;>@othe24     if phys >= 0x90:                             # a door ($90-$98; from $99 on solid); door = phys - 0x90
+;>@othe24b         if phys >= 0x99: return solid()
+;>@othe25         door = phys - 0x90
+;>@othe26         if not (door & 0x02):                    # top / bottom door: Link must stand in front
+;>@dx             if ((hLinkX - wDoorX[door] - 0x0C) & 0xFF) >= 8:
+;>@othe27                 return solid()
+;>@dy         elif ((hLinkY - wDoorY[door] - 0x14) & 0xFF) >= 8:
+;>@othe28             return solid()
+;>@othe29         if wDoorAnimation:
+;>@othe30             return solid()
+;>@othe31         if phys < 0x94:                          # locked doors: use a small key
+;>@othe32             if not wDungeonSmallKeys:
+;>@othe33                 return solid()
+;>@othe34             wDungeonSmallKeys -= 1
+;>@othe35         elif phys != 0x98:                       # shutters: only without a room event
+;>@othe36             if wRoomEvent:
+;>@othe37                 return solid()
+;>@othe38         elif not wDungeonHasNightmareKey:        # the boss door
+;>@othe39             OpenDialogAndStop(0x07)
+;>@othe40             return solid()
+;>@othe41         wDoorAnimIndex = phys - 0x90             # .openDoor
+;>@othe42         wDoorAnimFrame = 0
+;>@othe43         wDoorAnimation = 1
+;>@othe44         SaveDungeonItemFlags()
+;>@othe45         PlayUnlockSound()
+;>@othe46         return solid()
+;>@othe47     if phys < 0x7C:
+;>@othe48         return free()
+;>@othe49     if phys in (0x7C, 0x7D):                     # .halfSolid: objects $7C-$8F
+;>@othe50         CheckRevolvingDoorOrExit()
+;>@othe51     if phys >= 0x90:
+;>@othe52         return free()
+;>@q     quadrants = HalfSolidObjectQuadrants + (phys - 0x7C) * 4
+;>@qr     quarter = ((hMultiPurpose4 >> 3) & 0x01) | ((hMultiPurpose5 >> 2) & 0x02)
+;>@othe53     if mem[quadrants + quarter]:
+;>@othe54         return solid()
+;>@othe55     return free()
+;>@deep1 def deepWater():                               # .deepWater
+;>@deep2     if wLinkMotionState == 2 or wCarriedEntityType == 0xD5:   # .deepWater
+;>@deep3         return blocked()
+;>@deep4     if (hMultiPurpose5 & 0x0F) < 8:
+;>@deep5         return free()
+;>@deep6     LinkJumpIntoWaterCentered()
+;>@deep7     return blocked()
+;>@exit1 def exit():                                    # .exit
+;>@exit2     if wIsCarryingLiftedObject:                  # .exit: stairs and room exits
+;>@exit3         return blocked()
+;>@exit4     if (hMultiPurpose5 & 0x0F) >= 6:
+;>@exit5         return middle()
+;>@fs     follower_stops = not wIsIndoor and (wIsGhostFollowingLink == 1 or wIsMarinFollowingLink)
+;>@fr     if follower_stops and hMapRoom in (0xD3, 0x24, 0xB5, 0x2B, 0xD9, 0xAC, 0x8C, 0x0E):
+;>@exit6         if wIsGhostFollowingLink == 1:
+;>@exit7             OpenDialogTable2AndStop(0x12)
+;>@exit8             return blocked()
+;>@exit9         mem[0xDB47] = 0                          # Marin speaks, then the screen fades
+;>@exit10         mem[0xC3C9] = 0x98
+;>@exit11         OpenDialogTable1(0x98)
+;>@exit12         wMarinReunion = wLowHealth + 1
+;>@exit13         StartScreenFadeOut()
+;>@exit14         return blocked()
+;>@exit15     if wLinkPushedTimer:
+;>@exit16         return blocked()
+;>@exit17     if wIsIndoor:
+;>@exit18         return StartWarpFadeOut()
+;>@exit19     return StartWarpFadeOutWithNoise()
+;>@rais1 def raisedBlock():                             # .raisedBlock
+;>@rais2     if wLinkOnRaisedBlock:                       # .raisedBlock
+;>@rais3         return free()
+;>@rais4     if not (0xDB <= hRoomObjectType < 0xDD):
+;>@rais5         return solid()
+;>@rb     if wRaisedBlocksState ^ mem[RaisedBlockLoweredPhase + (hRoomObjectType - 0xDB)]:
+;>@rais6         return solid()                          # raised
+;>@rais7     return free()                               # lowered
+;>@grou1 def groundVfx():                               # .groundVfx
+;>@grou2     wLinkGroundVfx = 1                           # .groundVfx
+;>@grou3     if phys == 0x0A:
+;>@grou4         return free()
+;>@grou5     return middle()
+;>@midd1 def middle():                                  # .middle
+;>@midd2     if 6 <= (hMultiPurpose4 & 0x0F) < 0x0B:      # .middle: only the middle of the square is free
+;>@midd3         return free()
+;>@midd4     return solid()
+;>@soli1 def solid():                                   # .solid
+;>@69     if hRoomObjectType == 0x69 and (hLinkDirection != hMultiPurposeC or not wIsUsingShield):   # .solid
+;>@soli2         HurtLinkOnGround()
+;>@pu     if hLinkDirection == hMultiPurposeC and not (wLinkPushedTimer or wIsLinkInTheAir):   # pushing into it
+;>@soli3         hint = None
+;>@soli4         if wIsIndoor:
+;>@soli5             if hRoomObjectType == 0xA9:
+;>@soli6                 hint = 0x8A
+;>@cr             elif hRoomObjectType in (0x4F, 0x4E, 0x88):   # crystal blocks
+;>@soli7                 if not wIsUsingPegasusBoots:
+;>@soli8                     hint = 0x8B
+;>@soli9             elif hRoomObjectType == 0xDE and not wDungeonSmallKeys:   # a key block
+;>@soli10                 hint = 0x8C
+;>@br         if hRoomObjectType == 0x20 and wItemA != 3 and wItemB != 3 and not (wHasInstrument2 & 0x02):
+;>@soli11             hint = 0x8D                         # a heavy object: the power bracelet is needed
+;>@soli12         if hint and not wRoomEventJustDone:
+;>@soli13             wRoomEventJustDone = 1
+;>@soli14             OpenDialogAndStop(hint)
+;>@soli15     if not wIsUsingPegasusBoots and wSwordAnimationStatePrev == 5:   # the sword held out against it
+;>@soli16         if hLinkDirection != mem[WallProbeDirections + probe]:
+;>@soli17             return blocked()
+;>@soli18         wSwordPokeCounter += 1
+;>@soli19         if wSwordPokeCounter < 0x0C:
+;>@soli20             return blocked()
+;>@soli21         wSwordPokeCounter = 0                    # poke it
+;>@soli22         wSpinAttackTimer = 0
+;>@soli23         wSwordCharge = 0
+;>@soli24         wSwordPokeTimer = 0x0C
+;>@soli25         return blocked()
+;>@soli26     if not wIsUsingShield:
+;>@soli27         wLinkPushingTimer = 3
+;>@cc     if hMapId and hRoomObjectType in (0x88, 0x4E, 0x4F):   # crystal blocks
+;>@soli28         if not wIsUsingPegasusBoots:
+;>@soli29             return blocked()
+;>@soli30         hBGPosX = hMultiPurpose4 & 0xF0          # the dash breaks it
+;>@soli31         hBGPosY = hMultiPurpose5 & 0xF0
+;>@soli32         RemoveRoomObject(hMultiPurposeH)
+;>@soli33         e, full = SpawnEntity(probe, 0x05)                    # the pieces
+;>@soli34         if full:                                 # no free slot
+;>@soli35             return blocked()
+;>@ex         wEntityX[e] = ((hMultiPurposeH << 4) & 0xF0) + 8
+;>@soli36         wEntityY[e] = (hMultiPurposeH & 0xF0) + 0x10
+;>@soli37         wEntitySpriteVariant[e] = 0
+;>@soli38         hNoiseSfx = 0x09
+;>@soli39         wEntityTimer1[e] = 0x0F
+;>@soli40         wEntityPhysicsFlags[e] = 0xC4
+;>@soli41         return free()
+;>@soli42     frames = 0x20                                # push blocks: how long to push
+;>@soli43     if hRoomObjectType == 0xC5:
+;>@soli44         if wIsIndoor:
+;>@soli45             return blocked()
+;>@ib     elif not wIsIndoor or hRoomObjectType not in (0xDE, 0xA7):
+;>@soli46         return blocked()
+;>@soli47     if hRoomObjectType != 0xDE:
+;>@soli48         frames = 0x40
+;>@soli49     wLinkPushCounter += 1
+;>@soli50     if wLinkPushCounter >= frames:
+;>@soli51         hMultiPurposeG = frames
+;>@soli52         wLinkPushCounter = 0
+;>@soli53         OpenLockedOrPushBlock()
+;>@soli54     return blocked()
+;>@bloc1 def blocked():                                 # .blocked
+;>@bloc2     wLinkCollisionFlags |= mem[WallBlockedBits + probe]   # .blocked
+;>@bloc3     return True
+;>@free1 def free():                                    # .free
+;>@free2     wLinkPushCounter = 0                         # .free
+;>@free3     return False
 ;> hMultiPurpose4 = (hLinkX - 8 + mem[WallProbeDX + probe]) & 0xFF   # the point
 	ld hl, WallProbeDX
 	add hl, bc
@@ -10804,7 +11129,7 @@ ProbeWall::
 	or e
 	ld e, a
 	ldh [hMultiPurposeH], a
-;>@obj hRoomObjectType = wRoomObjects[hMultiPurposeH]   # (the address wraps within its page)
+;>@obj hRoomObjectType = mem[0xD700 | u8(addr(wRoomObjects) + hMultiPurposeH)]   # wRoomObjects[square], the address wrapping within its page
 	ld d, $00
 	ld hl, wRoomObjects
 	ld a, h
@@ -10922,7 +11247,7 @@ ProbeWall::
 	call PlayUnlockSound
 
 .keyholeEntity
-;>     e, full = SpawnEntity(bc, 0x28)
+;>     e, full = SpawnEntity(probe, 0x28)
 	ld a, $28
 	call SpawnEntity
 ;>     wEntityPrivate2[e] += 1
@@ -10946,7 +11271,7 @@ ProbeWall::
 
 ;>     ResetSoundEngine()
 	call ResetSoundEngine
-;>     e, full = SpawnEntity(bc, 0x5F)
+;>     e, full = SpawnEntity(probe, 0x5F)
 	ld a, $5f
 	call SpawnEntity
 ;>     wEntityPrivate4[e] -= 1
@@ -10995,9 +11320,11 @@ ProbeWall::
 	ld [wLinkPoseLock], a
 ;> ResetSoundEngine()
 	call ResetSoundEngine
+;> return opened()
 
 .opened
-;>@op wRoomStatus[hMapRoom] |= 0x10                # .opened: the keyhole is open for good
+;=@open1
+;=@op
 	ld hl, wRoomStatus
 	ldh a, [hMapRoom]
 	ld e, a
@@ -11007,35 +11334,37 @@ ProbeWall::
 ;=@op
 	or $10
 	ld [hl], a
-;> hRoomStatus = wRoomStatus[hMapRoom]
+;=@open2
 	ldh [hRoomStatus], a
 
 .keyholeSolid
-;> return solid()
+;=@open3
 	jp .solid
 
 
 .noKey
-;> OpenDialogTable2AndStop(hint)                           # .noKey: a hint about the missing key
+;=@noKe1
+;=@noKe2
 	ld a, e
 	call OpenDialogTable2AndStop
-;> return solid()
+;=@noKe3
 	jp .solid
 
 
 .other
-;> if hRoomObjectType == 0xDB and wLinkMotionState == 1:   # .other
+;=@othe1
+;=@othe2
 	ldh a, [hRoomObjectType]
 	cp $db
 	jr nz, .ledge
 
 	ld a, [wLinkMotionState]
 	cp $01
-;>     return solid()
+;=@othe3
 	jp z, .solid
 
 .ledge
-;> if 0xD0 <= phys < 0xD4:                      # a ledge; side = phys - 0xD0 (right, left, up, down)
+;=@othe4
 	ldh a, [hMultiPurposeD]
 	cp $d0
 	jp c, .door
@@ -11043,10 +11372,10 @@ ProbeWall::
 	cp $d4
 	jp nc, .door
 
-;>     side = phys - 0xD0
+;=@othe5
 	sub $d0
 	ld e, a
-;>@lr     if not wIsIndoor and side == 0 and (hMultiPurpose4 & 0x0F) < 8:
+;=@lr
 	ld a, [wIsIndoor]
 	and a
 	jr nz, .ledgePush
@@ -11059,24 +11388,24 @@ ProbeWall::
 	ldh a, [hMultiPurpose4]
 	and $0f
 	cp $08
-;>         return free()                     # only the right half of the square
+;=@othe6
 	jp c, .free
 
 	jr .ledgePush
 
 .ledgeLeft
-;>     if not wIsIndoor and side == 1 and (hMultiPurpose4 & 0x0F) >= 8:
+;=@othe7
 	cp $01
 	jr nz, .ledgePush
 
 	ldh a, [hMultiPurpose4]
 	and $0f
 	cp $08
-;>         return free()
+;=@othe8
 	jp nc, .free
 
 .ledgePush
-;>@lp     if hLinkDirection == side and not (wLinkPushedTimer or wSpinAttackTimer or wLinkPulledByDevice):
+;=@lp
 	ld d, $00
 	ldh a, [hLinkDirection]
 	cp e
@@ -11090,79 +11419,80 @@ ProbeWall::
 	or [hl]
 	jr nz, .resetPush
 
-;>         if not wIsUsingPegasusBoots:
+;=@othe9
 	ld a, [wIsUsingPegasusBoots]
 	and a
 	jr nz, .jumpDown
 
-;>             if not (hJoypadHeld & mem[DirectionJoypadBits + side]):
+;=@othe10
 	ld hl, DirectionJoypadBits
 	add hl, de
 	ldh a, [hJoypadHeld]
 	and [hl]
-;>                 return resetPush()
+;=@othe11
 	jr z, .resetPush
 
-;>             wLinkPushCounter += 1
+;=@othe12
 	ld a, [wLinkPushCounter]
 	inc a
 	ld [wLinkPushCounter], a
-;>             if wLinkPushCounter < 0x0C:
+;=@othe13
 	cp $0c
-;>                 return solid()
+;=@othe14
 	jp c, .solid
 
 .jumpDown
-;>         ResetPegasusBoots()                  # jump down the ledge
+;=@othe15
 	call ResetPegasusBoots
-;>         hLinkSpeedX = mem[LedgeJumpSpeedX + side]
+;=@othe16
 	ld hl, LedgeJumpSpeedX
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkSpeedX], a
-;>         hLinkSpeedY = mem[LedgeJumpSpeedY + side]
+;=@othe17
 	ld hl, LedgeJumpSpeedY
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkSpeedY], a
-;>         hLinkSpeedZ = 0x1C
+;=@othe18
 	ld a, $1c
 	ldh [hLinkSpeedZ], a
-;>         wIsLinkInTheAir = 1
+;=@othe19
 	ld a, $01
 	ld [wIsLinkInTheAir], a
-;>         wIsJumpingDownLedge = 1
+;=@othe20
 	ld a, $01
 	ld [wIsJumpingDownLedge], a
-;>         hJingle = 0x08
+;=@othe21
 	ld a, $08
 	ldh [hJingle], a
 
 .resetPush
-;>     wLinkPushCounter = 0                     # .resetPush
+;=@othe22
 	xor a
 	ld [wLinkPushCounter], a
-;>     return solid()
+;=@othe23
 	jp .solid
 
 
 .door
-;> if 0x90 <= phys < 0x99:                      # a door; door = phys - 0x90
+;=@othe24
 	cp $90
 	jp c, .halfSolid
 
+;=@othe24b
 	cp $99
 	jp nc, .solid
 
-;>     door = phys - 0x90
+;=@othe25
 	sub $90
 	ld e, a
 	ld d, $00
-;>     if not (door & 0x02):                    # top / bottom door: Link must stand in front
+;=@othe26
 	bit 1, a
 	jr nz, .sideDoor
 
-;>@dx         if ((hLinkX - wDoorX[door] - 0x0C) & 0xFF) >= 8:
+;=@dx
 	ld hl, wDoorX
 	add hl, de
 	ld e, [hl]
@@ -11171,13 +11501,13 @@ ProbeWall::
 	sub $0c
 ;=@dx
 	cp $08
-;>             return solid()
+;=@othe27
 	jp nc, .solid
 
 	jr .doorOpen
 
 .sideDoor
-;>@dy     elif ((hLinkY - wDoorY[door] - 0x14) & 0xFF) >= 8:
+;=@dy
 	ld hl, wDoorY
 	add hl, de
 	ld e, [hl]
@@ -11186,85 +11516,85 @@ ProbeWall::
 	sub $14
 ;=@dy
 	cp $08
-;>         return solid()
+;=@othe28
 	jp nc, .solid
 
 .doorOpen
-;>     if wDoorAnimation:
+;=@othe29
 	ld a, [wDoorAnimation]
 	and a
-;>         return solid()
+;=@othe30
 	jp nz, .solid
 
-;>     if phys < 0x94:                          # locked doors: use a small key
+;=@othe31
 	ldh a, [hMultiPurposeD]
 	cp $94
 	jr nc, .notLocked
 
-;>         if not wDungeonSmallKeys:
+;=@othe32
 	ld a, [wDungeonSmallKeys]
 	and a
-;>             return solid()
+;=@othe33
 	jp z, .solid
 
-;>         wDungeonSmallKeys -= 1
+;=@othe34
 	dec a
 	ld [wDungeonSmallKeys], a
 	jr .openDoor
 
 .notLocked
-;>     elif phys != 0x98:                       # shutters: only without a room event
+;=@othe35
 	cp $98
 	jr z, .bossDoor
 
-;>         if wRoomEvent:
+;=@othe36
 	ld a, [wRoomEvent]
 	and a
 	jr z, .openDoor
 
-;>             return solid()
+;=@othe37
 	jp .solid
 
 
 .bossDoor
-;>     elif not wDungeonHasNightmareKey:        # the boss door
+;=@othe38
 	ld a, [wDungeonHasNightmareKey]
 	and a
 	jr nz, .openDoor
 
-;>         OpenDialogAndStop(0x07)
+;=@othe39
 	ld a, $07
 	call OpenDialogAndStop
-;>         return solid()
+;=@othe40
 	jp .solid
 
 
 .openDoor
-;>     wDoorAnimIndex = phys - 0x90             # .openDoor
+;=@othe41
 	ldh a, [hMultiPurposeD]
 	sub $90
 	ld [wDoorAnimIndex], a
-;>     wDoorAnimFrame = 0
+;=@othe42
 	xor a
 	ld [wDoorAnimFrame], a
-;>     wDoorAnimation = 1
+;=@othe43
 	inc a
 	ld [wDoorAnimation], a
-;>     SaveDungeonItemFlags()
+;=@othe44
 	call SaveDungeonItemFlags
-;>     PlayUnlockSound()
+;=@othe45
 	call PlayUnlockSound
-;>     return solid()
+;=@othe46
 	jp .solid
 
 
 .halfSolid
-;> if phys < 0x7C:
+;=@othe47
 	cp $7c
-;>     return free()
+;=@othe48
 	jp c, .free
 
-;> if phys in (0x7C, 0x7D):                     # .halfSolid: objects $7C-$8F
+;=@othe49
 	push af
 	jr z, .call7723
 
@@ -11272,17 +11602,17 @@ ProbeWall::
 	jr nz, .quadrant
 
 .call7723
-;>     CheckRevolvingDoorOrExit()
+;=@othe50
 	call CheckRevolvingDoorOrExit
 
 .quadrant
-;> if phys >= 0x90:
+;=@othe51
 	pop af
 	cp $90
-;>     return free()
+;=@othe52
 	jp nc, .free
 
-;>@q quadrants = HalfSolidObjectQuadrants + (phys - 0x7C) * 4
+;=@q
 	sub $7c
 	sla a
 	sla a
@@ -11291,7 +11621,7 @@ ProbeWall::
 ;=@q
 	ld hl, HalfSolidObjectQuadrants
 	add hl, de
-;>@qr quarter = ((hMultiPurpose4 >> 3) & 0x01) | ((hMultiPurpose5 >> 2) & 0x02)
+;=@qr
 	ldh a, [hMultiPurpose4]
 	rra
 	rra
@@ -11305,57 +11635,59 @@ ProbeWall::
 	and $02
 	or e
 	ld e, a
-;> if quadrants[quarter]:
+;=@othe53
 	ld d, $00
 	add hl, de
 	ld a, [hl]
 	and a
-;>     return solid()
+;=@othe54
 	jp nz, .solid
 
-;> return free()
+;=@othe55
 	jp .free
 
 
 .deepWater
-;> if wLinkMotionState == 2 or wCarriedEntityType == 0xD5:   # .deepWater
+;=@deep1
+;=@deep2
 	ld a, [wLinkMotionState]
 	cp $02
 	jp z, .blocked
 
 	ld a, [wCarriedEntityType]
 	cp $d5
-;>     return blocked()
+;=@deep3
 	jp z, .blocked
 
-;> if (hMultiPurpose5 & 0x0F) < 8:
+;=@deep4
 	ldh a, [hMultiPurpose5]
 	and $0f
 	cp $08
-;>     return free()
+;=@deep5
 	jp c, .free
 
-;> LinkJumpIntoWaterCentered()
+;=@deep6
 	call LinkJumpIntoWaterCentered
-;> return blocked()
+;=@deep7
 	jp .blocked
 
 
 .exit
-;> if wIsCarryingLiftedObject:                  # .exit: stairs and room exits
+;=@exit1
+;=@exit2
 	ld a, [wIsCarryingLiftedObject]
 	and a
-;>     return blocked()
+;=@exit3
 	jp nz, .blocked
 
-;> if (hMultiPurpose5 & 0x0F) >= 6:
+;=@exit4
 	ldh a, [hMultiPurpose5]
 	and $0f
 	cp $06
-;>     return middle()
+;=@exit5
 	jp nc, .middle
 
-;>@fs follower_stops = not wIsIndoor and (wIsGhostFollowingLink == 1 or wIsMarinFollowingLink)
+;=@fs
 	ld a, [wIsIndoor]
 	and a
 	jr nz, .warp
@@ -11370,7 +11702,7 @@ ProbeWall::
 	jr z, .warp
 
 .followerRoom
-;>@fr if follower_stops and hMapRoom in (0xD3, 0x24, 0xB5, 0x2B, 0xD9, 0xAC, 0x8C, 0x0E):
+;=@fr
 	ldh a, [hMapRoom]
 	cp $d3
 	jr z, .follower
@@ -11399,71 +11731,72 @@ ProbeWall::
 	jr nz, .warp
 
 .follower
-;>     if wIsGhostFollowingLink == 1:
+;=@exit6
 	ld a, [wIsGhostFollowingLink]
 	cp $01
 	jr nz, .marin
 
-;>         OpenDialogTable2AndStop(0x12)
+;=@exit7
 	ld a, $12
 	call OpenDialogTable2AndStop
-;>         return blocked()
+;=@exit8
 	jp .blocked
 
 
 .marin
-;>     mem[0xDB47] = 0                          # Marin speaks, then the screen fades
+;=@exit9
 	xor a
 	ld [$db47], a
-;>     mem[0xC3C9] = 0x98
+;=@exit10
 	ld a, $98
 	ld [$c3c9], a
-;>     OpenDialogTable1(0x98)
+;=@exit11
 	call OpenDialogTable1
-;>     wMarinReunion = wLowHealth + 1
+;=@exit12
 	ld a, [wLowHealth]
 	inc a
 	ld [wMarinReunion], a
-;>     StartScreenFadeOut()
+;=@exit13
 	call StartScreenFadeOut
-;>     return blocked()
+;=@exit14
 	jp .blocked
 
 
 .warp
-;> if wLinkPushedTimer:
+;=@exit15
 	ld a, [wLinkPushedTimer]
 	and a
-;>     return blocked()
+;=@exit16
 	jp nz, .blocked
 
-;> if wIsIndoor:
+;=@exit17
 	ld a, [wIsIndoor]
 	and a
-;>     return StartWarpFadeOut()
+;=@exit18
 	jp nz, StartWarpFadeOut
 
-;> return StartWarpFadeOutWithNoise()
+;=@exit19
 	jp StartWarpFadeOutWithNoise
 
 
 .raisedBlock
-;> if wLinkOnRaisedBlock:                       # .raisedBlock
+;=@rais1
+;=@rais2
 	ld a, [wLinkOnRaisedBlock]
 	and a
-;>     return free()
+;=@rais3
 	jp nz, .free
 
-;> if not (0xDB <= hRoomObjectType < 0xDD):
+;=@rais4
 	ldh a, [hRoomObjectType]
 	cp $db
 	jr c, .solid
 
 	cp $dd
-;>     return solid()
+;=@rais5
 	jr nc, .solid
 
-;>@rb if wRaisedBlocksState ^ mem[RaisedBlockLoweredPhase + (hRoomObjectType - 0xDB)]:
+;=@rb
 	sub $db
 	ld e, a
 	ld d, $00
@@ -11472,35 +11805,40 @@ ProbeWall::
 	ld a, [wRaisedBlocksState]
 ;=@rb
 	xor [hl]
-;>     return solid()                          # raised
+;=@rais6
 	jr nz, .solid
 
-;> return free()                               # lowered
+;=@rais7
 	jp .free
 
 
 .groundVfx
-;> wLinkGroundVfx = 1                           # .groundVfx
+;=@grou1
+;=@grou2
 	ld hl, wLinkGroundVfx
 	ld [hl], $01
-;> if phys == 0x0A:
+;=@grou3
 	cp $0a
-;>     return free()
+;=@grou4
 	jp z, .free
+;=@grou5
 
 .middle
-;> if 6 <= (hMultiPurpose4 & 0x0F) < 0x0B:      # .middle: only the middle of the square is free
+;=@midd1
+;=@midd2
 	ldh a, [hMultiPurpose4]
 	and $0f
 	cp $06
 	jr c, .solid
 
 	cp $0b
-;>     return free()
+;=@midd3
 	jp c, .free
+;=@midd4
 
 .solid
-;>@69 if hRoomObjectType == 0x69 and (hLinkDirection != hMultiPurposeC or not wIsUsingShield):   # .solid
+;=@soli1
+;=@69
 	ldh a, [hRoomObjectType]
 	cp $69
 	jr nz, .pushing
@@ -11516,11 +11854,11 @@ ProbeWall::
 	jr nz, .pushing
 
 .call78B5
-;>     HurtLinkOnGround()
+;=@soli2
 	call HurtLinkOnGround
 
 .pushing
-;>@pu if hLinkDirection == hMultiPurposeC and not (wLinkPushedTimer or wIsLinkInTheAir):   # pushing into it
+;=@pu
 	ld hl, hMultiPurposeC
 	ldh a, [hLinkDirection]
 	cp [hl]
@@ -11532,20 +11870,20 @@ ProbeWall::
 	or [hl]
 	jr nz, .sword
 
-;>     hint = None
-;>     if wIsIndoor:
+;=@soli3
+;=@soli4
 	ld a, [wIsIndoor]
 	and a
 	ldh a, [hRoomObjectType]
 	jr z, .outdoorHint
 
-;>         if hRoomObjectType == 0xA9:
+;=@soli5
 	ld e, $8a
 	cp $a9
-;>             hint = 0x8A
+;=@soli6
 	jr z, .hint
 
-;>@cr         elif hRoomObjectType in (0x4F, 0x4E, 0x88):   # crystal blocks
+;=@cr
 	ld e, $8b
 	cp $4f
 	jr z, .crystal
@@ -11558,16 +11896,16 @@ ProbeWall::
 	jr nz, .keyBlock
 
 .crystal
-;>             if not wIsUsingPegasusBoots:
+;=@soli7
 	ld a, [wIsUsingPegasusBoots]
 	and a
 	jr nz, .sword
 
-;>                 hint = 0x8B
+;=@soli8
 	jr .hint
 
 .keyBlock
-;>         elif hRoomObjectType == 0xDE and not wDungeonSmallKeys:   # a key block
+;=@soli9
 	cp $de
 	jr nz, .outdoorHint
 
@@ -11575,12 +11913,12 @@ ProbeWall::
 	and a
 	jr nz, .sword
 
-;>             hint = 0x8C
+;=@soli10
 	ld e, $8c
 	jr .hint
 
 .outdoorHint
-;>@br     if hRoomObjectType == 0x20 and wItemA != 3 and wItemB != 3 and not (wHasInstrument2 & 0x02):
+;=@br
 	cp $20
 	jr nz, .sword
 
@@ -11597,24 +11935,24 @@ ProbeWall::
 	and $02
 	jr nz, .sword
 
-;>         hint = 0x8D                         # a heavy object: the power bracelet is needed
+;=@soli11
 	ld e, $8d
 
 .hint
-;>     if hint and not wRoomEventJustDone:
+;=@soli12
 	ld a, [wRoomEventJustDone]
 	and a
 	jr nz, .sword
 
-;>         wRoomEventJustDone = 1
+;=@soli13
 	inc a
 	ld [wRoomEventJustDone], a
-;>         OpenDialogAndStop(hint)
+;=@soli14
 	ld a, e
 	call OpenDialogAndStop
 
 .sword
-;> if not wIsUsingPegasusBoots and wSwordAnimationStatePrev == 5:   # the sword held out against it
+;=@soli15
 	ld a, [wIsUsingPegasusBoots]
 	and a
 	jr nz, .push
@@ -11623,50 +11961,50 @@ ProbeWall::
 	cp $05
 	jr nz, .push
 
-;>     if hLinkDirection != mem[WallProbeDirections + probe]:
+;=@soli16
 	ld hl, WallProbeDirections
 	add hl, bc
 	ldh a, [hLinkDirection]
 	cp [hl]
-;>         return blocked()
+;=@soli17
 	jp nz, .blocked
 
-;>     wSwordPokeCounter += 1
+;=@soli18
 	ld a, [wSwordPokeCounter]
 	inc a
 	ld [wSwordPokeCounter], a
-;>     if wSwordPokeCounter < 0x0C:
+;=@soli19
 	cp $0c
-;>         return blocked()
+;=@soli20
 	jp c, .blocked
 
-;>     wSwordPokeCounter = 0                    # poke it
+;=@soli21
 	xor a
 	ld [wSwordPokeCounter], a
-;>     wSpinAttackTimer = 0
+;=@soli22
 	xor a
 	ld [wSpinAttackTimer], a
-;>     wSwordCharge = 0
+;=@soli23
 	ld [wSwordCharge], a
-;>     wSwordPokeTimer = 0x0C
+;=@soli24
 	ld a, $0c
 	ld [wSwordPokeTimer], a
-;>     return blocked()
+;=@soli25
 	jp .blocked
 
 
 .push
-;> if not wIsUsingShield:
+;=@soli26
 	ld a, [wIsUsingShield]
 	and a
 	jr nz, .crystalCheck
 
-;>     wLinkPushingTimer = 3
+;=@soli27
 	ld a, $03
 	ld [wLinkPushingTimer], a
 
 .crystalCheck
-;>@cc if hMapId and hRoomObjectType in (0x88, 0x4E, 0x4F):   # crystal blocks
+;=@cc
 	ldh a, [hMapId]
 	and a
 	ldh a, [hRoomObjectType]
@@ -11683,33 +12021,33 @@ ProbeWall::
 	jp nz, .pushBlock
 
 .breakCrystal
-;>     if not wIsUsingPegasusBoots:
+;=@soli28
 	ld a, [wIsUsingPegasusBoots]
 	and a
-;>         return blocked()
+;=@soli29
 	jp z, .blocked
 
-;>     hBGPosX = hMultiPurpose4 & 0xF0          # the dash breaks it
+;=@soli30
 	ldh a, [hMultiPurpose4]
 	and $f0
 	ldh [hBGPosX], a
-;>     hBGPosY = hMultiPurpose5 & 0xF0
+;=@soli31
 	ldh a, [hMultiPurpose5]
 	and $f0
 	ldh [hBGPosY], a
-;>     RemoveRoomObject(hMultiPurposeH)
+;=@soli32
 	ldh a, [hMultiPurposeH]
 	ld e, a
 	ld d, $00
 	call RemoveRoomObject
-;>     e, full = SpawnEntity(bc, 0x05)                    # the pieces
+;=@soli33
 	ld a, $05
 	call SpawnEntity
-;>     if not e:                                # (carry: no free slot)
-;>         return blocked()
+;=@soli34
+;=@soli35
 	jr c, .blocked
 
-;>@ex     wEntityX[e] = ((hMultiPurposeH << 4) & 0xF0) + 8
+;=@ex
 	ld hl, wEntityX
 	add hl, de
 	ldh a, [hMultiPurposeH]
@@ -11718,48 +12056,48 @@ ProbeWall::
 	add $08
 ;=@ex
 	ld [hl], a
-;>     wEntityY[e] = (hMultiPurposeH & 0xF0) + 0x10
+;=@soli36
 	ld hl, wEntityY
 	add hl, de
 	ldh a, [hMultiPurposeH]
 	and $f0
 	add $10
 	ld [hl], a
-;>     wEntitySpriteVariant[e] = 0
+;=@soli37
 	ld hl, wEntitySpriteVariant
 	add hl, de
 	ld [hl], d
-;>     hNoiseSfx = 0x09
+;=@soli38
 	ld hl, hNoiseSfx
 	ld [hl], $09
-;>     wEntityTimer1[e] = 0x0F
+;=@soli39
 	ld hl, wEntityTimer1
 	add hl, de
 	ld [hl], $0f
-;>     wEntityPhysicsFlags[e] = 0xC4
+;=@soli40
 	ld hl, wEntityPhysicsFlags
 	add hl, de
 	ld [hl], $c4
-;>     return free()
+;=@soli41
 	jr .free
 
 .pushBlock
-;> frames = 0x20                                # push blocks: how long to push
+;=@soli42
 	ld e, $20
-;> if hRoomObjectType == 0xC5:
+;=@soli43
 	cp $c5
 	jr nz, .indoorBlock
 
-;>     if wIsIndoor:
+;=@soli44
 	ld a, [wIsIndoor]
 	and a
 	jr z, .slow
 
-;>         return blocked()
+;=@soli45
 	jr .blocked
 
 .indoorBlock
-;>@ib elif not wIsIndoor or hRoomObjectType not in (0xDE, 0xA7):
+;=@ib
 	ld a, [wIsIndoor]
 	and a
 	jr z, .blocked
@@ -11770,49 +12108,52 @@ ProbeWall::
 
 ;=@ib
 	cp $a7
-;>     return blocked()
+;=@soli46
 	jr nz, .blocked
 
 .slow
-;> if hRoomObjectType != 0xDE:
-;>     frames = 0x40
+;=@soli47
+;=@soli48
 	ld e, $40
 
 .count
-;> wLinkPushCounter += 1
+;=@soli49
 	ld a, [wLinkPushCounter]
 	inc a
 	ld [wLinkPushCounter], a
-;> if wLinkPushCounter >= frames:
+;=@soli50
 	cp e
 	jr c, .blocked
 
-;>     hMultiPurposeG = frames
+;=@soli51
 	ld a, e
 	ldh [hMultiPurposeG], a
-;>     wLinkPushCounter = 0
+;=@soli52
 	xor a
 	ld [wLinkPushCounter], a
-;>     OpenLockedOrPushBlock()
+;=@soli53
 	call OpenLockedOrPushBlock
+;=@soli54
 
 .blocked
-;> wLinkCollisionFlags |= mem[WallBlockedBits + probe]   # .blocked
+;=@bloc1
+;=@bloc2
 	ld hl, WallBlockedBits
 	add hl, bc
 	ld a, [wLinkCollisionFlags]
 	or [hl]
 	ld [wLinkCollisionFlags], a
-;> return True
+;=@bloc3
 	scf
 	ret
 
 
 .free
-;> wLinkPushCounter = 0                         # .free
+;=@free1
+;=@free2
 	xor a
 	ld [wLinkPushCounter], a
-;> return False
+;=@free3
 	scf
 	ccf
 	ret
@@ -12014,7 +12355,7 @@ GetObjectUnderLink::
 	or e
 	ld e, a
 	ldh [hLinkSquare], a
-;>@o object = wRoomObjects[hLinkSquare]           # (the address wraps within its page)
+;>@o object = mem[0xD700 | u8(addr(wRoomObjects) + hLinkSquare)]   # wRoomObjects[hLinkSquare], the address wrapping within its page
 	ld d, $00
 	ld hl, wRoomObjects
 	ld a, h
@@ -12126,6 +12467,7 @@ SetLinkSpriteDY::
 	ld [wLinkSpriteDY], a
 
 .done
+;> return
 	ret
 
 
@@ -12240,7 +12582,7 @@ CheckGroundUnderLink::
 	jp z, NormalGround
 
 ;> if wLinkGroundType != 0xE0:                  # else spikes: on into HurtLinkOnGround
-;>     return OtherGround()
+;>     raise NotModeled('the other ground types go on at HurtLinkOnGround.other')
 	cp $e0
 	jr nz, HurtLinkOnGround.other
 
@@ -12494,7 +12836,7 @@ GroundEffects:
 
 	ld a, [wHasFlippers]
 	and a
-;>         return StartSwimming()
+;>         raise NotModeled('swimming starts at LinkDrown.swim')
 	jr nz, LinkDrown.swim
 
 ;@ def LinkDrown()
@@ -12870,6 +13212,7 @@ RoomScrollCameraDY::
 ;@ is set, after a scroll down he may hop into water, the room's entry hooks run and in dungeons the
 ;@ compass chimes for a room whose item is still there.
 ;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
+;@ test: wRoomTransitionState = rand(0, 5)
 UpdateRoomTransition::
 ;> if not wRoomTransitionState:
 	ld a, [wRoomTransitionState]
@@ -13081,7 +13424,7 @@ RoomTransitionNone::
 
 
 ;@ path: world/room_scroll
-;@ The Face Shrine maze room ($71 of map $08): the 8 directions to walk out of it (0 right, 1 left,
+;@ The Wind Fish's Egg maze room ($71 of map $08): the 8 directions to walk out of it (0 right, 1 left,
 ;@ 2 up), from index wFaceShrineHint (4 routes, 8 bytes apart... overlapping). Read by LoadNextRoom.
 MazeRoomPaths::
 	db $01, $01, $02, $00, $00, $02, $01, $02, $00, $02, $02, $00, $02, $02, $00, $02
@@ -13090,7 +13433,7 @@ MazeRoomPaths::
 ;@ def LoadNextRoom()
 ;@ path: world/room_scroll
 ;@ Transition step 1: picks the room behind the edge (OverworldRoomStep / IndoorRoomStep, with a few
-;@ special links, and the Face Shrine maze that keeps Link in its room until he walks its path), loads
+;@ special links, and the maze inside the Wind Fish's Egg that keeps Link in its room until he walks its path), loads
 ;@ it and its entities, and picks the overworld music of the new room (the power-up music stays).
 ;@ test: skip reads data tables by index, which the trial's stand-ins cannot do
 LoadNextRoom::

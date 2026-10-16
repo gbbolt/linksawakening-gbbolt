@@ -565,7 +565,7 @@ DEF wRecentRooms EQU $CE81 ;@ u8[6] The last six rooms entered; a room dropped f
 DEF wPodobooCount EQU $C5A0 ;@ u8 Podoboos in the air this frame (each counts itself; cleared every frame)
 DEF wPodobooCountPrev EQU $C5A1 ;@ u8 wPodobooCount of the previous frame (at most 2 podoboos leap at once)
 DEF wHasInstrument2 EQU $DB66 ;@ u8 Progress flags of the second dungeon (Bottle Grotto); bit 1 set once its instrument is obtained
-DEF wInventorySlideSpeed EQU $C150 ;@ s8 Pixels the window moves per frame while the inventory slides: -8 up (opening), +8 down (closing)
+DEF wInventorySlideSpeed EQU $C150 ;@ u8 Pixels the window moves per frame while the inventory slides: $F8 (-8) up (opening), +8 down (closing)
 DEF wInventoryStaticDrawn EQU $C151 ;@ u8 Nonzero once the fixed parts of the sliding inventory are queued for drawing
 DEF wInventoryRowsToDraw EQU $C154 ;@ u8 Inventory rows still to be drawn while it slides in (counts down from 11)
 DEF wRupeeCountDelay EQU $C3CE ;@ u8 Frames before the rupee counter starts counting (set when a chest gives rupees)
@@ -661,6 +661,6 @@ DEF wMasterStalfosSwordY EQU $D20D ;@ u8 Master Stalfos: y offset of his sword (
 DEF wMasterStalfosTorsoY EQU $D20E ;@ u8 Master Stalfos: y offset of his torso above the legs (signed; $F0 standing, 0 = collapsed, legs hidden)
 DEF wMasterStalfosLegsY EQU $D20F ;@ u8 Master Stalfos: y offset of his legs (never set, 0)
 DEF wCrackedFloorTimer EQU $C1C9 ;@ u8 Frames Link has stood still on a cracked floor square (it gives way at $28)
-DEF wMazeRoomStep EQU $C5AA ;@ u8 Steps of the Face Shrine maze path walked so far (0-7; reset on a wrong step)
+DEF wMazeRoomStep EQU $C5AA ;@ u8 Steps of the Wind Fish's Egg maze path walked so far (0-7; reset on a wrong step)
 DEF wElectricShockTimer EQU $D464 ;@ u8 Frames of an electric shock (a Buzz Blob hit with the sword, $40): the screen flashes and shakes and Link is held
 DEF wOwlSlot EQU $C501 ;@ u8 Entity slot of the owl in the current room (set by its handler); opening a chest with content $11 sets its wEntityTimer1 to $38, so the owl waits until the item pose is over

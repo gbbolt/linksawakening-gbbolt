@@ -16,6 +16,107 @@ WEAPON_ROWS = ['sword L1', 'sword L1 strong / L2', 'sword L2 strong', 'weapon 3'
                'weapon $0E', 'weapon $0F']
 
 
+ITEM_B, INVENTORY = 0xDB00, 0xDB02     # wItemB, wInventoryItems
+LEVELS = {0xDB4E: 1, 0xDB44: 1, 0xDB43: 1}   # wSwordLevel, wShieldLevel, wPowerBraceletLevel
+COUNTS = {0xDB4D: 0x10, 0xDB45: 0x10, 0xDB4C: 0x10}   # wBombCount, wArrowCount, wMagicPowderCount (BCD)
+INVENTORY_ITEMS = {1: 'sword', 2: 'bombs', 3: 'Power Bracelet', 4: 'shield', 5: 'bow', 6: 'hookshot', 7: 'Fire Rod',
+                   8: 'Pegasus Boots', 9: 'Ocarina', 0x0A: 'Roc\'s Feather', 0x0B: 'shovel', 0x0C: 'magic powder',
+                   0x0D: 'boomerang'}
+# folder -> the inventory pictures it gets: ('item', id) | ('toadstool',) | ('instruments',) | ('trade',) |
+# ('hearts',) | ('dungeon',) | ('all',)
+FOLDER_PICS = {
+    'item/sword': [('item', 1)], 'link/sword': [('item', 1)], 'item/bomb': [('item', 2)],
+    'link/lift': [('item', 3)], 'link/carry': [('item', 3)], 'item/bow': [('item', 5)],
+    'item/hookshot': [('item', 6)], 'item/magic-rod': [('item', 7)], 'link/pegasus_boots': [('item', 8)],
+    'link/dash': [('item', 8)], 'item/ocarina': [('item', 9)], 'link/ocarina': [('item', 9)],
+    'link/jump': [('item', 0x0A)], 'item/shovel': [('item', 0x0B)], 'item/magic_powder': [('item', 0x0C)],
+    'item/boomerang': [('item', 0x0D)], 'item/toadstool': [('toadstool',)], 'item/instrument': [('instruments',)],
+    'item/instruments': [('instruments',)], 'item/trade': [('trade',)], 'item/heart-piece': [('hearts',)],
+    'item/heart-container': [('hearts',)], 'item/keys': [('dungeon',)], 'item/inventory': [('all',)],
+    'link/items': [('all',)], 'item/use': [('all',)], 'link/shield': [('item', 4)],
+}
+
+
+def inventory_pictures(rom):
+    """The inventory screen as the game draws it with each item: {key: (picture, caption)}. Every picture is the
+    part of the inventory (background only) that changes from the empty inventory of a new game when the item is
+    given, so it is the item's own icon with its level or count. Each trade item is taken on its own (one at a time
+    in the game)."""
+    import pickle
+    from _game import START
+    world = _la.World(rom)
+    m = world.m
+    m.run(30)
+    start = pickle.dumps(m)
+
+    def shot(pokes, dungeon=False, reload=False, sprites=False):
+        mm = pickle.loads(start)
+        for a, v in pokes.items():
+            mm.mem[a] = v
+        if dungeon:
+            _la.load_room(mm, True, 0, 0, pos=0x3B, settle=30)        # in Tail Cave: its items show
+        elif reload:                    # a room load copies the tiles that go with the items (the trade item's)
+            _la.load_room(mm, False, 0, 0xA2, settle=30)
+        for a, v in pokes.items():      # again: entering a dungeon copies its saved item flags over them
+            mm.mem[a] = v
+        mm.press(START, 4, 90)
+        return mm.screen(sprites)       # the items are background; the trade item is a sprite (the cursor
+        # sprite, which jumps to an item, is left out otherwise)
+    base = shot({})
+    dbase = shot({}, True)
+    rbase = shot({}, reload=True, sprites=True)
+
+    def diff(img, ref, pad=0):
+        cells = [(x, y) for y in range(0, 144, 8) for x in range(0, 160, 8)
+                 if any(img[y + r][x:x + 8] != ref[y + r][x:x + 8] for r in range(8))]
+        if not cells:
+            return None
+        x0, x1 = min(c[0] for c in cells), max(c[0] for c in cells) + 8
+        y0, y1 = min(c[1] for c in cells), max(c[1] for c in cells) + 8
+        x0, y0, x1, y1 = max(0, x0 - 8 * pad), max(0, y0 - 8 * pad), min(160, x1 + 8 * pad), min(144, y1 + 8 * pad)
+        return [bytearray(img[y][x0:x1]) for y in range(y0, y1)]
+    out = {}
+    common = {**LEVELS, **COUNTS}
+    for it, name in INVENTORY_ITEMS.items():
+        p = diff(shot({**common, INVENTORY + 1: it}), base)      # slot 1: the cursor stays on slot 0
+        if p:
+            out[('item', it)] = (p, 'the {} in the inventory'.format(name))
+    p = diff(shot({**common, INVENTORY + 1: 0x0C, 0xDB4B: 1}), base)
+    if p:
+        out[('toadstool',)] = (p, 'the Sleepy Toadstool in the inventory (in the magic powder\'s place)')
+    p = diff(shot({0xDB65 + k: 2 for k in range(8)}), base, 0)
+    if p:
+        out[('instruments',)] = (p, 'the eight instruments in the inventory')
+    trades = []
+    for t in range(1, 15):
+        p = diff(shot({0xDB0E: t}, reload=True, sprites=True), rbase)
+        if p:
+            trades.append(p)
+    if trades:
+        w = sum(len(p[0]) for p in trades) + 2 * (len(trades) - 1)
+        h = max(len(p) for p in trades)
+        img = [bytearray(w) for _ in range(h)]
+        x = 0
+        for p in trades:
+            for y, row in enumerate(p):
+                img[y][x:x + len(row)] = row
+            x += len(p[0]) + 2
+        out[('trade',)] = (img, 'the {} items of the trading sequence ($01-$0E) in the inventory'.format(len(trades)))
+    p = diff(shot({0xDB5C: 3}), base)
+    if p:
+        out[('hearts',)] = (p, 'three pieces of heart in the inventory')
+    p = diff(shot({0xDBCC: 1, 0xDBCD: 1, 0xDBCE: 1, 0xDBCF: 1, 0xDBD0: 3}, True), dbase)
+    if p:
+        out[('dungeon',)] = (p, 'map, compass, stone beak, nightmare key and 3 small keys in the inventory, in a dungeon')
+    full = {**common, ITEM_B: 1, ITEM_B + 1: 4, 0xDB0E: 1, 0xDB5C: 3}
+    for k in range(10):
+        full[INVENTORY + k] = [2, 3, 5, 6, 7, 8, 9, 0x0A, 0x0B, 0x0C][k]
+    for k in range(8):
+        full[0xDB65 + k] = 2
+    out[('all',)] = ([bytearray(r) for r in shot(full, reload=True, sprites=True)], 'the inventory with every item')
+    return out
+
+
 def is_data(u):
     lines = [x for x in u['body'] if x.strip() and not x.strip().startswith(';')]
     return bool(lines) and all(DATA.match(x) for x in lines)
@@ -49,6 +150,8 @@ def build(ctx):
                         '"fairy" turns the entity into a fairy, "-" does nothing. The strong sword is a spin attack, '
                         'a Pegasus dash or a hit with the Piece of Power active.']})
     # the folders: their code (what the item does) and their tables
+    pics = inventory_pictures(rom)
+    from _game import COLORS
     all_rows = []
     for path in sorted(folders):
         code, data = [], []
@@ -76,7 +179,14 @@ def build(ctx):
                              'columns': ['table', 'description', 'bytes', 'values (signed)'], 'rows': data})
         if not sections:
             continue
-        out.append({'name': 'items-' + path.replace('/', '-'), 'type': 'card', 'group': {'item': 'items', 'link': 'Link'}.get(path.split('/')[0], 'objects'),
+        images = []
+        for key in FOLDER_PICS.get(path, []):
+            if key in pics:
+                img, cap = pics[key]
+                images.append({'type': 'image', 'width': len(img[0]), 'height': len(img), 'packed': 'zlib',
+                               'pixels': ctx.packed_pixels(img), 'colors': list(COLORS), 'fixedColors': True,
+                               'scale': 3 if len(img[0]) <= 48 else 2, 'caption': cap})
+        out.append({'name': 'items-' + path.replace('/', '-'), 'type': 'card', 'images': images, 'group': {'item': 'items', 'link': 'Link'}.get(path.split('/')[0], 'objects'),
                     'title': path, 'unit': (folders[path] or [None])[0],
                     'subtitle': '{} routine(s), {} table(s)'.format(len(code), len(data)), 'sections': sections,
                     'doc': ['The code and data of the folder {}: each routine with its description and each table '

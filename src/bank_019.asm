@@ -4420,7 +4420,7 @@ RammableBlockWaitForRam::
 	ret z
 ;> ResetSpinAttackAndDash()
 	call ResetSpinAttackAndDash
-;> hLinkSpeedX = u8(-s8(hLinkSpeedX) >> 2)  # bounce back at a quarter of the speed (s8 = signed value)
+;> hLinkSpeedX = u8(((u8(-hLinkSpeedX) ^ 0x80) - 0x80) >> 2)  # bounce back at a quarter of the speed (signed)
 	ldh a, [hLinkSpeedX]
 	cpl
 	inc a
@@ -4540,11 +4540,13 @@ DirectionFromSteepVector::
 	db $04, $04, $03, $03, $03, $02, $02, $02, $0c, $0c, $0d, $0d, $0d, $0e, $0e, $0e
 	db $04, $04, $05, $05, $05, $06, $06, $06, $0c, $0c, $0b, $0b, $0b, $0a, $0a, $0a
 
-;@ def GetDirectionFromVector() -> a
+;@ def GetDirectionFromVector(slot: bc) -> a
 ;@ path: entity/helpers
 ;@ Turns the vector in hMultiPurpose0 (y) / hMultiPurpose1 (x), as GetVectorTowardsLink leaves it (components up
 ;@ to 31), into one of 16 directions (0 right, 4 down, 8 left, $0C up).
 ;@ test: wCurrentBank = $19
+;@ test: slot = rand(0, 15)
+;@ test: hMultiPurpose0 = rand(0xE1, 0x11E) & 0xFF; hMultiPurpose1 = rand(0xE1, 0x11E) & 0xFF
 GetDirectionFromVector::
 ;> quadrant = (hMultiPurpose0 >> 7)       # y negative
 	ldh a, [hMultiPurpose0]
@@ -4581,7 +4583,7 @@ GetDirectionFromVector::
 ;> if ay < ax:
 	cp d
 	jr nc, .steep
-;>     i = row + (ay >> 2)
+;>     i = u8(row + (((ay ^ 0x80) - 0x80) >> 2))
 	sra a
 	sra a
 	add h
@@ -4593,7 +4595,7 @@ GetDirectionFromVector::
 	ld a, [hl]
 	ret
 .steep
-;> i = row + (ax >> 2)
+;> i = u8(row + (((ax ^ 0x80) - 0x80) >> 2))
 	ld a, d
 	sra a
 	sra a
@@ -4904,7 +4906,7 @@ ThwompWait::
 ;> GetVectorTowardsLink(slot, 0x1F)
 	ld a, $1f
 	call GetVectorTowardsLink
-;> dir8 = (GetDirectionFromVector() >> 1) & 7
+;> dir8 = (GetDirectionFromVector(slot) >> 1) & 7
 	call GetDirectionFromVector
 	rra
 	and $07
@@ -7997,6 +7999,7 @@ JumpingCheepCheepHandler::
 ;@ Runs the jumping Cheep Cheep's current state routine.
 ;@ test: slot = rand(0, 15)
 ;@ test: wCurrentBank = $19
+;@ test: hActiveEntityState = rand(0, 5)
 RunJumpingCheepCheepState::
 ;> return JumpingCheepCheepStates[hActiveEntityState](slot)
 	ldh a, [hActiveEntityState]
@@ -10074,7 +10077,7 @@ MansionBonusShell::
 ;>             else: mem[status] |= 0x40
 	set 6, [hl]
 .count
-;>             wSeashells = bcd_add(wSeashells, 1)
+;>             wSeashells = to_bcd((bcd_to_int(wSeashells) + 1) % 100)   # +1 in BCD
 	add $01
 	daa
 	ld [wSeashells], a
@@ -11295,7 +11298,7 @@ UnusedBossDeathExplosions_19::
 ;@ happens while the game is paused (map screen, dialogue, room transition).
 ;@ test: skip enters ReturnIfNonInteractive_19 in the middle
 UnusedSpawnExplosionCloud_19::
-;> ReturnIfNonInteractive_19_afterStatusCheck()   # drops our caller when the game is paused
+;> raise NotModeled('enters ReturnIfNonInteractive_19 after its status check, which drops our caller while the game is paused')
 	call ReturnIfNonInteractive_19 + 6
 ;> hMultiPurpose0 = hActiveEntityX
 	ldh a, [hActiveEntityX]
@@ -11362,6 +11365,7 @@ UnusedSpawnHeartContainer_19::
 ;@ Sets bit 5 in the current room's status byte (and in hRoomStatus), so the room's one-time event does not
 ;@ happen again. Indoor maps $06-$19 use the second group of 256 indoor rooms.
 ;@ test: wCurrentBank = $19
+;@ test: wIsIndoor = rand(0, 1)
 MarkRoomEventDone_19::
 ;> group = wIsIndoor
 	ld hl, wRoomStatus
@@ -11377,7 +11381,7 @@ MarkRoomEventDone_19::
 	jr c, .add
 	inc d
 .add
-;> p = wRoomStatus + group * 256 + hMapRoom
+;> p = u16(wRoomStatus + group * 256 + hMapRoom)
 	add hl, de
 ;> mem[p] |= 0x20
 	ld a, [hl]

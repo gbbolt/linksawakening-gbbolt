@@ -7,7 +7,7 @@ SECTION "ROM Bank $012", ROMX[$4000], BANK[$12]
 
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $C0: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesC0::
 	db $03, $00, $3f, $01, $3f, $13, $7f, $1f, $ff, $31, $ff, $60, $ff, $24, $7f, $26
 	db $7f, $26, $ff, $22, $ff, $70, $ff, $38, $7f, $1f, $3f, $13, $3f, $01, $03, $00
@@ -27,7 +27,7 @@ EntityTilesC0::
 	db $ff, $00, $f0, $0f, $e8, $1f, $fc, $ff, $f0, $ff, $92, $ff, $9e, $ff, $f8, $ff
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $C1: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesC1::
 	db $00, $00, $00, $00, $00, $00, $01, $00, $03, $00, $0c, $03, $13, $0c, $27, $18
 	db $2f, $10, $5f, $20, $4f, $30, $7b, $04, $cf, $30, $ff, $10, $af, $58, $b7, $4f
@@ -47,7 +47,7 @@ EntityTilesC1::
 	db $5d, $be, $42, $bc, $dd, $3e, $dd, $3e, $dd, $3e, $42, $bc, $5d, $be, $dd, $3e
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $C2: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesC2::
 	db $60, $00, $b0, $40, $b0, $40, $b0, $40, $b8, $40, $bc, $40, $bc, $40, $be, $40
 	db $9f, $60, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $fd, $02, $ff, $00, $f6, $09
@@ -67,7 +67,7 @@ EntityTilesC2::
 	db $82, $fc, $d2, $ec, $f4, $68, $e4, $18, $e8, $d0, $b0, $e0, $f0, $60, $70, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $C3: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesC3::
 	db $06, $00, $0f, $06, $0f, $05, $0f, $06, $16, $09, $11, $0f, $10, $0f, $0b, $04
 	db $0c, $03, $0f, $04, $0d, $06, $0b, $04, $07, $01, $03, $01, $02, $01, $01, $00
@@ -87,7 +87,7 @@ EntityTilesC3::
 	db $fc, $d8, $bc, $c8, $4c, $80, $e0, $c0, $e0, $00, $00, $00, $00, $00, $00, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $C4: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesC4::
 	db $1c, $00, $3e, $1c, $37, $0e, $0b, $06, $0b, $04, $0f, $07, $1f, $0b, $1f, $0b
 	db $2f, $19, $2f, $1f, $17, $0f, $3f, $10, $3f, $17, $1b, $07, $1d, $0e, $1f, $00
@@ -107,7 +107,7 @@ EntityTilesC4::
 	db $7e, $24, $3c, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $C5: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesC5::
 	db $07, $00, $18, $07, $26, $19, $27, $1a, $4f, $33, $5f, $2b, $3f, $0f, $1f, $0d
 	db $17, $0d, $2b, $17, $2f, $10, $3f, $0d, $1f, $0d, $1d, $02, $17, $0f, $1f, $00
@@ -127,7 +127,7 @@ EntityTilesC5::
 	db $a0, $c0, $c0, $80, $ec, $c0, $9e, $ec, $7e, $b4, $ac, $70, $d8, $e0, $f0, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $C6: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesC6::
 	db $05, $00, $07, $00, $0d, $02, $0b, $04, $0f, $00, $1f, $0c, $3f, $0d, $79, $3e
 	db $c7, $78, $e9, $56, $8b, $75, $5f, $21, $31, $00, $03, $01, $07, $02, $07, $00
@@ -147,7 +147,7 @@ EntityTilesC6::
 	db $00, $ff, $00, $ff, $22, $ff, $14, $ff, $08, $ff, $14, $ff, $22, $ff, $00, $ff
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $C7: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesC7::
 	db $01, $00, $03, $01, $f9, $00, $b4, $78, $63, $1c, $38, $07, $36, $19, $3a, $1d
 	db $3a, $1d, $1c, $0b, $0c, $03, $02, $01, $01, $00, $03, $00, $07, $03, $07, $00
@@ -167,7 +167,7 @@ EntityTilesC7::
 	db $05, $03, $02, $01, $01, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $C8: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesC8::
 	db $1f, $00, $16, $0b, $20, $1f, $3c, $03, $fe, $09, $fe, $61, $f6, $39, $fc, $7f
 	db $5a, $3d, $7c, $33, $f8, $6f, $f8, $6f, $7f, $30, $3c, $03, $3e, $17, $3f, $00
@@ -187,7 +187,7 @@ EntityTilesC8::
 	db $e9, $36, $f1, $ee, $f1, $de, $f3, $dc, $fd, $e2, $e7, $f8, $8e, $7c, $fe, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $C9: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesC9::
 	db $cf, $3f, $cf, $3f, $cf, $3f, $cf, $3f, $cf, $3f, $cf, $3f, $cf, $3f, $cf, $3f
 	db $cf, $3f, $cf, $3f, $cf, $3f, $cf, $3f, $cf, $3f, $cf, $3f, $cf, $3f, $cf, $3f
@@ -207,7 +207,7 @@ EntityTilesC9::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $CA: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesCA::
 	db $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $80, $ff, $80, $7f, $40
 	db $7f, $40, $3f, $20, $3f, $20, $1f, $10, $0f, $0c, $03, $03, $00, $00, $00, $00
@@ -227,7 +227,7 @@ EntityTilesCA::
 	db $7f, $40, $ff, $80, $ff, $80, $ff, $f0, $0f, $08, $0f, $08, $0f, $08, $0f, $08
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $CB: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesCB::
 	db $0f, $08, $0f, $08, $0f, $08, $0f, $08, $0f, $08, $0f, $08, $0f, $08, $0f, $08
 	db $0f, $08, $0f, $08, $07, $04, $07, $04, $07, $04, $03, $02, $03, $02, $01, $01
@@ -247,7 +247,7 @@ EntityTilesCB::
 	db $8f, $7e, $ff, $00, $41, $3e, $4f, $3e, $4f, $3e, $4f, $3e, $4f, $3e, $7f, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $CC: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesCC::
 	db $0e, $00, $15, $0a, $10, $0f, $1e, $01, $cf, $06, $e5, $03, $fb, $00, $79, $30
 	db $3f, $00, $0e, $05, $0e, $01, $09, $06, $07, $00, $00, $00, $00, $00, $00, $00
@@ -267,7 +267,7 @@ EntityTilesCC::
 	db $27, $c0, $fb, $06, $6d, $9e, $da, $3c, $84, $78, $38, $c0, $38, $f0, $38, $f0
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $CD: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesCD::
 	db $a2, $5d, $82, $7d, $44, $3b, $38, $07, $39, $07, $65, $1b, $c3, $7c, $ff, $00
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
@@ -287,7 +287,7 @@ EntityTilesCD::
 	db $70, $00, $f8, $70, $f8, $f0, $b8, $f0, $b0, $60, $f0, $e0, $f0, $60, $e0, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $CE: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesCE::
 	db $01, $00, $01, $00, $01, $00, $02, $01, $04, $03, $05, $02, $04, $03, $02, $01
 	db $01, $00, $03, $00, $07, $03, $06, $03, $04, $03, $04, $03, $02, $01, $01, $00
@@ -307,7 +307,7 @@ EntityTilesCE::
 	db $00, $ff, $00, $ff, $22, $ff, $14, $ff, $08, $ff, $14, $ff, $22, $ff, $00, $ff
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $CF: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesCF::
 	db $00, $00, $00, $00, $00, $00, $1b, $00, $24, $1b, $2e, $13, $30, $0f, $20, $1f
 	db $73, $0c, $78, $1f, $7b, $3c, $5f, $3b, $38, $07, $29, $16, $1c, $03, $07, $00
@@ -327,7 +327,7 @@ EntityTilesCF::
 	db $fc, $00, $d6, $28, $d6, $28, $a4, $58, $fc, $00, $f0, $00, $c8, $f0, $f8, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $D0: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesD0::
 	db $06, $00, $0e, $04, $1e, $0c, $3b, $1c, $74, $3b, $e8, $77, $fa, $05, $1a, $05
 	db $18, $07, $fc, $03, $ef, $70, $77, $38, $3b, $1c, $1e, $0c, $0e, $04, $06, $00
@@ -347,7 +347,7 @@ EntityTilesD0::
 	db $87, $78, $b7, $48, $b7, $78, $87, $7c, $bb, $46, $b9, $7f, $80, $7f, $ff, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $D1: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesD1::
 	db $00, $00, $00, $00, $00, $00, $0f, $00, $3f, $00, $3f, $00, $1f, $01, $07, $03
 	db $7f, $02, $a7, $58, $81, $7e, $f8, $07, $7d, $3a, $5f, $3d, $37, $0e, $0b, $07
@@ -367,7 +367,7 @@ EntityTilesD1::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $D2: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesD2::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $80, $00, $e0, $00, $10, $e0, $f0, $00
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
@@ -387,7 +387,7 @@ EntityTilesD2::
 	db $7c, $80, $fe, $40, $ff, $c2, $7f, $82, $f9, $06, $fa, $04, $fc, $00, $e0, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $D3: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesD3::
 	db $03, $00, $07, $00, $0f, $00, $0f, $07, $1f, $0b, $1f, $0b, $0f, $07, $1f, $0f
 	db $16, $0f, $2f, $10, $27, $19, $2f, $14, $1f, $06, $0f, $00, $1c, $0f, $1f, $00
@@ -407,7 +407,7 @@ EntityTilesD3::
 	db $e4, $d8, $e8, $90, $f8, $00, $f8, $00, $7c, $80, $fe, $04, $fe, $dc, $dc, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $D4: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesD4::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $01, $00, $03, $04, $1e, $01, $3f, $0d
 	db $3f, $1d, $3f, $1d, $2e, $1d, $13, $0c, $0f, $00, $00, $00, $00, $00, $00, $00
@@ -427,7 +427,7 @@ EntityTilesD4::
 	db $14, $e8, $24, $d8, $48, $b0, $88, $70, $30, $c0, $c0, $00, $00, $00, $00, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $D5: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesD5::
 	db $ff, $7e, $ff, $7e, $81, $7e, $ff, $00, $fc, $7b, $85, $7a, $86, $79, $fc, $03
 	db $7c, $3b, $45, $3a, $7d, $02, $7c, $3b, $44, $3b, $7f, $00, $7f, $3e, $7f, $00
@@ -447,7 +447,7 @@ EntityTilesD5::
 	db $00, $ff, $00, $ff, $22, $ff, $14, $ff, $08, $ff, $14, $ff, $22, $ff, $00, $ff
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $D6: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesD6::
 	db $c0, $b8, $88, $f8, $98, $f8, $98, $f8, $98, $f8, $98, $f8, $f8, $f8, $98, $f8
 	db $98, $f8, $9c, $fc, $98, $f8, $98, $f8, $98, $f8, $98, $f8, $b8, $f8, $d8, $e0
@@ -467,7 +467,7 @@ EntityTilesD6::
 	db $00, $ff, $00, $ff, $22, $ff, $14, $ff, $08, $ff, $14, $ff, $22, $ff, $00, $ff
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $D7: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesD7::
 	db $1f, $00, $3f, $16, $7f, $36, $eb, $76, $db, $66, $fb, $56, $bb, $46, $7b, $06
 	db $fb, $66, $fb, $76, $fb, $76, $fb, $56, $eb, $76, $fb, $66, $df, $62, $73, $00
@@ -487,7 +487,7 @@ EntityTilesD7::
 	db $7f, $99, $3d, $c3, $1f, $e7, $4f, $b5, $cf, $37, $7d, $03, $0e, $01, $07, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $D8: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesD8::
 	db $37, $00, $6f, $37, $5f, $2f, $3f, $1a, $3f, $12, $7f, $17, $ff, $7f, $bf, $78
 	db $5f, $30, $3f, $13, $3f, $1f, $2c, $1f, $17, $0f, $10, $0f, $0c, $03, $03, $00
@@ -507,7 +507,7 @@ EntityTilesD8::
 	db $ff, $fe, $f9, $fe, $fe, $88, $fc, $70, $cc, $f8, $04, $f8, $08, $f0, $f0, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $D9: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesD9::
 	db $07, $00, $3c, $03, $48, $37, $59, $27, $77, $0f, $cc, $3f, $99, $7e, $92, $7d
 	db $95, $7b, $ca, $37, $b5, $4e, $f5, $4e, $b0, $4f, $c8, $37, $94, $7b, $88, $7f
@@ -527,7 +527,7 @@ EntityTilesD9::
 	db $10, $ef, $fb, $07, $fc, $f3, $07, $f8, $71, $8e, $a9, $76, $ff, $00, $00, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $DA: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesDA::
 	db $00, $00, $00, $00, $00, $00, $00, $01, $00, $03, $00, $07, $01, $0f, $03, $1f
 	db $07, $1f, $07, $3f, $0f, $3f, $0f, $3f, $1f, $7f, $1f, $7f, $1f, $7f, $1f, $7f
@@ -547,7 +547,7 @@ EntityTilesDA::
 	db $7f, $bf, $5f, $bf, $37, $cf, $0f, $f0, $00, $ff, $07, $f8, $0f, $f0, $4e, $b1
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $DB: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesDB::
 	db $ff, $00, $87, $7f, $80, $7f, $80, $7f, $ff, $00, $7f, $00, $40, $3f, $41, $3e
 	db $62, $1d, $f3, $6d, $f5, $6b, $96, $6b, $96, $6b, $66, $1b, $46, $3b, $44, $3b
@@ -567,7 +567,7 @@ EntityTilesDB::
 	db $fe, $fd, $fa, $fd, $ec, $f3, $f0, $0f, $00, $ff, $e0, $1f, $f0, $0f, $72, $8d
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $DC: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesDC::
 	db $00, $00, $00, $00, $07, $00, $0f, $00, $3f, $00, $7f, $30, $7f, $37, $7f, $3e
 	db $3f, $0e, $0b, $07, $1f, $00, $3f, $18, $3c, $1b, $1f, $00, $0f, $07, $0f, $00
@@ -587,7 +587,7 @@ EntityTilesDC::
 	db $f6, $08, $f6, $08, $06, $f8, $f6, $08, $fa, $e4, $fa, $a4, $fa, $e4, $fe, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $DD: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesDD::
 	db $37, $00, $5f, $20, $7e, $00, $7f, $00, $55, $2e, $7f, $0a, $95, $6e, $de, $61
 	db $bc, $43, $fe, $11, $3f, $19, $2f, $1f, $17, $0f, $0f, $00, $1b, $0d, $1f, $00
@@ -607,7 +607,7 @@ EntityTilesDD::
 	db $27, $19, $2f, $17, $2f, $17, $17, $0b, $17, $0f, $0b, $07, $14, $0b, $1f, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $DE: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesDE::
 	db $38, $00, $78, $30, $f0, $40, $e7, $00, $bf, $67, $ef, $1f, $57, $3e, $5f, $2c
 	db $7f, $0c, $7f, $34, $fb, $77, $f4, $5b, $ff, $60, $e2, $5d, $c1, $22, $00, $01
@@ -627,7 +627,7 @@ EntityTilesDE::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $DF: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesDF::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $33, $00, $2d, $13
 	db $33, $1e, $44, $3b, $e4, $1b, $86, $7f, $f1, $6e, $7e, $01, $3f, $17, $3f, $00
@@ -647,7 +647,7 @@ EntityTilesDF::
 	db $00, $ff, $00, $ff, $22, $ff, $14, $ff, $08, $ff, $14, $ff, $22, $ff, $00, $ff
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $E0: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. LoadTileset1D (the ending) copies $6000-$67FF to $8000. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesE0::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $03, $04, $0f, $00, $0f, $10
 	db $1f, $00, $1f, $00, $1f, $08, $1b, $0e, $1e, $03, $0f, $00, $03, $04, $00, $00
@@ -667,7 +667,7 @@ EntityTilesE0::
 	db $02, $1d, $1e, $21, $2e, $51, $3e, $41, $3c, $42, $00, $3c, $00, $00, $00, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $E1: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesE1::
 	db $00, $00, $01, $00, $01, $00, $03, $01, $03, $01, $0f, $00, $1e, $01, $1f, $20
 	db $3e, $01, $3f, $01, $3e, $11, $37, $1c, $3d, $06, $1f, $00, $07, $08, $00, $00
@@ -687,7 +687,7 @@ EntityTilesE1::
 	db $0b, $07, $09, $07, $08, $07, $04, $03, $03, $00, $00, $00, $00, $00, $00, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $E2: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesE2::
 	db $15, $00, $1f, $00, $1f, $00, $3f, $07, $7f, $2d, $7f, $28, $5b, $37, $38, $17
 	db $3f, $10, $3f, $08, $7f, $27, $77, $28, $33, $0f, $1e, $01, $3d, $1e, $1f, $00
@@ -707,7 +707,7 @@ EntityTilesE2::
 	db $df, $6e, $be, $c0, $f8, $00, $f8, $10, $ec, $18, $9e, $04, $86, $00, $00, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $E3: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. Also page $63 of the table at $01:$7FA4 (copied to $8F00 on map $09). 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesE3::
 	db $07, $00, $e8, $07, $91, $6f, $53, $2f, $21, $1f, $2c, $1f, $2f, $1b, $2f, $19
 	db $37, $0d, $57, $2f, $9c, $63, $a5, $43, $cf, $00, $13, $0f, $1f, $00, $00, $00
@@ -727,7 +727,7 @@ EntityTilesE3::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $E4: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesE4::
 	db $07, $00, $1e, $01, $3f, $00, $7f, $00, $7f, $20, $ff, $50, $ff, $50, $ff, $20
 	db $ff, $00, $bf, $40, $ff, $30, $77, $3e, $7e, $17, $3f, $02, $1f, $00, $07, $00
@@ -747,7 +747,7 @@ EntityTilesE4::
 	db $7e, $24, $5a, $3c, $3c, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $E5: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesE5::
 	db $00, $00, $00, $00, $36, $00, $5e, $20, $7e, $00, $7f, $0e, $7f, $3f, $7f, $1b
 	db $df, $6b, $9f, $6f, $bf, $47, $f8, $07, $20, $1f, $18, $07, $37, $18, $3f, $00
@@ -767,7 +767,7 @@ EntityTilesE5::
 	db $7e, $24, $3c, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $E6: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. LoadTileset1B copies $6600-$667F to $8000. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesE6::
 	db $07, $00, $18, $07, $26, $19, $27, $1a, $4f, $33, $5f, $2b, $3f, $0f, $1f, $0d
 	db $17, $0d, $2b, $17, $2f, $10, $3f, $0d, $1f, $0d, $1d, $02, $17, $0f, $1f, $00
@@ -787,7 +787,7 @@ EntityTilesE6::
 	db $a4, $d8, $44, $b8, $c2, $3c, $e2, $1c, $bc, $40, $10, $e0, $08, $f0, $f8, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $E7: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesE7::
 	db $00, $00, $00, $00, $07, $00, $0f, $00, $3f, $00, $7f, $30, $7f, $37, $7f, $3e
 	db $3f, $0e, $0b, $07, $1f, $00, $3f, $18, $3c, $1b, $1f, $00, $0f, $07, $0f, $00
@@ -807,7 +807,7 @@ EntityTilesE7::
 	db $f0, $e0, $e0, $80, $c0, $00, $f0, $00, $38, $d0, $78, $b0, $f0, $60, $f8, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $E8: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesE8::
 	db $00, $00, $03, $00, $0f, $00, $1f, $00, $3f, $00, $7f, $00, $7f, $00, $ff, $00
 	db $ff, $00, $ff, $00, $ff, $00, $ff, $00, $7f, $00, $7f, $00, $3f, $00, $0f, $00
@@ -827,7 +827,7 @@ EntityTilesE8::
 	db $ff, $00, $ff, $00, $ff, $00, $7f, $00, $7f, $00, $3f, $00, $1f, $00, $07, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $E9: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesE9::
 	db $00, $00, $1c, $00, $3e, $00, $7f, $00, $ff, $00, $cf, $00, $0f, $00, $0f, $00
 	db $7f, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $7f, $00
@@ -847,7 +847,7 @@ EntityTilesE9::
 	db $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $7f, $00, $7f, $00, $1f, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $EA: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesEA::
 	db $00, $00, $00, $00, $03, $00, $0f, $00, $1f, $00, $1f, $00, $3f, $00, $3f, $00
 	db $3f, $00, $3f, $00, $3f, $00, $3f, $00, $1f, $00, $1f, $00, $0f, $00, $0f, $00
@@ -867,7 +867,7 @@ EntityTilesEA::
 	db $ff, $00, $ff, $00, $ff, $00, $ff, $00, $cf, $30, $f7, $38, $fb, $3c, $ff, $3c
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $EB: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesEB::
 	db $dd, $3e, $ff, $1e, $ef, $1e, $f7, $0e, $fd, $02, $ff, $00, $ff, $00, $ff, $00
 	db $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $3f, $00, $07, $00
@@ -887,7 +887,7 @@ EntityTilesEB::
 	db $00, $ff, $00, $ff, $22, $ff, $14, $ff, $08, $ff, $14, $ff, $22, $ff, $00, $ff
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $EC: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesEC::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $01, $00
 	db $03, $00, $03, $00, $07, $00, $07, $00, $07, $00, $07, $00, $07, $00, $07, $00
@@ -907,7 +907,7 @@ EntityTilesEC::
 	db $3f, $00, $3f, $00, $3f, $00, $3f, $00, $3f, $00, $1e, $00, $0c, $00, $00, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $ED: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesED::
 	db $e0, $40, $e0, $40, $fc, $60, $7e, $3c, $3f, $0e, $0f, $06, $07, $02, $07, $02
 	db $3f, $06, $7f, $3e, $fe, $70, $f0, $60, $e0, $40, $e0, $40, $e0, $40, $e0, $40
@@ -927,7 +927,7 @@ EntityTilesED::
 	db $8f, $7f, $8f, $7f, $87, $7f, $43, $3f, $40, $3f, $20, $1f, $18, $07, $07, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $EE: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesEE::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	db $01, $00, $01, $00, $00, $00, $00, $00, $01, $00, $01, $00, $07, $00, $0f, $00
@@ -947,7 +947,7 @@ EntityTilesEE::
 	db $7e, $3f, $5d, $3e, $3f, $00, $1d, $00, $3c, $00, $7c, $00, $78, $00, $30, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $EF: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesEF::
 	db $e7, $00, $ff, $00, $ff, $00, $7f, $00, $7f, $00, $ff, $00, $ff, $00, $ff, $00
 	db $ff, $00, $ff, $00, $ff, $00, $7f, $00, $7f, $00, $ff, $00, $ff, $00, $e7, $00
@@ -967,7 +967,7 @@ EntityTilesEF::
 	db $00, $ff, $00, $ff, $22, $ff, $14, $ff, $08, $ff, $14, $ff, $22, $ff, $00, $ff
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $F0: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesF0::
 	db $c3, $00, $f3, $00, $fb, $00, $fb, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00
 	db $ff, $00, $ff, $00, $7f, $00, $3f, $00, $03, $00, $00, $00, $00, $00, $00, $00
@@ -987,7 +987,7 @@ EntityTilesF0::
 	db $fe, $c0, $ff, $c0, $ff, $80, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $fe, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $F1: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesF1::
 	db $01, $00, $09, $00, $1b, $00, $1f, $00, $3f, $00, $3f, $00, $3b, $00, $33, $00
 	db $31, $00, $11, $00, $01, $00, $03, $00, $03, $00, $01, $00, $01, $00, $01, $00
@@ -1007,7 +1007,7 @@ EntityTilesF1::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $F2: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesF2::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $39, $00
 	db $7f, $00, $7f, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00
@@ -1027,7 +1027,7 @@ EntityTilesF2::
 	db $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $00, $00, $00, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $F3: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesF3::
 	db $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $ff, $00, $7f, $00, $78, $07
 	db $7c, $03, $3f, $00, $3f, $00, $1f, $00, $07, $00, $01, $00, $00, $00, $00, $00
@@ -1047,7 +1047,7 @@ EntityTilesF3::
 	db $ff, $00, $fd, $f6, $0f, $f0, $fd, $06, $fd, $06, $fd, $f6, $09, $f6, $ff, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $F4: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesF4::
 	db $3f, $00, $7f, $3b, $bf, $7b, $af, $70, $be, $61, $be, $61, $bf, $60, $bb, $67
 	db $f7, $2f, $bb, $4c, $bf, $68, $bf, $68, $bf, $68, $57, $2c, $2b, $17, $1f, $00
@@ -1067,7 +1067,7 @@ EntityTilesF4::
 	db $00, $ff, $00, $ff, $22, $ff, $14, $ff, $08, $ff, $14, $ff, $22, $ff, $00, $ff
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $F5: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. LoadTileset15 copies $7500-$753F to $8000 and $7500-$76FF to $8D00 (the ending). 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesF5::
 	db $03, $00, $07, $00, $07, $03, $1f, $04, $3d, $13, $39, $17, $3a, $15, $2c, $13
 	db $1c, $03, $14, $0b, $34, $1b, $3b, $14, $17, $0f, $18, $07, $1f, $00, $0f, $00
@@ -1087,7 +1087,7 @@ EntityTilesF5::
 	db $17, $0b, $17, $0a, $1f, $02, $3d, $1b, $3f, $19, $1f, $00, $02, $01, $01, $00
 ;@ path: gfx/sprites/entities
 ;@ Entity graphics set $F6: 16 sprite tiles (8 x 16 pairs) that LoadTileset09 copies to one of the four entity tile slots ($8400-$87FF) when a room's entity graphics set (OverworldSpritesets / IndoorSpritesets, through EntityTilesBanks) names it. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 EntityTilesF6::
 	db $c0, $00, $e0, $c0, $e0, $00, $bc, $40, $fe, $0c, $fe, $cc, $fc, $80, $fe, $08
 	db $fd, $1a, $f1, $3e, $b5, $6e, $a5, $5e, $ca, $3c, $82, $7c, $0c, $f0, $f0, $00

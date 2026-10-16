@@ -29,7 +29,7 @@ BushCrawlerSprites::
 BushCrawlerCoverSprites::
 	db $f4, $10, $f6, $10, $f0, $10, $f2, $10
 
-;@ def BushCrawlerHandler(slot: c)
+;@ def BushCrawlerHandler(slot: bc)
 ;@ path: enemy/bush_crawler
 ;@ Entity $BB, a small enemy that hides under a bush-like cover. While covered (wEntityPrivate1 = 1)
 ;@ it cannot be hurt; when Link is in its row, or in its column below it, the cover slides at him
@@ -178,7 +178,7 @@ BushCrawlerDashSpeedX::
 BushCrawlerDashSpeedY::
 	db $00, $00, $f0, $10
 
-;@ def BushCrawler_Hidden(slot: c)
+;@ def BushCrawler_Hidden(slot: bc)
 ;@ path: enemy/bush_crawler
 ;@ State 0: sits still under its cover, untouchable. When the rest time is over and Link is in the
 ;@ same row, or in the same column below, it dashes towards him for $30 frames. Meanwhile Link can
@@ -369,7 +369,7 @@ BushCrawler_Return:
 	ret
 
 
-;@ def BushCrawler_Dash(slot: c)
+;@ def BushCrawler_Dash(slot: bc)
 ;@ path: enemy/bush_crawler
 ;@ State 1: the cover slides at Link with the crawler wiggling under it, until the time is up or it
 ;@ hits a wall; then it rests $20 frames hidden.
@@ -422,7 +422,7 @@ BushCrawler_Dash::
 BushCrawlerWanderSpeeds::
 	db $f0, $f4, $00, $0c, $10, $0c, $00, $f4, $f0, $f4
 
-;@ def BushCrawlerUncovered(slot: c)
+;@ def BushCrawlerUncovered(slot: bc)
 ;@ path: enemy/bush_crawler
 ;@ The released bush crawler (wEntityPrivate1 = 2): wiggles about in one of 8 directions, picking a
 ;@ new random direction every $20-$3F frames, and can be hit and knocked back.
@@ -492,7 +492,7 @@ FishermanSprites::
 	db $fc, $f0, $64, $00, $fc, $f8, $66, $00, $00, $00, $60, $00, $00, $08, $62, $00
 	db $fc, $f0, $64, $00, $fc, $f8, $66, $00, $00, $00, $74, $00, $00, $08, $76, $00
 
-;@ def FishermanUnderBridgeHandler(slot: c)
+;@ def FishermanUnderBridgeHandler(slot: bc)
 ;@ path: npc/fisherman_under_bridge
 ;@ Entity $B8, the fisherman who sits in a boat under the bridge (a side-view room). On the first
 ;@ frame he moves 8 pixels down and spawns his boat (a second $B8 with wEntityPrivate1 = 2,
@@ -582,7 +582,7 @@ FishermanStates::
 	dw Fisherman_PullOut
 	dw Fisherman_Done
 
-;@ def Fisherman_Idle(slot: c)
+;@ def Fisherman_Idle(slot: bc)
 ;@ path: npc/fisherman_under_bridge
 ;@ State 0: sits fishing. Talked to with the fishing hook (trade item $0B) he asks for it (text
 ;@ $E8, then state 1); before that he chats (text $E7), after the trade he says text $ED.
@@ -627,7 +627,7 @@ Fisherman_IdleAnimation:
 	jp SetEntitySpriteVariant
 
 
-;@ def Fisherman_Answer(slot: c)
+;@ def Fisherman_Answer(slot: bc)
 ;@ path: npc/fisherman_under_bridge
 ;@ State 1: if Link agreed to give the hook (first answer), freezes Link and fishes for $D0
 ;@ frames (text $E9, state 2); otherwise text $EA and back to idle.
@@ -660,7 +660,7 @@ Fisherman_Answer::
 	ret
 
 
-;@ def Fisherman_Fishing(slot: c)
+;@ def Fisherman_Fishing(slot: bc)
 ;@ path: npc/fisherman_under_bridge
 ;@ State 2: Link must stand still while the fisherman fishes: for the first $50 frames he sits
 ;@ normally, then the line twitches (frames 0/1 every $18 frames), and for the last $30 frames he
@@ -706,7 +706,7 @@ Fisherman_Fishing::
 	jp SetEntitySpriteVariant
 
 
-;@ def Fisherman_PullOut(slot: c)
+;@ def Fisherman_PullOut(slot: bc)
 ;@ path: npc/fisherman_under_bridge
 ;@ State 3: after $20 frames the catch flies out of the water: entity $54 (the fishing catch, with
 ;@ wEntityPrivate4 = 1) appears $20 pixels left and 8 below with an upward hop, with an appearing
@@ -830,7 +830,7 @@ FishermanUnusedOffsets::
 FishermanBoatBobOffsets::
 	db $00, $00, $01, $02, $02, $02, $01, $00
 
-;@ def FishermanBoat(slot: c)
+;@ def FishermanBoat(slot: bc)
 ;@ path: npc/fisherman_under_bridge
 ;@ The fisherman's boat ($B8 with wEntityPrivate1 = 2). It bobs on the water, carries the
 ;@ fisherman (the entity in slot 0) 16 pixels above it, and is a platform: Link landing on it from
@@ -963,7 +963,7 @@ MermaidTailSprites::
 MermaidBobOffsets::
 	db $00, $00, $01, $02, $02, $02, $01, $00
 
-;@ def MermaidHandler(slot: c)
+;@ def MermaidHandler(slot: bc)
 ;@ path: npc/mermaid
 ;@ Entity $B7, the mermaid in Martha's Bay. She swims and bobs, dives away when Link swims too
 ;@ close and comes up $30 pixels away on the other side. In the trading sequence she takes the
@@ -1096,7 +1096,7 @@ Mermaid_Init::
 	jp IncrementEntityState
 
 
-;@ def Mermaid_Wait(slot: c)
+;@ def Mermaid_Wait(slot: bc)
 ;@ path: npc/mermaid
 ;@ State 1: faces Link and blocks his way. When Link swims within $12 pixels she says text $F1 and
 ;@ dives (state 2, $14 frames). Talked to with the necklace she asks for it (text $F2, state 5);
@@ -1171,7 +1171,7 @@ Mermaid_StartDive::
 	jp IncrementEntityState
 
 
-;@ def Mermaid_Dive(slot: c)
+;@ def Mermaid_Dive(slot: bc)
 ;@ path: npc/mermaid
 ;@ State 3: once the text is closed she dives (frames 3, then 2, over the last $10 frames) and
 ;@ disappears for $40 frames with a splash effect (state 4).
@@ -1217,7 +1217,7 @@ Mermaid_Dive::
 	ret
 
 
-;@ def Mermaid_Resurface(slot: c)
+;@ def Mermaid_Resurface(slot: bc)
 ;@ path: npc/mermaid
 ;@ State 4: when the time is up she comes up on the other side: x moves by wEntityPrivate1 (which
 ;@ flips between +$30 and -$30), back to state 1.
@@ -1249,7 +1249,7 @@ Mermaid_Resurface::
 	ret
 
 
-;@ def Mermaid_Answer(slot: c)
+;@ def Mermaid_Answer(slot: bc)
 ;@ path: npc/mermaid
 ;@ State 5: if Link agreed to give the necklace, $C0 frames of the exchange follow (state 6);
 ;@ otherwise text $F4 and back to state 0.
@@ -1275,7 +1275,7 @@ Mermaid_Answer::
 	jp OpenDialogTable1
 
 
-;@ def Mermaid_TakeNecklace(slot: c)
+;@ def Mermaid_TakeNecklace(slot: bc)
 ;@ path: npc/mermaid
 ;@ State 6, the exchange: Link holds still in his item pose (hLinkMotionStep 1 from timer $8F down
 ;@ to $20); at timer $90 a sparkle appears on Link, at $70 she thanks him (text $F3). At the end
@@ -1359,7 +1359,7 @@ Mermaid_TakeNecklace::
 	ret
 
 
-;@ def Mermaid_JumpStart(slot: c)
+;@ def Mermaid_JumpStart(slot: bc)
 ;@ path: npc/mermaid
 ;@ State 7: after the wait she leaps out of the water: the tail frame (4 or 5 for her facing), x
 ;@ speed -8 or +8, upward speed $20, a splash effect and jingle $24.
@@ -1397,7 +1397,7 @@ Mermaid_JumpStart::
 	ret
 
 
-;@ def Mermaid_Jump(slot: c)
+;@ def Mermaid_Jump(slot: bc)
 ;@ path: npc/mermaid
 ;@ State 8: flies in an arc (gravity 2 per frame) until she is back in the water, then splashes
 ;@ (state 9, $10 frames).
@@ -1463,7 +1463,7 @@ Mermaid_Splash::
 	ret
 
 
-;@ def Mermaid_NextJump(slot: c)
+;@ def Mermaid_NextJump(slot: bc)
 ;@ path: npc/mermaid
 ;@ State 10: after the wait, comes up $10 pixels above or below with a random facing and leaps
 ;@ again (state 7); after her fourth leap (wEntityPrivate5 = 3) she is gone.
@@ -1544,7 +1544,7 @@ MermaidAfterTradeStates::
 	dw MermaidAfterTrade_Jump
 	dw MermaidAfterTrade_Sit
 
-;@ def MermaidAfterTrade_Wait(slot: c)
+;@ def MermaidAfterTrade_Wait(slot: bc)
 ;@ path: npc/mermaid
 ;@ State 0: stays at ($58, $80) out of sight until Link makes a splash in the water
 ;@ (wLinkGroundVfxPrev nonzero).
@@ -1570,7 +1570,7 @@ MermaidAfterTrade_Wait::
 	ret
 
 
-;@ def MermaidAfterTrade_Leap(slot: c)
+;@ def MermaidAfterTrade_Leap(slot: bc)
 ;@ path: npc/mermaid
 ;@ State 1: jumps up (height speed $20, moving up the screen at 4/16 pixel per frame) with a
 ;@ splash.
@@ -1592,7 +1592,7 @@ MermaidAfterTrade_Leap::
 	jp IncrementEntityState
 
 
-;@ def MermaidAfterTrade_Jump(slot: c)
+;@ def MermaidAfterTrade_Jump(slot: bc)
 ;@ path: npc/mermaid
 ;@ State 2: in the air (gravity 1 per frame, frame 0/1 every 16 frames) until she lands (state 3).
 ;@ test: skip draws sprites, may return from its caller
@@ -1632,7 +1632,7 @@ MermaidAfterTrade_Jump::
 	ret
 
 
-;@ def MermaidAfterTrade_Sit(slot: c)
+;@ def MermaidAfterTrade_Sit(slot: bc)
 ;@ path: npc/mermaid
 ;@ State 3: sits facing Link (frame 2 or 3) and chats when talked to (text $F6).
 ;@ test: skip draws sprites and opens dialogue
@@ -1716,7 +1716,7 @@ PapahlRightSprites::
 PapahlSymbolSprite::
 	db $7e, $00, $7e, $20
 
-;@ def PapahlHandler(slot: c)
+;@ def PapahlHandler(slot: bc)
 ;@ path: npc/papahl
 ;@ Entity $B6, Papahl. At home (indoors) he is away while he is lost (story flag $DB66 bit 1, before
 ;@ the trade) and chats otherwise (text $27 of the second table before the trade, $76 after). In the
@@ -1841,7 +1841,7 @@ PapahlStates::
 	dw Papahl_GiveItem
 	dw Papahl_Done
 
-;@ def Papahl_Wait(slot: c)
+;@ def Papahl_Wait(slot: bc)
 ;@ path: npc/papahl
 ;@ State 0: looks towards Link. While Link is within $24 pixels he sits still (frame 0) and can be
 ;@ talked to: with the pineapple (trade item $07) he asks for it (text $70), otherwise text $77;
@@ -1895,7 +1895,7 @@ Papahl_Wait::
 	ret
 
 
-;@ def Papahl_Answer(slot: c)
+;@ def Papahl_Answer(slot: bc)
 ;@ path: npc/papahl
 ;@ State 1: if Link agreed to give the pineapple he thanks him (text $72) and eats for $C0 frames
 ;@ (state 2); otherwise text $71 and back to state 0.
@@ -1929,7 +1929,7 @@ Papahl_Answer::
 	ret
 
 
-;@ def Papahl_Eat(slot: c)
+;@ def Papahl_Eat(slot: bc)
 ;@ path: npc/papahl
 ;@ State 2: eats the pineapple while Link waits (the music plays faster, wMusicSpeed = 1). When the
 ;@ time is up: normal music speed, text $73, Link's trade item becomes the hibiscus ($08), state 3.
@@ -1966,10 +1966,10 @@ Papahl_Eat::
 	ld [wMusicSpeed], a
 ;> PapahlEatAnimation()                   # falls through
 
-;@ def PapahlEatAnimation()
+;@ def PapahlEatAnimation(slot: bc)
 ;@ path: npc/papahl
 ;@ Shows the eating frames 2 and 3, switching every 8 frames.
-;@ test: skip writes the sprite variant of the slot in c
+;@ test: slot = rand(0, 15)
 PapahlEatAnimation::
 ;> frame = ((hFrameCounter >> 3) & 1) + 2
 	ldh a, [hFrameCounter]
@@ -1983,7 +1983,7 @@ PapahlEatAnimation::
 	ret
 
 
-;@ def Papahl_GiveItem(slot: c)
+;@ def Papahl_GiveItem(slot: bc)
 ;@ path: npc/papahl
 ;@ State 3: once the text is closed, the hibiscus is shown above Link (SpawnHeldItemEntity); state 4.
 ;@ test: skip spawns an entity through bank 3
@@ -2000,7 +2000,7 @@ Papahl_GiveItem::
 	ret
 
 
-;@ def Papahl_Done(slot: c)
+;@ def Papahl_Done(slot: bc)
 ;@ path: npc/papahl
 ;@ State 4: keeps eating and says text $75 when talked to.
 ;@ test: skip opens dialogue through another bank
@@ -2042,7 +2042,7 @@ BearThoughtSprite::
 BearCounterSprites::
 	db $7a, $00, $7c, $00, $7c, $20, $7a, $20
 
-;@ def BearHandler(slot: c)
+;@ def BearHandler(slot: bc)
 ;@ path: npc/bear
 ;@ Entity $B5, the bear cook in Animal Village, behind his counter. He trades the pineapple (trade
 ;@ item $07) for the honeycomb ($06). States (wEntityState): 0 wait, 1 answer, 2 thanks.
@@ -2118,7 +2118,7 @@ BearStates::
 	dw Bear_Answer
 	dw Bear_Thanks
 
-;@ def Bear_Wait(slot: c)
+;@ def Bear_Wait(slot: bc)
 ;@ path: npc/bear
 ;@ State 0: talked to across the counter: text $D3 once the event of overworld room $FD is done
 ;@ ($D8FD bits 4-5); with the honeycomb he asks for it (text $CF, state 1); with Marin along text
@@ -2178,7 +2178,7 @@ BearReturn:
 	ret
 
 
-;@ def Bear_Answer(slot: c)
+;@ def Bear_Answer(slot: bc)
 ;@ path: npc/bear
 ;@ State 1: once the question is closed: "no" gives text $D1 and back to state 0; "yes" makes
 ;@ Link's trade item the pineapple ($07), shows it above him and waits $70 frames (state 2).
@@ -2219,7 +2219,7 @@ Bear_Answer::
 	ret
 
 
-;@ def Bear_Thanks(slot: c)
+;@ def Bear_Thanks(slot: bc)
 ;@ path: npc/bear
 ;@ State 2: when the time is up and no text is open, thanks Link (text $D2) and goes back to
 ;@ state 0.
@@ -2268,7 +2268,7 @@ BearOpenDialog::
 HoneycombSprites::
 	db $70, $00, $70, $20
 
-;@ def HoneycombHandler(slot: c)
+;@ def HoneycombHandler(slot: bc)
 ;@ path: npc/honeycomb
 ;@ Entity $B3, the honeycomb in the tree on Ukuku Prairie and its bees (wEntityPrivate4 = 1,
 ;@ BeeHandler). Tarin pokes it with his stick: it shakes, the bees chase him, it drops, and Link
@@ -2318,7 +2318,7 @@ HoneycombStates::
 	dw Honeycomb_Idle
 	dw Honeycomb_Fall
 
-;@ def Honeycomb_Init(slot: c)
+;@ def Honeycomb_Init(slot: bc)
 ;@ path: npc/honeycomb
 ;@ State 0: if Tarin already knocked it down (wTradeSceneState 2) it lies 16 pixels lower and falls
 ;@ the last bit at once (state 4); otherwise one bee starts buzzing around it (state 1).
@@ -2415,7 +2415,7 @@ Honeycomb_Wait::
 	ret
 
 
-;@ def Honeycomb_SpawnBees(slot: c)
+;@ def Honeycomb_SpawnBees(slot: bc)
 ;@ path: npc/honeycomb
 ;@ State 2: five more bees come out, one every 8 frames, numbered 1-5 in their
 ;@ wEntityPrivateCounter (their place in the swarm); then state 3.
@@ -2463,7 +2463,7 @@ Honeycomb_Idle::
 	ret
 
 
-;@ def Honeycomb_Fall(slot: c)
+;@ def Honeycomb_Fall(slot: bc)
 ;@ path: npc/honeycomb
 ;@ State 4: after the timer it falls (gravity 2 per frame) to the ground; when Link touches it he
 ;@ gets it: trade item $06 (the honeycomb), shown above him, and the scene is over.
@@ -2518,7 +2518,7 @@ Honeycomb_Fall::
 BeeSprites::
 	db $72, $00, $72, $40
 
-;@ def BeeHandler(slot: c)
+;@ def BeeHandler(slot: bc)
 ;@ path: npc/honeycomb
 ;@ A bee of the honeycomb ($B3 with wEntityPrivate4 = 1), flapping every 4 frames. States
 ;@ (wEntityState): 0 buzz around the honeycomb, 1 chase Tarin, 2 idle.
@@ -2652,7 +2652,7 @@ BeeSwarmOffsetY::
 	db $00, $f8, $08, $f8, $08, $00, $00, $08
 	db $f8, $08, $f8, $00, $10, $18, $18, $20, $20, $28, $f0, $e8, $e8, $e0, $e0, $d8
 
-;@ def Bee_Chase(slot: c)
+;@ def Bee_Chase(slot: bc)
 ;@ path: npc/honeycomb
 ;@ State 1: buzzes (jingle $22) and, on its own frame of every 8 (its bee number), steers at speed
 ;@ $24 towards its place in the swarm behind Tarin. When Tarin is gone, the bee is too.
@@ -2761,7 +2761,7 @@ TarinStickSceneSprites::
 	db $54, $00, $56, $00, $56, $20, $54, $20, $50, $00, $52, $00, $52, $20, $50, $20
 	db $74, $00, $76, $00
 
-;@ def TarinHoneycombHandler(slot: c)
+;@ def TarinHoneycombHandler(slot: bc)
 ;@ path: npc/tarin
 ;@ Entity $B4, Tarin under the honeycomb tree on Ukuku Prairie (he is there after story flag $DB67
 ;@ bit 1, and gone once the room's flag hRoomStatus bit 6 is set). Asked, he pokes the honeycomb
@@ -2824,7 +2824,7 @@ TarinHoneycombStates::
 	dw TarinHoneycomb_RunOff
 	dw TarinHoneycomb_Leave
 
-;@ def TarinHoneycomb_Wait(slot: c)
+;@ def TarinHoneycomb_Wait(slot: bc)
 ;@ path: npc/tarin
 ;@ State 0: stands at ($60, $58) facing left; talked to he asks whether to get the honeycomb down
 ;@ (text $C0, state 1).
@@ -2855,7 +2855,7 @@ TarinHoneycomb_Wait::
 	ret
 
 
-;@ def TarinHoneycomb_Answer(slot: c)
+;@ def TarinHoneycomb_Answer(slot: bc)
 ;@ path: npc/tarin
 ;@ State 1: once the question is closed: "yes" starts the scene (wTradeSceneState = 2, bit 6 of
 ;@ overworld room $87's flags, jingle 1, $A0 frames, state 2); "no" gives text $C2 and back to
@@ -2905,7 +2905,7 @@ TarinHoneycomb_Answer::
 TarinStickSprites::
 	db $78, $00, $ff, $00, $7a, $00, $7c, $00
 
-;@ def TarinHoneycomb_RaiseStick(slot: c)
+;@ def TarinHoneycomb_RaiseStick(slot: bc)
 ;@ path: npc/tarin
 ;@ State 2 (Link frozen): for $70 frames Tarin holds the stick over his head (frame 8, the stick 16
 ;@ pixels up); then he holds it sideways (frames 2/3) and for the last $18 frames walks up and to
@@ -2998,7 +2998,7 @@ TarinHoneycomb_RaiseStick::
 	ret
 
 
-;@ def TarinHoneycomb_Poke(slot: c)
+;@ def TarinHoneycomb_Poke(slot: bc)
 ;@ path: npc/tarin
 ;@ State 3 ($C0 frames): Tarin pokes the honeycomb, swinging the stick every $20 frames. At timer
 ;@ $A0 the honeycomb starts shaking, at $60 the bees swarm (wEntityScratch2), at $20 Tarin jumps
@@ -3120,11 +3120,11 @@ TarinFleeDurations::
 TarinRunFrames::
 	db $00, $02, $04, $06
 
-;@ def TarinHoneycomb_Flee(slot: c)
+;@ def TarinHoneycomb_Flee(slot: bc)
 ;@ path: npc/tarin
 ;@ State 4: Tarin runs round in a square with the bees behind him - right, up, left, down - for
 ;@ ten legs while Link turns to watch him; then he runs off (state 5).
-;@ test: skip
+;@ test: slot = rand(0, 15)
 TarinHoneycomb_Flee::
 ;> hLinkInteractiveMotionBlocked = 1
 	ld a, $01
@@ -3205,12 +3205,12 @@ TarinHoneycombRunAnimation:
 	jp SetEntitySpriteVariant
 
 
-;@ def TarinHoneycomb_RunOff(slot: c)
+;@ def TarinHoneycomb_RunOff(slot: bc)
 ;@ path: npc/tarin
 ;@ State 5: runs off to the left and down (twice as fast: TarinHoneycombRunAnimation moves him
 ;@ again), Link facing left. Once he is past the left edge (x $C0-$C3), Link may move again and
 ;@ state 6 follows.
-;@ test: skip
+;@ test: slot = rand(0, 15)
 TarinHoneycomb_RunOff::
 ;> hLinkInteractiveMotionBlocked = 1
 	ld a, $01
@@ -3246,11 +3246,12 @@ TarinHoneycomb_RunOff::
 	ld a, $01
 	jr TarinHoneycombRunAnimation
 
-;@ def TarinHoneycomb_Leave(slot: c)
+;@ def TarinHoneycomb_Leave(slot: bc)
 ;@ path: npc/tarin
 ;@ State 6: lets the honeycomb fall (its state 4, after $50 frames, from 16 pixels lower and a
 ;@ height of 16) and removes Tarin.
-;@ test: skip
+;@ test: slot = rand(0, 15)
+;@ test: wCurrentBank = $07
 TarinHoneycomb_Leave::
 ;> comb = wEntityScratch1
 	ld a, [wEntityScratch1]
@@ -3285,7 +3286,7 @@ TarinHoneycomb_Leave::
 HoleFillerSprites::
 	db $40, $00, $40, $20, $42, $00, $42, $20
 
-;@ def HoleFillerHandler(slot: c)
+;@ def HoleFillerHandler(slot: bc)
 ;@ path: object/hole_filler
 ;@ Entity $B1, a block that fills holes. Link pushes it for 16 frames to set it rolling away from
 ;@ him; while it rolls he cannot move and steers it with the D-pad (any way but straight back).
@@ -3330,7 +3331,7 @@ HoleFillerSpeedX::
 HoleFillerSpeedY::
 	db $00, $00, $f8, $08
 
-;@ def HoleFiller_Wait(slot: c)
+;@ def HoleFiller_Wait(slot: bc)
 ;@ path: object/hole_filler
 ;@ State 0: while Link pushes against it (touching it with the D-pad held) Link shows his pushing
 ;@ pose; after 16 frames of pushing it starts rolling away from him (state 1).
@@ -3422,7 +3423,7 @@ HoleFillerAheadX::
 HoleFillerAheadY::
 	db $00, $00, $f0, $10
 
-;@ def HoleFiller_Roll(slot: c)
+;@ def HoleFiller_Roll(slot: bc)
 ;@ path: object/hole_filler
 ;@ State 1: rolls (Link held still, rolling sound $3E); a D-pad press turns it, except straight
 ;@ back. Each time it is exactly on a tile, that tile becomes floor (room object $0D, background
@@ -3575,7 +3576,7 @@ HoleFiller_Roll::
 	add [hl]
 	and $f0
 	or e
-;>@ph physics = GetObjectPhysics(wRoomObjects[ahead])
+;>@ph physics = GetObjectPhysics(wRoomObjects[ahead], 1)
 	ld e, a
 	ld d, b
 	ld hl, wRoomObjects
@@ -3620,7 +3621,7 @@ HoleFiller_Roll::
 	ld c, b
 	ld hl, wRoomObjectsArea
 .scan
-;>@hole         if GetObjectPhysics(obj) in (0x50, 0x51):
+;>@hole         if GetObjectPhysics(obj, 1) in (0x50, 0x51):
 	ld a, [hli]
 	push hl
 	ld e, a
@@ -3659,13 +3660,14 @@ Direction16Flat::
 	db $04, $04, $03, $03, $03, $02, $02, $02, $0c, $0c, $0d, $0d, $0d, $0e, $0e, $0e
 	db $04, $04, $05, $05, $05, $06, $06, $06, $0c, $0c, $0b, $0b, $0b, $0a, $0a, $0a
 
-;@ def GetDirection16FromVector() -> a
+;@ def GetDirection16FromVector(slot: bc) -> a
 ;@ path: entity/helpers
 ;@ Turns the vector (hMultiPurpose0 = y, hMultiPurpose1 = x; signed, length up to about $1F, as
 ;@ left by the aiming routine SetEntitySpeedTowardsLink) into a direction 0-15 using Direction16Steep /
 ;@ Direction16Flat.
 ;@ test: hMultiPurpose0 = rand(0xE1, 0x11E) & 0xFF; hMultiPurpose1 = rand(0xE1, 0x11E) & 0xFF
 ;@ test: wCurrentBank = $07
+;@ test: slot = rand(0, 15)
 GetDirection16FromVector::
 ;> sx = hMultiPurpose0 >> 7
 	ldh a, [hMultiPurpose0]
@@ -3729,7 +3731,7 @@ GetDirection16FromVector::
 	ret
 
 
-;@ def PincerHandler(slot: c)
+;@ def PincerHandler(slot: bc)
 ;@ path: enemy/pincer
 ;@ Entity $B0, the pincer: a snake-like head that hides in a hole in the floor. When Link comes
 ;@ within $20 pixels it peeks out, aims at him and lunges out on a neck of three segments, then
@@ -3828,7 +3830,7 @@ Pincer_Hidden::
 	ret
 
 
-;@ def Pincer_Peek(slot: c)
+;@ def Pincer_Peek(slot: bc)
 ;@ path: enemy/pincer
 ;@ State 2: its eyes show in the hole (frame 1). At timer $10 it aims at Link and picks the head
 ;@ frame for that direction (wEntityPrivate3 = 2-9, one of 8 directions), leaving the lunge speed
@@ -3861,7 +3863,7 @@ Pincer_Peek::
 ;>     SetEntitySpeedTowardsLink(slot, 0x1F)                            # aim at Link (leaves the vector in hMultiPurpose0/1)
 	ld a, $1f
 	call SetEntitySpeedTowardsLink
-;>     wEntityPrivate3[slot] = (GetDirection16FromVector() >> 1) + 2
+;>     wEntityPrivate3[slot] = (GetDirection16FromVector(slot) >> 1) + 2
 	call GetDirection16FromVector
 	sra a
 	add $02
@@ -3878,7 +3880,7 @@ Pincer_Peek::
 	ret
 
 
-;@ def Pincer_Lunge(slot: c)
+;@ def Pincer_Lunge(slot: bc)
 ;@ path: enemy/pincer
 ;@ State 3: shoots out towards Link; when the time is up it stays out $20 frames (state 4).
 ;@ test: skip checks Link collision through bank 3
@@ -3898,7 +3900,7 @@ Pincer_Lunge::
 	ret
 
 
-;@ def Pincer_Extended(slot: c)
+;@ def Pincer_Extended(slot: bc)
 ;@ path: enemy/pincer
 ;@ State 4: stays stretched out until the time is up (then state 5).
 ;@ test: skip checks Link collision through bank 3
@@ -3914,7 +3916,7 @@ Pincer_Extended::
 	ret
 
 
-;@ def Pincer_Retract(slot: c)
+;@ def Pincer_Retract(slot: bc)
 ;@ path: enemy/pincer
 ;@ State 5: heads back to its hole at speed $10 (aiming at the hole by putting its position in
 ;@ hLinkX/hLinkY for the aiming routine). Within 2 pixels it snaps into the hole, hides (frame 0)
@@ -3993,7 +3995,7 @@ PincerSprites::
 	db $60, $00, $60, $20, $66, $00, $68, $00, $62, $00, $64, $00, $66, $40, $68, $40
 	db $60, $40, $60, $60, $68, $60, $66, $60
 
-;@ def DrawPincer(slot: c)
+;@ def DrawPincer(slot: bc)
 ;@ path: enemy/pincer
 ;@ Draws the head; from state 3 on also the neck: three sprites (tile $6A) evenly spaced between
 ;@ the hole and the head, written straight into the OAM buffer.
@@ -4105,7 +4107,7 @@ TradeItemSprites::
 TradeItemStickSprites::
 	db $74, $00, $76, $00
 
-;@ def TradeItemHandler(slot: c)
+;@ def TradeItemHandler(slot: bc)
 ;@ path: item/trade
 ;@ Entity $AF, a trading-sequence item. Either it lies in the world until Link touches it, or
 ;@ SpawnHeldItemEntity puts it on Link after a trade. When touched: the item fanfare (music $10),
@@ -4332,7 +4334,7 @@ WingedOctorokSprites::
 	db $50, $40, $50, $60, $52, $40, $52, $60, $54, $00, $56, $00, $58, $00, $5a, $00
 	db $56, $20, $54, $20, $5a, $20, $58, $20
 
-;@ def WingedOctorokHandler(slot: c)
+;@ def WingedOctorokHandler(slot: bc)
 ;@ path: enemy/winged_octorok
 ;@ Entity $AE, the winged octorok. It walks in a random direction (every fourth time towards Link)
 ;@ for $20-$3F frames, then pauses $10-$1F frames; in a pause facing Link it spits a rock. When
@@ -4571,11 +4573,12 @@ WingedOctorokHandler::
 	ret
 
 
-;@ def WingedOctorok_Jump(slot: c)
+;@ def WingedOctorok_Jump(slot: bc)
 ;@ path: enemy/winged_octorok
 ;@ State 2: in the air it flaps its wings (every 4 frames) and faces Link; on landing it pauses
 ;@ $20 frames (state 1).
-;@ test: skip
+;@ test: slot = rand(0, 15)
+;@ test: wCurrentBank = $07
 WingedOctorok_Jump::
 ;>@w wEntityPrivate2[slot] = (hFrameCounter >> 2) & 1     # wing frame
 	ldh a, [hFrameCounter]
@@ -4700,7 +4703,7 @@ WingedOctorokShootRock::
 WingedOctorokWingSprites::
 	db $00, $fc, $22, $40, $00, $0c, $22, $60, $00, $fc, $22, $00, $00, $0c, $22, $20
 
-;@ def DrawWingedOctorokWings(slot: c)
+;@ def DrawWingedOctorokWings(slot: bc)
 ;@ path: enemy/winged_octorok
 ;@ Draws the wing frame wEntityPrivate2 (2 sprites of WingedOctorokWingSprites).
 ;@ test: skip draws sprites through bank 0
@@ -4740,7 +4743,7 @@ KikiSpritesRight::
 	db $72, $20, $78, $20, $72, $20, $7a, $20, $72, $20, $70, $20
 	db $7e, $20, $7c, $20, $76, $20, $74, $20
 
-;@ def KikiHandler(slot: c)
+;@ def KikiHandler(slot: bc)
 ;@ path: npc/kiki
 ;@ Entity $AD, Kiki the monkey by the river on Kanalet's side (and, in states 7-8, the other
 ;@ monkeys). With Bow-Wow along he is scared and hops away; otherwise he trades the bananas (trade
@@ -4830,7 +4833,7 @@ KikiStates::
 	dw Monkey_Land
 	dw Kiki_Idle
 
-;@ def Kiki_Wait(slot: c)
+;@ def Kiki_Wait(slot: bc)
 ;@ path: npc/kiki
 ;@ State 0: with Bow-Wow following Link, Kiki panics (text $60) as soon as he is hit or Link comes
 ;@ within $18 pixels, and starts hopping about (state 5). Without Bow-Wow see Kiki_WaitNoBowWow.
@@ -4883,7 +4886,7 @@ KikiReturn:
 	ret
 
 
-;@ def Kiki_WaitNoBowWow(slot: c)
+;@ def Kiki_WaitNoBowWow(slot: bc)
 ;@ path: npc/kiki
 ;@ State 0 without Bow-Wow: Kiki blocks the way and fidgets. Talked to with the bananas (trade item
 ;@ $04) he asks for them (text $65, state 1); otherwise text $61.
@@ -4913,7 +4916,7 @@ Kiki_WaitNoBowWow::
 	call KikiSay
 ;> KikiIdleAnimation(slot)                    # falls through
 
-;@ def KikiIdleAnimation(slot: c)
+;@ def KikiIdleAnimation(slot: bc)
 ;@ path: npc/kiki
 ;@ Sitting frames 0/1 every 8 frames; every 32 frames he turns round with a 50% chance.
 ;@ test: skip draws on random numbers
@@ -4943,7 +4946,7 @@ KikiIdleAnimation::
 	ret
 
 
-;@ def Kiki_Answer(slot: c)
+;@ def Kiki_Answer(slot: bc)
 ;@ path: npc/kiki
 ;@ State 1: once the question is closed: "yes" takes the bananas after $10 frames (state 2); "no"
 ;@ says text $61 and back to state 0.
@@ -5011,7 +5014,7 @@ Kiki_TakeBananas::
 KikiBananasSprite::
 	db $9a, $10, $9c, $10
 
-;@ def Kiki_Eat(slot: c)
+;@ def Kiki_Eat(slot: bc)
 ;@ path: npc/kiki
 ;@ State 3: Kiki eats (frame 3); at timer $10 he calls his friends (text $62). Then the monkey
 ;@ music ($36) starts and the bridge building takes $80 frames (wEntityDropTimer, state 4).
@@ -5075,7 +5078,7 @@ MonkeyStartY::
 BridgeRowsY::
 	db $10, $30, $20
 
-;@ def Kiki_BuildBridge(slot: c)
+;@ def Kiki_BuildBridge(slot: bc)
 ;@ path: npc/kiki
 ;@ State 4 (Link held, $80 frames): every 32 frames a helper monkey jumps in (up to 7, jingle $24)
 ;@ and heads for its spot; in the last $40 frames every 64 frames one tile of the bridge appears
@@ -5269,7 +5272,7 @@ Kiki_BuildBridge::
 	ret
 
 
-;@ def Kiki_HopStart(slot: c)
+;@ def Kiki_HopStart(slot: bc)
 ;@ path: npc/kiki
 ;@ State 5: waits (fidgeting; arms up while wEntityTimer1 runs), then jumps (state 6). Scared of
 ;@ Bow-Wow (counter below 5) he leaps towards Bow-Wow at speed $14 with height speed $18; when
@@ -5352,7 +5355,7 @@ Kiki_HopStart::
 	ldh [hLinkX], a
 ;> KikiFaceSpeed(slot)                         # falls through
 
-;@ def KikiFaceSpeed(slot: c)
+;@ def KikiFaceSpeed(slot: bc)
 ;@ path: npc/kiki
 ;@ Faces the monkey the way it moves along x (0 right, 1 left), then shows the waiting frames
 ;@ (KikiHopWait: fidgeting, or arms up while wEntityTimer1 runs).
@@ -5384,7 +5387,7 @@ KikiHopWait:
 	ret
 
 
-;@ def Kiki_Hop(slot: c)
+;@ def Kiki_Hop(slot: bc)
 ;@ path: npc/kiki
 ;@ State 6: in the air (frame 3). Above y 8 he is gone. While scared (counter below 5) walls stop
 ;@ him. On landing: back to state 5, resting $30-$6F frames - or, when leaving, $10 frames with
@@ -5443,7 +5446,7 @@ Kiki_Hop::
 	ret
 
 
-;@ def Monkey_JumpToSpot(slot: c)
+;@ def Monkey_JumpToSpot(slot: bc)
 ;@ path: npc/kiki
 ;@ State 7 (a helper monkey): each time it lands it jumps again towards its spot (wEntityPrivate1/2)
 ;@ - speed and height speed $10 while just arrived (wEntityTimer2) or leaving, else 8. When the
@@ -5540,7 +5543,7 @@ Monkey_JumpToSpot::
 	ret
 
 
-;@ def Monkey_Land(slot: c)
+;@ def Monkey_Land(slot: bc)
 ;@ path: npc/kiki
 ;@ State 8: a helper monkey in the air (frame 3); on landing it waits 8 frames in state 7.
 ;@ test: c = rand(0, 15)
@@ -5584,7 +5587,7 @@ Kiki_Idle::
 BlooperSprites::
 	db $6a, $00, $6a, $20, $68, $00, $68, $20
 
-;@ def BlooperHandler(slot: c)
+;@ def BlooperHandler(slot: bc)
 ;@ path: enemy/blooper
 ;@ Entity $A9, the blooper (a squid of the side-view underwater rooms). It sinks slowly and, when
 ;@ Link is above it, pushes off upwards towards him in strokes. It cannot leave the water: outside
@@ -5874,7 +5877,7 @@ PillarSprites::
 	db $e0, $00, $ff, $00, $e0, $08, $ff, $20, $d0, $00, $ff, $00, $d0, $08, $ff, $20
 	db $c0, $00, $ff, $00, $c0, $08, $ff, $20
 
-;@ def PillarHandler(slot: c)
+;@ def PillarHandler(slot: bc)
 ;@ path: object/tower_pillar
 ;@ Entity $A7, a pillar of Eagle's Tower (dungeon 7) that the iron ball can smash; also its dust
 ;@ puffs (wEntityPrivate1 = 1, PillarDust) and falling debris (wEntityPrivate1 = 2, PillarDebris).
@@ -5964,13 +5967,13 @@ Pillar_Idle::
 	ret
 
 
-;@ def Pillar_Shake(slot: c)
+;@ def Pillar_Shake(slot: bc)
 ;@ path: object/tower_pillar
 ;@ State 1: the screen shakes sideways while the timer runs (Link held still); then it crumbles
 ;@ (state 2).
-;@ test: c = rand(0, 15); wEntityTimer[c] = rand(0, 255)
 ;@ test: slot = rand(0, 15)
 ;@ test: wCurrentBank = $07
+;@ test: mem[wEntityTimer + slot] = rand(0, 255)
 Pillar_Shake::
 ;> HoldLinkStill()
 	call HoldLinkStill
@@ -6000,7 +6003,7 @@ SetScreenShakeFromTimer::
 	ret
 
 
-;@ def Pillar_Crumble(slot: c)
+;@ def Pillar_Crumble(slot: bc)
 ;@ path: object/tower_pillar
 ;@ State 2: shaking, the pillar loses a row every $20 frames (sprite variant + 1), with debris
 ;@ falling (3 times in 4) and dust puffing up every 4 frames. When it is gone the pillar count goes
@@ -6098,13 +6101,13 @@ PillarGone:
 	ret
 
 .notLast
-;> MarkRoomEventDone()
+;> MarkRoomEventDone(slot)
 	call MarkRoomEventDone
 ;> return ClearEntityStatus(slot)
 	jp ClearEntityStatus
 
 
-;@ def Pillar_TowerShake(slot: c)
+;@ def Pillar_TowerShake(slot: bc)
 ;@ path: object/tower_pillar
 ;@ State 3 (the fourth pillar): the screen shakes; then the game switches to the picture mode (8)
 ;@ showing the top of the tower falling, and the pillar waits $20 frames in state 4.
@@ -6145,7 +6148,6 @@ Pillar_TowerShake::
 ;@ def HoldLinkStill()
 ;@ path: object/tower_pillar
 ;@ Keeps Link from moving and holds his pose this frame.
-;@ test: skip
 HoldLinkStill::
 ;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
@@ -6155,11 +6157,12 @@ HoldLinkStill::
 	ret
 
 
-;@ def Pillar_Collapse(slot: c)
+;@ def Pillar_Collapse(slot: bc)
 ;@ path: object/tower_pillar
 ;@ State 4: after the picture, sets the room's event flag and dungeon 7 flag bit 2 (the tower's top
 ;@ has fallen) and removes the pillar.
-;@ test: skip
+;@ test: slot = rand(0, 15)
+;@ test: wCurrentBank = $07
 Pillar_Collapse::
 ;> wScreenShakeX = 0
 	xor a
@@ -6167,7 +6170,7 @@ Pillar_Collapse::
 ;> if wEntityTimer[slot] == 0:
 	call GetEntityTimer
 	jr nz, .wait
-;>     MarkRoomEventDone()
+;>     MarkRoomEventDone(slot)
 	call MarkRoomEventDone
 ;>     wDungeon7Flags |= 0x04
 	ld hl, wDungeon7Flags
@@ -6188,7 +6191,7 @@ Pillar_Collapse::
 PillarQuakeOffsets::
 	db $00, $02, $04, $06, $06, $04, $02, $00
 
-;@ def Pillar_Quake(slot: c)
+;@ def Pillar_Quake(slot: bc)
 ;@ path: object/tower_pillar
 ;@ State 5, a quake: the screen bobs up and down (PillarQuakeOffsets) while the timer runs, with
 ;@ rumbling (noise $0C every 8 frames) above $40 and falling debris every 4 frames below $20.
@@ -6244,7 +6247,7 @@ Pillar_Quake::
 PillarDustSprites::
 	db $30, $00, $30, $20, $32, $00, $32, $20
 
-;@ def PillarDust(slot: c)
+;@ def PillarDust(slot: bc)
 ;@ path: object/tower_pillar
 ;@ A dust puff of a crumbling pillar ($A7 with wEntityPrivate1 = 1): frame 1 for its last 4 frames,
 ;@ gone when its timer runs out.
@@ -6337,7 +6340,7 @@ PillarDebrisSpeedX::
 PillarDebrisSpeedY::
 	db $f4, $f4, $0c, $0c
 
-;@ def PillarDebris(slot: c)
+;@ def PillarDebris(slot: bc)
 ;@ path: object/tower_pillar
 ;@ A piece of debris ($A7 with wEntityPrivate1 = 2): falls (gravity 2), drawn 8 pixels lower, and
 ;@ bounces off the floor four times, each time lower and in a random diagonal; then it is gone.
@@ -6421,7 +6424,7 @@ PillarDebris::
 IronBallSprites::
 	db $4e, $00, $4e, $20
 
-;@ def IronBallHandler(slot: c)
+;@ def IronBallHandler(slot: bc)
 ;@ path: object/iron_ball
 ;@ Entity $A8, the iron ball in Eagle's Tower (dungeon 7). Link lifts it with the power bracelet
 ;@ and throws it; it hits enemies, bounces off walls and smashes the tower's pillars ($A7). It
@@ -6582,7 +6585,7 @@ IronBallStates::
 	dw IronBall_Held
 	dw IronBall_Thrown
 
-;@ def IronBall_OnGround(slot: c)
+;@ def IronBall_OnGround(slot: bc)
 ;@ path: object/iron_ball
 ;@ State 0: on the ground it slides to a stop (friction 1 per frame). Link touching it with the
 ;@ power bracelet (item 3) and pressing its button lifts it (status 7, state 2 once thrown).
@@ -6599,7 +6602,7 @@ IronBall_OnGround::
 ;>     SlowDownEntitySpeed(wEntitySpeedX)         # falls into the helper
 	ld hl, wEntitySpeedX
 
-;@ def SlowDownEntitySpeed(speeds: hl, slot: c)
+;@ def SlowDownEntitySpeed(speeds: hl, slot: bc)
 ;@ path: object/iron_ball
 ;@ Moves the speed speeds[slot] one step towards 0, then goes on with the lifting check
 ;@ (IronBallTryLift) - so the first of IronBall_OnGround's two calls runs that check too.
@@ -6619,7 +6622,7 @@ SlowDownEntitySpeed::
 	dec [hl]
 ;> IronBallTryLift(slot)                         # falls through
 
-;@ def IronBallTryLift(slot: c)
+;@ def IronBallTryLift(slot: bc)
 ;@ path: object/iron_ball
 ;@ Link touching the ball with the power bracelet (item 3) and pressing its button lifts it:
 ;@ status 7 (carried), state 2 (thrown when he lets go).
@@ -6700,7 +6703,7 @@ IronBall_Held::
 	ret
 
 
-;@ def IronBall_Thrown(slot: c)
+;@ def IronBall_Thrown(slot: bc)
 ;@ path: object/iron_ball
 ;@ State 2, flying: it hits enemies (as weapon $0B) and every pillar it reaches. Hitting a wall it
 ;@ bounces back at half speed (jingle 7); on landing it lies again (state 0).
@@ -6731,7 +6734,7 @@ IronBallBounceBack::
 ;> hJingle = 7
 	ld a, $07
 	ldh [hJingle], a
-;>@bx wEntitySpeedX[slot] = (-wEntitySpeedX[slot] & 0xFF) >> 1     # signed
+;>@bx wEntitySpeedX[slot] = u8(((u8(-wEntitySpeedX[slot]) ^ 0x80) - 0x80) >> 1)  # -x / 2, signed
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld a, [hl]
@@ -6740,7 +6743,7 @@ IronBallBounceBack::
 	sra a
 ;=@bx
 	ld [hl], a
-;>@by wEntitySpeedY[slot] = (-wEntitySpeedY[slot] & 0xFF) >> 1
+;>@by wEntitySpeedY[slot] = u8(((u8(-wEntitySpeedY[slot]) ^ 0x80) - 0x80) >> 1)
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
@@ -6760,7 +6763,7 @@ IronBallStop:
 	ret
 
 
-;@ def IronBall_Fly(slot: c)
+;@ def IronBall_Fly(slot: bc)
 ;@ path: object/iron_ball
 ;@ The thrown ball in flight: it hits enemies (as weapon $0B) and checks every pillar ($A7) in the
 ;@ room with IronBallCheckPillarHit.
@@ -6802,12 +6805,12 @@ IronBall_Fly::
 	ret
 
 
-;@ def IronBallCheckPillarHit(pillar: de, slot: c)
+;@ def IronBallCheckPillarHit(pillar: de, slot: bc)
 ;@ path: object/iron_ball
 ;@ If the ball (not just bounced, its timer 0) is within 16 pixels across and close above or below
 ;@ the pillar, it rebounds (noise $25, jingle $0B, $10 frames before the next hit) and a standing
 ;@ pillar starts shaking (its state 1, timer $50).
-;@ test: skip
+;@ test: slot = rand(0, 15)
 IronBallCheckPillarHit::
 ;> if wEntityTimer[slot] != 0:
 	call GetEntityTimer
@@ -6864,7 +6867,7 @@ IronBallCheckPillarHit::
 SideViewWeightSprites::
 	db $50, $00, $50, $20
 
-;@ def SideViewWeightsHandler(slot: c)
+;@ def SideViewWeightsHandler(slot: bc)
 ;@ path: object/side_view_platform
 ;@ Entity $A6, one of two weights hanging on a pulley in a side-view room (the pair is found by
 ;@ wEntityLoadOrder, which differs only in bit 0). Link standing on one makes it sink at speed $10
@@ -7159,6 +7162,7 @@ FindOtherWeight::
 	ldh a, [hMultiPurpose0]
 	cp [hl]
 ;>         return other
+;> return 16                                    # none
 	jr z, .done
 .next
 ;=@loop
@@ -7176,7 +7180,7 @@ FindOtherWeight::
 MovingPlatformSprites::
 	db $00, $00, $50, $00, $00, $08, $52, $00, $00, $10, $52, $20, $00, $18, $50, $20
 
-;@ def MovingPlatformHandler(slot: c)
+;@ def MovingPlatformHandler(slot: bc)
 ;@ path: object/side_view_platform
 ;@ Entities $A3 (moving sideways) and $A4 (moving up and down), the moving platforms of side-view
 ;@ rooms. Every 4 frames the speed swings one step towards +6 or -6; at the limit the platform turns
@@ -7237,7 +7241,7 @@ MovingPlatformHandler::
 	ld [hl], $6a
 ;> CarryLinkOnPlatform(slot)                       # falls through
 
-;@ def CarryLinkOnPlatform(slot: c)
+;@ def CarryLinkOnPlatform(slot: bc)
 ;@ path: object/side_view_platform
 ;@ Moves the platform by its speed (stopped by walls) and, when Link stands on it (touching it from
 ;@ above while not jumping up), keeps him on top and moves him along with it; then
@@ -7323,7 +7327,7 @@ PlatformAccel::
 PlatformSpeedLimits::
 	db $06, $fa
 
-;@ def MovingPlatformVertical(slot: c)
+;@ def MovingPlatformVertical(slot: bc)
 ;@ path: object/side_view_platform
 ;@ The $A4 platform's speed step: the same as MovingPlatformHandler, on the y speed.
 ;@ test: skip checks Link collision through bank 3
@@ -7366,7 +7370,7 @@ MovingPlatformVertical::
 SinkingPlatformSprites::
 	db $00, $00, $50, $00, $00, $08, $52, $00, $00, $10, $52, $20, $00, $18, $50, $20
 
-;@ def SinkingPlatformHandler(slot: c)
+;@ def SinkingPlatformHandler(slot: bc)
 ;@ path: object/side_view_platform
 ;@ Entity $A5, a platform that sinks under Link (speed up to 4, one step every 4 frames, with a
 ;@ creak - noise $11 - on the fourth frame). In room $3B it always sinks; elsewhere only while
@@ -7456,7 +7460,7 @@ SinkingPlatformHandler::
 	ret
 
 
-;@ def PiranhaPlantHandler(slot: c)
+;@ def PiranhaPlantHandler(slot: bc)
 ;@ path: enemy/piranha_plant
 ;@ Entity $A2, the piranha plant of the side-view pipes. It hides in its pipe while Link stands
 ;@ within 16 pixels across; otherwise it rises 32 pixels out of it, snaps for $80 frames and sinks
@@ -7539,7 +7543,7 @@ PiranhaRiseFrames::
 PiranhaRiseOffsets::
 	db $e0, $e0, $e8, $f0, $00, $00, $00, $00
 
-;@ def PiranhaPlant_Rise(slot: c)
+;@ def PiranhaPlant_Rise(slot: bc)
 ;@ path: enemy/piranha_plant
 ;@ State 1: comes out of the pipe in steps (PiranhaRiseFrames / PiranhaRiseOffsets); then bites for
 ;@ $80 frames (state 2).
@@ -7585,7 +7589,7 @@ PiranhaPlant_Rise::
 	ret
 
 
-;@ def PiranhaPlant_Bite(slot: c)
+;@ def PiranhaPlant_Bite(slot: bc)
 ;@ path: enemy/piranha_plant
 ;@ State 2: out of the pipe it snaps its jaws (frames 4 and 5, $10 frames each); then it sinks
 ;@ (state 3, $40 frames).
@@ -7625,7 +7629,7 @@ PiranhaSinkFrames::
 PiranhaSinkOffsets::
 	db $00, $00, $00, $00, $00, $f0, $e8, $e0
 
-;@ def PiranhaPlant_Sink(slot: c)
+;@ def PiranhaPlant_Sink(slot: bc)
 ;@ path: enemy/piranha_plant
 ;@ State 3: goes back down into the pipe; then waits hidden (state 0, $40 frames).
 ;@ test: skip checks Link collision through bank 3
@@ -7711,7 +7715,6 @@ DrawPiranhaPlant::
 ;@ Draw commands (for DrawCommands) that clear the background: 18 commands of 4 bytes, one per row
 ;@ of the 20x18 screen in the BG map at $9800: address high, address low, $53 (20 tiles, all the
 ;@ same), tile $7F.
-;@ asset: drawcommands
 ClearScreenRowCommands::
 	db $98, $00, $53, $7f, $98, $20, $53, $7f, $98, $40, $53, $7f, $98, $60, $53, $7f
 	db $98, $80, $53, $7f, $98, $a0, $53, $7f, $98, $c0, $53, $7f, $98, $e0, $53, $7f
@@ -7719,7 +7722,7 @@ ClearScreenRowCommands::
 	db $99, $80, $53, $7f, $99, $a0, $53, $7f, $99, $c0, $53, $7f, $99, $e0, $53, $7f
 	db $9a, $00, $53, $7f, $9a, $20, $53, $7f
 
-;@ def ClearScreenAndShowMapText(slot: c)
+;@ def ClearScreenAndShowMapText(slot: bc)
 ;@ path: enemy/goomba
 ;@ The $9F entity with wEntityPrivate1 set: resets the scroll and hides the window, clears the
 ;@ background two rows per frame (ClearScreenRowCommands); then, when its timer is up, opens text
@@ -7808,7 +7811,7 @@ ClearScreenAndShowMapText::
 GoombaSprites::
 	db $4a, $00, $4c, $00, $4c, $20, $4a, $20, $4e, $00, $4e, $20
 
-;@ def GoombaHandler(slot: c)
+;@ def GoombaHandler(slot: bc)
 ;@ path: enemy/goomba
 ;@ Entity $9F, the goomba. In top view it wanders (pause, walk); in side view it walks towards Link
 ;@ and falls with gravity, turning at walls. Jumped on it is squashed (state 2) and leaves a heart
@@ -7856,7 +7859,7 @@ GoombaSpeedX::
 GoombaSpeedY::
 	db $00, $00, $f8, $08
 
-;@ def Goomba_Pause(slot: c)
+;@ def Goomba_Pause(slot: bc)
 ;@ path: enemy/goomba
 ;@ State 0: stands; after the pause it walks $30-$6F frames in a random direction (every fourth
 ;@ time towards Link).
@@ -7917,7 +7920,7 @@ Goomba_Pause::
 ;> return GoombaWalkAnimation()
 	jr GoombaWalkAnimation
 
-;@ def Goomba_Walk(slot: c)
+;@ def Goomba_Walk(slot: bc)
 ;@ path: enemy/goomba
 ;@ State 1: walks (stopped by walls); after the time it pauses $20 frames (state 0).
 ;@ test: skip checks Link collision through bank 3
@@ -7990,7 +7993,7 @@ Goomba_Squashed::
 	ret
 
 
-;@ def GoombaSideView(slot: c)
+;@ def GoombaSideView(slot: bc)
 ;@ path: enemy/goomba
 ;@ The goomba in a side-view room: squashed (state 2) as in top view; otherwise it can be hit, hurts
 ;@ Link on touch, and runs GoombaSideViewStates (0 start, 1 walk).
@@ -8038,7 +8041,7 @@ GoombaSideView_Start::
 	jp IncrementEntityState
 
 
-;@ def GoombaSideView_Walk(slot: c)
+;@ def GoombaSideView_Walk(slot: bc)
 ;@ path: enemy/goomba
 ;@ State 1: walks with gravity (+2 per frame); a wall turns it round; standing on the floor it is
 ;@ put on the tile edge (+3) and walks (frames 0/1), in the air it shows frame 0.
@@ -8126,7 +8129,7 @@ GoombaSideViewTouchLink::
 PeahatSprites::
 	db $40, $00, $40, $20, $42, $00, $42, $20
 
-;@ def PeahatHandler(slot: c)
+;@ def PeahatHandler(slot: bc)
 ;@ path: enemy/peahat
 ;@ Entity $A0, the peahat: a flying plant that spins its leaves, rises 16 pixels and drifts in
 ;@ slow curves, then lands and stops spinning. Only on the ground can it be hit: the handler sets
@@ -8171,7 +8174,7 @@ PeahatStates::
 	dw Peahat_SpinUp
 	dw Peahat_Fly
 
-;@ def Peahat_Land(slot: c)
+;@ def Peahat_Land(slot: bc)
 ;@ path: enemy/peahat
 ;@ State 0: sinks 1 pixel every 8 frames; on the ground it can be hit. Every 8 frames its speed
 ;@ slows by 1 towards 0, every 32 frames the spin slows by 1. When the drop timer is up it starts
@@ -8257,7 +8260,7 @@ Peahat_Land::
 	jp PeahatSpin
 
 
-;@ def Peahat_SpinUp(slot: c)
+;@ def Peahat_SpinUp(slot: bc)
 ;@ path: enemy/peahat
 ;@ State 1: the spin speeds up by 1 every 16 frames; at speed 8 it takes off (state 2) for $80-$9F
 ;@ frames (drop timer).
@@ -8324,7 +8327,7 @@ PeahatSine::
 	db $00, $05, $0a, $0d, $0e, $0d, $0a, $05, $00, $fb, $f6, $f3, $f2, $f3, $f6, $fb
 	db $00, $05, $0a, $0d
 
-;@ def Peahat_Fly(slot: c)
+;@ def Peahat_Fly(slot: bc)
 ;@ path: enemy/peahat
 ;@ State 2: rises 1 pixel every 8 frames up to 16 pixels. Up there it flies a curve: every $18
 ;@ frames the heading turns one step (wEntityPrivate2) and the speed follows PeahatSine; now and
@@ -8427,7 +8430,7 @@ Peahat_Fly::
 SnakeSprites::
 	db $44, $00, $46, $00, $44, $00, $48, $00, $46, $20, $44, $20, $48, $20, $44, $20
 
-;@ def SnakeHandler(slot: c)
+;@ def SnakeHandler(slot: bc)
 ;@ path: enemy/snake
 ;@ Entity $A1, the snake: it crawls about in short random runs, and when Link comes into its row or
 ;@ column it darts at him at double speed. Running into a wall makes it stop and rest (state 0,
@@ -8497,7 +8500,7 @@ SnakeSpeedY::
 SnakeFacing::
 	db $02, $00, $ff, $ff
 
-;@ def Snake_Rest(slot: c)
+;@ def Snake_Rest(slot: bc)
 ;@ path: enemy/snake
 ;@ State 0: rests (SnakeStand) while the timer runs; then crawls (state 1) for $30-$4F frames in
 ;@ the direction given by the low 2 bits of that time.
@@ -8559,7 +8562,7 @@ SetSnakeDirection::
 	ret
 
 
-;@ def SnakeStand(slot: c)
+;@ def SnakeStand(slot: bc)
 ;@ path: enemy/snake
 ;@ The resting snake: stands still, keeps watching for Link and wriggles (SnakeCrawlAnimation).
 ;@ test: skip checks Link position through other routines
@@ -8571,7 +8574,7 @@ SnakeStand::
 ;> return SnakeCrawlAnimation()
 	jr SnakeCrawlAnimation
 
-;@ def Snake_Crawl(slot: c)
+;@ def Snake_Crawl(slot: bc)
 ;@ path: enemy/snake
 ;@ State 1: crawls in its direction; after the time it rests $18 frames (state 0). Meanwhile it
 ;@ watches for Link.
@@ -8600,7 +8603,7 @@ SnakeCrawlAnimation:
 	ret
 
 
-;@ def SnakeLookForLink(slot: c)
+;@ def SnakeLookForLink(slot: bc)
 ;@ path: enemy/snake
 ;@ Unless it is still resting after a wall (wEntityTimer1), checks whether Link is within 8 pixels
 ;@ of its column or row; if so it darts at him (state 2) at double speed for $30 frames.
@@ -8688,7 +8691,7 @@ Snake_Dart::
 ;@ rows 0-4 of the room): the doorway at the top, the rock face and the ground below it. Drawn
 ;@ row by row by AnglerTunnelOpening_Build, every other frame swapped with
 ;@ AnglerTunnelBlankTiles so that the new row flickers into place.
-;@ asset: bgtiles 10x10
+;@ asset: tilemap width=10 height=10 addressing=8800 tiles=LoadTileset05+CopyData(hl=OverworldTileset34,de=$9000,bc=$200)
 AnglerTunnelEntranceTiles::
 	db $55, $56, $0a, $0b, $0c, $0d, $0e, $0f, $55, $56, $55, $56, $1a, $1b, $1c, $1d
 	db $1e, $1f, $55, $56, $55, $56, $04, $05, $64, $65, $06, $07, $55, $56, $55, $56
@@ -8701,7 +8704,7 @@ AnglerTunnelEntranceTiles::
 ;@ path: world/angler_tunnel_entrance
 ;@ The same 10 x 10 tiles before the entrance appears: the plain wall (tile $6E between the edge
 ;@ tiles $55/$56) and the ground (tile $6D).
-;@ asset: bgtiles 10x10
+;@ asset: tilemap width=10 height=10 addressing=8800 tiles=LoadTileset05+CopyData(hl=OverworldTileset34,de=$9000,bc=$200)
 AnglerTunnelBlankTiles::
 	db $55, $56, $6e, $6e, $6e, $6e, $6e, $6e, $55, $56, $55, $56, $6e, $6e, $6e, $6e
 	db $6e, $6e, $55, $56, $55, $56, $6e, $6e, $6e, $6e, $6e, $6e, $55, $56, $55, $56
@@ -8732,7 +8735,7 @@ AnglerTunnelObjectRows::
 AnglerTunnelRowY::
 	db $00, $08, $10, $18, $20, $28, $30, $38, $40, $48
 
-;@ def AnglerTunnelOpening(slot: c)
+;@ def AnglerTunnelOpening(slot: bc)
 ;@ path: world/angler_tunnel_entrance
 ;@ Entity $5F started with wEntityPrivate4 = $FF: the scene in overworld room $2B when Link has
 ;@ the Angler Key (bank 2 spawns it). The ground rumbles, the music changes ($4C) and with the
@@ -8759,7 +8762,7 @@ AnglerTunnelOpeningStates::
 	dw AnglerTunnelOpening_Quake
 	dw AnglerTunnelOpening_Build
 
-;@ def AnglerTunnelOpening_Rumble(slot: c)
+;@ def AnglerTunnelOpening_Rumble(slot: bc)
 ;@ path: world/angler_tunnel_entrance
 ;@ State 0: a rumbling noise, then $28 frames of waiting (state 1).
 ;@ test: skip plays a sound
@@ -8808,7 +8811,7 @@ AnglerTunnelOpening_Quake::
 	jp IncrementEntityState
 
 
-;@ def AnglerTunnelOpening_Build(slot: c)
+;@ def AnglerTunnelOpening_Build(slot: bc)
 ;@ path: world/angler_tunnel_entrance
 ;@ State 3: shakes the screen 2 pixels sideways (every 8 frames). Once the timer is up, every frame
 ;@ it redraws the current tile row (wEntityPrivateCounter, 1-10) - from AnglerTunnelEntranceTiles
@@ -8984,7 +8987,7 @@ AnglerTunnelOpeningDone:
 	jp ClearEntityStatus
 
 
-;@ def MasterStalfosHandler(slot: c)
+;@ def MasterStalfosHandler(slot: bc)
 ;@ path: boss/master_stalfos
 ;@ Entity $5F, the Master Stalfos (mini-boss of dungeon 5), a big skeleton with sword and shield
 ;@ built from separate parts (torso, legs, shield, sword; their frames and offsets are
@@ -9194,7 +9197,7 @@ MasterStalfosDoNothing::
 	ret
 
 
-;@ def MasterStalfos_Speak(slot: c)
+;@ def MasterStalfos_Speak(slot: bc)
 ;@ path: boss/master_stalfos
 ;@ State 2: crouched from the fall, he straightens up after $20 frames. Just before the end he
 ;@ speaks: text $12 in rooms $92 and $84, text $14 in room $80, nothing elsewhere. Then he looks
@@ -9285,19 +9288,19 @@ MasterStalfos_LookAround::
 	and $3f
 	jr nz, .turn
 .turn
-;> if wEntityTimer[slot] & 0x40:
+;> if not (wEntityTimer[slot] & 0x40):
 	call GetEntityTimer
 	and $40
-;>     return MasterStalfosPoseRight()
+;>     return MasterStalfosPoseRight(slot)
 	jr z, MasterStalfosPoseRight
-;> return MasterStalfosPoseLeft()               # runs on into it
+;> return MasterStalfosPoseLeft(slot)               # runs on into it
 
-;@ def MasterStalfosPoseLeft()
+;@ def MasterStalfosPoseLeft(slot: bc)
 ;@ path: boss/master_stalfos
 ;@ Puts the parts in the stance facing left: torso frame 1, shield in front (x -16, y -8), sword
 ;@ held up behind (frame 0 at x +16, y -13).
-;@ test: c = 0
 ;@ test: wCurrentBank = $07
+;@ test: slot = rand(0, 15)
 MasterStalfosPoseLeft::
 ;> MasterStalfosResetParts()
 	call MasterStalfosResetParts
@@ -9325,12 +9328,12 @@ MasterStalfosPoseLeft::
 	ret
 
 
-;@ def MasterStalfosPoseRight()
+;@ def MasterStalfosPoseRight(slot: bc)
 ;@ path: boss/master_stalfos
 ;@ Puts the parts in the stance facing right: torso frame 0, shield at x -8, y -8, sword frame 0
 ;@ at x +16, y -16.
-;@ test: c = 0
 ;@ test: wCurrentBank = $07
+;@ test: slot = rand(0, 15)
 MasterStalfosPoseRight::
 ;> MasterStalfosResetParts()
 	call MasterStalfosResetParts
@@ -9358,7 +9361,7 @@ MasterStalfosPoseRight::
 	ret
 
 
-;@ def MasterStalfos_Decide(slot: c)
+;@ def MasterStalfos_Decide(slot: bc)
 ;@ path: boss/master_stalfos
 ;@ State 4: MasterStalfosCheckLeap may start a leap. When the timer is up he walks at Link (speed
 ;@ 8) for $30-$4F frames (state 5). He always turns to face Link.
@@ -9404,7 +9407,7 @@ MasterStalfosFaceLink::
 ;@ test: slot = rand(0, 15)
 ;@ test: wCurrentBank = $07
 MasterStalfosSetPose::
-;> MasterStalfosPoseLeft()
+;> MasterStalfosPoseLeft(slot)
 	call MasterStalfosPoseLeft
 ;> if wEntityDirection[slot] == 0:
 	ld hl, wEntityDirection
@@ -9412,13 +9415,13 @@ MasterStalfosSetPose::
 	ld a, [hl]
 	and a
 	jr nz, .done
-;>     MasterStalfosPoseRight()
+;>     MasterStalfosPoseRight(slot)
 	call MasterStalfosPoseRight
 .done
 	ret
 
 
-;@ def MasterStalfos_Walk(slot: c)
+;@ def MasterStalfos_Walk(slot: bc)
 ;@ path: boss/master_stalfos
 ;@ State 5: walks at Link (legs frame toggled every 16 frames). MasterStalfosCheckLeap may start a
 ;@ leap; when Link is within 32 pixels across and 28 up or down he slashes (state 6, $30 frames);
@@ -9472,7 +9475,7 @@ MasterStalfos_Walk::
 	ld [wMasterStalfosLegsFrame], a
 ;> return MasterStalfosMove(slot)              # runs on into it
 
-;@ def MasterStalfosMove(slot: c)
+;@ def MasterStalfosMove(slot: bc)
 ;@ path: boss/master_stalfos
 ;@ Moves him by his speed, stopped by walls.
 ;@ test: skip checks walls through bank 3
@@ -9484,7 +9487,7 @@ MasterStalfosMove::
 	ret
 
 
-;@ def MasterStalfos_Slash(slot: c)
+;@ def MasterStalfos_Slash(slot: bc)
 ;@ path: boss/master_stalfos
 ;@ State 6: a sword stroke towards Link over $30 frames: until timer $18 the sword is raised, at
 ;@ $17 it comes down with a swish (noise $27) and the blade sweep (wEntityTimer2 = $10,
@@ -9523,7 +9526,7 @@ MasterStalfosRecover::
 	ret
 
 
-;@ def MasterStalfosSwing(slot: c)
+;@ def MasterStalfosSwing(slot: bc)
 ;@ path: boss/master_stalfos
 ;@ The stroke of MasterStalfos_Slash for the current timer, on his facing side: sword raised
 ;@ (timer $18 and up), the downward stroke with the sweep ($10-$17; at $17 noise $27 and
@@ -9541,7 +9544,7 @@ MasterStalfosSwing::
 ;>     if t >= 0x18:                           # sword raised
 	cp $18
 	jr c, .rightDown
-;>         MasterStalfosPoseRight()
+;>         MasterStalfosPoseRight(slot)
 	call MasterStalfosPoseRight
 ;>         wMasterStalfosSwordX = 0x08
 	ld a, $08
@@ -9611,7 +9614,7 @@ MasterStalfosSwing::
 ;>     if t >= 0x18:
 	cp $18
 	jr c, .leftDown
-;>         MasterStalfosPoseLeft()
+;>         MasterStalfosPoseLeft(slot)
 	call MasterStalfosPoseLeft
 ;>         wMasterStalfosLegsFrame = 1
 	ld a, $01
@@ -9677,7 +9680,7 @@ MasterStalfosSwing::
 	ret
 
 
-;@ def MasterStalfos_Crouch(slot: c)
+;@ def MasterStalfos_Crouch(slot: bc)
 ;@ path: boss/master_stalfos
 ;@ State 7: faces Link, crouched 2 pixels, until the timer is up; then leaps (state 8, jingle $24):
 ;@ straight at Link (height speed $28, speed $18), or - when Link is close above him
@@ -9741,7 +9744,7 @@ MasterStalfosLowerParts::
 	ret
 
 
-;@ def MasterStalfos_Leap(slot: c)
+;@ def MasterStalfos_Leap(slot: bc)
 ;@ path: boss/master_stalfos
 ;@ State 8: flies through the air; on landing he crouches for $10 frames, then decides again
 ;@ (MasterStalfosRecover).
@@ -9779,7 +9782,7 @@ MasterStalfos_Leap::
 	ret
 
 
-;@ def MasterStalfos_KnockedDown(slot: c)
+;@ def MasterStalfos_KnockedDown(slot: bc)
 ;@ path: boss/master_stalfos
 ;@ State 9: hit, he drops to the ground; there he falls apart (state 10, $20 frames, jingle $28),
 ;@ and from now on his bones can be hit (bit 7 of wEntityHitboxFlags cleared, bit 6 of
@@ -9907,7 +9910,7 @@ MasterStalfos_Rattle::
 	ret
 
 
-;@ def MasterStalfos_Reassemble(slot: c)
+;@ def MasterStalfos_Reassemble(slot: bc)
 ;@ path: boss/master_stalfos
 ;@ State 12: the torso rises back to 16 pixels above the legs, shield and sword go back up (in
 ;@ the last $24 frames). When the time is up: if his bones were hit fewer times than the room's
@@ -9996,7 +9999,7 @@ MasterStalfos_Reassemble::
 	ret
 
 
-;@ def MasterStalfos_Flee(slot: c)
+;@ def MasterStalfos_Flee(slot: bc)
 ;@ path: boss/master_stalfos
 ;@ State 13: crouches for a moment (noise $3F), then jumps up out of the room; above height $78 the
 ;@ area music returns, the entity is gone and the room is marked as done (MarkRoomEventDone).
@@ -10035,14 +10038,14 @@ MasterStalfos_Flee::
 	call SelectAreaMusicFar
 ;>     ClearEntityStatus(slot)
 	call ClearEntityStatus
-;>     return MarkRoomEventDone()                # runs on into it
+;>     return MarkRoomEventDone(slot)                # runs on into it
 
-;@ def MarkRoomEventDone()
+;@ def MarkRoomEventDone(slot: bc)
 ;@ path: world/room_status
 ;@ Sets bit 5 (event done) in the status byte of the current indoor room (wRoomStatus + $100 +
 ;@ room; the second indoor group, + $200, for maps 6-$19) and in hRoomStatus.
-;@ test: c = 0
 ;@ test: wCurrentBank = $07
+;@ test: slot = rand(0, 15)
 MarkRoomEventDone::
 ;> p = wRoomStatus + 0x100 + hMapRoom
 	ld hl, wRoomStatus + $100
@@ -10069,7 +10072,7 @@ MarkRoomEventDone::
 	ret
 
 
-;@ def MasterStalfosCheckLeap(slot: c)
+;@ def MasterStalfosCheckLeap(slot: bc)
 ;@ path: boss/master_stalfos
 ;@ Starts a leap (state 7, crouching $20 frames, facing Link) when Link is more than 48 pixels
 ;@ away on either axis, or close and above him (then wEntityPrivate1 = 1 for the higher jump).
@@ -10218,7 +10221,7 @@ MasterStalfosSlashLeftSprites::
 MasterStalfosShadowSprites::
 	db $0c, $fb, $26, $00, $0c, $01, $26, $00, $0c, $07, $26, $00, $0c, $0d, $26, $00
 
-;@ def DrawMasterStalfos(slot: c)
+;@ def DrawMasterStalfos(slot: bc)
 ;@ path: boss/master_stalfos
 ;@ Draws nothing while he is above height $70 (out of sight); otherwise sword, sword sweep, shield,
 ;@ torso and legs, and in the air his shadow.
@@ -10307,7 +10310,7 @@ DrawMasterStalfosSword::
 	ret
 
 
-;@ def DrawMasterStalfosSlash(slot: c)
+;@ def DrawMasterStalfosSlash(slot: bc)
 ;@ path: boss/master_stalfos
 ;@ While wEntityTimer2 runs (just after a stroke): checks the sweep against Link
 ;@ (MasterStalfosSlashHitsLink) and draws it on his facing side.
@@ -10457,7 +10460,7 @@ DrawMasterStalfosLegs::
 	jp FinishMasterStalfosPart
 
 
-;@ def MasterStalfosSlashHitsLink(slot: c)
+;@ def MasterStalfosSlashHitsLink(slot: bc)
 ;@ path: boss/master_stalfos
 ;@ Unless Link is in the air or invincible: if Link is inside the sweep (in front of him, 8 pixels
 ;@ to his facing side, within 26 across and 12 up or down of the blade's line 24 below his drawn
@@ -10539,7 +10542,7 @@ MasterStalfosSlashHitsLink::
 FireballShooterSpeeds::
 	db $12, $14, $16, $18, $19, $1a, $1a, $1a, $1a, $1a
 
-;@ def FireballShooterHandler(slot: c)
+;@ def FireballShooterHandler(slot: bc)
 ;@ path: object/fireball_shooter
 ;@ Entity $9E, an invisible shooter on a statue of the room: every 128 frames, while any ordinary
 ;@ enemy is still alive in the room (not another shooter, not a shot $7D, not type $82, not an
@@ -10653,7 +10656,7 @@ FireballShooterReturn:
 	ret
 
 
-;@ def HiddenSwordMoblinHandler(slot: c)
+;@ def HiddenSwordMoblinHandler(slot: bc)
 ;@ path: enemy/sword_moblin
 ;@ Entity $94, invisible, sitting on a pot-like object of the room. Once a hit knocks it
 ;@ (wEntityIgnoreHitsTimer set), the object shatters like a pot (BreakIntoPiecesFar), the room
@@ -10802,7 +10805,7 @@ StarSprites::
 	db $74, $00, $74, $20, $76, $00, $78, $00, $7a, $00, $7a, $20, $78, $20, $76, $20
 	db $7c, $00, $7c, $00
 
-;@ def StarHandler(slot: c)
+;@ def StarHandler(slot: bc)
 ;@ path: enemy/star
 ;@ Entity $9C, the star: flies in a straight line and bounces off walls, turning over (frames 0-3,
 ;@ every 8 frames).
@@ -10877,7 +10880,7 @@ HidingZolSprites::
 HidingZolSmallSprites::
 	db $56, $00, $56, $00
 
-;@ def HidingZolHandler(slot: c)
+;@ def HidingZolHandler(slot: bc)
 ;@ path: enemy/hiding_zol
 ;@ Entity $9B, a zol hidden in the floor. When Link comes within 32 pixels it rises out and hops
 ;@ at him 3 to 6 times (wEntityPrivate1), quivering between hops, then sinks back into the floor
@@ -10941,7 +10944,7 @@ HidingZolStates::
 	dw HidingZol_InAir
 	dw HidingZol_Sink
 
-;@ def HidingZol_Hidden(slot: c)
+;@ def HidingZol_Hidden(slot: bc)
 ;@ path: enemy/hiding_zol
 ;@ State 0: once its timer is up, waits for Link to come within 32 pixels; then it comes out
 ;@ ($20 frames, state 1) and will hop 3-6 times.
@@ -10978,7 +10981,7 @@ HidingZol_Hidden::
 	ret
 
 
-;@ def HidingZol_Emerge(slot: c)
+;@ def HidingZol_Emerge(slot: bc)
 ;@ path: enemy/hiding_zol
 ;@ State 1: shows the bump (frame 1) and then the zol half out (frame 2, last $10 frames); then it
 ;@ jumps out (height 8, height speed 8, frame 3, physics flags $12, jingle $24) and waits to land
@@ -11058,7 +11061,7 @@ HidingZol_Land::
 	ret
 
 
-;@ def HidingZol_Quiver(slot: c)
+;@ def HidingZol_Quiver(slot: bc)
 ;@ path: enemy/hiding_zol
 ;@ State 3: can be hit; jiggles left and right (half a pixel, switching every 4 frames); then it
 ;@ stops and hops after $10 frames (state 4).
@@ -11095,7 +11098,7 @@ HidingZol_Quiver::
 	ret
 
 
-;@ def HidingZol_Hop(slot: c)
+;@ def HidingZol_Hop(slot: bc)
 ;@ path: enemy/hiding_zol
 ;@ State 4: when the timer is up it hops at Link (speed $0C, height speed $18, jingle $24; state 5).
 ;@ Frame 3.
@@ -11128,7 +11131,7 @@ HidingZol_Hop::
 	ret
 
 
-;@ def HidingZol_InAir(slot: c)
+;@ def HidingZol_InAir(slot: bc)
 ;@ path: enemy/hiding_zol
 ;@ State 5: in the air (frame 2). On landing it stops; after $20 frames it hops again (state 4),
 ;@ or after the last hop it sinks into the floor (state 6, $30 frames, physics flags $D2).
@@ -11214,7 +11217,7 @@ HidingZol_Sink::
 	ret
 
 
-;@ def HidingZolCheckWalls(slot: c)
+;@ def HidingZolCheckWalls(slot: bc)
 ;@ path: enemy/hiding_zol
 ;@ The wall check with wEntityIgnoreHitsTimer set to 3 for its duration (then 0).
 ;@ test: skip checks walls through bank 3
@@ -11232,7 +11235,7 @@ HidingZolCheckWalls::
 	ret
 
 
-;@ def FlyingTilesHandler(slot: c)
+;@ def FlyingTilesHandler(slot: bc)
 ;@ path: enemy/flying_tiles
 ;@ Entity $9A, the invisible starter of a flying floor tiles trap: one after another 16 floor
 ;@ tiles lift off and fly at Link (each a Facade entity $5A in its flying tile form,
@@ -11291,7 +11294,7 @@ FlyingTilesOrder::
 FlyingTilesDelays::
 	db $30, $30, $30, $30, $30, $30, $30, $28, $28
 
-;@ def FlyingTiles_Launch(slot: c)
+;@ def FlyingTiles_Launch(slot: bc)
 ;@ path: enemy/flying_tiles
 ;@ State 1: every FlyingTilesDelays[map] frames the next tile (wEntityPrivateCounter, 0-15) flies:
 ;@ a Facade entity in its tile form at the tile's place (x = column * 16 + 8, y = row * 16 + 16),
@@ -11410,7 +11413,7 @@ FlyingTiles_Launch::
 WaterTektiteSprites::
 	db $70, $00, $70, $20, $72, $00, $72, $20
 
-;@ def WaterTektiteHandler(slot: c)
+;@ def WaterTektiteHandler(slot: bc)
 ;@ path: enemy/water_tektite
 ;@ Entity $99, the water tektite: skates over the water in spurts - it speeds up for $20 frames in
 ;@ a random diagonal (wEntityPrivate1/2 = +1 or -1 per axis), then glides to a stop and pauses $10
@@ -11469,7 +11472,7 @@ WaterTektiteStates::
 	dw WaterTektite_SpeedUp
 	dw WaterTektite_SlowDown
 
-;@ def WaterTektite_Pause(slot: c)
+;@ def WaterTektite_Pause(slot: bc)
 ;@ path: enemy/water_tektite
 ;@ State 0: after the pause it picks a random diagonal and speeds up for $20 frames (state 1).
 ;@ test: skip draws on random numbers
@@ -11568,9 +11571,9 @@ WaterTektite_SlowDown::
 	ret
 
 .slow
-;> WaterTektiteStepToZero(wEntitySpeedX, slot)
+;> WaterTektiteStepToZero(addr(wEntitySpeedX) + slot, wEntitySpeedX[slot])
 	call WaterTektiteStepToZero
-;> return WaterTektiteStepToZero(wEntitySpeedY, slot)          # runs on into it
+;> return WaterTektiteStepToZero(addr(wEntitySpeedY) + slot, wEntitySpeedY[slot])  # runs on into it
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld a, [hl]
@@ -11578,7 +11581,8 @@ WaterTektite_SlowDown::
 ;@ def WaterTektiteStepToZero(p: hl, value: a)
 ;@ path: enemy/water_tektite
 ;@ mem[p] += 1 if value is negative, else -= 1 (so a speed of 0 becomes -1).
-;@ test: skip writes through a pointer
+;@ test: p = rand_ram(1)
+;@ test: wCurrentBank = $07
 WaterTektiteStepToZero::
 ;> mem[p] += 1 if value & 0x80 else -1
 	bit 7, a
@@ -11600,7 +11604,7 @@ HorseHeadSprites::
 	db $60, $00, $62, $00, $64, $00, $66, $00, $62, $60, $60, $60, $66, $60, $64, $60
 	db $66, $20, $64, $20
 
-;@ def HorseHeadHandler(slot: c)
+;@ def HorseHeadHandler(slot: bc)
 ;@ path: object/horse_head
 ;@ Entity $98, one of the two horse head pieces in the Face Shrine (dungeon 6) room: Link lifts
 ;@ and throws them; a thrown piece bounces and tumbles about, then comes to rest showing a random
@@ -11677,7 +11681,7 @@ HorseHeadStates::
 	dw HorseHead_AtRest
 	dw HorseHead_Judged
 
-;@ def HorseHead_Lying(slot: c)
+;@ def HorseHead_Lying(slot: bc)
 ;@ path: object/horse_head
 ;@ States 0 and 1: waits to be picked up (HorseHeadCheckLift).
 ;@ test: skip checks Link collision through bank 3
@@ -11703,7 +11707,7 @@ HorseHeadSpeedY::
 HorseHeadRestFrames::
 	db $00, $01, $04, $00
 
-;@ def HorseHead_Tumble(slot: c)
+;@ def HorseHead_Tumble(slot: bc)
 ;@ path: object/horse_head
 ;@ State 2 (thrown): tumbles (frames 0-3, every 8 frames). On the ground it turns one step left
 ;@ or right at random (at once after a hard landing, otherwise every 8 frames) and takes the
@@ -11820,7 +11824,7 @@ HorseHead_Tumble::
 ;> return HorseHeadTurnSpeed(wEntitySpeedY, slot)       # runs on into it
 	ld hl, wEntitySpeedY
 
-;@ def HorseHeadTurnSpeed(array: hl, slot: c)
+;@ def HorseHeadTurnSpeed(array: hl, slot: bc)
 ;@ path: object/horse_head
 ;@ array[slot] = (~array[slot] >> 1 (signed)) + 1 - turns a speed round at about half of it - and
 ;@ then HorseHeadMark.
@@ -11851,7 +11855,7 @@ HorseHeadMark::
 	ret
 
 
-;@ def HorseHead_AtRest(slot: c)
+;@ def HorseHead_AtRest(slot: bc)
 ;@ path: object/horse_head
 ;@ State 3: the first piece waits until the second (slot wEntityScratch1) is at rest too; then
 ;@ both are judged (state 4). Both upright: TriggerRoomEvent. Otherwise both wait $40 frames and
@@ -11906,7 +11910,7 @@ HorseHead_AtRest::
 	ret
 
 
-;@ def HorseHead_Judged(slot: c)
+;@ def HorseHead_Judged(slot: bc)
 ;@ path: object/horse_head
 ;@ State 4: on the last frame of the wait the piece falls over (frame 1); it can be picked up
 ;@ again.
@@ -11925,7 +11929,7 @@ HorseHead_Judged::
 	ret
 
 
-;@ def HorseHeadCheckLift(slot: c)
+;@ def HorseHeadCheckLift(slot: bc)
 ;@ path: object/horse_head
 ;@ When Link touches the piece and presses the button of the power bracelet (item 3 on B or A),
 ;@ not already carrying something and not in an item pose: he lifts it (status 7 = carried,
@@ -12004,7 +12008,7 @@ SpikedBeetleSprites::
 SpikedBeetleSpritesMap3::
 	db $60, $00, $60, $20, $62, $00, $62, $20, $64, $00, $64, $20, $66, $00, $66, $20
 
-;@ def SpikedBeetleHandler(slot: c)
+;@ def SpikedBeetleHandler(slot: bc)
 ;@ path: enemy/spiked_beetle
 ;@ Entity $2C, the spiked beetle: wanders, and when Link comes in line with it (within 6 pixels of
 ;@ its row or column) it charges at him. Its spiked front cannot be hurt (hitbox flags $80,
@@ -12126,7 +12130,7 @@ SpikedBeetleSpeedX::
 SpikedBeetleSpeedY::
 	db $00, $00, $fa, $06
 
-;@ def SpikedBeetle_Pause(slot: c)
+;@ def SpikedBeetle_Pause(slot: bc)
 ;@ path: enemy/spiked_beetle
 ;@ State 0: stands; then walks for $30-$4F frames (state 1) in a random direction, 1 time in 4
 ;@ towards Link. Watches for Link (SpikedBeetleLookForLink).
@@ -12178,7 +12182,7 @@ SpikedBeetle_Pause::
 ;> return SpikedBeetleLookForLink(slot)
 	jr SpikedBeetleLookForLink
 
-;@ def SpikedBeetle_Walk(slot: c)
+;@ def SpikedBeetle_Walk(slot: bc)
 ;@ path: enemy/spiked_beetle
 ;@ State 1: walks; after the time it pauses $18 frames (state 0). Watches for Link: when Link is
 ;@ within 6 pixels of its column or row it charges at him (state 2, timer $FF).
@@ -12321,7 +12325,7 @@ SpikedBeetleWalkFrame::
 	ret
 
 
-;@ def SpikedBeetle_OnBack(slot: c)
+;@ def SpikedBeetle_OnBack(slot: bc)
 ;@ path: enemy/spiked_beetle
 ;@ State 3: on its back it can be hurt (options $08, no hitbox flags) and kicks its legs (frames
 ;@ 2/3). In the last $60 frames it wriggles left and right (switching every 4 frames; the wall
@@ -12403,7 +12407,7 @@ SpikedBeetle_OnBack::
 UnusedWalkBaseFrames::
 	db $06, $04, $02, $00
 
-;@ def SwordMoblinHandler(slot: c)
+;@ def SwordMoblinHandler(slot: bc)
 ;@ path: enemy/sword_moblin
 ;@ Entity $14, the moblin with a sword (and shield, which Link's sword bounces off). It patrols
 ;@ left and right; when it notices Link (close and not facing away, or a sword clash, or a hit)
@@ -12466,7 +12470,7 @@ SwordMoblinSpeedX::
 SwordMoblinSpeedY::
 	db $00, $00, $fa, $06
 
-;@ def SwordMoblin_Pause(slot: c)
+;@ def SwordMoblin_Pause(slot: bc)
 ;@ path: enemy/sword_moblin
 ;@ State 0: stands and looks out for Link; then turns round and patrols $80 frames (state 1).
 ;@ test: skip checks Link position through other routines
@@ -12524,7 +12528,7 @@ SwordMoblinTurnAround::
 	ret
 
 
-;@ def SwordMoblin_Patrol(slot: c)
+;@ def SwordMoblin_Patrol(slot: bc)
 ;@ path: enemy/sword_moblin
 ;@ State 1: walks to and fro (turning at walls) and looks out for Link; after the time it pauses
 ;@ $30 frames (state 0).
@@ -12568,7 +12572,7 @@ SwordMoblinResetState::
 	ret
 
 
-;@ def SwordMoblin_Charge(slot: c)
+;@ def SwordMoblin_Charge(slot: bc)
 ;@ path: enemy/sword_moblin
 ;@ State 2: after noticing Link it stands facing him for $10 frames (wEntityTimer1; in the
 ;@ hideout, once the room scroll has finished, it says text $190 the first time,
@@ -12648,7 +12652,7 @@ SwordMoblinFaceLink:
 SwordMoblinOppositeDirections::
 	db $01, $00, $03, $02
 
-;@ def SwordMoblinLookForLink(slot: c)
+;@ def SwordMoblinLookForLink(slot: bc)
 ;@ path: enemy/sword_moblin
 ;@ The moblin notices Link (SwordMoblinAlert) after a sword clash (wClinkTimer), or when Link is
 ;@ within 48 pixels on both axes unless the moblin faces straight away from him.
@@ -12743,7 +12747,7 @@ SwordMoblinSprites::
 	db $60, $00, $62, $00, $62, $20, $60, $20, $64, $00, $66, $00, $66, $20, $64, $20
 	db $68, $00, $6a, $00, $6c, $00, $6e, $00, $6a, $20, $68, $20, $6e, $20, $6c, $20
 
-;@ def DrawSwordMoblin(slot: c)
+;@ def DrawSwordMoblin(slot: bc)
 ;@ path: enemy/sword_moblin
 ;@ Draws the moblin: facing down also its sword hilt sprite (DrawSwordMoblinHilt), then the sword
 ;@ (DrawSpritePair, 2 sprites at the offset for its frame) with a 4x4 clash box on it, then the
@@ -12888,7 +12892,7 @@ ChestItemMusic::
 	db $01, $10, $10, $10, $10, $10, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01
 	db $01, $00
 
-;@ def ChestItemHandler(slot: c)
+;@ def ChestItemHandler(slot: bc)
 ;@ path: object/chest_item
 ;@ Entity $07, the content of an opened chest (the sprite variant says which). Link is held
 ;@ still. The item rises out of the chest for 16 frames; at frame 8 the item's sound starts
@@ -13082,7 +13086,7 @@ ChestItemHandler::
 	ret
 
 
-;@ def PushLinkOutOfEntity(slot: c) -> carry
+;@ def PushLinkOutOfEntity(slot: bc) -> carry
 ;@ path: entity/helpers
 ;@ For solid entities: when Link touches it, he is put back where he was and his dash stops; a
 ;@ hookshot chain on its way (an entity of type 3 in slot wHookshotChainSlot - 1) is reset to state
@@ -13134,9 +13138,9 @@ WalkBaseFrames::
 ;@ path: entity/helpers
 ;@ Advances the walk counter (wEntityPrivateCounter) and sets the sprite frame to
 ;@ WalkBaseFrames[wEntityDirection] plus the step (bit 4 of the counter).
-;@ test: c = rand(0, 15); wEntityDirection[c] = rand(0, 3)
 ;@ test: slot = rand(0, 15)
 ;@ test: wCurrentBank = $07
+;@ test: mem[wEntityDirection + slot] = rand(0, 3)
 UpdateWalkFrame::
 ;>@b base = mem[WalkBaseFrames + wEntityDirection[slot]]
 	ld hl, wEntityDirection
@@ -13165,7 +13169,7 @@ UpdateWalkFrame::
 	jp SetEntitySpriteVariant
 
 
-;@ def ShouldLinkTalkToEntity_Wide(slot: c) -> carry
+;@ def ShouldLinkTalkToEntity_Wide(slot: bc) -> carry
 ;@ path: entity/helpers
 ;@ Same check as ShouldLinkTalkToEntity, but Link may stand up to twice as far above or below the
 ;@ character (used by a character behind a counter).
@@ -13307,7 +13311,7 @@ ReturnIfPaused::
 	ret
 
 
-;@ def ApplyRecoilIfNeeded(slot: c)
+;@ def ApplyRecoilIfNeeded(slot: bc)
 ;@ path: entity/helpers
 ;@ While the entity's knockback timer runs, moves it one step with its knockback speed instead of
 ;@ its own speed (bumping into walls unless option bit 5 says otherwise) and ends the calling
@@ -13446,7 +13450,7 @@ AddEntitySpeedToPos_Done:
 	ret
 
 
-;@ def AddEntityZSpeedToPos(slot: c)
+;@ def AddEntityZSpeedToPos(slot: bc)
 ;@ path: entity/helpers
 ;@ Adds the signed height speed to the height, the same way AddEntitySpeedToPosX does for x.
 ;@ test: skip shares its second half with AddEntitySpeedToPosX
@@ -13469,7 +13473,7 @@ AddEntityZSpeedToPos::
 ;> wEntitySpeedZAcc[slot] = frac & 0xFF
 	ld [hl], a
 	rl d
-;> wEntityZ[slot] += signed(speed >> 4) + (frac >> 8)    # same tail as AddEntitySpeedToPosX
+;> wEntityZ[slot] += ((speed >> 4) - (0x10 if speed & 0x80 else 0)) + (frac >> 8)    # same tail as AddEntitySpeedToPosX
 	ld hl, wEntityZ
 	jr AddEntitySpeedToPos_Add
 
@@ -13588,7 +13592,7 @@ ClearEntityStatus::
 	ret
 
 
-;@ def BossDefeatedHandler(slot: c)
+;@ def BossDefeatedHandler(slot: bc)
 ;@ path: boss/defeat
 ;@ Plays a defeated boss's end, stepped by wEntityPrivate2: flashing, a burst of explosions, then
 ;@ the drop.
@@ -13659,7 +13663,7 @@ BossDefeated_Flash::
 	ret
 
 
-;@ def BossDefeated_Explode(slot: c)
+;@ def BossDefeated_Explode(slot: bc)
 ;@ path: boss/defeat
 ;@ Explosions burst around the boss while the timer runs. Then Master Stalfos (type $5F) drops the
 ;@ item entity $30 with a small hop and restores the area's music; any other boss shakes the
@@ -13775,7 +13779,7 @@ SpawnExplosionAtEntity::
 	ret
 
 
-;@ def UnusedSpawnHeartContainer(slot: c)
+;@ def UnusedSpawnHeartContainer(slot: bc)
 ;@ path: unused
 ;@ Nothing jumps here. Spawns a heart container (type $36) at hMultiPurpose0/1; in a side-view room
 ;@ it gives the handled entity an upward speed, otherwise the heart container a hop from a height of

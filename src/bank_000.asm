@@ -842,7 +842,7 @@ LCDStatHandler::
 	cp $05
 	jr nz, .baseScroll
 
-;>         rSCY = wEntityWorkRAM            # $D000: the ending keeps the lower scroll there
+;>         rSCY = wEntityWorkRAM[0]            # $D000: the ending keeps the lower scroll there
 	ld a, [wEntityWorkRAM]
 ;=@sy
 	jr .setScrollY
@@ -1267,7 +1267,7 @@ CopyRequestedTiles::
 	cp $07
 	jp z, .job7
 
-;>@k         TileJob7()                       # bank 1 $7BC5 (a staged job of its own)
+;>@k         set_rom_bank(0x01); TileJobInstruments()   # a staged job of its own
 ;>@k2         return RestoreGfxBank()
 ;>     elif job == 3:
 	cp $03
@@ -2188,7 +2188,7 @@ RestoreLinkPosition::
 	ret
 
 
-;@ def AddTransientVfx(kind: a)
+;@ def AddTransientVfx(kind: a) -> de
 ;@ path: gfx/vfx
 ;@ Starts a short visual effect `kind` (dust, splash, clink star, ...) at (hMultiPurpose0,
 ;@ hMultiPurpose1) for $0F frames. Takes the highest free effect slot; when all 16 are busy it
@@ -2254,6 +2254,7 @@ AddTransientVfx::
 	ld hl, wVfxTimer
 	add hl, de
 	ld [hl], $0f
+;> return slot                             # (de: the effect's slot)
 	ret
 
 
@@ -3220,7 +3221,7 @@ LinkMotionHandlers::
 ;@ def UpdateLinkInTransition()
 ;@ path: link/frame
 ;@ While the room scrolls: only Link's sprites are updated (UpdateLinkItemSprites, then DrawLinkOAM).
-;@ test: skip
+;@ test: skip runs with bank 2 switched in (UpdateLinkItemSprites is there); the trials of a bank-0 routine have no bank 2 at $4000
 UpdateLinkInTransition::
 ;> UpdateLinkItemSprites()
 	call UpdateLinkItemSprites
@@ -4124,11 +4125,11 @@ UseBow::
 	ld c, a
 	ld b, $00
 
-;@ def SetArrowSpeed(direction: c, slot: de)
+;@ def SetArrowSpeed(direction: bc, slot: de)
+;@ test: direction = rand(0, 3); slot = rand(0, 15)
 ;@ path: link/items
 ;@ Gives the arrow in `slot` its speed for `direction` (ArrowSpeedX/Y), faster with a Piece of
 ;@ Power. Also used by bank 2.
-;@ test: skip
 SetArrowSpeed::
 ;> if wActivePowerUp == 1:
 	ld a, [wActivePowerUp]
@@ -5073,6 +5074,7 @@ StopLinkSpeed::
 ;@ test: skip calls bank 2
 UpdateLinkItemSprites::
 ;> UpdateLinkGround()
+;> return DrawLinkItemSprites()                 # (runs on into it)
 	call UpdateLinkGround
 
 ;@ def DrawLinkItemSprites()
@@ -5646,7 +5648,6 @@ LinkMotionMapFadeOut::
 ;@ path: save/spawn
 ;@ Saves a restart point: the 5 bytes of `record` (kind, map, room, x, y) to wSpawnIsIndoor...
 ;@ wSpawnY, and wIndoorRoom to wSpawnIndoorRoom. Returns with de pointing at wSpawnIndoorRoom.
-;@ test: skip
 SetSpawnPoint::
 ;> hMultiPurpose0 = 0
 	ld a, $00
@@ -5975,7 +5976,7 @@ UpdateLinkAnimationState::
 	sra a
 	and $01
 	ld d, a
-;> i = 2 * hLinkDirection + frame
+;> i = u8(2 * hLinkDirection) | frame
 	ldh a, [hLinkDirection]
 	sla a
 	or d
@@ -6332,6 +6333,7 @@ UpdateAnimatedTiles::
 ;@ path: gfx/animation
 ;@ Runs the animated-tiles routine of the room's group (hAnimatedTilesGroup).
 ;@ test: skip writes VRAM
+;@ test: hAnimatedTilesGroup = rand(0, 16)
 RunAnimatedTiles::
 ;> return AnimatedTilesHandlers[hAnimatedTilesGroup]()
 	ldh a, [hAnimatedTilesGroup]
@@ -6896,7 +6898,7 @@ BGChangeTiles88E0Alt::
 	ld hl, AnimatedTiles + $C0
 ;> dest = 0x88E0
 	ld de, $88e0
-;> return BGChangeTiles8CA0.copy2(src, dest)   # (shared end of BGChangeTiles8CA0)
+;> set_rom_bank(0x0C); return CopyBGChangeTiles(src, dest, 0x20)   # (the end of BGChangeTiles8CA0)
 	jr BGChangeTiles8CA0.copyBGChangeTiles
 
 ;@ def BGChangeTilesBank11()
@@ -6908,7 +6910,7 @@ BGChangeTilesBank11::
 ;> set_rom_bank(0x11)
 	ld a, $11
 	ld [$2100], a
-;>@o offset = (wEntityWorkRAM & 0x0F) * 0x40
+;>@o offset = (wEntityWorkRAM[0] & 0x0F) * 0x40
 	ld a, [wEntityWorkRAM]
 	swap a
 	and $f0
@@ -6949,7 +6951,7 @@ BGChangeTilesBank13::
 ;> set_rom_bank(0x13)
 	ld a, $13
 	ld [$2100], a
-;>@o offset = (wEntityWorkRAM & 0x0F) * 0x40
+;>@o offset = (wEntityWorkRAM[0] & 0x0F) * 0x40
 	ld a, [wEntityWorkRAM]
 	swap a
 	and $f0
@@ -7152,6 +7154,7 @@ CopyBGChangeTiles64::
 ;@ test: skip writes VRAM
 CopyBGChangeTiles::
 ;> copy(dest, src, count)
+;> return FinishBGChange()                     # (runs on into it)
 	call CopyData
 
 ;@ def FinishBGChange()
@@ -7689,6 +7692,7 @@ ResetLiftPull:
 ;@ path: link/lift
 ;@ Link picks up the room object in front of him (hMultiPurpose0 = its id, hMultiPurpose1 = its place in
 ;@ wRoomObjects): the object disappears from the room map and comes back as a lifted entity over his head.
+;@ test: skip the projectile it spawns sits next to the entity slot the caller leaves in bc (SpawnLinkProjectile)
 LiftRoomObject::
 ;> pos = hMultiPurpose1                     # where the object is in wRoomObjects
 	ldh a, [hMultiPurpose1]
@@ -7709,10 +7713,12 @@ LiftRoomObject::
 	ret
 
 
-;@ def RemoveRoomObject(pos: e)
+;@ def RemoveRoomObject(pos: de)
 ;@ path: object/lift
 ;@ Takes the object at `pos` out of the room (the code in bank $14 puts the floor in its place and queues the
 ;@ redraw of that square), then switches the caller's bank back in.
+;@ test: pos = rand(0, 0x9F)
+;@ test: wIsIndoor = rand(0, 1)
 RemoveRoomObject::
 ;> set_rom_bank(0x14)
 	ld a, $14
@@ -7728,6 +7734,7 @@ RemoveRoomObject::
 ;@ Creates the entity for an object Link has just lifted (type 5), in the lifted state, with the sprite
 ;@ variant from hMultiPurposeE (1 = a bush), and lets bank 3 place it over Link's head. Nothing happens when
 ;@ all entity slots are taken.
+;@ test: skip the projectile it spawns sits next to the entity slot the caller leaves in bc (SpawnLinkProjectile)
 SpawnLiftedObject::
 ;> slot = SpawnLinkProjectile(0x05)                   # a new entity of type 5; carry = no free slot
 	ld a, $05
@@ -7877,6 +7884,7 @@ ApplyLinkSpeedZ::
 ;@ game mode and the box place of the next character (wDialogCharSlot: 0-$0F first line, $10-$1F second
 ;@ line; after the first 32 characters every character goes to the second line, as the text scrolls up)
 ;@ are worked out.
+;@ test: wDialogState = rand(1, 15) | (rand(0, 1) << 7)
 UpdateDialog::
 ;> state = wDialogState
 	ld a, [wDialogState]
@@ -8080,7 +8088,7 @@ SaveDialogBackground::
 	add hl, bc
 	push hl
 	pop bc
-;> row = u8(wBGOriginLow + mem[DialogBackgroundSaveTable + 10 + i])   # low byte of the row start
+;> hMultiPurpose0 = u8(wBGOriginLow + mem[DialogBackgroundSaveTable + 10 + i])   # low byte of the row start
 	ld hl, DialogBackgroundSaveTable + 10
 	add hl, de
 	ld a, [wBGOriginLow]
@@ -8093,7 +8101,7 @@ SaveDialogBackground::
 	ld a, [wBGOriginHigh]
 	add [hl]
 	ld h, a
-;> src = (high << 8) | row
+;> src = (high << 8) | hMultiPurpose0
 	ldh a, [hMultiPurpose0]
 	ld l, a
 ;>@rows for r in range(2):
@@ -8130,18 +8138,18 @@ SaveDialogBackground::
 	cp $12
 	jr nz, .copyTile
 
-;>     row += 0x20                           # next row; a carry goes into the high byte
+;>     row = hMultiPurpose0 + 0x20; hMultiPurpose0 = row   # next row; a carry goes into the high byte
 	ld e, $00
 	ldh a, [hMultiPurpose0]
 	add $20
 	ldh [hMultiPurpose0], a
-;>     if row > 0xFF: src += 0x100; row = u8(row)
+;>     if row > 0xFF: src += 0x100
 	jr nc, .noCarry
 
 	inc h
 
 .noCarry
-;>     src = (src & 0xFF00) | row
+;>     src = (src & 0xFF00) | hMultiPurpose0
 	ld l, a
 ;=@rows
 	inc d
@@ -8176,7 +8184,7 @@ DialogStateClearBox::
 	cp $05
 	jr z, NextDialogState
 
-;> if wDialogState & 0x80: step += 5        # the bottom box's rows
+;> if wDialogState & 0x80: step = u8(step + 5)   # the bottom box's rows
 	bit 7, c
 	jr z, .top
 
@@ -8425,7 +8433,7 @@ DialogStatePlaceChar::
 	ld a, [wDialogState]
 	ld c, a
 	ld a, [wDialogCharSlot]
-;> if wDialogState & 0x80: p += 0x20       # bottom box
+;> if wDialogState & 0x80: p = u8(p + 0x20)   # bottom box
 	bit 7, c
 	jr z, .top
 
@@ -8461,7 +8469,7 @@ DialogStatePlaceChar::
 	ld a, [wBGOriginLow]
 	add [hl]
 	ld d, a
-;> if low >= row_end: low -= 0x20           # stay on the same BG map row
+;> if low >= row_end: low = u8(low - 0x20)   # stay on the same BG map row
 	cp e
 	jr c, .haveLow
 
@@ -8609,6 +8617,7 @@ PlayDialogJingle::
 ;@ path: text/dialog
 ;@ Part of DialogStateDrawChar: $FF ends the text (nothing is drawn, step $0C waits for a button), other
 ;@ characters are typed by DialogTypeChar.
+;@ test: skip pops the address that DialogStateDrawChar left on the stack (its tail)
 DialogCheckEnd::
 ;> if char != 0xFF: return DialogTypeChar(char)
 	cp $ff
@@ -8642,6 +8651,7 @@ ThiefName::
 ;@ copies the character's 16-byte glyph from the font ($5000 in the caller's bank, glyph number from the
 ;@ table at $1C:$45E1) into the draw command, and moves on to the next character (step 6), or to step 9 when
 ;@ the box is full.
+;@ test: skip pops the address that DialogStateDrawChar left on the stack (its tail)
 DialogTypeChar::
 ;> if char != 0x20:                         # spaces make no sound
 	cp $20
@@ -8979,13 +8989,14 @@ ScrollDialogText1::
 ;> ScrollDialogRows(high, DialogScroll1Address, b)
 	ld hl, DialogScroll1Address
 
-;@ def ScrollDialogRows(high: b, table: hl, b: e)
+;@ def ScrollDialogRows(high: b, table: hl, index: de)
+;@ test: high = rand(0x98, 0x9B); index = rand(0, 9)
 ;@ path: text/dialog
 ;@ Moves 16 columns of the dialog box up by one tile row: the row at (high, wBGOriginLow + table[b]) goes to
 ;@ the row above it, the row below it takes its place, and that lower row is blanked. Columns wrap within
 ;@ the 32-tile BG map row. Sets the 8-frame pause and moves on to the next dialog step.
 ScrollDialogRows::
-;> col = u8(wBGOriginLow + mem[table + b])
+;> col = u8(wBGOriginLow + mem[table + index])
 	add hl, de
 	ld a, [wBGOriginLow]
 	add [hl]
@@ -9019,9 +9030,9 @@ ScrollDialogRows::
 	ldh a, [hMultiPurposeG]
 	ld [hl], a
 	pop bc
-;>     col = u8(col + 1)
+;>     bc = ((high << 8) | col) + 1; high = hi(bc); col = lo(bc)   # inc bc: a carry goes into the high byte
 	inc bc
-;>     if col & 0x1F == 0: col -= 0x20      # wrap around within the BG map row
+;>     if col & 0x1F == 0: col = u8(col - 0x20)   # wrap around within the BG map row
 	ld a, c
 	and $1f
 	jr nz, .next
@@ -9159,6 +9170,7 @@ DrawDialogMoreArrow::
 ;@ def RunRoomTransition()
 ;@ path: world/transition
 ;@ Runs one frame of the scroll from one room to the next (UpdateRoomTransition, by wRoomTransitionState).
+;@ test: wRoomTransitionState = rand(0, 5)
 RunRoomTransition::
 ;> SwitchBank(2)
 	ld a, $02
@@ -9224,7 +9236,7 @@ QueueTransitionStrip::
 ;> wTransitionDrawDelay = 1
 	ld a, $01
 	ld [wTransitionDrawDelay], a
-;> obj = wTransitionObjectIndex
+;> hMultiPurpose2 = wTransitionObjectIndex    # the object index
 	ld a, [wTransitionObjectIndex]
 	ldh [hMultiPurpose2], a
 ;> wDrawCommand[1] = wTransitionDrawLow
@@ -9280,7 +9292,7 @@ QueueTransitionStrip::
 ;> while True:
 	push bc
 	push de
-;>     o = wRoomObjects[obj]
+;>     o = wRoomObjects[hMultiPurpose2]
 	ldh a, [hMultiPurpose2]
 	ld c, a
 	ld b, $00
@@ -9351,7 +9363,7 @@ QueueTransitionStrip::
 	ld a, [wRoomTransitionDirection]
 	ld c, a
 	ld b, $00
-;>     obj = u8(obj + mem[TransitionStripTables + 8 + d])
+;>     hMultiPurpose2 += mem[TransitionStripTables + 8 + d]
 	ld hl, TransitionStripTables + 8
 	add hl, bc
 	ldh a, [hMultiPurpose2]
@@ -9757,6 +9769,7 @@ FillBGMapsWith7F::
 
 
 ;@ def CopyDataFromBank(bank: a, src: hl, dest: de, count: bc)
+;@ test: bank = rand(1, 0x3F); src = rand(0x4000, 0x7E00); dest = rand(0xC000, 0xDE00); count = rand(1, 0x100)
 ;@ path: system/memory
 ;@ Copies `count` bytes from `src` in ROM bank `bank` to `dest`, then switches bank 1 in.
 CopyDataFromBank::
@@ -9772,6 +9785,7 @@ CopyDataFromBank::
 
 
 ;@ def CopyData(src: hl, dest: de, count: bc)
+;@ test: src = rand(0xC000, 0xCF00); dest = rand(0xD000, 0xDE00); count = rand(1, 0x100)
 ;@ path: system/memory
 ;@ Copies `count` bytes (1-65536) from `src` to `dest`, front to back.
 CopyData::
@@ -9793,6 +9807,9 @@ CopyData::
 ;@ path: gfx/bgmap
 ;@ Part of DrawCommands: runs the draw command at `cmds` (its first byte `high` is not 0) and goes on with the
 ;@ next one.
+;@ test: cmds = rand(0xC000, 0xCE00); p = cmds
+;@ test: for _ in range(rand(1, 3)): m = rand(0, 255) & 0xBF; mem[p] = 0x98 + rand(0, 3); mem[p + 1] = rand(0, 255); mem[p + 2] = m; p += 4 + (m & 0x3F)
+;@ test: mem[p] = 0; high = mem[cmds]
 DrawNextCommand::
 ;> dest = (high << 8) | mem[cmds + 1]
 	inc de
@@ -9814,6 +9831,9 @@ DrawNextCommand::
 ;@ map row, 1 one byte repeated along the row, 2 copy down a column, 3 one byte repeated down the column.
 ;@ While the screen scrolls to another room the commands are run by ExecuteDrawCommandSkipEE instead
 ;@ (copies only, $EE bytes are left out).
+;@ test: cmds = rand(0xC000, 0xCE00); p = cmds
+;@ test: for _ in range(rand(1, 3)): m = rand(0, 255) & 0xBF; mem[p] = 0x98 + rand(0, 3); mem[p + 1] = rand(0, 255); mem[p + 2] = m; p += 4 + (m & 0x3F)
+;@ test: mem[p] = 0
 DrawCommands::
 ;> if wRoomTransitionState: return DrawCommandsSkipEE(cmds)
 	ld a, [wRoomTransitionState]
@@ -9825,6 +9845,9 @@ DrawCommands::
 ;@ def DrawCommandsLoop(cmds: de)
 ;@ path: gfx/bgmap
 ;@ The loop of DrawCommands: stops at the 0 that ends the list.
+;@ test: cmds = rand(0xC000, 0xCE00); p = cmds
+;@ test: for _ in range(rand(1, 3)): m = rand(0, 255) & 0xBF; mem[p] = 0x98 + rand(0, 3); mem[p + 1] = rand(0, 255); mem[p + 2] = m; p += 4 + (m & 0x3F)
+;@ test: mem[p] = 0
 DrawCommandsLoop::
 ;> if mem[cmds] != 0: return DrawNextCommand(mem[cmds], cmds)
 	ld a, [de]
@@ -9838,6 +9861,9 @@ DrawCommandsLoop::
 ;@ def DrawNextCommandSkipEE(high: a, cmds: de)
 ;@ path: gfx/bgmap
 ;@ Like DrawNextCommand, for the commands drawn during a room scroll.
+;@ test: cmds = rand(0xC000, 0xCE00); p = cmds
+;@ test: for _ in range(rand(1, 3)): m = rand(0, 255) & 0xBF; mem[p] = 0x98 + rand(0, 3); mem[p + 1] = rand(0, 255); mem[p + 2] = m; p += 4 + (m & 0x3F)
+;@ test: mem[p] = 0; high = mem[cmds]
 DrawNextCommandSkipEE::
 ;> dest = (high << 8) | mem[cmds + 1]
 	inc de
@@ -9855,6 +9881,9 @@ DrawNextCommandSkipEE::
 ;@ def DrawCommandsSkipEE(cmds: de)
 ;@ path: gfx/bgmap
 ;@ Runs a list of draw commands with ExecuteDrawCommandSkipEE, until the 0 that ends the list.
+;@ test: cmds = rand(0xC000, 0xCE00); p = cmds
+;@ test: for _ in range(rand(1, 3)): m = rand(0, 255) & 0xBF; mem[p] = 0x98 + rand(0, 3); mem[p + 1] = rand(0, 255); mem[p + 2] = m; p += 4 + (m & 0x3F)
+;@ test: mem[p] = 0
 DrawCommandsSkipEE::
 ;> if mem[cmds] != 0: return DrawNextCommandSkipEE(mem[cmds], cmds)
 	ld a, [de]
@@ -10091,8 +10120,9 @@ ClearWRAM1300::
 ;@ def ClearHRAMPartAndWRAM()
 ;@ path: system/memory
 ;@ Clears HRAM $FF90-$FFBE and WRAM $C000-$DEFF (going on in ClearHRAMAndWRAM). Called from bank 1.
+;@ test: skip clears HRAM up to $FFFC, where the tester keeps the return address
 ClearHRAMPartAndWRAM::
-;> ClearMemory(hNeedsUpdatingBGTiles, 0x2F)  # (done by the rest of ClearHRAMAndWRAM)
+;> ClearMemory(addr(hNeedsUpdatingBGTiles), 0x2F)  # (done by the rest of ClearHRAMAndWRAM)
 	ld bc, $002f
 ;> return ClearMemory(wOAMBuffer, 0x1F00)
 	jr ClearHRAMFromFF90
@@ -10100,12 +10130,13 @@ ClearHRAMPartAndWRAM::
 ;@ def ClearHRAMAndWRAM()
 ;@ path: system/memory
 ;@ Clears HRAM $FF90-$FFFC and WRAM $C000-$DEFF (the stack at the top of WRAM is left alone).
+;@ test: skip clears HRAM up to $FFFC, where the tester keeps the return address
 ClearHRAMAndWRAM::
 ;> count = 0x6D
 	ld bc, $006d
 
 ClearHRAMFromFF90:
-;> ClearMemory(hNeedsUpdatingBGTiles, count)   # HRAM from $FF90
+;> ClearMemory(addr(hNeedsUpdatingBGTiles), count)   # HRAM from $FF90
 	ld hl, hNeedsUpdatingBGTiles
 	call ClearMemory
 ;> count = 0x1F00
@@ -10116,6 +10147,7 @@ ClearHRAMFromFF90:
 	ld hl, wOAMBuffer
 
 ;@ def ClearMemory(addr: hl, count: bc)
+;@ test: addr = rand(0xC000, 0xDE00); count = rand(1, 0x100)
 ;@ path: system/memory
 ;@ Sets `count` bytes (1-65536) from `addr` to 0.
 ClearMemory::
@@ -10185,7 +10217,7 @@ OpenRoomDialog::
 	jp RestoreBank
 
 
-;@ def GetObjectPhysics(obj: de) -> a
+;@ def GetObjectPhysics(obj: e, indoor: d) -> a
 ;@ path: object/physics
 ;@ The physics kind of room object e (wall, floor, water, pit, ...) from the table at $08:$5110; d = 0 for
 ;@ the overworld objects, 1 for the indoor ones (the callers pass wIsIndoor).
@@ -10193,7 +10225,7 @@ GetObjectPhysics::
 ;> set_rom_bank(0x08)
 	ld a, $08
 	ld [$2100], a
-;> kind = mem[OverworldObjectPhysics + obj]
+;> kind = mem[u16(OverworldObjectPhysics + 0x100 * indoor + obj)]   # $100 overworld objects, then $100 indoor ones
 	ld hl, OverworldObjectPhysics
 	add hl, de
 	ld a, [hl]
@@ -10202,14 +10234,14 @@ GetObjectPhysics::
 ;> return kind
 
 
-;@ def GetObjectPhysicsBank3(obj: de) -> a
+;@ def GetObjectPhysicsBank3(obj: e, indoor: d) -> a
 ;@ path: object/physics
 ;@ GetObjectPhysics for code in bank 3: switches bank 3 back in afterwards.
 GetObjectPhysicsBank3::
 ;> set_rom_bank(0x08)
 	ld a, $08
 	ld [$2100], a
-;> kind = mem[OverworldObjectPhysics + obj]
+;> kind = mem[u16(OverworldObjectPhysics + 0x100 * indoor + obj)]   # $100 overworld objects, then $100 indoor ones
 	ld hl, OverworldObjectPhysics
 	add hl, de
 	ld a, [hl]
@@ -10576,6 +10608,8 @@ LoadTileset04::
 ;@ ($200, after $0D:$4000 -> $9200 $600), $01:$7FA4 -> $12:xx00 to $8F00 ($100). Also $0C:$47C0 -> $DCC0
 ;@ ($40), the common world tiles, and $12:$7D00 (dungeons) or $0C:$4C00 (other maps) -> $8C00 ($300). Ends
 ;@ with LoadWorldItemTiles.
+;@ test: hAnimatedTilesGroup = rand(0, 16)
+;@ test: hMapId = rand(0, 0x1F)
 LoadTileset06::
 ;> SwitchBank(0x01)
 	ld a, $01
@@ -10713,6 +10747,7 @@ LoadWorldItemTiles::
 ;@ path: gfx/tilesets
 ;@ Tile set requests 5 and 7, the overworld tiles: $0C:$5200 -> $9200 ($600), $0C:$4C00 -> $8C00 ($400),
 ;@ the common world tiles, then LoadWorldItemTiles.
+;@ test: hAnimatedTilesGroup = rand(0, 16)
 LoadTileset05::
 ;> SwitchBank(0x0C)
 	ld a, $0c
@@ -10737,6 +10772,7 @@ LoadTileset05::
 ;@ path: gfx/tilesets
 ;@ The tiles every world map uses, from the bank the caller switched in ($0C): $4800 -> $8800 ($800) and
 ;@ $4200 -> $8200 ($100); restarts the animated background tiles first.
+;@ test: hAnimatedTilesGroup = rand(0, 16)
 LoadCommonWorldTiles::
 ;> hAnimatedTilesFrameCount = 0
 	xor a
@@ -11187,7 +11223,7 @@ LoadTileset01::
 	pop hl
 	pop de
 	inc hl
-;>@or     if obj & 0x0F == 0x0B: obj = (obj & 0xF0) + 0x11   # past column 10: next row of objects
+;>@or     if obj & 0x0F == 0x0B: obj = (obj & 0xFFF0) + 0x11   # past column 10: next row of objects
 	ld a, l
 	and $0f
 	cp $0b
@@ -11737,6 +11773,8 @@ OverworldMacroHandlers::
 ;@ path: world/rooms
 ;@ The indoor part of LoadRoomObject: types $EC-$FD are the doors and other macros (IndoorMacroHandlers),
 ;@ the others single objects or strips (LoadIndoorObject).
+;@ test: data = rand(0xC000, 0xDFF0)
+;@ test: mem[data] = rand(0, 0xFD)
 LoadRoomObjectIndoor::
 ;> if mem[data] < 0xEC: return LoadIndoorObject(mem[data] - 0xEC, data, status)
 	ld a, [bc]
@@ -11947,7 +11985,7 @@ LoadOverworldObject::
 ;>     wRoomDoorCount = n + 1
 	inc a
 	ld [wRoomDoorCount], a
-;>@wp     wWarpDestPosition[n] = mem[data - 1]  # its position
+;>@wp     mem[addr(wWarpDestPosition) + n] = mem[data - 1]  # its position
 	ld d, $00
 	ld hl, wWarpDestPosition
 	add hl, de
@@ -11979,7 +12017,7 @@ LoadOverworldObject::
 ;@ 4. $BE, $BF and $CB are stairs (RecordStairsObject); the rest goes on in LoadIndoorObjectEnd.
 ;@ test: skip passes the object on the stack
 LoadIndoorObject::
-;> obj = kind + 0xEC
+;> obj = u8(kind + 0xEC); hMultiPurpose9 = obj
 	add $ec
 	ldh [hMultiPurpose9], a
 	push af
@@ -12281,12 +12319,12 @@ PlaceRoomObject::
 	ld e, a
 	pop af
 	ld d, a
-;>@sp     for _ in range(n):
+;>@sp     for _ in range(n or 256):              # (a length of 0 makes 256)
 .strip
 ;>         mem[dest] = obj; dest += 1
 	ld a, d
 	ld [hli], a
-;>         if hMultiPurpose0 & 0x40: dest += 0x0F   # downwards: one row ($10) per object
+;>         if hMultiPurpose0 & 0x40: dest = (dest & 0xFF00) | u8(dest + 0x0F)   # downwards: one row ($10) per object, within the page
 	ldh a, [hMultiPurpose0]
 	and $40
 	jr z, .next
@@ -12325,7 +12363,7 @@ PlaceRoomObject::
 ;@ apart, to the right or downwards). A column of $F means one square left of the room's first column, so
 ;@ the tree sticks out at the left edge.
 OverworldMacroTree::
-;> e = mem[data - 1] + 0x11
+;> data -= 1; e = u8(mem[data] + 0x11)
 	dec bc
 	ld a, [bc]
 	add $11
@@ -12348,7 +12386,7 @@ OverworldMacroTree::
 	and a
 	jr z, PlaceTree
 
-;>@tr for _ in range(hMultiPurpose0 & 0x0F):
+;>@tr for _ in range((hMultiPurpose0 & 0x0F) or 256):   # (a count of 0 makes 256 trees)
 	and $0f
 	ld e, a
 
@@ -12366,7 +12404,8 @@ OverworldMacroTree::
 	ld d, $0f
 
 .haveStep
-;>     dest = (dest & 0xFF00) | u8(dest + 0x11 + step)
+;>     after = ((dest & 0xFF00) | u8(dest + 0x10)) + 1   # where PlaceTree leaves hl
+;>     dest = (after & 0xFF00) | u8(after + step)
 	ld a, l
 	add d
 	ld l, a
@@ -12384,6 +12423,7 @@ OverworldMacroTree::
 ;@ Writes a 2x2 tree into wRoomObjects at `dest`: objects $25 $26 / $27 $28 on open ground (objects below
 ;@ $10). Where a square already holds something else (another tree's half), the joined tree pieces
 ;@ $29 $2A / $2A $29 are used, and on the bottom row objects $8A and up get $82 / $83. Returns data + 1.
+;@ test: dest = rand(0xC000, 0xDFFF)
 PlaceTree::
 ;>@t1 mem[dest] = 0x25 if mem[dest] < 0x10 else 0x29
 	ld a, [hl]
@@ -12407,10 +12447,11 @@ PlaceTree::
 .topRight
 ;=@t2
 	ld [hld], a
-;>@bl mem[dest + 0x10] = 0x82 if mem[dest + 0x10] >= 0x8A else 0x27 if mem[dest + 0x10] < 0x10 else 0x2A
+;> low = (dest & 0xFF00) | u8(dest + 0x10)       # the row below (the address wraps within its page)
 	ld a, l
 	add $10
 	ld l, a
+;>@bl mem[low] = 0x82 if mem[low] >= 0x8A else 0x27 if mem[low] < 0x10 else 0x2A
 	ld a, [hl]
 	cp $8a
 	jr nc, .bottomLeft82
@@ -12430,7 +12471,7 @@ PlaceTree::
 .bottomLeft
 ;=@bl
 	ld [hli], a
-;>@br mem[dest + 0x11] = 0x83 if mem[dest + 0x11] >= 0x8A else 0x28 if mem[dest + 0x11] < 0x10 else 0x29
+;>@br mem[low + 1] = 0x83 if mem[low + 1] >= 0x8A else 0x28 if mem[low + 1] < 0x10 else 0x29
 	ld a, [hl]
 	cp $8a
 	jr nc, .bottomRight83
@@ -13231,6 +13272,9 @@ FillRoomObjects::
 ;@ heavy ball is placed where it was left (wIronBallRoom / X / Y). Then the room's entity list is read from
 ;@ bank $16: pointer table at $4000 (overworld), $4200 (indoor group 1) or $4400 (maps 6-$19), two bytes
 ;@ per room; each entry is 2 bytes (position row << 4 | column, entity type), $FF ends the list.
+;@ test: wRecentRoomsIndex = rand(0, 5)
+;@ test: wIsIndoor = rand(0, 1)
+;@ test: hMapId = rand(0, 0x1F)
 LoadRoomEntities::
 ;> set_rom_bank(0x01)
 	ld a, $01
@@ -13267,7 +13311,7 @@ LoadRoomEntities::
 	cp [hl]
 	jr nz, .indoorTable
 
-;>         slot, full = SpawnEntity(bc, 0xA8)
+;>         slot, full = SpawnEntity(offset, 0xA8)   # (bc still holds the offset: its x, y come from that "slot")
 	ld a, $a8
 	call SpawnEntity
 ;>         wEntityX[slot] = wIronBallX
@@ -13341,6 +13385,7 @@ RoomEntityBitMask::
 ;@ (being set up), position from the entry (the middle of the square: x + 8, y + $10 for the status bar),
 ;@ type. Entries 0-7 are left out when wRoomDefeatedEntityBits says they were defeated; also when all 16
 ;@ slots are taken. Returns `data` past the entry.
+;@ test: wIsIndoor = rand(0, 1)
 LoadRoomEntity::
 ;>@df skip = hMultiPurposeD < 8 and bool(wRoomDefeatedEntityBits[hMapRoom] & mem[RoomEntityBitMask + hMultiPurposeD])
 	ldh a, [hMultiPurposeD]
@@ -13423,6 +13468,7 @@ LoadRoomEntity::
 ;@ path: entity/spawn
 ;@ Sets up a just-spawned entity from its type's defaults (InitSpawnedEntityProperties) and notes its place in the room's
 ;@ list (PlaceEntityForRoomScroll: wEntityLoadOrder = hMultiPurposeD, which counts on). Ends with bank $16 switched in.
+;@ test: slot = rand(0, 15)
 InitLoadedEntity::
 ;> set_rom_bank(0x03)
 	ld a, $03
@@ -13446,6 +13492,7 @@ InitLoadedEntity::
 ;@ Builds the walls of an indoor room from one of its templates (PlaceIndoorWalls, high nibble of the room
 ;@ data's second byte), then switches back to the bank of the room data (kept in hMultiPurposeG by
 ;@ LoadRoom). bc is kept.
+;@ test: template = rand(0, 15)
 ApplyIndoorRoomTemplate::
 ;> set_rom_bank(0x14)
 	ld e, a
@@ -13544,6 +13591,7 @@ ConfineLinkToArena::
 ;@ def OnRoomEnteredBank1()
 ;@ path: world/rooms
 ;@ SpawnFollowers, run by bank 2 when Link has entered a room; bank 2 is switched back in.
+;@ test: skip Marin is spawned next to the entity slot the caller leaves in bc (SpawnMarinFollower)
 OnRoomEnteredBank1::
 ;> SwitchBank(0x01)
 	ld a, $01
@@ -13569,14 +13617,16 @@ InitEntityPropertiesFar::
 	jp RestoreBank
 
 
-;@ def UpdateCarriedEntity()
+;@ def UpdateCarriedEntity(slot: bc)
 ;@ path: entity/carry
 ;@ CarriedEntityStep, for the entity that Link carries; for code in bank 3, which is switched back in.
+;@ test: slot = rand(0, 15)
+;@ test: hLinkDirection = rand(0, 3)
 UpdateCarriedEntity::
 ;> set_rom_bank(0x14)
 	ld a, $14
 	ld [$2100], a
-;> CarriedEntityStep()
+;> CarriedEntityStep(slot)
 	call CarriedEntityStep
 ;> set_rom_bank(0x03)
 	ld a, $03
@@ -13598,6 +13648,7 @@ OAMStartOffsets::
 ;@ picks the OAM start (rotating by frame inside the dungeons - maps below $0A - else 0), clears the per-frame
 ;@ flags the entities set (Link in water, on a platform, carried entity, ...), and runs DrawSwordPowerSparkleAB. Nothing
 ;@ runs while wLinkMotionState is 7.
+;@ test: skip runs every entity's handler, from the 233-entry handler table in other banks
 UpdateEntities::
 ;> if wDelayedWaveSfxTimer:
 	ld hl, wDelayedWaveSfxTimer
@@ -13751,6 +13802,7 @@ ResetEntityVariablesFrom3::
 ;@ (UpdateEntityTimers), then the code for its status: the type's own handler (RunEntityHandler) when active
 ;@ (status 5), else EntityStatusHandlers in bank 3.
 ;@ test: slot = rand(0, 15)
+;@ test: skip runs the handler of the entity's type, from the 233-entry handler table in other banks
 UpdateEntity::
 ;> hActiveEntityType = wEntityType[slot]
 	ld hl, wEntityType
@@ -13835,6 +13887,7 @@ EntityStatusHandlers::
 ;@ path: entity/engine
 ;@ RunEntityHandler for code in bank 3, which is switched back in afterwards.
 ;@ test: slot = rand(0, 15)
+;@ test: skip runs the handler of the entity's type (RunEntityHandler: 233-entry table, handlers in many banks)
 RunEntityHandlerFrom3::
 ;> RunEntityHandler(slot)
 	call RunEntityHandler
@@ -13848,6 +13901,7 @@ RunEntityHandlerFrom3::
 ;@ Runs the handler of the active entity's type (hActiveEntityType): its bank comes from the table at
 ;@ $03:$4000 (one byte per type; bank 3 must be switched in), its address from EntityHandlers.
 ;@ test: skip dispatches into the entity handlers of eight banks
+;@ test: skip jumps to the handler of the entity's type (in its own bank) through the 233-entry table after its rst $00
 RunEntityHandler::
 ;>@bk SwitchBank(mem[EntityHandlerBankTable + hActiveEntityType])
 	ldh a, [hActiveEntityType]
@@ -14340,6 +14394,7 @@ SpawnEntity::
 ;@ SpawnEntityFromSlot_03 from any bank: like SpawnEntity, but only slots 0-`last` are used (de = the
 ;@ slot; carry set when none is free).
 ;@ test: slot = rand(0, 15)
+;@ test: last = rand(0, 15)
 SpawnEntityFromSlot::
 ;> set_rom_bank(0x03)
 	push af
@@ -14621,7 +14676,7 @@ DrawEntityShadow::
 ;> set_rom_bank(wCurrentBank)
 	jr FinishEntityDraw.drawEntityShadow
 
-;@ def DrawEntitySpritesAtOAMStart(count: c, sprites: hl)
+;@ def DrawEntitySpritesAtOAMStart(sprites: hl, count: c)
 ;@ path: entity/draw
 ;@ Like DrawEntitySprites, but the sprites are written to the very start of the OAM buffer (before the
 ;@ entity area), so they are always shown. Used for entities that must never flicker.
@@ -14632,7 +14687,7 @@ DrawEntitySpritesAtOAMStart::
 	ld hl, wOAMBuffer
 	jr DrawSpriteListToOAM
 
-;@ def DrawEntitySprites(count: c, sprites: hl)
+;@ def DrawEntitySprites(sprites: hl, count: c)
 ;@ path: entity/draw
 ;@ Draws the active entity from a list of `count` sprites, 4 bytes each: y offset, x offset, tile,
 ;@ attributes (offsets from the entity's draw position). Written at wOAMNextIndex in the entity area
@@ -14863,6 +14918,7 @@ ReserveOAMEntriesFar::
 ;@ MiniMoldormInit (bank 4) from any bank: set-up of a new Mini Moldorm (entity $29), an entry
 ;@ of the entity init table in bank 3.
 ;@ test: slot = rand(0, 15)
+;@ test: mem[wEntityLoadOrder + slot] = rand(0, 7)
 MiniMoldormInitFar::
 ;> set_rom_bank(0x04)
 	ld hl, $2100
@@ -15063,6 +15119,7 @@ DrawRupeesAndHeartsFar::
 ;@ path: item/chest
 ;@ SpawnChestContents (bank 2) for code in bank 3, which is switched back to afterwards: the item
 ;@ rises out of the opened chest.
+;@ test: skip the chest item is spawned next to the entity slot the caller leaves in bc (SpawnChestContents)
 SpawnChestContentsFrom3::
 ;> SwitchBank(0x02)
 	ld a, $02
@@ -15109,7 +15166,7 @@ DrawInstrumentWarpEffectFrom3::
 ;> SwitchBank(0x06)
 	ld a, $06
 	call SwitchBank
-;> DrawInstrumentWarpEffect(slot)
+;> DrawInstrumentWarpEffect()
 	call DrawInstrumentWarpEffect
 ;> return SwitchBank(0x03)
 	ld a, $03

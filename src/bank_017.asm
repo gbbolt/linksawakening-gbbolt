@@ -437,6 +437,7 @@ CreditsRollFadeOut::
 ;@ $10: the bird that crosses the screen at the very end, see EndingLastBird) just off the left edge
 ;@ (x $E0, y $10), flying to the right.
 ;@ test: wCurrentBank = $17
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 CreditsRollSendBird::
 ;> slot, full = SpawnEntity(bc, 0xE8)               # spawn an ending object
 	ld a, $e8
@@ -803,8 +804,8 @@ PlaySeaSounds::
 
 ;@ path: ending/sea
 ;@ Background tiles of the moving water row (21 bytes: tiles $92 and $93 alternating), read by
-;@ AnimateWaterRows from the first or the second byte (20 tiles) to shift the pattern by one tile.
-;@ asset: tilemap width=21 height=1 addressing=8800
+;@ AnimateWaterRows, which uses only the first or the second byte (one tile for the whole row, swapped every 16 frames).
+;@ asset: tilemap width=21 height=1 addressing=8800 tiles=LoadTileset16
 WaterTilesLower::
 	db $92, $93, $92, $93, $92, $93, $92, $93, $92, $93, $92, $93, $92, $93, $92, $93
 	db $92, $93, $92, $93, $92
@@ -812,7 +813,7 @@ WaterTilesLower::
 ;@ path: ending/sea
 ;@ Background tiles of the water row above it (21 bytes: tiles $82 and $83 alternating), read like
 ;@ WaterTilesLower.
-;@ asset: tilemap width=21 height=1 addressing=8800
+;@ asset: tilemap width=21 height=1 addressing=8800 tiles=LoadTileset16
 WaterTilesUpper::
 	db $82, $83, $82, $83, $82, $83, $82, $83, $82, $83, $82
 	db $83, $82, $83, $82, $83, $82, $83, $82, $83, $82
@@ -820,8 +821,9 @@ WaterTilesUpper::
 ;@ def AnimateWaterRows(dest: de)
 ;@ path: ending/sea
 ;@ Animates two rows of water in the background: every 16 frames queues two background draw commands,
-;@ 20 tiles of WaterTilesLower at the map address dest and 20 tiles of WaterTilesUpper on the row above,
-;@ both shifted by one tile every other time so the waves roll.
+;@ one row at the map address dest and one on the row above, each filled with 20 copies of a single tile:
+;@ the first or second byte of WaterTilesLower / WaterTilesUpper, swapped every 16 frames so the water ripples.
+;@ (The copy loop never advances its source, so only that one byte of each table is used.)
 ;@ test: wCurrentBank = $17
 AnimateWaterRows::
 ;> if (hFrameCounter & 0x0F) != 2:
@@ -852,7 +854,7 @@ AnimateWaterRows::
 ;>     src += 1
 	inc de
 
-;> copy(addr(wDrawCommand) + 3, src, 20)
+;> fill(addr(wDrawCommand) + 3, mem[src], 20)    # (the loop never moves de on: 20 times the same tile)
 .copy1
 	ld c, $14
 
@@ -883,7 +885,7 @@ AnimateWaterRows::
 ;>     src += 1
 	inc de
 
-;> copy(addr(wDrawCommand) + 26, src, 20)
+;> fill(addr(wDrawCommand) + 26, mem[src], 20)   # (the same here)
 .copy2
 	ld c, $14
 
@@ -1048,6 +1050,7 @@ WaveLineOffsets::
 ;@ restart the ending and Right/Left skip to the next scene.
 ;@ test: wGameplaySubtype = rand(0, 8)
 ;@ test: wCurrentBank = $17
+;@ test: skip runs the entities through UpdateEntity, whose handler tables need real entity states and types
 CreditsHandler::
 ;> if hJoypadPressed & 0x0C and mem[0x0004]:     # debug: Up or Down
 	ldh a, [hJoypadPressed]
@@ -1410,12 +1413,13 @@ EndingNextStep::
 	ret
 
 
-;@ def EndingSpawnLightColumn()
+;@ def EndingSpawnStairway()
 ;@ path: ending/scene
 ;@ Step 1 of ending part 2: requests screen layout $16 (the night sky above the egg) and spawns two
 ;@ ending objects (entity $E8): part 0, the stairway that comes down to Link (EndingStairway), at x $40
 ;@ above the screen (y $E0), and part 1, the twinkling stars (EndingStars); Link stands at ($50, $98).
 ;@ test: wCurrentBank = $17
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 EndingSpawnStairway::
 ;> wBGMapToLoad = 0x16
 	ld a, $16
@@ -1634,7 +1638,7 @@ EndingClearScreen::
 ;> wEntityWorkRAM[0] += 1
 	inc a
 	ld [wEntityWorkRAM], a
-;> src = ClearScreenCommands + n * 8
+;> src = ClearScreenCommands + u8(n * 8)
 	sla e
 	sla e
 	sla e
@@ -1801,7 +1805,7 @@ EndingDrawWindFish::
 ;> wEntityWorkRAM[0] += 1
 	inc a
 	ld [wEntityWorkRAM], a
-;> offset = n * 24
+;> offset = u8(u8(n * 8) + u8(n * 16))          # n * 24, in a byte
 	sla e
 	sla e
 	sla e
@@ -2232,6 +2236,7 @@ InstrumentOAMOffsets::
 ;@ path: ending/instruments
 ;@ Step 17 of ending part 2: after the wait, Link takes pose 4, music $3F starts and the eight
 ;@ instruments appear (ending objects, part 3) on a ring around him, moving outwards for 32 frames.
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 EndingSpawnInstruments::
 ;> if wSceneTimer:
 	ld a, [wSceneTimer]
@@ -2364,6 +2369,8 @@ EndingWaitInstruments::
 ;@ five pictures that fade in and out, then the island itself dissolves. Runs the sub-step
 ;@ wEntityWorkRAM of IslandMemorySteps.
 ;@ test: wCurrentBank = $17
+;@ test: mem[wEntityWorkRAM] = rand(0, 17)
+;@ test: skip its scenes spawn entities next to the entity slot the caller leaves in bc
 EndingIslandMemories::
 ;> IslandMemorySteps[wEntityWorkRAM[0]]()
 	ld a, [wEntityWorkRAM]
@@ -2469,7 +2476,7 @@ MemoryFadeToWhite::
 	jp MemoryNextStep
 
 
-;> i = wSceneFadeStep + (hFrameCounter & 3)
+;> i = u8(wSceneFadeStep + (hFrameCounter & 3))
 .palette
 	ldh a, [hFrameCounter]
 	and $03
@@ -2525,6 +2532,7 @@ ShakeScreenSideways::
 ;@ BowWow (entity $6D) at ($48, $50), entity $6F at ($68, $30) and two entities $78 at ($2C, $58)
 ;@ and ($60, $52), the second one with wEntityPrivate1 = 1.
 ;@ test: wCurrentBank = $17
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 MemoryScene1::
 ;> wSceneFadeStep = 0
 	xor a
@@ -2625,6 +2633,7 @@ CheckMemorySkip::
 ;@ Memories sub-step 3: after the wait, fades the picture out; then the second picture (screen layout
 ;@ $1E, two children playing): entity $71 at ($48, $50) (state 1, timer $20, facing up) and entity
 ;@ $72 at ($78, $50).
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 MemoryScene2::
 ;> if wSceneTimer:
 	ld a, [wSceneTimer]
@@ -2710,6 +2719,7 @@ MemoryFadeIn2::
 ;@ path: ending/memories
 ;@ Memories sub-step 5: fades out, then the third picture (screen layout $22) with entity $C5 at
 ;@ ($28, $40) and two entities $09 at ($48, $50) and ($68, $60).
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 MemoryScene3::
 ;> if wSceneTimer:
 	ld a, [wSceneTimer]
@@ -2793,6 +2803,7 @@ MemoryFadeIn3::
 ;@ path: ending/memories
 ;@ Memories sub-step 7: fades out, then the fourth picture (screen layout $21, a pond among flowers)
 ;@ with entity $3F at ($78, $50).
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 MemoryScene4::
 ;> if wSceneTimer:
 	ld a, [wSceneTimer]
@@ -2855,6 +2866,7 @@ MemoryFadeIn4::
 ;@ Memories sub-step 9: fades out, then the fifth picture (screen layout $1F, Marin singing): entity
 ;@ $3E at ($28, $50), three entities $6E (the music notes) at ($18, $4C), ($38, $54) and ($28, $30),
 ;@ and entity $6F at ($78, $60).
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 MemoryScene5::
 ;> if wSceneTimer:
 	ld a, [wSceneTimer]
@@ -3284,6 +3296,7 @@ UnusedFadeOut::
 ;@ already over, sets it up: the map at $9C00 (tile set $15), Link (pose 0) at ($50, $5C) on the
 ;@ stairway object (ending object part 0, already in its state 2) at ($40, $60), the stars (part 1),
 ;@ a black background for now, $A0 frames of rumbling (noise $34) and screen shake.
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 MemoryShowPillar::
 ;> wBGPalette = 0xC9
 	ld a, $c9
@@ -3842,6 +3855,7 @@ FarLogInit::
 ;@ three ending objects: Link on his log far away (part 4) at ($48, $60) and two pieces of driftwood
 ;@ (part 5) at ($28, $68) and ($78, $60), the second with sprite variant 1.
 ;@ test: wCurrentBank = $17
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 FarLogSpawn::
 ;> wBGMapToLoad = 0x17
 	ld a, $17
@@ -4007,6 +4021,7 @@ SkyViewInit::
 ;@ at ($18, $20) flying right and at ($78, $78) flying left (sprite variant 3), and the gleam (part 7)
 ;@ at ($68, $60); the fade-in starts $60 x 4 frames later.
 ;@ test: wCurrentBank = $17
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 SkyViewSpawn::
 ;> wBGMapToLoad = 0x18
 	ld a, $18
@@ -4266,6 +4281,7 @@ LinkWakesInit::
 ;@ seagull (part 9) at ($08, $50) flying up to the right; the face animation starts $50 x 4 frames
 ;@ later.
 ;@ test: wCurrentBank = $17
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 LinkWakesSpawn::
 ;> wBGMapToLoad = 0x19
 	ld a, $19
@@ -4828,6 +4844,7 @@ WindFishFliesInit::
 ;@ Fish high in the sky (ending object part $0A) at x $40, y $4E. It is spawned into slot 0, whose x
 ;@ position WindFishFliesTiltUp later uses as the vertical scroll.
 ;@ test: wCurrentBank = $17
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 WindFishFliesSpawn::
 ;> wBGMapToLoad = 0x1A
 	ld a, $1a
@@ -5230,6 +5247,7 @@ SkyFadeBGP::
 ;@ row $44 the glow (part $0B) appears and sprite palette 1 becomes $E3. The water rows roll for the
 ;@ first 14 rows. Ends with the view at $30 after the last row: then $FF frames of rest before the
 ;@ fade-out.
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 WindFishFliesTiltUp::
 ;> if wSceneVarD < 0x0E:
 	ld a, [wSceneVarD]
@@ -5399,6 +5417,7 @@ WindFishFliesTiltUp::
 ;@ to step 36); at step 5 the streak of light (part $0C) appears at ($62, $5A) and sprite palette 0
 ;@ becomes $1E. When wSceneSlowTimer has run out the background goes white and the next part follows.
 ;@ test: wSceneVarC = rand(0, 0x24)
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 WindFishFliesFadeOut::
 ;> if wSceneSlowTimer == 0:
 	ld a, [wSceneSlowTimer]
@@ -5518,6 +5537,7 @@ PortraitInit::
 ;@ palette 0 $6E: the portrait still pale) and spawns the portrait (ending object part $0D) at
 ;@ ($38, $50).
 ;@ test: wCurrentBank = $17
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 PortraitSpawn::
 ;> wBGMapToLoad = 0x1B
 	ld a, $1b
@@ -5817,6 +5837,7 @@ FinalInit::
 ;@ object part $0E) at ($50, $78) and prepares the credits roll (step 0, no title yet), which starts
 ;@ $B0 x 4 frames later. Restarts the frame counter.
 ;@ test: wCurrentBank = $17
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 FinalSpawn::
 ;> wBGMapToLoad = 0x1C
 	ld a, $1c
@@ -5915,6 +5936,7 @@ FinalSceneFadeIn::
 ;@ Step 3 of ending part 8: after the long wait the view rises by 1 pixel every 8 frames. At map y
 ;@ $C0 the Wind Fish appears flying off (part $0F) at ($18, $B0); at $A0 Link's log (slot 15) is gone
 ;@ and a patch of clouds is drawn (DrawFinalPatch); at $70 the view stops (step 4).
+;@ test: skip spawns entities next to the entity slot the caller leaves in bc
 FinalScrollUp::
 ;> if wSceneVerySlowTimer or hFrameCounter & 7:
 ;>     return
@@ -6030,7 +6052,7 @@ DrawFinalPatch::
 ;@ The Wind Fish flying away at the very end (ending object part $0F): 4 frames of 10 sprites, each
 ;@ sprite 4 bytes (y offset, x offset, tile, attributes) relative to the object's position; frame n at
 ;@ offset n * 40. 8x8 sprites (the last part uses them for the credits).
-;@ asset: oam length=$A0
+;@ asset: oam length=$A0 frame=$28 signed tiles=LoadTileset1B
 WindFishAwaySprites::
 	db $08, $00, $5c, $00, $10, $00, $5d, $00, $00, $08, $c0, $00, $08, $08, $c1, $00
 	db $00, $10, $ce, $00, $08, $10, $cf, $00, $00, $18, $de, $00, $08, $18, $df, $00
@@ -6080,7 +6102,7 @@ EndingWindFishAway::
 	and $e0
 	add e
 	ld e, a
-;> DrawEntitySpritesAtOAMStart(10, WindFishAwaySprites + offset)     # draw 10 sprites at the start of the OAM buffer
+;> DrawEntitySpritesAtOAMStart(WindFishAwaySprites + offset, 10)     # draw 10 sprites at the start of the OAM buffer
 	ld d, b
 	ld hl, WindFishAwaySprites
 	add hl, de
@@ -6124,7 +6146,7 @@ EndingWindFishAway::
 ;@ path: ending/objects
 ;@ The seagull of the very end (ending object part $10): 4 frames of 8 sprites (y offset, x offset,
 ;@ tile, attributes), frame n at offset n * 32.
-;@ asset: oam length=$80
+;@ asset: oam length=$80 frame=$20 signed tiles=LoadTileset1B
 LastSeagullSprites::
 	db $00, $00, $00, $00, $08, $00, $01, $00, $00, $08, $02, $00, $08, $08, $03, $00
 	db $00, $fa, $10, $00, $08, $fa, $11, $00, $00, $0e, $10, $20, $08, $0e, $11, $20
@@ -6167,7 +6189,7 @@ EndingLastSeagull::
 	rla
 	rla
 	and $e0
-;>     DrawEntitySpritesAtOAMStart(8, LastSeagullSprites + offset)
+;>     DrawEntitySpritesAtOAMStart(LastSeagullSprites + offset, 8)
 	ld e, a
 	ld d, b
 	ld hl, LastSeagullSprites
@@ -6224,7 +6246,7 @@ EndingLastSeagull::
 ;@ path: ending/objects
 ;@ Link on his log, far away on the sea, during the credits (ending object part $0E): 4 frames of
 ;@ 12 sprites (y offset, x offset, tile, attributes), frame n at offset n * 48.
-;@ asset: oam length=$C0
+;@ asset: oam length=$C0 frame=$30 signed tiles=LoadTileset1B
 LinkOnLogSprites::
 	db $00, $00, $4c, $00, $08, $00, $4d, $00, $00, $08, $4e, $00, $08, $08, $4f, $00
 	db $10, $f8, $60, $00, $18, $f8, $61, $00, $10, $00, $62, $00, $18, $00, $63, $00
@@ -6300,7 +6322,7 @@ EndingLinkOnLog::
 	and $e0
 	add e
 	ld e, a
-;> DrawEntitySpritesAtOAMStart(12, LinkOnLogSprites + offset)
+;> DrawEntitySpritesAtOAMStart(LinkOnLogSprites + offset, 12)
 	ld d, b
 	ld hl, LinkOnLogSprites
 	add hl, de
@@ -6316,7 +6338,7 @@ EndingLinkOnLog::
 ;@ path: ending/objects
 ;@ Link's portrait in ending part 7 (ending object part $0D): 27 sprites of 8x16 (y offset, x offset,
 ;@ tile, attributes) forming the picture, 108 bytes; the face is drawn on top from LinkFaceSprites.
-;@ asset: oam length=$6C
+;@ asset: oam length=$6C signed tall tiles=LoadTileset1A
 LinkPortraitSprites::
 	db $00, $00, $00, $00, $00, $08, $02, $00, $00, $10, $04, $00, $00, $18, $06, $00
 	db $00, $20, $08, $00, $00, $28, $0a, $00, $10, $20, $14, $00, $10, $28, $16, $00
@@ -6329,7 +6351,7 @@ LinkPortraitSprites::
 ;@ path: ending/objects
 ;@ The face of Link's portrait: 3 expressions of 7 sprites (y offset, x offset, tile, attributes) plus
 ;@ 4 unused bytes ($FF), 32 bytes each; wSceneVar3 picks the expression (PortraitSmile).
-;@ asset: oam length=$60
+;@ asset: oam length=$60 frame=$20 signed tall tiles=LoadTileset1A
 LinkFaceSprites::
 	db $10, $00, $0c, $00
 	db $10, $08, $0e, $00, $10, $10, $10, $00, $10, $18, $12, $00, $20, $08, $18, $00
@@ -6360,7 +6382,7 @@ EndingLinkPortrait::
 	ldh a, [hActiveEntityDrawY]
 	add e
 	ldh [hActiveEntityDrawY], a
-;> DrawEntitySpritesAtOAMStart(27, LinkPortraitSprites)
+;> DrawEntitySpritesAtOAMStart(LinkPortraitSprites, 27)
 	ld hl, LinkPortraitSprites
 	ld c, $1b
 	call DrawEntitySpritesAtOAMStart
@@ -6385,7 +6407,7 @@ EndingLinkPortrait::
 	ld c, $07
 	ld a, $40
 	ld [wOAMNextIndex], a
-;> DrawEntitySprites(7, list)                   # draw 7 sprites at wOAMNextIndex
+;> DrawEntitySprites(list, 7)                   # draw 7 sprites at wOAMNextIndex
 	call DrawEntitySprites
 ;> ReserveOAMEntriesFar(7)
 	ld a, $07
@@ -6397,7 +6419,7 @@ EndingLinkPortrait::
 ;@ path: ending/objects
 ;@ The streak of light (ending object part $0C): 3 frames of 3 sprites (y offset, x offset, tile,
 ;@ attributes), 12 bytes each, by sprite variant.
-;@ asset: oam length=$24
+;@ asset: oam length=$24 frame=$0C signed tall tiles=LoadTileset17
 StreakSprites::
 	db $00, $00, $70, $00, $00, $00, $70, $00, $00, $00, $70, $00, $00, $00, $70, $00
 	db $08, $08, $5c, $00, $08, $08, $5c, $00, $00, $00, $70, $00, $08, $08, $5e, $00
@@ -6424,7 +6446,7 @@ EndingStreak::
 	and $f8
 	add e
 	ld e, a
-;> DrawEntitySprites(3, StreakSprites + offset)
+;> DrawEntitySprites(StreakSprites + offset, 3)
 	ld d, b
 	ld hl, StreakSprites
 	add hl, de
@@ -6452,7 +6474,7 @@ EndingStreak::
 ;@ path: ending/objects
 ;@ The ring of light (ending object part $0B): 14 sprites (y offset, x offset, tile, attributes),
 ;@ 56 bytes.
-;@ asset: oam length=$38
+;@ asset: oam length=$38 signed tall tiles=LoadTileset19
 GlowRingSprites::
 	db $00, $00, $62, $10, $00, $08, $62, $30, $10, $f0, $64, $10, $10, $f8, $66, $10
 	db $10, $00, $68, $10, $10, $08, $68, $30, $10, $10, $66, $30, $10, $18, $64, $30
@@ -6474,7 +6496,7 @@ EndingGlowRing::
 	ldh a, [hActiveEntityDrawY]
 	sub [hl]
 	ldh [hActiveEntityDrawY], a
-;> DrawEntitySprites(14, GlowRingSprites)
+;> DrawEntitySprites(GlowRingSprites, 14)
 	ld hl, GlowRingSprites
 	ld c, $0e
 	call DrawEntitySprites
@@ -6510,7 +6532,7 @@ EndingGlowRing::
 ;@ path: ending/objects
 ;@ The Wind Fish high in the sky in ending part 6 (ending object part $0A): 3 frames of 17 sprites of
 ;@ 8x16 (y offset, x offset, tile, attributes), 68 bytes each; wEntityWorkRAM picks the frame.
-;@ asset: oam length=$CC
+;@ asset: oam length=$CC frame=$44 signed tall tiles=LoadTileset19
 WindFishSprites::
 	db $00, $08, $b2, $00, $00, $10, $b4, $00, $00, $18, $b6, $00, $00, $20, $b8, $00
 	db $10, $10, $ba, $00, $10, $18, $bc, $00, $10, $20, $86, $00, $20, $00, $88, $00
@@ -6599,7 +6621,7 @@ EndingWindFishHigh::
 	rla
 	and $c0
 	add e
-;> DrawEntitySprites(17, WindFishSprites + offset)
+;> DrawEntitySprites(WindFishSprites + offset, 17)
 	ld e, a
 	ld d, b
 	ld hl, WindFishSprites
@@ -6616,7 +6638,7 @@ EndingWindFishHigh::
 ;@ path: ending/objects
 ;@ The gleam on the sea in ending part 3 (ending object part 7): 3 sprites (y offset, x offset, tile,
 ;@ attributes), 12 bytes.
-;@ asset: oam length=$0C
+;@ asset: oam length=$0C signed tall tiles=LoadTileset17
 SkyStreakSprites::
 	db $00, $00, $70, $00, $08, $08, $5e, $00, $08, $10, $60, $00
 
@@ -6629,7 +6651,7 @@ EndingSkyStreak::
 	ld hl, wEntityPhysicsFlags
 	add hl, bc
 	ld [hl], $c3
-;> DrawEntitySprites(3, SkyStreakSprites)
+;> DrawEntitySprites(SkyStreakSprites, 3)
 	ld hl, SkyStreakSprites
 	ld c, $03
 	call DrawEntitySprites
@@ -6703,14 +6725,14 @@ EndingSeagull::
 ;@ path: ending/objects
 ;@ Link on his log far out at sea (ending object part 4), first frame: 7 sprites (y offset, x offset,
 ;@ tile, attributes), 28 bytes. Alternates with FarLogSpritesB every 16 frames.
-;@ asset: oam length=$1C
+;@ asset: oam length=$1C signed tall tiles=LoadTileset16
 FarLogSpritesA::
 	db $00, $08, $0e, $00, $00, $10, $1e, $00, $00, $18, $2e, $00, $10, $00, $50, $00
 	db $10, $08, $52, $00, $10, $10, $54, $00, $10, $18, $58, $00
 
 ;@ path: ending/objects
 ;@ The second frame of Link on his log far out at sea: 7 sprites, 28 bytes (the log differs).
-;@ asset: oam length=$1C
+;@ asset: oam length=$1C signed tall tiles=LoadTileset16
 FarLogSpritesB::
 	db $00, $08, $0e, $00
 	db $00, $10, $1e, $00, $00, $18, $2e, $00, $10, $00, $60, $00, $10, $08, $62, $00
@@ -6765,7 +6787,7 @@ EndingFarLog::
 ;>     sprites = FarLogSpritesB
 	ld hl, FarLogSpritesB
 
-;> DrawEntitySprites(7, sprites)
+;> DrawEntitySprites(sprites, 7)
 .draw
 	ld c, $07
 	call DrawEntitySprites
@@ -7381,7 +7403,7 @@ StairwayGone::
 ;@ (6 sprites side by side at y 0 and $10, x 0-$28, the right half mirrored with attribute $30), sprites
 ;@ 12-31 the shaft below, 2 sprites wide (x $10 and $18) from y $20 down to $B0. All use palette OBP1.
 ;@ Drawn by DrawStairway, which copies only as many bytes as StairwaySpriteBytes allows.
-;@ asset: oam length=$80
+;@ asset: oam length=$80 signed tall tiles=LoadTileset1F
 StairwaySprites::
 	db $00, $00, $10, $10, $00, $08, $04, $10, $00, $10, $06, $10, $00, $18, $06, $30
 	db $00, $20, $04, $30, $00, $28, $10, $30, $10, $00, $08, $10, $10, $08, $0a, $10
@@ -7635,7 +7657,7 @@ DrawStars::
 ;@ The owl of the ending, 4 frames of its wing beat: 4 sprites each (16 bytes per frame, 4 bytes per
 ;@ sprite: y offset, x offset, tile, attributes), x offsets -8, 0, 8, $10, the right half mirrored.
 ;@ Indexed by sprite variant, drawn by EndingOwl.
-;@ asset: oam length=$10
+;@ asset: oam length=$10 frame=$10 signed tall tiles=LoadTileset1F
 OwlSprites::
 	db $00, $f8, $58, $00, $00, $00, $68, $00, $00, $08, $68, $20, $00, $10, $58, $20
 	db $00, $f8, $5a, $00, $00, $00, $6a, $00, $00, $08, $6a, $20, $00, $10, $5a, $20
@@ -7664,7 +7686,7 @@ EndingOwl::
 	ld e, a
 	ld d, b
 	add hl, de
-;> DrawEntitySprites(4, sprites)
+;> DrawEntitySprites(sprites, 4)
 	ld c, $04
 	call DrawEntitySprites
 ;> ReserveOAMEntriesFar(4)

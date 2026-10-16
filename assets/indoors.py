@@ -180,8 +180,8 @@ def build(ctx):
                           doc=['{} as the game draws it: each room at its place of the 8 x 8 layout of the map '
                                '(bank $14, $4200 + 64 x map: the room number at each position, read by the loader '
                                'LoadRoom with the position in $DBAE), built by the game\'s own loader with its '
-                               'entities as they appear a few frames after entering. Side-view rooms show as the '
-                               'game draws them from above. Link is left out; click a room for its '
+                               'entities as they appear a few frames after entering. Side-view rooms get the side-view '
+                               'tiles, as when their stairway leads in. Link is left out; click a room for its '
                                'sheet.'.format(title if mp < 10 else 'The caves of map $0A')],
                           users=['LoadRoom', 'Indoor{}RoomPointers'.format(g), 'Indoor{}EntityPointers'.format(g)]))
     # ---- every other room: houses, caves, shops, side views

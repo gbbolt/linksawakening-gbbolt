@@ -61,6 +61,14 @@
       "max_seconds": 12
     }
   },
+  "loop_channels": {
+    "_doc": "a channel has looped when its record repeats an earlier state at a note: pattern list pointer (+0), pattern pointer (+4), the $9B repeat's start (+C) and count (+F); a repeat inside a pattern ($9B..$9C) never matches, because its count differs. Channels without a pattern list (+1 = 0) are unused, and so are channels that only rest (MusicSilentChannel_1B/1E: 32 of the longest rests, again and again)",
+    "skip_silent": true,
+    "count": 4,
+    "stride": 16,
+    "fields": [["0xD310", 2], ["0xD314", 2], ["0xD31C", 2], ["0xD31F", 1]],
+    "active": "0xD311"
+  },
   "music_channels": {
     "_doc": "per channel: its RAM record, the offset of the pattern pointer (the note just played is the byte before it), the pattern list pointer, and the flag byte/bit set while a sound effect owns the channel",
     "structs": [
@@ -102,12 +110,12 @@
   },
   "names": {
     "music 1": [
-      "Track $01",
-      "requested in bank $01"
+      "Title screen",
+      "IntroScrollToSky: when the view has risen from the beach to the sky and the title comes"
     ],
     "music 2": [
-      "Indoor map $0F",
-      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $0F"
+      "Trendy Game",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $0F, the Trendy Game in Mabe Village (overworld room $B3)"
     ],
     "music 3": [
       "Game over",
@@ -138,20 +146,20 @@
       "SelectAreaMusic, overworld table 02:4000: rows 4-7, columns 0-3, and room $80"
     ],
     "music 10": [
-      "Indoor maps $10, $12, $1D",
-      "SelectAreaMusic, IndoorMusicTracks (by hMapId)"
+      "Houses",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): maps $10, $12, $1D, the houses (Marin and Tarin's house is room $A3 of map $10)"
     ],
     "music 11": [
       "Animal Village",
       "SelectAreaMusic, overworld table 02:4000: rooms $CC, $CD, $DC, $DD"
     ],
     "music 12": [
-      "Track $0C",
-      "not requested directly"
+      "Fairy fountain",
+      "EntityInit_BigFairy: the great fairy (once Link has a sword)"
     ],
     "music 13": [
-      "Intro",
-      "GameplayIntroHandler"
+      "Title screen (intro skipped)",
+      "GameplayIntroHandler: Start pressed during the intro (IntroSkipToTitle)"
     ],
     "music 14": [
       "Madam MeowMeow",
@@ -170,12 +178,12 @@
       "FileSelectShowScreen"
     ],
     "music 18": [
-      "Indoor map $08",
-      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $08"
+      "Wind Fish's Egg",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $08, the egg with its maze room (MazeRoomPaths)"
     ],
     "music 19": [
-      "Indoor map $14",
-      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $14"
+      "Kanalet Castle",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $14, entered from overworld rooms $59 and $69"
     ],
     "music 20": [
       "Dungeon 1",
@@ -198,52 +206,52 @@
       "HeartContainerHandler; SelectAreaMusic while wIndoorAltMusic is set"
     ],
     "music 25": [
-      "Track $19",
-      "requested in bank $04"
+      "Boss battle",
+      "StartBossMusic: the eight dungeon bosses (entity option bit 2 clear); ShopOwnerSetup: the shopkeeper when Link comes back after stealing"
     ],
     "music 26": [
-      "Track $1A",
-      "requested in bank $01"
+      "Intro: the storm and the beach",
+      "IntroInit: from the boat in the storm until Marin finds Link on the beach"
     ],
     "music 27": [
       "Instrument",
       "Collect_Instrument, WarpAppear"
     ],
     "music 28": [
-      "Track $1C",
-      "not requested directly"
+      "Marin and Tarin's house (the start)",
+      "EntityInit_GameOwner / EntityInit_Townsperson (Tarin and the villagers) while Link has no shield yet"
     ],
     "music 29": [
       "No sword yet",
       "SelectAreaMusic while Link has no sword; bank $06"
     ],
     "music 30": [
-      "Track $1E",
-      "requested in bank $06"
+      "Falling asleep in the Dream Shrine",
+      "DreamShrineBedWait: Link jumps into the bed"
     ],
     "music 31": [
-      "Indoor map $16",
-      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $16"
+      "Southern Face Shrine",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $16, the shrine with the mural"
     ],
     "music 32": [
-      "Track $20",
-      "not requested directly"
+      "Full Moon Cello",
+      "Instrument_StartMusic: InstrumentMusicTracks entry 0 (the instrument of dungeon 1 plays its part of the Wind Fish's melody)"
     ],
     "music 33": [
       "Side-scrolling rooms",
       "SelectAreaMusic: side-view rooms of maps below $0A"
     ],
     "music 34": [
-      "Track $22",
-      "requested in bank $06"
+      "The owl",
+      "OwlEventWait: while the owl speaks (OwlEventFlyAway puts the area music back)"
     ],
     "music 35": [
       "Nightmare",
       "NightmareIntroCueMusic"
     ],
     "music 36": [
-      "Track $24",
-      "not requested directly"
+      "Dream Shrine",
+      "EntityInit_DreamShrineBed: room music of the room with the bed"
     ],
     "music 37": [
       "Heart container fanfare",
@@ -258,36 +266,36 @@
       "Collect_PieceOfPower"
     ],
     "music 40": [
-      "Track $28",
-      "not requested directly"
+      "Conch Horn",
+      "Instrument_StartMusic: InstrumentMusicTracks entry 1 (the instrument of dungeon 2 plays its part of the Wind Fish's melody)"
     ],
     "music 41": [
-      "Track $29",
-      "not requested directly"
+      "Sea Lily's Bell",
+      "Instrument_StartMusic: InstrumentMusicTracks entry 2 (the instrument of dungeon 3 plays its part of the Wind Fish's melody)"
     ],
     "music 42": [
-      "Track $2A",
-      "not requested directly"
+      "Surf Harp",
+      "Instrument_StartMusic: InstrumentMusicTracks entry 3 (the instrument of dungeon 4 plays its part of the Wind Fish's melody)"
     ],
     "music 43": [
-      "Track $2B",
-      "not requested directly"
+      "Wind Marimba",
+      "Instrument_StartMusic: InstrumentMusicTracks entry 4 (the instrument of dungeon 5 plays its part of the Wind Fish's melody)"
     ],
     "music 44": [
-      "Track $2C",
-      "not requested directly"
+      "Coral Triangle",
+      "Instrument_StartMusic: InstrumentMusicTracks entry 5 (the instrument of dungeon 6 plays its part of the Wind Fish's melody)"
     ],
     "music 45": [
-      "Track $2D",
-      "not requested directly"
+      "Organ of Evening Calm",
+      "Instrument_StartMusic: InstrumentMusicTracks entry 6 (the instrument of dungeon 7 plays its part of the Wind Fish's melody)"
     ],
     "music 46": [
-      "Track $2E",
-      "not requested directly"
+      "Thunder Drum",
+      "Instrument_StartMusic: InstrumentMusicTracks entry 7 (the instrument of dungeon 8 plays its part of the Wind Fish's melody)"
     ],
     "music 47": [
-      "Marin",
-      "EntityInit_Marin, WalrusAskMarin"
+      "Marin sings",
+      "EntityInit_Marin (Animal Village), WalrusAskMarin"
     ],
     "music 48": [
       "Manbo's mambo",
@@ -298,12 +306,12 @@
       "Sword_Hold, MarinFollowHandler: track $05 without its first pattern"
     ],
     "music 50": [
-      "Track $32",
-      "not requested directly"
+      "Mr. Write's house",
+      "EntityInit_MrWrite: entity $76 in room $A8 (once Link has a sword)"
     ],
     "music 51": [
-      "Track $33",
-      "not requested directly"
+      "Telephone booth",
+      "EntityInit_Telephone (once Link has a sword)"
     ],
     "music 52": [
       "Tarin and the honeycomb",
@@ -318,35 +326,35 @@
       "Kiki_Eat"
     ],
     "music 55": [
-      "Track $37",
-      "not requested directly"
+      "Christine's house",
+      "EntityInit_MrWrite: entity $76 (Christine) in room $D9 (once Link has a sword)"
     ],
     "music 56": [
-      "Track $38",
-      "not requested directly"
+      "Wave-channel tune, unused",
+      "not requested by any code; only the wave channel plays (13 s, no loop)"
     ],
     "music 57": [
       "Turtle Rock wakes",
       "TurtleRockWake"
     ],
     "music 58": [
-      "Track $3A",
-      "not requested directly"
+      "Fisherman under the bridge",
+      "EntityInit_FishermanUnderBridge"
     ],
     "music 59": [
-      "Track $3B",
-      "not requested directly"
+      "Short rising jingle, unused",
+      "not requested by any code; four rising notes (1.5 s)"
     ],
     "music 60": [
-      "Track $3C",
-      "not requested directly"
+      "Song with a drum beat, unused",
+      "not requested by any code; a short intro, then a loop with bass and drums"
     ],
     "music 61": [
-      "Ending: the sky",
-      "SkyViewInit"
+      "Ending theme and staff credits",
+      "SkyViewInit: plays on through the sea scenes and the staff credits"
     ],
     "music 62": [
-      "Indoor map $15",
+      "Moblins' hideout",
       "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $15"
     ],
     "music 63": [
@@ -354,39 +362,39 @@
       "EndingSpawnInstruments"
     ],
     "music 64": [
-      "Track $40",
-      "not requested directly"
+      "Richard's villa",
+      "EntityInit_Richard (once Link has a sword)"
     ],
     "music 65": [
-      "Track $41",
-      "not requested directly"
+      "The egg: Ballad with 2 instruments",
+      "EggSongPlayInstruments: at the egg, after the Ballad of the Wind Fish on the ocarina, $41 plus the number of instruments of dungeons 3-8 Link has in a row; this one: instruments 1-2"
     ],
     "music 66": [
-      "Track $42",
-      "not requested directly"
+      "The egg: Ballad with 3 instruments",
+      "EggSongPlayInstruments: at the egg, after the Ballad of the Wind Fish on the ocarina, $41 plus the number of instruments of dungeons 3-8 Link has in a row; this one: instruments 1-3"
     ],
     "music 67": [
-      "Track $43",
-      "not requested directly"
+      "The egg: Ballad with 4 instruments",
+      "EggSongPlayInstruments: at the egg, after the Ballad of the Wind Fish on the ocarina, $41 plus the number of instruments of dungeons 3-8 Link has in a row; this one: instruments 1-4"
     ],
     "music 68": [
-      "Track $44",
-      "not requested directly"
+      "The egg: Ballad with 5 instruments",
+      "EggSongPlayInstruments: at the egg, after the Ballad of the Wind Fish on the ocarina, $41 plus the number of instruments of dungeons 3-8 Link has in a row; this one: instruments 1-5"
     ],
     "music 69": [
-      "Track $45",
-      "not requested directly"
+      "The egg: Ballad with 6 instruments",
+      "EggSongPlayInstruments: at the egg, after the Ballad of the Wind Fish on the ocarina, $41 plus the number of instruments of dungeons 3-8 Link has in a row; this one: instruments 1-6"
     ],
     "music 70": [
-      "Track $46",
-      "not requested directly"
+      "The egg: Ballad with 7 instruments",
+      "EggSongPlayInstruments: at the egg, after the Ballad of the Wind Fish on the ocarina, $41 plus the number of instruments of dungeons 3-8 Link has in a row; this one: instruments 1-7"
     ],
     "music 71": [
-      "Track $47",
-      "not requested directly"
+      "The egg: Ballad with all eight instruments",
+      "EggSongPlayInstruments: at the egg, after the Ballad of the Wind Fish on the ocarina, $41 plus the number of instruments of dungeons 3-8 Link has in a row; this one: all eight"
     ],
     "music 72": [
-      "Indoor map $1E",
+      "Indoor map $1E (the ghost's house)",
       "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $1E"
     ],
     "music 73": [
@@ -394,16 +402,16 @@
       "SelectAreaMusic while a piece of power or acorn works; Collect_PieceOfPower"
     ],
     "music 74": [
-      "Track $4A",
-      "not requested directly"
+      "Ballad of the Wind Fish, unused arrangement",
+      "not requested by any code; built from patterns of tracks $43 and $2F"
     ],
     "music 75": [
       "Dungeon 5",
       "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $04"
     ],
     "music 76": [
-      "Track $4C",
-      "requested in bank $07"
+      "Angler's Tunnel opens",
+      "AnglerTunnelOpening_Music"
     ],
     "music 77": [
       "Marin at the beach",
@@ -414,24 +422,24 @@
       "MarinBeachAnswer"
     ],
     "music 79": [
-      "Track $4F",
-      "not requested directly"
+      "Short fragment, unused",
+      "not requested by any code; 1.6 s of pattern pieces shared with other songs"
     ],
     "music 80": [
-      "Boss",
-      "LanmolaHandler and other bosses (hDefaultMusicTrack)"
+      "Mini-boss battle",
+      "StartBossMusic: entities with option bit 2 (the mini-bosses, the Moblin chief); LanmolaHandler; NightmareDethIFight (the final Nightmare's last form)"
     ],
     "music 81": [
-      "Track $51",
-      "not requested directly"
+      "Kanalet Castle (copy)",
+      "not requested by any code; its SongTable_1E entry is the song of track $13"
     ],
     "music 82": [
-      "Track $52",
-      "not requested directly"
+      "Dungeon 1 (copy)",
+      "not requested by any code; its SongTable_1E entry is the song of track $14"
     ],
     "music 83": [
-      "Indoor map $13",
-      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $13"
+      "Dream Shrine: the dream",
+      "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $13, the Dream Shrine (the bed room plays $24)"
     ],
     "music 84": [
       "Evil Eagle",
@@ -442,8 +450,8 @@
       "RoosterGraveWaitForSong"
     ],
     "music 86": [
-      "Track $56",
-      "requested in bank $19"
+      "Seashell Mansion: the sword",
+      "MansionCheckReward: 20 seashells, the hidden passage opens"
     ],
     "music 87": [
       "The rooster indoors",
@@ -454,8 +462,8 @@
       "SelectAreaMusic, IndoorMusicTracks (by hMapId): map $05"
     ],
     "music 89": [
-      "Credits",
-      "CreditsSetUp; wave effect $1F requests it after the Wind Fish scene"
+      "Ending: the Wind Fish",
+      "CreditsSetUp: the ending on the mountain (the owl, the Wind Fish rising); wave effect $1F requests it again"
     ],
     "music 90": [
       "Dungeon 8",
@@ -474,16 +482,16 @@
       "NightmareIntroStart"
     ],
     "music 94": [
-      "Track $5E",
-      "StunEntity, banks $05 and $15"
+      "Boss's last words",
+      "StunEntity (bosses $5A, $62, $63 beaten), DrawSlimeEelBody, NightmareDethIFight"
     ],
     "music 95": [
-      "Track $5F",
-      "not requested directly"
+      "The final Nightmare dies",
+      "NightmareDethIDefeated"
     ],
     "music 96": [
-      "Name entry",
-      "FileNewNameEntry"
+      "ZELDA name tune (Totaka's Song)",
+      "FileNewNameEntry: the new file is named ZELDA"
     ],
     "jingle 1": [
       "Gift chord",

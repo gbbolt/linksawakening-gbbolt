@@ -134,8 +134,9 @@ BowWowEntityHandler::
 ;@ def BowWowDispatch(slot: bc)
 ;@ path: npc/bowwow
 ;@ Runs BowWow's stage from wEntityPrivate4: 0 = set up the chain once, 1 = normal behaviour.
-;@ test: slot = rand(0, 15)
+;@ test: slot = rand(0, 15); mem[wEntityPrivate4 + slot] = rand(0, 1)
 ;@ test: wCurrentBank = $05
+;@ test: hActiveEntityState = rand(0, 4)
 BowWowDispatch::
 ;> BowWowStages[wEntityPrivate4[slot]](slot)
 	ld hl, wEntityPrivate4
@@ -211,6 +212,8 @@ BowWowInit::
 ;@ text $16C opens and it starts following him. Then the hop physics (height falls 2 per frame,
 ;@ hMultiPurposeG is used as a "just landed" flag) and the state from BowWowStates.
 ;@ test: slot = rand(0, 15)
+;@ test: hActiveEntityState = rand(0, 4)
+;@ test: wCurrentBank = $05
 BowWowMain::
 ;> if wIsBowWowFollowingLink != 0:
 	ld a, [wIsBowWowFollowingLink]
@@ -668,27 +671,27 @@ DrawBowWowChain::
 ;@ test: slot = rand(0, 15)
 ;@ test: wCurrentBank = $05
 BowWowLookForFood::
-;> if wIsBowWowFollowingLink == 0x80:
+;> if wIsBowWowFollowingLink != 0x80:        # still on its chain: look for something to eat
 	ld a, [wIsBowWowFollowingLink]
 	cp $80
 	jp z, .wait
 
-;>@wait     wEntityTimer[slot] = 0x10
-;>@wait     return
-;> if GetRandomByte() & 1 == 0:
+
+
+;>     if GetRandomByte() & 1 == 0:
 	call GetRandomByte
 	ld d, b
 	and $01
 	jr nz, .loop
 
-;>     other, step, end = 0x0F, -1, 0xFF  # search downwards
+;>         other = 0x0F; hMultiPurpose0 = 0xFF; hMultiPurpose1 = 0xFF   # search downwards (the step in hMultiPurpose0, the end in hMultiPurpose1)
 	ld e, $0f
 	ld a, $ff
 	ldh [hMultiPurpose0], a
 	jr .loop2
 
-;> else:
-;>     other, step, end = 0, 1, 0x10      # search upwards
+;>     else:
+;>         other = 0; hMultiPurpose0 = 1; hMultiPurpose1 = 0x10       # search upwards
 .loop
 	ld e, $00
 	ld a, $01
@@ -698,15 +701,15 @@ BowWowLookForFood::
 .loop2
 	ldh [hMultiPurpose1], a
 
-;>@search while other != end:
-;>     if other == slot:
+;>@search     while other != hMultiPurpose1:
+;>         if other == slot:
 .checkEntityStatus
 	ld a, e
 	cp c
-;>         pass
+;>             pass
 	jr z, .search
 
-;>     elif wEntityStatus[other] in (0, 1):   # free slot or dying
+;>         elif wEntityStatus[other] in (0, 1):   # free slot or dying
 	ld hl, wEntityStatus
 	add hl, de
 	ld a, [hl]
@@ -714,86 +717,88 @@ BowWowLookForFood::
 	jr z, .search
 
 	cp $01
-;>         pass
+;>             pass
 	jr z, .search
 
-;>     elif wEntitySpriteVariant[other] == 1:
+;>         elif wEntitySpriteVariant[other] == 1:
 	ld hl, wEntitySpriteVariant
 	add hl, de
 	ld a, [hl]
 	dec a
-;>         pass
+;>             pass
 	jr z, .search
 
-;>     elif GetEntityTypeByte14(wEntityType[other]) == 0:   # not something BowWow eats
+;>         elif GetEntityTypeByte14(wEntityType[other]) == 0:   # not something BowWow eats
 	push de
 	ld hl, wEntityType
 	add hl, de
 	ld e, [hl]
 	call GetEntityTypeByte14
 	pop de
-;>         pass
+;>             pass
 	and a
 	jr z, .search
 
-;>     elif (hLinkX - wEntityX[other] + 0x2F) & 0xFF >= 0x5E:   # too far from Link
+;>         elif (hLinkX - wEntityX[other] + 0x2F) & 0xFF >= 0x5E:   # too far from Link
 	ld hl, wEntityX
 	add hl, de
 	ldh a, [hLinkX]
 	sub [hl]
 	add $2f
 	cp $5e
-;>         pass
+;>             pass
 	jr nc, .search
 
-;>     elif (hLinkY - wEntityY[other] + 0x2F) & 0xFF >= 0x5E:
+;>         elif (hLinkY - wEntityY[other] + 0x2F) & 0xFF >= 0x5E:
 	ld hl, wEntityY
 	add hl, de
 	ldh a, [hLinkY]
 	sub [hl]
 	add $2f
 	cp $5e
-;>         pass
+;>             pass
 	jr nc, .search
 
-;>     else:
-;>         wBowWowTargetSlot = other
+;>         else:
+;>             wBowWowTargetSlot = other
 	ld a, e
 	ld [wBowWowTargetSlot], a
-;>         link_x, link_y = hLinkX, hLinkY
+;>             link_x, link_y = hLinkX, hLinkY
 	ldh a, [hLinkY]
 	push af
 	ldh a, [hLinkX]
 	push af
-;>         hLinkY = wEntityY[other]       # aim at the target as if it were Link
+;>             hLinkY = wEntityY[other]       # aim at the target as if it were Link
 	ld a, [hl]
 	ldh [hLinkY], a
-;>         hLinkX = wEntityX[other]
+;>             hLinkX = wEntityX[other]
 	ld hl, wEntityX
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkX], a
-;>         SetEntitySpeedTowardsLink(slot, 0x30)                # speed $30 towards it
+;>             SetEntitySpeedTowardsLink(slot, 0x30)                # speed $30 towards it
 	ld a, $30
 	call SetEntitySpeedTowardsLink
-;>         hLinkX = link_x
+;>             hLinkX = link_x
 	pop af
 	ldh [hLinkX], a
-;>         hLinkY = link_y
+;>             hLinkY = link_y
 	pop af
 	ldh [hLinkY], a
-;>         wEntitySpeedZ[slot] = 0x10
+;>             wEntitySpeedZ[slot] = 0x10
 	ld hl, wEntitySpeedZ
 	add hl, bc
 	ld [hl], $10
-;>         wEntityState[slot] = 4
+;>             wEntityState[slot] = 4
 	call IncrementEntityState
 	ld [hl], $04
-;>         return
+;>             return
 	ret
 
 
-;>     other = (other + step) & 0xFF
+;>         other = u8(other + hMultiPurpose0)
+;>@wait wEntityTimer[slot] = 0x10                 # nothing found (or led by Link): wait
+;>@wait return
 .search
 	ld hl, hMultiPurpose0
 	ld a, e
@@ -1666,6 +1671,7 @@ CuccoIdleState::
 ;@ wEntityTimer has run out at a landing; then it stands for $30 frames (state 0). Walks with
 ;@ variants 0/1 every 8 frames.
 ;@ test: slot = rand(0, 15)
+;@ test: wCurrentBank = $05
 CuccoHopState::
 ;> UpdateEntityPosWithSpeed_05(slot)
 	call UpdateEntityPosWithSpeed_05
@@ -1730,6 +1736,7 @@ CuccoRevengeSpawnY::
 ;@ revenge cucco (another type $6C in state 3) at a random screen-edge point, flying at Link with
 ;@ speed $18.
 ;@ test: slot = rand(0, 15)
+;@ test: wCurrentBank = $05
 CuccoAngryState::
 ;> z = wEntityZ[slot]
 	ld hl, wEntityZ
@@ -1770,7 +1777,7 @@ CuccoAngryState::
 	rra
 	and $01
 	call SetEntitySpriteVariant
-;> wEntityDirection[slot] = EntityLinkDiffX_05(slot) ^ 1     # face away from Link
+;> wEntityDirection[slot] = EntityLinkDiffX_05(slot)[1] ^ 1     # face away from Link
 	call EntityLinkDiffX_05
 	ld hl, wEntityDirection
 	add hl, bc
@@ -1916,7 +1923,7 @@ WitchSprites::
 ;@ path: npc/witch
 ;@ Draws the witch: the 4 sprites of her current variant in WitchSprites.
 DrawWitch::
-;>@draw DrawEntitySprites(4, WitchSprites + 16 * hActiveEntitySpriteVariant)
+;>@draw DrawEntitySprites(WitchSprites + 16 * hActiveEntitySpriteVariant, 4)
 	ldh a, [hActiveEntitySpriteVariant]
 	rla
 	rla
@@ -1979,94 +1986,76 @@ WitchStates::
 ;@ test: slot = rand(0, 15)
 ;@ test: wCurrentBank = $05
 WitchWaitForToadstoolState::
+;>@ho def hand_over(item):                    # the toadstool leaves its item slot; she starts brewing
+;>@ho1     mem[item] = 0
+;>@ho2     wHasToadstool = 0
+;>@ho3     wEntityTimer[slot] = 4
+;>@ho4     return IncrementEntityState(slot)
 ;> if wDialogState:
+;>     return
 	ld a, [wDialogState]
 	and a
-;>     return
 	jr nz, .return
-
 ;> if wHasToadstool:
 	ld a, [wHasToadstool]
 	and a
 	jr z, .talk
-
-;>     talk, in_front = ShouldLinkTalkToEntity_05(slot)
+;>     ShouldLinkTalkToEntity_05(slot)
 	call ShouldLinkTalkToEntity_05
-;>     if not in_front:
+;>     if not (u8(hLinkY - hActiveEntityY + 0x14) < 0x28 and u8(hLinkX - hActiveEntityX + 0x10) < 0x20):
+;>         return                              # (e = 0 from the call: Link does not stand by her)
 	ld a, e
 	and a
-;>         return
 	jr z, .return
-
-;>     if wItemB == 0x0C:                  # toadstool on B
+;>     if wItemB == 0x0C:                      # toadstool on B
 	ld hl, wItemB
 	ld a, [hl]
 	cp $0c
 	jr nz, .checkJoypadPressed
-
-;>         if hJoypadPressed & 0x20 == 0:
+;>         if not hJoypadPressed & 0x20: return
 	ldh a, [hJoypadPressed]
 	and $20
-;>             return
 	jr z, .return
-
 ;>         wLinkShowItemPose = 0
 	xor a
 	ld [wLinkShowItemPose], a
 ;>         wLinkShowItemPoseActive = 0
 	ld [wLinkShowItemPoseActive], a
-;>@give         wItemB = 0
+;>         return hand_over(addr(wItemB))
 	jr .give
-
-;>     elif wItemA == 0x0C:                # toadstool on A
 .checkJoypadPressed
+;>     if wItemA == 0x0C:                      # toadstool on A
 	inc hl
 	ld a, [hl]
 	cp $0c
 	jr nz, .talk
-
-;>         if hJoypadPressed & 0x10 == 0:
+;>         if not hJoypadPressed & 0x10: return
 	ldh a, [hJoypadPressed]
 	and $10
-;>             return
 	ret z
-
-;>@give         wItemA = 0
+;>         return hand_over(addr(wItemA))
 .give
-;=@give
+;=@ho
+;=@ho1
 	ld [hl], b
 	jr .talk2
-
-;>@talk     else:
-;>@talk         if ShouldLinkTalkToEntity_05(slot):
-;>@talk             OpenDialog(0x0C)        # text $00C
-;>@talk         return
-;>@talk     wHasToadstool = 0
-;>@talk     wEntityTimer[slot] = 4
-;>@talk     wEntityState[slot] += 1
-;>@talk     return
-;> elif ShouldLinkTalkToEntity_05(slot):
 .talk
-;=@talk
+;> if ShouldLinkTalkToEntity_05(slot):
 	call ShouldLinkTalkToEntity_05
 	ret nc
-
-;>     OpenDialog(0x0C)                    # text $00C
+;>     OpenDialog(0x0C)                        # text $00C
 	ld a, $0c
 	call OpenDialog
-
 .return
 	ret
-
-
 .talk2
-;=@talk
+;=@ho2
 	xor a
 	ld [wHasToadstool], a
-;=@talk
+;=@ho3
 	call GetEntityTimer
 	ld [hl], $04
-;=@talk
+;=@ho4
 	jp IncrementEntityState
 
 
@@ -2149,7 +2138,7 @@ WitchBrewingState::
 ;@ path: npc/witch
 ;@ State 3, after the text: Link holds up the magic powder (pose 3 for $2A frames), gets the powder
 ;@ item ($0C) and 20 doses, with a jingle; state 4.
-;@ test: slot = rand(0, 15)
+;@ test: slot = rand(0, 15); wMagicPowderCount = to_bcd(rand(0, 99))
 ;@ test: wCurrentBank = $05
 WitchGivePowderState::
 ;> if wDialogState:
@@ -2167,7 +2156,7 @@ WitchGivePowderState::
 ;> GiveInventoryItem_05(0x0C)             # magic powder
 	ld d, $0c
 	call GiveInventoryItem_05
-;> wMagicPowderCount = bcd_add(wMagicPowderCount, 0x20)
+;> wMagicPowderCount = to_bcd((bcd_to_int(wMagicPowderCount) + 20) % 100)   # +20 in BCD
 	ld a, [wMagicPowderCount]
 	add $20
 	daa
@@ -2180,6 +2169,7 @@ WitchGivePowderState::
 	ldh [hJingle], a
 ;> wEntityState[slot] += 1
 	call IncrementEntityState
+;> return WitchDoneState(slot)    # (runs on into it)
 
 ;@ def WitchDoneState(slot: bc)
 ;@ path: npc/witch
@@ -2250,7 +2240,7 @@ TarinEntityHandler::
 ;>         sprites = TarinEndingSprites2
 	ld hl, TarinEndingSprites2
 
-;>     DrawEntitySprites(4, sprites)
+;>     DrawEntitySprites(sprites, 4)
 .checkEntityPrivateCounter
 	ld c, $04
 	call DrawEntitySprites
@@ -2668,7 +2658,7 @@ RaccoonSpinState::
 ;@ path: npc/tarin
 ;@ Makes the slot's speed in the given speed table 1 faster in its direction (0 counts as positive),
 ;@ until it reaches $30 / -$30.
-;@ test: slot = rand(0, 15)
+;@ test: slot = rand(0, 15); table = rand_ram(16)
 ;@ test: wCurrentBank = $05
 RaccoonSpeedUpAxis::
 ;> speed = mem[table + slot]
@@ -2738,13 +2728,13 @@ TarinFallState::
 	call GetEntityDirectionToLink_05
 	add $08
 	call SetEntitySpriteVariant
-;>     if (EntityLinkDiffX_05(slot) + 0x12) & 0xFF < 0x24:
+;>     if (EntityLinkDiffX_05(slot)[0] + 0x12) & 0xFF < 0x24:
 	call EntityLinkDiffX_05
 	add $12
 	cp $24
 	jr nc, .incrementEntityState
 
-;>         if (EntityLinkDiffY_05(slot) + 0x12) & 0xFF < 0x24:
+;>         if (EntityLinkDiffY_05(slot)[0] + 0x12) & 0xFF < 0x24:
 	call EntityLinkDiffY_05
 	add $12
 	cp $24
@@ -3492,13 +3482,13 @@ MarinEntityHandler::
 	ld hl, wEntityDirection
 	add hl, bc
 	ld [hl], $03
-;>         if (EntityLinkDiffX_05(slot) + 0x14) & 0xFF < 0x28:
+;>         if (EntityLinkDiffX_05(slot)[0] + 0x14) & 0xFF < 0x28:
 	call EntityLinkDiffX_05
 	add $14
 	cp $28
 	jr nc, .animateNpcFacing
 
-;>             if (EntityLinkDiffY_05(slot) + 0x14) & 0xFF < 0x28:
+;>             if (EntityLinkDiffY_05(slot)[0] + 0x14) & 0xFF < 0x28:
 	call EntityLinkDiffY_05
 	add $14
 	cp $28
@@ -4525,7 +4515,7 @@ GiveInventoryItem_05::
 	ld hl, wItemB
 	ld e, $0c
 
-;>     if wItemB[i] == item:             # already there
+;>     if mem[addr(wItemB) + i] == item:             # already there
 .loop
 	ld a, [hli]
 	cp d
@@ -4539,13 +4529,13 @@ GiveInventoryItem_05::
 ;>@free for i in range(12):
 	ld hl, wItemB
 
-;>     if wItemB[i] == 0:
+;>     if mem[addr(wItemB) + i] == 0:
 .setItemB
 	ld a, [hl]
 	and a
 	jr nz, .free
 
-;>         wItemB[i] = item
+;>         mem[addr(wItemB) + i] = item
 	ld [hl], d
 ;>         return
 	ret
@@ -4847,13 +4837,13 @@ RaftStates::
 ;@ test: slot = rand(0, 15)
 ;@ test: wCurrentBank = $05
 RaftWaitState::
-;> if (EntityLinkDiffX_05(slot) + 8) & 0xFF < 0x10:
+;> if (EntityLinkDiffX_05(slot)[0] + 8) & 0xFF < 0x10:
 	call EntityLinkDiffX_05
 	add $08
 	cp $10
 	jr nc, .next
 
-;>     if (EntityLinkDiffY_05(slot) + 9) & 0xFF < 0x12:
+;>     if (EntityLinkDiffY_05(slot)[0] + 9) & 0xFF < 0x12:
 	call EntityLinkDiffY_05
 	add $09
 	cp $12
@@ -5135,6 +5125,7 @@ AnglerRoomHelperEntityHandler::
 ;@ wEntityPrivate3: 0 the fish, 1 a falling rock, 2 a bubble, 3 an angler fry.
 ;@ test: slot = rand(0, 15)
 ;@ test: wCurrentBank = $05
+;@ test: mem[wEntityPrivate3 + slot] = rand(0, 3)
 AnglerFishEntityHandler::
 ;> AnglerFishParts[wEntityPrivate3[slot]](slot)
 	ld hl, wEntityPrivate3
@@ -5722,7 +5713,7 @@ DrawAnglerFish::
 ;>     sprites = AnglerFishSpritesB
 	ld hl, AnglerFishSpritesB
 
-;> DrawEntitySprites(19, sprites + offset)
+;> DrawEntitySprites(sprites + offset, 19)
 .reserveOAMEntriesFar
 	add hl, de
 	ld c, $13
@@ -6061,6 +6052,7 @@ EvilEagleSpawnOffsetX::
 ;@ feather shot by the eagle.
 ;@ test: slot = rand(0, 15)
 ;@ test: wCurrentBank = $05
+;@ test: mem[wEntityPrivate1 + slot] = rand(0, 3)
 EvilEagleEntityHandler::
 ;> EvilEagleParts[wEntityPrivate1[slot]](slot)
 	ld hl, wEntityPrivate1
@@ -6079,10 +6071,10 @@ EvilEagleParts::
 ;@ def GrimCreeper(slot: bc)
 ;@ path: boss/evil_eagle
 ;@ The Grim Creeper on the tower top: runs his state.
-;@ test: slot = rand(0, 15)
+;@ test: slot = rand(0, 15); hActiveEntityState = rand(0, 4)
 ;@ test: wCurrentBank = $05
 GrimCreeper::
-;> GrimCreeperStates[hActiveEntityState](slot)
+;> (GrimCreeperArriveState, GrimCreeperCallEagleState, GrimCreeperWaitState, GrimCreeperFallState, GrimCreeperGoneState)[hActiveEntityState](slot)   # GrimCreeperStates
 	ldh a, [hActiveEntityState]
 	rst $00
 
@@ -6091,7 +6083,7 @@ GrimCreeper::
 ;@ The Grim Creeper's states (wEntityState): 0 arriving with his bats, 1 calling the eagle, 2 waiting,
 ;@ 3 blown off the tower (falling), 4 gone. States 3 and 4 are set by the Evil Eagle. The `ret` after
 ;@ the table is the early exit of GrimCreeperArriveState.
-;@ test: slot = rand(0, 15)
+;@ test: skip a jump table: its only code is the `ret` that GrimCreeperArriveState jumps to
 ;@ test: wCurrentBank = $05
 GrimCreeperStates::
 	dw GrimCreeperArriveState
@@ -6509,7 +6501,8 @@ EvilEagleScreech::
 
 
 .setEntityState
-;> # second pass of the Evil Eagle's turn (EvilEagleTurnState)
+;> return
+;> # (not reached from here: the second pass of EvilEagleTurnState)
 ;> wEntityState[slot] += 1
 	call IncrementEntityState
 ;> wEntityTimer[slot] = 0x30
@@ -7006,7 +6999,7 @@ EvilEagleSwoopState::
 ;@ def SlowSpeedTowardsZero_05(table: hl, slot: bc)
 ;@ path: entity/movement
 ;@ Moves the slot's value in the given speed table 1 towards 0 (leaves hl on it).
-;@ test: slot = rand(0, 15)
+;@ test: slot = rand(0, 15); table = rand_ram(16)
 ;@ test: wCurrentBank = $05
 SlowSpeedTowardsZero_05::
 ;> speed = mem[table + slot]
@@ -7033,7 +7026,8 @@ SlowSpeedTowardsZero_05::
 
 
 .setEntityState
-;> # the swoop has braked: the Evil Eagle blows (EvilEagleSwoopState)
+;> return
+;> # (not reached from here: the end of EvilEagleSwoopState once the swoop has braked)
 ;> wEntityState[slot] += 1
 	call IncrementEntityState
 ;> wEntityTimer[slot] = 0xFF
@@ -7157,28 +7151,29 @@ EvilEagleBlowState::
 	add hl, de
 	ld a, [hl]
 	ldh [hLinkSpeedX], a
-;>     ApplyLinkSpeedX()
+;>     ApplyLinkSpeedX(hLinkSpeedX)
 	push bc
 	call ApplyLinkSpeedX
 ;>     CheckLinkLeavesRoomFar()                       # his collisions
 	call CheckLinkLeavesRoomFar
 	pop bc
 
-;> wSongShowTimer = (wSongShowTimer + 1) & 0xFF       # here the wind noise counter
+;> n = lo(wSongShowTimer) + 1                         # wSongShowTimer's low byte: here the wind noise counter
 .checkSongShowTimer
 	ld a, [wSongShowTimer]
 	inc a
-;> if wSongShowTimer >= 0x22:
+;> if n >= 0x22:
 	cp $22
 	jr c, .checkGetEntityTimer
 
 ;>     hNoiseSfx = 0x32                  # wind
 	ld a, $32
 	ldh [hNoiseSfx], a
-;>     wSongShowTimer = 0
+;>     n = 0
 	xor a
 
 .checkGetEntityTimer
+;> mem[addr(wSongShowTimer)] = n
 	ld [wSongShowTimer], a
 ;> if GetEntityTimer(slot) < 0xC0 and hFrameCounter & 0x0F == 0:
 	call GetEntityTimer
@@ -7274,7 +7269,8 @@ EvilEagleBlowState::
 
 
 .setEntityState
-;> # the gust is over
+;> return
+;> # (below, jumped to from the top: the gust is over)
 ;> wEntityState[slot] += 1
 	call IncrementEntityState
 ;> wEntityTimer[slot] = 0x50
@@ -7687,7 +7683,7 @@ DrawEvilEagle::
 ;>     sprites = EvilEagleSpritesRight
 	ld hl, EvilEagleSpritesRight
 
-;>@v48 DrawEntitySprites(12, sprites + 48 * v)
+;>@v48 DrawEntitySprites(sprites + 48 * v, 12)
 .drawEntitySprites
 	ld e, a
 	ld d, b
@@ -7811,7 +7807,7 @@ BatHoverState::
 ;@ path: boss/evil_eagle
 ;@ Every 4th frame (counting from phase) moves the position byte 1 pixel; the direction flips every 16
 ;@ frames, and the two bats (slot parity) move opposite ways.
-;@ test: slot = rand(0, 15)
+;@ test: slot = rand(0, 15); pos = rand_ram(1)
 ;@ test: wCurrentBank = $05
 BatJitter::
 ;> t = (hFrameCounter + phase) & 0xFF
@@ -7918,6 +7914,7 @@ EvilEagleFeatherStates::
 ;@ State 0: hurts Link when it touches him; when it hits a wall it bounces up (y speed -$20, the
 ;@ upside-down picture, state 1). Its y speed falls by 1 a frame (it curves upwards).
 ;@ test: slot = rand(0, 15)
+;@ test: wCurrentBank = $05
 FeatherFlyState::
 ;> EntityCheckTouchLink(slot)                            # touches Link
 	call EntityCheckTouchLink
@@ -8502,7 +8499,7 @@ HotHeadShellState::
 ;@ def NegateEntityValue_05(table: hl, slot: bc)
 ;@ path: entity/movement
 ;@ Negates the slot's value in the given table (reverses a speed), then runs on into HotHeadTrail.
-;@ test: slot = rand(0, 15)
+;@ test: slot = rand(0, 15); table = rand_ram(16)
 ;@ test: wCurrentBank = $05
 NegateEntityValue_05::
 ;> mem[table + slot] = -mem[table + slot] & 0xFF
@@ -8924,7 +8921,7 @@ DrawHotHead::
 	rla
 	rla
 	and $e0
-;> DrawEntitySprites(8, HotHeadSprites + e)
+;> DrawEntitySprites(HotHeadSprites + e, 8)
 	ld e, a
 	ld d, b
 	ld hl, HotHeadSprites
@@ -8966,7 +8963,7 @@ DrawHotHeadShadow::
 ;> hActiveEntitySpriteVariant = 0
 	xor a
 	ldh [hActiveEntitySpriteVariant], a
-;> DrawEntitySprites(4, HotHeadShadowSprites)
+;> DrawEntitySprites(HotHeadShadowSprites, 4)
 	ld hl, HotHeadShadowSprites
 	ld c, $04
 	call DrawEntitySprites
@@ -9000,7 +8997,7 @@ DrawHotHeadSmall::
 	rla
 	rla
 	and $f0
-;> DrawEntitySprites(4, HotHeadSmallSprites + e)
+;> DrawEntitySprites(HotHeadSmallSprites + e, 4)
 	ld e, a
 	ld d, b
 	ld hl, HotHeadSmallSprites
@@ -9955,7 +9952,7 @@ DrawDodongoWhole::
 	sla e
 	add e
 	ld e, a
-;>     DrawEntitySprites(10, sprites + e)
+;>     DrawEntitySprites(sprites + e, 10)
 	add hl, de
 	ld c, $0a
 	call DrawEntitySprites
@@ -9974,7 +9971,7 @@ DrawDodongoWhole::
 	rla
 	rla
 	and $f0
-;> DrawEntitySprites(4, DodongoShortSprites + e)
+;> DrawEntitySprites(DodongoShortSprites + e, 4)
 	ld e, a
 	ld d, b
 	ld hl, DodongoShortSprites
@@ -10019,6 +10016,7 @@ SlimeEelInit::
 ;@ of one of the 4 wall holes, 2 the eel pulled out of its hole, crawling around.
 ;@ test: slot = rand(0, 15)
 ;@ test: wCurrentBank = $05
+;@ test: mem[wEntityPrivate1 + slot] = rand(0, 2)
 SlimeEelEntityHandler::
 ;> ConfineLinkToArena()
 	call ConfineLinkToArena
@@ -10044,6 +10042,7 @@ SlimeEelParts::
 ;@ Part 0, the tail: remembers its slot in wEntityWorkRAM3[1] (for the other parts) and runs its state.
 ;@ test: slot = rand(0, 15)
 ;@ test: wCurrentBank = $05
+;@ test: hActiveEntityState = rand(0, 3)
 SlimeEelTail::
 ;> wEntityWorkRAM3[1] = slot
 	ld a, c
@@ -10212,11 +10211,12 @@ SlimeEelRiseState::
 	call SlimeEelPitColumn
 ;> SlimeEelPitColumn(p)                   # runs on into it
 
-;@ def SlimeEelPitColumn(p: hl)
+;@ def SlimeEelPitColumn(p: hl) -> hl
 ;@ path: boss/slime_eel
 ;@ Adds a draw command for the next background column (hBGAddrLow + 1): 4 tiles down, $76, $7E,
 ;@ $7E, $77, and ends the list after it. Returns the end of the command.
 ;@ test: wCurrentBank = $05
+;@ test: p = rand_ram(8)
 SlimeEelPitColumn::
 ;> mem[p] = hBGAddrHigh
 	ldh a, [hBGAddrHigh]
@@ -10274,11 +10274,12 @@ SlimeEelCrackFloor::
 	call SlimeEelCrackColumns
 ;> SlimeEelCrackColumns(p)                # runs on into it
 
-;@ def SlimeEelCrackColumns(p: hl)
+;@ def SlimeEelCrackColumns(p: hl) -> hl
 ;@ path: boss/slime_eel
 ;@ Adds draw commands for the next 2 background columns, 4 tiles down each: $1C, $1E, $1C, $1E and
 ;@ $1D, $1F, $1D, $1F; ends the list after them. Returns the end.
 ;@ test: wCurrentBank = $05
+;@ test: p = rand_ram(16)
 SlimeEelCrackColumns::
 ;> mem[p] = hBGAddrHigh
 	ldh a, [hBGAddrHigh]
@@ -11094,7 +11095,7 @@ DrawSlimeEelSegment::
 ;@ returns.
 ;@ test: wCurrentBank = $05
 SlimeEelStopSegments::
-;> return
+;> return_from_caller()                     # drops its return address: back to the caller's caller
 	pop de
 	ret
 
@@ -11196,7 +11197,7 @@ SlimeEelPeekState::
 ;>     frames = SlimeEelPeekFramesBottom
 	ld hl, SlimeEelPeekFramesBottom
 
-;> SetEntitySpriteVariant(slot, frames[step])
+;> SetEntitySpriteVariant(slot, mem[frames + step])
 .return
 	add hl, de
 	ld a, [hl]
@@ -11272,7 +11273,7 @@ SlimeEelLungeState::
 ;>     frames = SlimeEelLungeFramesBottom
 	ld hl, SlimeEelLungeFramesBottom
 
-;> f = frames[step]
+;> f = mem[frames + step]
 .setEntitySpriteVariant
 	add hl, de
 	ld a, [hl]
@@ -11769,6 +11770,7 @@ SpawnEvilEagleHeartContainer_05::
 ;@ noise $1A.
 ;@ test: slot = rand(0, 15)
 ;@ test: wCurrentBank = $05
+;@ test: new = rand(0, 15)
 PlaceHeartContainer_05::
 ;> wEntityY[new] = hMultiPurpose1
 	ldh a, [hMultiPurpose1]
@@ -11978,7 +11980,7 @@ DrawSlimeEelLoose::
 	rla
 	rla
 	and $e0
-;> DrawEntitySprites(8, SlimeEelHeadSprites + e)
+;> DrawEntitySprites(SlimeEelHeadSprites + e, 8)
 	ld e, a
 	ld d, b
 	ld hl, SlimeEelHeadSprites
@@ -12075,6 +12077,7 @@ SlimeEelSpeeds::
 ;@ turning direction); every 4 frames its heading (wEntityState) turns by wEntityPrivate2 (+1 or -1,
 ;@ chosen anew every $10-$2F frames) and its speed follows (SlimeEelSpeeds).
 ;@ test: slot = rand(0, 15)
+;@ test: wCurrentBank = $05
 SlimeEelWander::
 ;> UpdateEntityPosWithSpeed_05(slot)
 	call UpdateEntityPosWithSpeed_05
@@ -12253,7 +12256,7 @@ DrawSlimeEelHead::
 	rl d
 	and $e0
 	ld e, a
-;> DrawEntitySprites(8, SlimeEelHeadSprites + e)
+;> DrawEntitySprites(SlimeEelHeadSprites + e, 8)
 	ld hl, SlimeEelHeadSprites
 	add hl, de
 	ld c, $08
@@ -12698,7 +12701,7 @@ GetEntityDirectionToLink_05::
 ;> hMultiPurpose0 = ex
 	ld a, e
 	ldh [hMultiPurpose0], a
-;> adx = abs(dx)
+;> adx = u8(-dx) if dx & 0x80 else dx      # |dx|
 	ld a, d
 	bit 7, a
 	jr z, .setDy
@@ -12713,7 +12716,7 @@ GetEntityDirectionToLink_05::
 ;> hMultiPurpose1 = ey
 	ld a, e
 	ldh [hMultiPurpose1], a
-;> ady = abs(dy)
+;> ady = u8(-dy) if dy & 0x80 else dy
 	ld a, d
 	bit 7, a
 	jr z, .setE
@@ -12818,7 +12821,7 @@ GohmaEntityHandler::
 	add c
 	ld e, a
 	ld d, b
-;> DrawEntitySprites(6, GohmaSprites + e)
+;> DrawEntitySprites(GohmaSprites + e, 6)
 	ld hl, GohmaSprites
 	add hl, de
 	ld c, $06
@@ -13284,6 +13287,7 @@ GohmaLungeState::
 ;=@b
 	cp [hl]
 	jr c, GohmaAnimateLunge
+;> return GohmaEndLunge(slot)    # (runs on into it)
 
 ;@ def GohmaEndLunge(slot: bc)
 ;@ path: boss/gohma
@@ -13429,6 +13433,7 @@ GohmaEyeState::
 ;@ then EndBossFight_05.
 ;@ test: slot = rand(0, 15)
 ;@ test: wCurrentBank = $05
+;@ test: mem[wEntityPrivate2 + slot] = rand(0, 2)
 BossDefeatedHandler_05::
 ;> BossDefeatedStates_05[wEntityPrivate2[slot]](slot)
 	ld hl, wEntityPrivate2
@@ -13538,8 +13543,8 @@ EndBossFight_05::
 
 ;>     opts = wEntityOptions1[e]
 ;>@m     if opts & 0x80:                    # a boss
-;>@m         if hMapId < 5: return
-;>@m         return MarkBossRoomBeaten_05()
+;>@m         if hMapId >= 5: return            # (only the first dungeons mark the room)
+;>@m         return MarkBossRoomBeaten_05(slot)
 	ld hl, wEntityOptions1
 	add hl, de
 	ld a, [hl]
@@ -13582,16 +13587,17 @@ BossDefeated_Puffs_05::
 	ret
 
 
-;@ def MarkBossRoomBeaten_05()
+;@ def MarkBossRoomBeaten_05(slot: bc)
 ;@ path: boss/common
 ;@ Sets bit 5 of the current room's wRoomStatus entry: $D900 + room for dungeon maps below 6 and from
 ;@ $1A on, $DA00 + room for maps 6-$19.
 ;@ test: wCurrentBank = $05
+;@ test: slot = rand(0, 15)
 MarkBossRoomBeaten_05::
 ;> e = hMapRoom
 	ldh a, [hMapRoom]
 	ld e, a
-;> d = 0
+;> d = 0                                  # (b: the high byte of the slot, 0)
 	ld d, b
 ;> if 6 <= hMapId < 0x1A:
 	ldh a, [hMapId]

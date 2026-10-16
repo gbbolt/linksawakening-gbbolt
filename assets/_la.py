@@ -19,6 +19,9 @@ ROOM_OBJECTS = 0xD711           # the room's 10 x 8 objects, rows 16 bytes apart
 WORLD = 0x0B                    # wGameplayType of the world (playing)
 PLAYING = 0x07                  # its last step: the room is built and the game runs
 LINK_OAM = 12                   # OAM entries 0-11 hold Link and his items; the entities' sprites follow
+LOADED_ENTITY_TILESETS = 0xC193  # wLoadedEntityTilesets: the tile set in each of the 4 entity tile slots
+ENTITY_TILE_BANKS = (1, 0x11, 0x0E, 0x12)   # EntityTilesBanks by bits 6-7 of a set (bank 0 reads as bank 1)
+IS_SIDE_SCROLLING = 0xFFF9      # hIsSideScrolling: 2 in the side-view places
 
 
 def lin(bank, addr):
@@ -63,6 +66,13 @@ def load_room(m, indoor, map_id=0, room=0, pos=None, settle=6, limit=400, link=(
     Dungeons (maps $00-$0A) are entered by the room's position in the dungeon layout (pos).
     link: where Link enters (x, y in pixels)."""
     mem = m.mem
+    target = room
+    if indoor and pos is not None and map_id <= 0x0A:
+        target = m.rom[lin(0x14, 0x4200 + 64 * map_id + pos)]
+    g = group_of_map(map_id) if indoor else 'ow'
+    # A side-view room is one a warp of type 2 leads to; that warp sets hIsSideScrolling, and with it the tile loader
+    # copies the side-view tiles (SideViewTiles / DungeonSideViewTiles) instead of the room's top-down tile set.
+    mem[IS_SIDE_SCROLLING] = 2 if indoor and (g, target) in side_view_rooms(m.rom) else 0
     mem[IS_INDOOR] = 1 if indoor else 0
     mem[MAP_ID] = map_id
     mem[MAP_ROOM] = room
@@ -78,6 +88,15 @@ def load_room(m, indoor, map_id=0, room=0, pos=None, settle=6, limit=400, link=(
             break
     else:
         return False
+    # The entity tile slots a room keeps ($FF in its graphics set) hold what the rooms before it loaded when one
+    # walks in; a warp-style load starts them empty. Fill them as the nearest room that sets them would have
+    # (entity_sets_for), copying the tile sets into their slots the way tile set request 9 (LoadTileset09) does.
+    own = room_entity_sets(m.rom, g, target)
+    for k, s in enumerate(entity_sets_for(m.rom, g, target)):
+        if own[k] == 0xFF and s != 0xFF:
+            mem[LOADED_ENTITY_TILESETS + k] = s
+            src = ENTITY_TILE_BANKS[s >> 6] * 0x4000 + ((s & 0x3F) << 8)
+            mem[0x8400 + 0x100 * k:0x8500 + 0x100 * k] = m.rom[src:src + 0x100]
     m.run(settle)
     return True
 
@@ -210,6 +229,95 @@ class RoomData:
 
     def spriteset(self, g, room):
         return self.rom[lin(8, SPRITESET_IDS[g] + room)]
+
+
+SPRITESETS = {'ow': 0x4540, 'A': 0x4788, 'B': 0x4788}   # bank $08: OverworldSpritesets, IndoorSpritesets
+_LINKS = {}
+
+
+def room_entity_sets(rom, g, room):
+    """The 4 entity tile sets of a room's graphics set ($FF = keep what the slot holds)."""
+    grp = rom[lin(8, SPRITESET_IDS[g] + room)]
+    a = lin(8, SPRITESETS[g] + 4 * grp)
+    return list(rom[a:a + 4])
+
+
+def _room_links(rom):
+    """(group, room) -> the rooms one walks in from: the overworld grid, the dungeon layouts and the warps."""
+    if _LINKS:
+        return _LINKS
+    links = {}
+
+    def link(a, b):
+        links.setdefault(a, []).append(b)
+        links.setdefault(b, []).append(a)
+    for r in range(256):
+        if r % 16 < 15:
+            link(('ow', r), ('ow', r + 1))
+        if r < 240:
+            link(('ow', r), ('ow', r + 16))
+    for mp in range(0x0B):
+        base = lin(0x14, 0x4200 + 64 * mp)
+        g = group_of_map(mp)
+        for pos in range(64):
+            if not rom[base + pos]:
+                continue
+            if pos % 8 < 7 and rom[base + pos + 1]:
+                link((g, rom[base + pos]), (g, rom[base + pos + 1]))
+            if pos < 56 and rom[base + pos + 8]:
+                link((g, rom[base + pos]), (g, rom[base + pos + 8]))
+    rd = RoomData(rom)
+    for g in ('ow', 'A', 'B'):
+        for r in range(256):
+            try:
+                warps = rd.parse(g, r)['warps']
+            except IndexError:
+                continue
+            for t, mp, room, _, _ in warps:
+                link((g, r), ('ow', room) if t == 0 else (group_of_map(mp), room))
+    _LINKS.update(links)
+    return _LINKS
+
+
+_SIDE = set()
+
+
+def side_view_rooms(rom):
+    """(group, room) of every side-view room: the destinations of the warps of type 2."""
+    if not _SIDE:
+        rd = RoomData(rom)
+        for g in ('ow', 'A', 'B'):
+            for r in range(256):
+                try:
+                    warps = rd.parse(g, r)['warps']
+                except IndexError:
+                    continue
+                _SIDE.update((group_of_map(mp), room) for t, mp, room, _, _ in warps if t == 2)
+    return _SIDE
+
+
+def entity_sets_for(rom, g, room):
+    """The 4 entity tile sets a room shows: its own, and for the slots it keeps those of the nearest room (walking
+    through the overworld grid, the dungeon layout or warps) that sets them."""
+    sets = room_entity_sets(rom, g, room)
+    if 0xFF not in sets:
+        return sets
+    links = _room_links(rom)
+    seen, queue = {(g, room)}, [(g, room)]
+    while queue and 0xFF in sets:
+        nxt = []
+        for node in queue:
+            for nb in links.get(node, []):
+                if nb in seen:
+                    continue
+                seen.add(nb)
+                nxt.append(nb)
+                other = room_entity_sets(rom, *nb)
+                for k in range(4):
+                    if sets[k] == 0xFF and other[k] != 0xFF:
+                        sets[k] = other[k]
+        queue = nxt
+    return sets
 
 
 CHEST = 0xA0                    # the object of a closed chest

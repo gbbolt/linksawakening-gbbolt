@@ -76,7 +76,7 @@ MamuWaitForLink::
 	cp $50
 ;>     if not CheckLinkCanTalkX_18(near):
 	call CheckLinkCanTalkX_18
-;>         return MamuAnimate()
+;>         return MamuAnimate(slot)
 	jr nc, MamuAnimate
 
 ;>     return MamuSayAlreadyLearnt()
@@ -86,7 +86,7 @@ MamuWaitForLink::
 ;> if hLinkY >= 0x4C:             # Link has not come up to the stage yet
 	ldh a, [hLinkY]
 	cp $4c
-;>     return MamuAnimate()
+;>     return MamuAnimate(slot)
 	jr nc, MamuAnimate
 
 ;> hLinkY = 0x4C                  # stop Link at the edge of the stage
@@ -129,9 +129,9 @@ MamuWaitForLink::
 	call MamuOpenDialog
 ;> IncrementEntityState(slot)                    # next state: MamuAskToPlay
 	call IncrementEntityState
-;> MamuAnimate()                  # falls through
+;> return MamuAnimate(slot)                  # (runs on into it)
 
-;@ def MamuAnimate()
+;@ def MamuAnimate(slot: bc)
 ;@ path: npc/mamu
 ;@ Mamu's idle animation: sprite variant 0 and 1, switching every 16 frames.
 ;@ test: skip sets the sprite variant through bank 0
@@ -178,7 +178,7 @@ MamuOpenDialog::
 ;@ 2 then waits $FF frames.
 ;@ test: skip opens dialogues
 MamuAskToPlay::
-;> MamuAnimate()
+;> MamuAnimate(slot)
 	call MamuAnimate
 ;> if wDialogState:
 	ld a, [wDialogState]
@@ -478,7 +478,7 @@ MamuEndSong::
 	call IncrementEntityState
 
 .animate
-;> return MamuAnimate()
+;> return MamuAnimate(slot)
 	jp MamuAnimate
 
 ;@ def MamuTeachSong(slot: bc)
@@ -535,7 +535,7 @@ MamuTeachSong::
 	ldh [hActiveEntitySpriteVariant], a
 ;> DrawEntity8x16(slot, SongLearntSprite)    # one sprite above Link's head
 	call DrawEntity8x16
-;> return MamuAnimate()
+;> return MamuAnimate(slot)
 	jp MamuAnimate
 
 ;@ def MamuFinish(slot: bc)
@@ -548,7 +548,7 @@ MamuFinish::
 ;> if wDialogState:
 	ld a, [wDialogState]
 	and a
-;>     return MamuAnimate()
+;>     return MamuAnimate(slot)
 	jr nz, MamuSayAlreadyLearnt.animate
 
 ;> wLinkFrozen = 0
@@ -563,7 +563,7 @@ MamuSayAlreadyLearnt:
 	call MamuOpenDialog
 
 .animate
-;> return MamuAnimate()
+;> return MamuAnimate(slot)
 	jp MamuAnimate
 
 
@@ -995,7 +995,7 @@ ManboEntityHandler::
 ;> if hActiveEntityDrawY >= 0x50:  # a fish in the pond
 	ldh a, [hActiveEntityDrawY]
 	cp $50
-;>     return ManboFishHandler()
+;>     return ManboFishHandler(slot)
 	jp nc, ManboFishHandler
 
 ;> wEntityY[slot] = 0x3E
@@ -1054,7 +1054,7 @@ ManboWaitForLink::
 
 ;>     if not CheckLinkCanTalkTall_18():
 	call CheckLinkCanTalkTall_18
-;>         return ManboAnimate()
+;>         return ManboAnimate(slot)
 	jr nc, ManboAnimate
 
 ;>     OpenDialogTable1(0x89)     # dialogue $189
@@ -1067,7 +1067,7 @@ ManboWaitForLink::
 ;> if hLinkX < 0x30:              # Link has not come close yet
 	ldh a, [hLinkX]
 	cp $30
-;>     return ManboAnimate()
+;>     return ManboAnimate(slot)
 	jr c, ManboAnimate
 
 ;> hLinkX = 0x2F                  # stop Link in front of the pond
@@ -1080,9 +1080,9 @@ ManboWaitForLink::
 	call OpenDialogTable1
 ;> IncrementEntityState(slot)                    # next state: ManboAskToPlay
 	call IncrementEntityState
-;> ManboAnimate()                 # falls through
+;> return ManboAnimate(slot)                 # (runs on into it)
 
-;@ def ManboAnimate()
+;@ def ManboAnimate(slot: bc)
 ;@ path: npc/manbo
 ;@ Manbo's idle animation: sprite variant 0 and 1, switching every 8 frames.
 ;@ test: skip sets the sprite variant through bank 0
@@ -1379,7 +1379,7 @@ ManboEndSong::
 ;> hLinkInteractiveMotionBlocked = 2
 	ld a, $02
 	ldh [hLinkInteractiveMotionBlocked], a
-;> ManboAnimate()
+;> ManboAnimate(slot)
 	call ManboAnimate
 	ret
 
@@ -1397,7 +1397,7 @@ SongLearntSprite::
 ;@ selected and Manbo goes back to state 0.
 ;@ test: skip runs the entity timer and draws sprites
 ManboTeachSong::
-;> ManboAnimate()
+;> ManboAnimate(slot)
 	call ManboAnimate
 ;> t = wEntityTimer[slot]
 	call GetEntityTimer
@@ -1580,7 +1580,7 @@ ManboFishPairs::
 	db $70, $00, $70, $20, $6a, $20, $68, $20, $6e, $20, $6c, $20, $72, $00, $74, $00
 	db $74, $20, $72, $20
 
-;@ def ManboFishHandler()
+;@ def ManboFishHandler(slot: bc)
 ;@ path: npc/manbo
 ;@ A fish of Manbo's pond (entity $C7 drawn at y $50 or lower): it wiggles (variant 0/1 every
 ;@ 16 frames) and during the dance takes its frame from wSongShowPlaying.
@@ -4249,6 +4249,11 @@ BunnyLeaveWithMarin::
 ;@ go, the handle slides back up to y $1B (state 0).
 ;@ test: skip reads the joypad and moves Link
 LeverEntityHandler::
+;>@rele1 def release():                                 # .release
+;>@rele2     if hActiveEntityDrawY >= 0x1B: # slide back up
+;>@rele3         wEntitySpeedY[slot] = 0xFD # -3
+;>@rele4         UpdateEntityYWithSpeed_18(slot)
+;>@rele5         hLeverPullState = 0
 ;> DrawLever(slot)
 	call DrawLever
 ;> ReturnIfNonInteractive_18()
@@ -4373,20 +4378,22 @@ LeverEntityHandler::
 	ld [hl], $08
 ;>     return
 	ret
+;> return release()
 
 .release
-;> if hActiveEntityDrawY >= 0x1B: # slide back up
+;=@rele1
+;=@rele2
 	ldh a, [hActiveEntityDrawY]
 	cp $1b
 	jr c, .done
 
-;>     wEntitySpeedY[slot] = 0xFD # -3
+;=@rele3
 	ld hl, wEntitySpeedY
 	add hl, bc
 	ld [hl], $fd
-;>     UpdateEntityYWithSpeed_18(slot)
+;=@rele4
 	call UpdateEntityYWithSpeed_18
-;>     hLeverPullState = 0
+;=@rele5
 	ld a, $00
 	ldh [hLeverPullState], a
 
@@ -8104,7 +8111,7 @@ GetObjectUnderEntity_18::
 ;=@obj
 	ld a, [hl]
 	ldh [hRoomObjectType], a
-;> hMultiPurpose3 = GetObjectPhysics(wIsIndoor << 8 | hRoomObjectType)
+;> hMultiPurpose3 = GetObjectPhysics(hRoomObjectType, wIsIndoor)
 	ld e, a
 	ld a, [wIsIndoor]
 	ld d, a
@@ -8379,7 +8386,7 @@ BlainoRunAttack::
 ;>     return
 	ret z
 
-;> drop_caller_return()
+;> return_from_caller()
 	pop de
 ;> return BlainoAttacks[attack - 1](slot)
 	dec a
@@ -8601,7 +8608,7 @@ BlainoWindmillPunch::
 	ld hl, wEntitySpeedX
 	add hl, bc
 	ld [hl], e
-;>@home if wEntityTimer1[slot] and (dx + 0x30) & 0xFF >= 0x60 and wEntityPrivateCounter[slot] < 0x18:
+;>@home if wEntityTimer1[slot] and (GetEntityXDistanceToLink_18(slot)[1] +0x30) & 0xFF >= 0x60 and wEntityPrivateCounter[slot] < 0x18:
 	call GetEntityTimer1
 	jr z, .next
 
@@ -9184,7 +9191,7 @@ VireWallSpeeds::
 VireFly::
 ;> VireCheckWalls(slot)
 	call VireCheckWalls
-;>@near if (dx + 0x1C) & 0xFF < 0x38 and (dy + 0x20) & 0xFF < 0x40:   # Link close
+;>@near if (GetEntityXDistanceToLink_18(slot)[1] +0x1C) & 0xFF < 0x38 and (GetEntityDrawYDistanceToLink_18()[1] +0x20) & 0xFF < 0x40:   # Link close
 	call GetEntityXDistanceToLink_18
 	add $1c
 	cp $38
@@ -9354,7 +9361,7 @@ VireFly::
 ;> VireDodge(slot)                # falls through
 	call VireDodge
 
-;@ def VireAnimate()
+;@ def VireAnimate(slot: bc)
 ;@ path: boss/vire
 ;@ Vire's wings flap: sprite variant 0 and 1, switching every 8 frames.
 ;@ test: skip sets the sprite variant through bank 0
@@ -9441,7 +9448,7 @@ VireDiveStart::
 ;@ (state 4, invisible, $20-$5F frames).
 ;@ test: skip aims at Link through bank 3
 VireSwoop::
-;>@sw if wEntityPrivate2[slot] != 0xFF and (dx + 0x18) & 0xFF < 0x30 and (dy + 0x18) & 0xFF < 0x30 and not wEntityFlashTimer[slot] and wSwordAnimationState:
+;>@sw if wEntityPrivate2[slot] != 0xFF and (GetEntityXDistanceToLink_18(slot)[1] +0x18) & 0xFF < 0x30 and (GetEntityDrawYDistanceToLink_18()[1] +0x18) & 0xFF < 0x30 and not wEntityFlashTimer[slot] and wSwordAnimationState:
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld a, [hl]
@@ -9663,7 +9670,7 @@ VireTouchLink::
 .dodge
 ;> VireDodge(slot)
 	call VireDodge
-;> return VireAnimate()
+;> return VireAnimate(slot)
 	jp VireAnimate
 
 
@@ -9789,7 +9796,7 @@ VireReturn::
 	ld [hl], a
 
 .flap
-;> return VireAnimate()
+;> return VireAnimate(slot)
 	jp VireAnimate
 
 
@@ -9829,7 +9836,7 @@ VireHit::
 	call VireTouchLink
 
 .flap
-;> return VireAnimate()
+;> return VireAnimate(slot)
 	jp VireAnimate
 
 
@@ -9857,7 +9864,7 @@ VireBreatheFire::
 .breathe
 ;> if t != 8:
 	cp $08
-;>     return VireOpenMouth()
+;>     return VireOpenMouth(slot)
 	jp nz, VireOpenMouth
 
 ;> VireShootFireballs(slot)       # falls through
@@ -10008,7 +10015,7 @@ VireShootFireball::
 	ret
 
 
-;@ def VireOpenMouth()
+;@ def VireOpenMouth(slot: bc)
 ;@ path: boss/vire
 ;@ Sprite variant 2: Vire with his mouth open.
 ;@ test: skip sets the sprite variant through bank 0
@@ -10517,7 +10524,7 @@ GrimCreeperFightStates::
 	dw GrimCreeperSignal
 	dw GrimCreeperWaitAttack
 
-;@ def GrimCreeperInit()
+;@ def GrimCreeperInit(slot: bc)
 ;@ path: boss/grim_creeper
 ;@ State 0: formation 7, so the first one is 0.
 ;@ test: skip runs the entity state
@@ -10641,7 +10648,7 @@ GrimCreeperSummon::
 
 .call
 ;> if t & 0x1F:
-;>     return GrimCreeperConduct()
+;>     return GrimCreeperConduct(slot)
 	and $1f
 	jr nz, GrimCreeperConduct
 
@@ -10651,14 +10658,14 @@ GrimCreeperSummon::
 	ld a, [hl]
 ;> if k >= 6:
 	cp $06
-;>     return GrimCreeperConduct()
+;>     return GrimCreeperConduct(slot)
 	jr nc, GrimCreeperConduct
 
 ;> bat, failed = SpawnEntity(slot, 0xBC)
 	ld a, $bc
 	call SpawnEntity
 ;> if failed:
-;>     return GrimCreeperConduct()
+;>     return GrimCreeperConduct(slot)
 	jr c, GrimCreeperConduct
 
 ;> hJingle = 0x31
@@ -10711,9 +10718,9 @@ GrimCreeperSummon::
 	add hl, de
 	set 6, [hl]
 	pop bc
-;> GrimCreeperConduct()           # falls through
+;> return GrimCreeperConduct(slot)           # (runs on into it)
 
-;@ def GrimCreeperConduct()
+;@ def GrimCreeperConduct(slot: bc)
 ;@ path: boss/grim_creeper
 ;@ The Grim Creeper waves his baton: sprite variant 0 and 1, switching every 32 frames.
 ;@ test: skip sets the sprite variant through bank 0
@@ -10757,7 +10764,7 @@ GrimCreeperWaitFormation::
 	call IncrementEntityState
 
 .conduct
-;> GrimCreeperConduct()
+;> GrimCreeperConduct(slot)
 	call GrimCreeperConduct
 	ret
 
@@ -10992,7 +10999,7 @@ GrimCreeperBatMove::
 ;> UpdateEntityPosWithSpeed_18(slot)   # falls through
 	call UpdateEntityPosWithSpeed_18
 
-;@ def GrimCreeperBatAnimate()
+;@ def GrimCreeperBatAnimate(slot: bc)
 ;@ path: boss/grim_creeper
 ;@ A bat's wings: sprite variant 0 and 1, switching every 8 frames.
 ;@ test: skip sets the sprite variant through bank 0
@@ -11041,7 +11048,7 @@ GrimCreeperBatWaitSignal::
 	call IncrementEntityState
 
 .flap
-;> return GrimCreeperBatAnimate()
+;> return GrimCreeperBatAnimate(slot)
 	jp GrimCreeperBatAnimate
 
 
@@ -11076,7 +11083,7 @@ GrimCreeperBatWaitTurn::
 	call IncrementEntityState
 
 .flap
-;> return GrimCreeperBatAnimate()
+;> return GrimCreeperBatAnimate(slot)
 	jp GrimCreeperBatAnimate
 
 
@@ -12136,7 +12143,7 @@ BuzzBlobWander::
 	ld hl, BuzzBlobFrames
 ;> if not wEntityPrivate1[slot]:  # a Buzz Blob
 	and a
-;>     return BuzzBlobAnimate(frames)
+;>     return BuzzBlobAnimate(slot,frames)
 	jr z, BuzzBlobAnimate
 
 ;> if CheckLinkCanTalk_18():      # a Cukeman
@@ -12154,10 +12161,10 @@ BuzzBlobWander::
 	call OpenDialogTable2
 
 .cukeman
-;> BuzzBlobAnimate(CukemanFrames)   # falls through
+;> BuzzBlobAnimate(slot,CukemanFrames)   # falls through
 	ld hl, CukemanFrames
 
-;@ def BuzzBlobAnimate(frames: hl)
+;@ def BuzzBlobAnimate(slot: bc, frames: hl)
 ;@ path: enemy/buzz_blob
 ;@ Sets the sprite variant from a 4-step animation table, one step every 8 frames.
 ;@ test: skip sets the sprite variant through bank 0
@@ -12194,7 +12201,7 @@ BuzzBlobShock::
 	ret
 
 .charged
-;> BuzzBlobAnimate(BuzzBlobShockFrames)
+;> BuzzBlobAnimate(slot,BuzzBlobShockFrames)
 	ld hl, BuzzBlobShockFrames
 	call BuzzBlobAnimate
 	ret
@@ -12400,7 +12407,7 @@ BomberAct::
 	ldh [hJingle], a
 
 .sword
-;>@sw if hLinkDirection ^ 1 == GetEntityDirectionToLink_18(slot) and (dx + 0x20) & 0xFF < 0x40 and (dy + 0x20) & 0xFF < 0x40 and wSwordAnimationState:
+;>@sw if hLinkDirection ^ 1 == GetEntityDirectionToLink_18(slot) and (GetEntityXDistanceToLink_18(slot)[1] +0x20) & 0xFF < 0x40 and (GetEntityDrawYDistanceToLink_18()[1] +0x20) & 0xFF < 0x40 and wSwordAnimationState:
 	call GetEntityDirectionToLink_18
 	ldh a, [hLinkDirection]
 	xor $01
@@ -12453,9 +12460,9 @@ BomberAct::
 .touch
 ;> EntityCheckHits(slot)
 	call EntityCheckHits
-;> BomberAnimate()                # falls through
+;> return BomberAnimate(slot)                # (runs on into it)
 
-;@ def BomberAnimate()
+;@ def BomberAnimate(slot: bc)
 ;@ path: enemy/bomber
 ;@ The Bomber's wings: sprite variants 0-3, one step every 4 frames.
 ;@ test: skip sets the sprite variant through bank 0
@@ -12505,7 +12512,7 @@ BomberDodge::
 	ld [hl], b
 
 .flap
-;> return BomberAnimate()
+;> return BomberAnimate(slot)
 	jp BomberAnimate
 
 
@@ -12631,13 +12638,13 @@ MagicPowderEntityHandler::
 
 ;> wRoomObjects[square] = 0xAC    # lit
 	ld [hl], $ac
-;> wEntityPrivate1[slot] = high(addr)   # where the torch is
+;> wEntityPrivate1[slot] = addr >> 8   # where the torch is
 	ld d, h
 	ld e, l
 	ld hl, wEntityPrivate1
 	add hl, bc
 	ld [hl], d
-;> wEntityPrivate2[slot] = low(addr)
+;> wEntityPrivate2[slot] = addr & 0xFF
 	ld hl, wEntityPrivate2
 	add hl, bc
 	ld [hl], e
@@ -12899,7 +12906,7 @@ GetSpeedDirection16_18::
 ;=@q
 	and $18
 	ld h, a
-;> ax = abs(hMultiPurpose1)
+;> ax = abs((u8(hMultiPurpose1) ^ 0x80) - 0x80)
 	ldh a, [hMultiPurpose1]
 	bit 7, a
 	jr z, .absX
@@ -12908,7 +12915,7 @@ GetSpeedDirection16_18::
 	inc a
 
 .absX
-;> ay = abs(hMultiPurpose0)
+;> ay = abs((u8(hMultiPurpose0) ^ 0x80) - 0x80)
 	ld d, a
 	ldh a, [hMultiPurpose0]
 	bit 7, a

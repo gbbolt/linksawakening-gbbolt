@@ -5157,7 +5157,7 @@ LanmolaDefeatStart::
 ;@ def IncrementEntityPrivate2_06(slot: bc)
 ;@ path: entity/helpers
 ;@ Advances the entity's wEntityPrivate2 by one (the step counter of the death sequences).
-;@ test: slot = rng.randrange(16)
+;@ test: slot = rand(0, 15)
 IncrementEntityPrivate2_06::
 ;> wEntityPrivate2[slot] += 1
 	ld hl, wEntityPrivate2
@@ -5917,8 +5917,9 @@ LanmolaDraw::
 ;@ path: boss/desert_lanmola
 ;@ Points the head the way it moves: along the faster axis, frame 1 right / 0 left, or 2 down /
 ;@ 3 up.
-;@ test: wEntitySpeedX[slot] = rng.randrange(256)
-;@ test: wEntitySpeedY[slot] = rng.randrange(256)
+;@ test: slot = rand(0, 15)
+;@ test: mem[wEntitySpeedX + slot] = rand(0, 255)
+;@ test: mem[wEntitySpeedY + slot] = rand(0, 256 - 1)
 ;@ test: wCurrentBank = $06
 LanmolaHeadFrame::
 ;> vx = wEntitySpeedX[slot]
@@ -8372,8 +8373,8 @@ WalkingFrameBase_06::
 ;@ path: entity/helpers
 ;@ Walking animation of the characters: frame = WalkingFrameBase_06[facing] + step, the step
 ;@ switching every 16 frames of wEntityPrivateCounter (advanced here).
-;@ test: slot = rng.randrange(16)
-;@ test: wEntityDirection[slot] = rng.randrange(4)
+;@ test: slot = rand(0, 15)
+;@ test: mem[wEntityDirection + slot] = rand(0, 4 - 1)
 ;@ test: wCurrentBank = $06
 SetWalkingFrame_06::
 ;> base = mem[WalkingFrameBase_06 + wEntityDirection[slot]]
@@ -8397,7 +8398,7 @@ SetWalkingFrame_06::
 	pop hl
 ;=@t1
 	and $01
-;> SetEntitySpriteVariant(slot, step | mem[base])
+;> SetEntitySpriteVariant(slot, step | base)
 	or [hl]
 	jp SetEntitySpriteVariant
 
@@ -8619,7 +8620,7 @@ ApplyRecoilIfNeeded_06::
 ;@ path: entity/helpers
 ;@ Moves the entity by its x and y speeds (AddEntitySpeedToPos_06 for x, then with slot + 16,
 ;@ which reaches the y arrays).
-;@ test: slot = rng.randrange(16)
+;@ test: slot = rand(0, 15)
 UpdateEntityPosWithSpeed_06::
 ;> AddEntitySpeedToPos_06(slot)              # x
 	call AddEntitySpeedToPos_06
@@ -8689,7 +8690,7 @@ AddEntitySpeedToPos_06::
 ;@ def AddEntityZSpeedToPos_06(slot: bc)
 ;@ path: entity/helpers
 ;@ The same for the height: wEntitySpeedZ into wEntitySpeedZAcc and wEntityZ.
-;@ test: slot = rng.randrange(16)
+;@ test: slot = rand(0, 15)
 AddEntityZSpeedToPos_06::
 ;> speed = wEntitySpeedZ[slot]
 	ld hl, wEntitySpeedZ
@@ -8717,7 +8718,7 @@ AddEntityZSpeedToPos_06::
 ;@ def GetEntityXDistanceToLink_06(slot: bc) -> (a, e)
 ;@ path: entity/helpers
 ;@ Returns hLinkX - x (also in d) and the side Link is on: 0 right, 1 left.
-;@ test: slot = rng.randrange(16)
+;@ test: slot = rand(0, 15)
 GetEntityXDistanceToLink_06::
 ;> side = 0
 	ld e, $00
@@ -8742,7 +8743,7 @@ GetEntityXDistanceToLink_06::
 ;@ def GetEntityYDistanceToLink_06(slot: bc) -> (a, e)
 ;@ path: entity/helpers
 ;@ Returns hLinkY - y (also in d) and the side Link is on: 2 above, 3 below.
-;@ test: slot = rng.randrange(16)
+;@ test: slot = rand(0, 15)
 GetEntityYDistanceToLink_06::
 ;> side = 2
 	ld e, $02
@@ -8768,7 +8769,7 @@ GetEntityYDistanceToLink_06::
 ;@ path: entity/helpers
 ;@ The direction (0 right, 1 left, 2 up, 3 down) of Link from the entity along the axis on which
 ;@ he is farther away (the vertical one on a tie). hMultiPurpose0 / 1 = the x / y side.
-;@ test: slot = rng.randrange(16)
+;@ test: slot = rand(0, 15)
 ;@ test: wCurrentBank = $06
 GetEntityDirectionToLink_06::
 ;> dx, side = GetEntityXDistanceToLink_06(slot)
@@ -8821,7 +8822,7 @@ GetEntityDirectionToLink_06::
 ;@ def ClearEntityStatus_06(slot: bc)
 ;@ path: entity/helpers
 ;@ Frees the entity's slot (status 0).
-;@ test: slot = rng.randrange(16)
+;@ test: slot = rand(0, 15)
 ClearEntityStatus_06::
 ;> wEntityStatus[slot] = 0
 	ld hl, wEntityStatus
@@ -10394,8 +10395,8 @@ RollingBonesDyingSteps::
 ;@ def RollingBonesDyingStart(slot: bc)
 ;@ path: boss/rolling_bones
 ;@ Starts the end: 255 frames of flashing.
-;@ test: slot = rng.randrange(16)
-;@ test: wEntityPrivate1[slot] = 0
+;@ test: slot = rand(0, 15)
+;@ test: mem[wEntityPrivate1 + slot] = 0
 ;@ test: wCurrentBank = $06
 RollingBonesDyingStart::
 ;> wEntityTimer[slot] = 0xFF
@@ -13296,7 +13297,7 @@ WizrobeAttack::
 ;@ def WizrobeSetUnhittable(slot: bc)
 ;@ path: enemy/wizrobe
 ;@ Sets the Wizrobe's physics flags to $42 (attacks pass through it).
-;@ test: slot = rng.randrange(16)
+;@ test: slot = rand(0, 15)
 WizrobeSetUnhittable::
 ;> wEntityPhysicsFlags[slot] = 0x42
 	ld hl, wEntityPhysicsFlags
@@ -13484,7 +13485,7 @@ TektiteHandler::
 	call UpdateEntityPosWithSpeed_06
 ;> EntityCheckWalls(slot)
 	call EntityCheckWalls
-;> p = addr(wEntityCollisions, slot)
+;> p = addr(wEntityCollisions) + slot
 	ld hl, wEntityCollisions
 	add hl, bc
 ;> if mem[p] & 3:
@@ -13629,26 +13630,26 @@ TektiteHandler::
 ;@ path: enemy/tektite
 ;@ Meant to bounce the Tektite back from a side wall, but it works on wEntitySpeedX without the
 ;@ slot offset, i.e. on slot 0's x speed: that becomes -x / 2. Returns hl = wEntitySpeedX.
-;@ test: skip writes another slot
+;@ test: wCurrentBank = $06
 TektiteSideWallBounce::
-;> p = wEntitySpeedX                         # slot 0
+;> p = addr(wEntitySpeedX)                   # slot 0
 	ld hl, wEntitySpeedX
-;> mem[p] = ((-mem[p] ^ 0x80) - 0x80) >> 1               # (shared tail)
+;> mem[p] = u8(((u8(-mem[p]) ^ 0x80) - 0x80) >> 1); return p  # (shared tail: -x / 2, signed)
 	jr TektiteEndWallBounce.return
 
 ;@ def TektiteEndWallBounce(slot: bc)
 ;@ path: enemy/tektite
 ;@ At a top or bottom wall: the Tektite's x speed becomes -x / 2 (the y speed stays as it is).
-;@ test: slot = rng.randrange(16)
-;@ test: wEntitySpeedX[slot] = rng.randrange(256)
+;@ test: slot = rand(0, 15)
+;@ test: mem[wEntitySpeedX + slot] = rand(0, 256 - 1)
 ;@ test: wCurrentBank = $06
 TektiteEndWallBounce::
-;> p = addr(wEntitySpeedX, slot)
+;> p = addr(wEntitySpeedX) + slot
 	ld hl, wEntitySpeedX
 	add hl, bc
 
 .return
-;> mem[p] = ((-mem[p] ^ 0x80) - 0x80) >> 1
+;> mem[p] = u8(((u8(-mem[p]) ^ 0x80) - 0x80) >> 1)  # -x / 2, signed
 	ld a, [hl]
 	cpl
 	inc a
@@ -13915,9 +13916,9 @@ BooBuddyStepSpeed::
 ;@ path: enemy/boo_buddy
 ;@ Puts the Boo Buddy at the opposite place of the room (mirrored around x $50, y $48) and
 ;@ starts 32 frames of flickering back in (wEntityTimer1).
-;@ test: slot = rng.randrange(16)
-;@ test: wEntityX[slot] = rng.randrange(256)
-;@ test: wEntityY[slot] = rng.randrange(256)
+;@ test: slot = rand(0, 15)
+;@ test: mem[wEntityX + slot] = rand(0, 256 - 1)
+;@ test: mem[wEntityY + slot] = rand(0, 256 - 1)
 ;@ test: wCurrentBank = $06
 BooBuddyMirrorPosition::
 ;> wEntityTimer1[slot] = 0x20
@@ -14049,7 +14050,7 @@ FloatingItemHandler::
 	ld hl, FloatingItemBobSideView
 
 .setEntityZ
-;>@t1 wEntityZ[slot] = bob[(hFrameCounter >> 3) & 7]
+;>@t1 wEntityZ[slot] = mem[bob + ((hFrameCounter >> 3) & 7)]
 	ldh a, [hFrameCounter]
 	rra
 	rra
@@ -14714,8 +14715,8 @@ GelCling::
 ;@ def GelShakeOff(slot: bc)
 ;@ path: enemy/gel
 ;@ One frame off the clinging timer (if it is not 0 yet).
-;@ test: slot = rng.randrange(16)
-;@ test: wEntityTimer[slot] = rng.randrange(256)
+;@ test: slot = rand(0, 15)
+;@ test: mem[wEntityTimer + slot] = rand(0, 256 - 1)
 ;@ test: wCurrentBank = $06
 GelShakeOff::
 ;> if GetEntityTimer(slot):
@@ -15033,8 +15034,8 @@ GibdoWalk::
 ;@ def GibdoWalkFrame(slot: bc)
 ;@ path: enemy/gibdo
 ;@ Walking frame: wEntityPrivate4 counts up, frame = (count >> 4) & 1.
-;@ test: slot = rng.randrange(16)
-;@ test: wEntityPrivate4[slot] = rng.randrange(256)
+;@ test: slot = rand(0, 15)
+;@ test: mem[wEntityPrivate4 + slot] = rand(0, 256 - 1)
 ;@ test: wCurrentBank = $06
 GibdoWalkFrame::
 ;> n = wEntityPrivate4[slot]

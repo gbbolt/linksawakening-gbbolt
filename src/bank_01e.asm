@@ -1774,18 +1774,18 @@ UpdateNoteEffects_1E::
 
 ;>     wMusicEffect = kind
 	ld [wMusicEffect], a
-;>     if wMusicChannel == 1: return ApplyFrequencyEffect_1E(ch + 8, 0x13)   # NR13/NR14
+;>     if wMusicChannel == 1: return ApplyFrequencyEffect_1E(ch + 8, 0x13, timer)   # NR13/NR14
 	ld a, [wMusicChannel]
 	ld c, $13
 	cp $01
 	jr z, ApplyFrequencyEffect_1E
 
-;>     if wMusicChannel == 2: return ApplyFrequencyEffect_1E(ch + 8, 0x18)   # NR23/NR24
+;>     if wMusicChannel == 2: return ApplyFrequencyEffect_1E(ch + 8, 0x18, timer)   # NR23/NR24
 	ld c, $18
 	cp $02
 	jr z, ApplyFrequencyEffect_1E
 
-;>     if wMusicChannel == 3: return ApplyFrequencyEffect_1E(ch + 8, 0x1D)   # NR33/NR34
+;>     if wMusicChannel == 3: return ApplyFrequencyEffect_1E(ch + 8, 0x1D, timer)   # NR33/NR34
 	ld c, $1d
 	cp $03
 	jr z, ApplyFrequencyEffect_1E
@@ -1812,18 +1812,18 @@ UpdateDropAndWaveEffects_1E::
 	and a
 	jp z, .waveEffects
 
-;>     if wMusicChannel == 1: return UpdatePitchDrop_1E(drop, 0x13)
+;>     if wMusicChannel == 1: return UpdatePitchDrop_1E(drop, 0x13, timer)
 	ld a, [wMusicChannel]
 	ld c, $13
 	cp $01
 	jp z, UpdatePitchDrop_1E
 
-;>     if wMusicChannel == 2: return UpdatePitchDrop_1E(drop, 0x18)
+;>     if wMusicChannel == 2: return UpdatePitchDrop_1E(drop, 0x18, timer)
 	ld c, $18
 	cp $02
 	jp z, UpdatePitchDrop_1E
 
-;>     return UpdatePitchDrop_1E(drop, 0x1D)
+;>     return UpdatePitchDrop_1E(drop, 0x1D, timer)
 	ld c, $1d
 	jp UpdatePitchDrop_1E
 
@@ -1848,7 +1848,7 @@ UpdateDropAndWaveEffects_1E::
 	jp PopHLReturn_1E
 
 
-;@ def ApplyFrequencyEffect_1E(p: hl, reg: c)
+;@ def ApplyFrequencyEffect_1E(p: hl, reg: c, timer: stack)
 ;@ path: sound/music/engine
 ;@ The frequency effect of the note (p = the channel's +8): type 1 is the vibrato; any other type plays the
 ;@ note one frequency step lower (a slight detune), rewritten every frame without restarting the note.
@@ -1868,7 +1868,7 @@ ApplyFrequencyEffect_1E::
 	add $04
 	ld l, a
 	ld b, [hl]
-;> if wMusicEffect == 1: return UpdateVibrato_1E()
+;> if wMusicEffect == 1: return UpdateVibrato_1E(timer, reg)
 	ld a, [wMusicEffect]
 	cp $01
 	jp z, UpdateVibrato_1E
@@ -1878,7 +1878,7 @@ ApplyFrequencyEffect_1E::
 	pop de
 	add hl, de
 	call WriteEffectFrequency_1E
-;> return UpdateDropAndWaveEffects_1E()
+;> return UpdateDropAndWaveEffects_1E(timer)
 	jp UpdateDropAndWaveEffects_1E
 
 
@@ -1887,10 +1887,10 @@ ApplyFrequencyEffect_1E::
 ;@ The release of the square channels: when a note (not a rest) with a release in instrument byte +7
 ;@ reaches its release frame, its envelope is switched to ReleaseEnvelopes_1E entry (+7 low nibble - 1)
 ;@ and the note restarted on the same frequency. Not while an effect holds the channel.
-;@ test: wMusicChannel1[0x0B] = rng.choice([0, 0, 1]); wMusicChannel1[7] = rng.choice([0, 0x21, 0x83, 0x45])
-;@ test: wMusicChannel1[0x0E] = rand(0, 4); wMusicReleaseFrame[0] = rand(0, 4); wMusicChannel1[0x0F] = rng.choice([0, 0x80])
-;@ test: wMusicChannel2[0x0B] = rng.choice([0, 0, 1]); wMusicChannel2[7] = rng.choice([0, 0x21, 0x83, 0x45])
-;@ test: wMusicChannel2[0x0E] = rand(0, 4); wMusicReleaseFrame[1] = rand(0, 4); wMusicChannel2[0x0F] = rng.choice([0, 0x80])
+;@ test: mem[wMusicChannel1 + 0x0B] =rng.choice([0, 0, 1]); mem[wMusicChannel1 + 7] =rng.choice([0, 0x21, 0x83, 0x45])
+;@ test: mem[wMusicChannel1 + 0x0E] =rand(0, 4); mem[wMusicReleaseFrame + 0] =rand(0, 4); mem[wMusicChannel1 + 0x0F] =rng.choice([0, 0x80])
+;@ test: mem[wMusicChannel2 + 0x0B] =rng.choice([0, 0, 1]); mem[wMusicChannel2 + 7] =rng.choice([0, 0x21, 0x83, 0x45])
+;@ test: mem[wMusicChannel2 + 0x0E] =rand(0, 4); mem[wMusicReleaseFrame + 1] =rand(0, 4); mem[wMusicChannel2 + 0x0F] =rng.choice([0, 0x80])
 ;@ test: wCurrentBank = $1E
 UpdateReleaseEnvelopes_1E::
 ;> if not wMusicChannel1[0x0B] and wMusicChannel1[7]:     # channel 1: no rest, a release
@@ -2197,7 +2197,7 @@ PitchDropOffCommand_1E::
 	xor a
 	jr PitchDropOnCommand_1E.store
 
-;@ def UpdatePitchDrop_1E(drop: de, reg: c, channel)
+;@ def UpdatePitchDrop_1E(drop: de, reg: c, timer: stack)
 ;@ path: sound/music/engine
 ;@ The pitch drop: in the first frame the note's own frequency, after that the one written last, goes
 ;@ down by 100 every frame (written without restarting the note).
@@ -2212,7 +2212,7 @@ UpdatePitchDrop_1E::
 ;>     mem[drop + 1] = 1
 	inc a
 	ld [de], a
-;>     f = GetNoteFrequency_1E(channel)   # the channel record UpdateNoteEffects_1E pushed
+;>     f = GetNoteFrequency_1E(timer)   # the channel record UpdateNoteEffects_1E pushed
 	pop hl
 	push hl
 	call GetNoteFrequency_1E
@@ -2334,7 +2334,7 @@ UpdateVibrato_1E::
 	cp $2d
 	jr z, .wrap
 
-;> elif not mem[v + 1]: return UpdateDropAndWaveEffects_1E()
+;> elif not mem[v + 1]: return UpdateDropAndWaveEffects_1E(timer)
 	ld a, [de]
 	and a
 	jp z, UpdateDropAndWaveEffects_1E
@@ -2366,7 +2366,7 @@ UpdateVibrato_1E::
 	pop de
 	add hl, de
 	call WriteEffectFrequency_1E
-;> return UpdateDropAndWaveEffects_1E()
+;> return UpdateDropAndWaveEffects_1E(timer)
 	jp UpdateDropAndWaveEffects_1E
 
 
@@ -2556,8 +2556,8 @@ Music27::
 	db $9b, $20, $a2, $1a, $a1, $1a, $1a, $9c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $50: Boss.
-;@ Where: LanmolaHandler and other bosses (hDefaultMusicTrack).
+;@ Music track $50: Mini-boss battle.
+;@ Where: StartBossMusic: entities with option bit 2 (the mini-bosses, the Moblin chief); LanmolaHandler; NightmareDethIFight (the final Nightmare's last form).
 ;@ Entry 48 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music50::
 	db $02 ; transpose
@@ -2783,7 +2783,8 @@ Padding_1E_4DA4::
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 
 ;@ path: sound/music/songs
-;@ Music track $1A: requested in bank $01.
+;@ Music track $1A: Intro: the storm and the beach.
+;@ Where: IntroInit: from the boat in the storm until Marin finds Link on the beach.
 ;@ Entry 10 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music1A::
 	db $00 ; transpose
@@ -3040,8 +3041,8 @@ Music23::
 	db $00
 
 ;@ path: sound/music/songs
-;@ Music track $12: Indoor map $08.
-;@ Where: SelectAreaMusic, IndoorMusicTracks (by hMapId): map $08.
+;@ Music track $12: Wind Fish's Egg.
+;@ Where: SelectAreaMusic, IndoorMusicTracks (by hMapId): map $08, the egg with its maze room (MazeRoomPaths).
 ;@ Entry 2 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music12::
 	db $00 ; transpose
@@ -3348,8 +3349,8 @@ Music17::
 	db $60, $64, $66, $8c, $8a, $88, $86, $84, $ae, $01, $00
 
 ;@ path: sound/music/songs
-;@ Music track $13 (also $51): Indoor map $14.
-;@ Where: SelectAreaMusic, IndoorMusicTracks (by hMapId): map $14.
+;@ Music track $13 (also $51): Kanalet Castle.
+;@ Where: SelectAreaMusic, IndoorMusicTracks (by hMapId): map $14, entered from overworld rooms $59 and $69.
 ;@ Entry 3, 49 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music13::
 	db $00 ; transpose
@@ -3403,7 +3404,8 @@ Music18::
 	db $00
 
 ;@ path: sound/music/songs
-;@ Music track $19: requested in bank $04.
+;@ Music track $19: Boss battle.
+;@ Where: StartBossMusic: the eight dungeon bosses (entity option bit 2 clear); ShopOwnerSetup: the shopkeeper when Link comes back after stealing.
 ;@ Entry 9 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music19::
 	db $00 ; transpose
@@ -3475,7 +3477,8 @@ Music1B::
 	db $64, $01, $a2, $60, $a1, $68, $6e, $a5, $78, $01, $00
 
 ;@ path: sound/music/songs
-;@ Music track $1C: not requested directly.
+;@ Music track $1C: Marin and Tarin's house (the start).
+;@ Where: EntityInit_GameOwner / EntityInit_Townsperson (Tarin and the villagers) while Link has no shield yet.
 ;@ Entry 12 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music1C::
 	db $00 ; transpose
@@ -3553,7 +3556,8 @@ Music1D::
 	db $9b, $02, $20, $01, $20, $20, $9c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $1E: requested in bank $06.
+;@ Music track $1E: Falling asleep in the Dream Shrine.
+;@ Where: DreamShrineBedWait: Link jumps into the bed.
 ;@ Entry 14 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music1E::
 	db $00 ; transpose
@@ -3625,8 +3629,8 @@ Music4B::
 	db $1a, $1a, $34, $1a, $1a, $01, $a5, $01, $ae, $01, $00
 
 ;@ path: sound/music/songs
-;@ Music track $1F: Indoor map $16.
-;@ Where: SelectAreaMusic, IndoorMusicTracks (by hMapId): map $16.
+;@ Music track $1F: Southern Face Shrine.
+;@ Where: SelectAreaMusic, IndoorMusicTracks (by hMapId): map $16, the shrine with the mural.
 ;@ Entry 15 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music1F::
 	db $00 ; transpose
@@ -3713,7 +3717,8 @@ Music21::
 	db $00
 
 ;@ path: sound/music/songs
-;@ Music track $22: requested in bank $06.
+;@ Music track $22: The owl.
+;@ Where: OwlEventWait: while the owl speaks (OwlEventFlyAway puts the area music back).
 ;@ Entry 18 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music22::
 	db $00 ; transpose
@@ -3729,7 +3734,8 @@ Music22::
 	db $a3, $32, $46, $58, $66, $70, $01, $a3, $2e, $42, $54, $62, $6c, $01, $00
 
 ;@ path: sound/music/songs
-;@ Music track $24: not requested directly.
+;@ Music track $24: Dream Shrine.
+;@ Where: EntityInit_DreamShrineBed: room music of the room with the bed.
 ;@ Entry 20 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music24::
 	db $00 ; transpose
@@ -3754,8 +3760,8 @@ Music24::
 	db $9b, $03, $a7, $54, $01, $9c, $a2, $54, $54, $a4, $01, $00
 
 ;@ path: sound/music/songs
-;@ Music track $53: Indoor map $13.
-;@ Where: SelectAreaMusic, IndoorMusicTracks (by hMapId): map $13.
+;@ Music track $53: Dream Shrine: the dream.
+;@ Where: SelectAreaMusic, IndoorMusicTracks (by hMapId): map $13, the Dream Shrine (the bed room plays $24).
 ;@ Entry 51 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music53::
 	db $00 ; transpose
@@ -3869,7 +3875,8 @@ Music5B::
 	db $9b, $18, $a5, $01, $9c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $4C: requested in bank $07.
+;@ Music track $4C: Angler's Tunnel opens.
+;@ Where: AnglerTunnelOpening_Music.
 ;@ Entry 44 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music4C::
 	db $00 ; transpose
@@ -3995,7 +4002,8 @@ Music4E::
 ; (the pattern goes on in the next unit)
 
 ;@ path: sound/music/songs
-;@ Music track $4F: not requested directly.
+;@ Music track $4F: Short fragment, unused.
+;@ Where: not requested by any code; 1.6 s of pattern pieces shared with other songs.
 ;@ Entry 47 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music4F::
 	db $00 ; transpose
@@ -4286,7 +4294,8 @@ Padding_1E_6EB8::
 	db $ff, $ff, $ff, $ff, $ff, $ff, $ff, $ff
 
 ;@ path: sound/music/songs
-;@ Music track $41: not requested directly.
+;@ Music track $41: The egg: Ballad with 2 instruments.
+;@ Where: EggSongPlayInstruments: at the egg, after the Ballad of the Wind Fish on the ocarina, $41 plus the number of instruments of dungeons 3-8 Link has in a row; this one: instruments 1-2.
 ;@ Entry 33 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music41::
 	db $00 ; transpose
@@ -4304,7 +4313,8 @@ Music41::
 	db $01, $94, $00
 
 ;@ path: sound/music/songs
-;@ Music track $42: not requested directly.
+;@ Music track $42: The egg: Ballad with 3 instruments.
+;@ Where: EggSongPlayInstruments: at the egg, after the Ballad of the Wind Fish on the ocarina, $41 plus the number of instruments of dungeons 3-8 Link has in a row; this one: instruments 1-3.
 ;@ Entry 34 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music42::
 	db $00 ; transpose
@@ -4342,7 +4352,8 @@ Music42::
 	db $01, $4e, $a8, $60, $a7, $01, $5e, $70, $6e, $01, $a4, $01, $a5, $01, $95, $00
 
 ;@ path: sound/music/songs
-;@ Music track $43: not requested directly.
+;@ Music track $43: The egg: Ballad with 4 instruments.
+;@ Where: EggSongPlayInstruments: at the egg, after the Ballad of the Wind Fish on the ocarina, $41 plus the number of instruments of dungeons 3-8 Link has in a row; this one: instruments 1-4.
 ;@ Entry 35 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music43::
 	db $00 ; transpose
@@ -4367,7 +4378,8 @@ Music43::
 	db $9b, $04, $4e, $56, $64, $5c, $9c, $95, $00
 
 ;@ path: sound/music/songs
-;@ Music track $44: not requested directly.
+;@ Music track $44: The egg: Ballad with 5 instruments.
+;@ Where: EggSongPlayInstruments: at the egg, after the Ballad of the Wind Fish on the ocarina, $41 plus the number of instruments of dungeons 3-8 Link has in a row; this one: instruments 1-5.
 ;@ Entry 36 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music44::
 	db $00 ; transpose
@@ -4387,7 +4399,8 @@ Music44::
 	db $9d, $87, $00, $80, $a5, $8c, $8c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $45: not requested directly.
+;@ Music track $45: The egg: Ballad with 6 instruments.
+;@ Where: EggSongPlayInstruments: at the egg, after the Ballad of the Wind Fish on the ocarina, $41 plus the number of instruments of dungeons 3-8 Link has in a row; this one: instruments 1-6.
 ;@ Entry 37 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music45::
 	db $00 ; transpose
@@ -4399,7 +4412,8 @@ Music45::
 	db $9b, $0a, $a1, $1f, $1f, $1f, $1f, $a2, $1f, $a3, $24, $a2, $1f, $a3, $24, $a1
 	db $1f, $1f, $1f, $1f, $a3, $24, $a1, $1f, $1f, $1f, $1f, $a3, $24, $9c, $00
 ;@ path: sound/music/songs
-;@ Music track $46: not requested directly.
+;@ Music track $46: The egg: Ballad with 7 instruments.
+;@ Where: EggSongPlayInstruments: at the egg, after the Ballad of the Wind Fish on the ocarina, $41 plus the number of instruments of dungeons 3-8 Link has in a row; this one: instruments 1-7.
 ;@ Entry 38 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music46::
 	db $00 ; transpose
@@ -4423,7 +4437,8 @@ Music46::
 	db $9d, $61, $82, $80, $00
 
 ;@ path: sound/music/songs
-;@ Music track $47: not requested directly.
+;@ Music track $47: The egg: Ballad with all eight instruments.
+;@ Where: EggSongPlayInstruments: at the egg, after the Ballad of the Wind Fish on the ocarina, $41 plus the number of instruments of dungeons 3-8 Link has in a row; this one: all eight.
 ;@ Entry 39 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music47::
 	db $00 ; transpose
@@ -4444,7 +4459,8 @@ Music47::
 	db $9b, $02, $a1, $1f, $1f, $1f, $1f, $a2, $1f, $a3, $24, $a2, $1f, $a3, $24, $00
 
 ;@ path: sound/music/songs
-;@ Music track $20: not requested directly.
+;@ Music track $20: Full Moon Cello.
+;@ Where: Instrument_StartMusic: InstrumentMusicTracks entry 0 (the instrument of dungeon 1 plays its part of the Wind Fish's melody).
 ;@ Entry 16 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music20::
 	db $00 ; transpose
@@ -4468,7 +4484,8 @@ Music20::
 	db $01, $35, $66, $53, $10, $02, $46, $8a, $01, $35, $66, $53, $10, $02, $46, $8a
 
 ;@ path: sound/music/songs
-;@ Music track $28: not requested directly.
+;@ Music track $28: Conch Horn.
+;@ Where: Instrument_StartMusic: InstrumentMusicTracks entry 1 (the instrument of dungeon 2 plays its part of the Wind Fish's melody).
 ;@ Entry 24 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music28::
 	db $00 ; transpose
@@ -4492,7 +4509,8 @@ Music28::
 	db $9b, $20, $ae, $01, $9c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $29: not requested directly.
+;@ Music track $29: Sea Lily's Bell.
+;@ Where: Instrument_StartMusic: InstrumentMusicTracks entry 2 (the instrument of dungeon 3 plays its part of the Wind Fish's melody).
 ;@ Entry 25 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music29::
 	db $00 ; transpose
@@ -4518,7 +4536,8 @@ Music29::
 	db $9b, $20, $ae, $01, $9c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $2A: not requested directly.
+;@ Music track $2A: Surf Harp.
+;@ Where: Instrument_StartMusic: InstrumentMusicTracks entry 3 (the instrument of dungeon 4 plays its part of the Wind Fish's melody).
 ;@ Entry 26 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music2A::
 	db $18 ; transpose
@@ -4545,7 +4564,8 @@ Music2A::
 	db $9b, $20, $ae, $01, $9c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $2B: not requested directly.
+;@ Music track $2B: Wind Marimba.
+;@ Where: Instrument_StartMusic: InstrumentMusicTracks entry 4 (the instrument of dungeon 5 plays its part of the Wind Fish's melody).
 ;@ Entry 27 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music2B::
 	db $00 ; transpose
@@ -4577,7 +4597,8 @@ Music2B::
 	db $68, $60, $64, $6e, $78, $82, $ae, $7c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $2C: not requested directly.
+;@ Music track $2C: Coral Triangle.
+;@ Where: Instrument_StartMusic: InstrumentMusicTracks entry 5 (the instrument of dungeon 6 plays its part of the Wind Fish's melody).
 ;@ Entry 28 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music2C::
 	db $00 ; transpose
@@ -4613,7 +4634,8 @@ Music2C::
 	db $9b, $20, $ae, $01, $9c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $2D: not requested directly.
+;@ Music track $2D: Organ of Evening Calm.
+;@ Where: Instrument_StartMusic: InstrumentMusicTracks entry 6 (the instrument of dungeon 7 plays its part of the Wind Fish's melody).
 ;@ Entry 29 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music2D::
 	db $00 ; transpose
@@ -4636,7 +4658,8 @@ Music2D::
 	db $a1, $01, $a5, $56, $00
 
 ;@ path: sound/music/songs
-;@ Music track $2E: not requested directly.
+;@ Music track $2E: Thunder Drum.
+;@ Where: Instrument_StartMusic: InstrumentMusicTracks entry 7 (the instrument of dungeon 8 plays its part of the Wind Fish's melody).
 ;@ Entry 30 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music2E::
 	db $00 ; transpose
@@ -4661,8 +4684,8 @@ Music2E::
 	db $9b, $20, $ae, $01, $9c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $2F: Marin.
-;@ Where: EntityInit_Marin, WalrusAskMarin.
+;@ Music track $2F: Marin sings.
+;@ Where: EntityInit_Marin (Animal Village), WalrusAskMarin.
 ;@ Entry 31 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music2F::
 	db $00 ; transpose
@@ -4696,7 +4719,8 @@ Music2F::
 	db $60, $a3, $01, $a1, $01, $00
 
 ;@ path: sound/music/songs
-;@ Music track $4A: not requested directly.
+;@ Music track $4A: Ballad of the Wind Fish, unused arrangement.
+;@ Where: not requested by any code; built from patterns of tracks $43 and $2F.
 ;@ Entry 42 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music4A::
 	db $00 ; transpose
@@ -4786,7 +4810,7 @@ Music30::
 	db $9b, $20, $ae, $01, $9c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $48: Indoor map $1E.
+;@ Music track $48: Indoor map $1E (the ghost's house).
 ;@ Where: SelectAreaMusic, IndoorMusicTracks (by hMapId): map $1E.
 ;@ Entry 40 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music48::
@@ -4862,7 +4886,8 @@ Music55::
 	db $9b, $20, $a2, $62, $6c, $76, $78, $9c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $56: requested in bank $19.
+;@ Music track $56: Seashell Mansion: the sword.
+;@ Where: MansionCheckReward: 20 seashells, the hidden passage opens.
 ;@ Entry 54 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music56::
 	db $00 ; transpose
@@ -4972,8 +4997,8 @@ Music25::
 	db $00
 
 ;@ path: sound/music/songs
-;@ Music track $59: Credits.
-;@ Where: CreditsSetUp; wave effect $1F requests it after the Wind Fish scene.
+;@ Music track $59: Ending: the Wind Fish.
+;@ Where: CreditsSetUp: the ending on the mountain (the owl, the Wind Fish rising); wave effect $1F requests it again.
 ;@ Entry 57 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music59::
 	db $00 ; transpose
@@ -5009,7 +5034,8 @@ Music59::
 	db $9b, $20, $a3, $38, $9c, $00
 
 ;@ path: sound/music/songs
-;@ Music track $5E: StunEntity, banks $05 and $15.
+;@ Music track $5E: Boss's last words.
+;@ Where: StunEntity (bosses $5A, $62, $63 beaten), DrawSlimeEelBody, NightmareDethIFight.
 ;@ Entry 62 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music5E::
 	db $00 ; transpose
@@ -5038,7 +5064,8 @@ Music5E::
 	db $9d, $40, $00, $40, $00
 
 ;@ path: sound/music/songs
-;@ Music track $5F: not requested directly.
+;@ Music track $5F: The final Nightmare dies.
+;@ Where: NightmareDethIDefeated.
 ;@ Entry 63 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music5F::
 	db $00 ; transpose
@@ -5074,8 +5101,8 @@ Music5F::
 	dw Music48.waveform14
 	db $20, $a5, $01, $01, $a8, $01, $a3, $01, $00
 ;@ path: sound/music/songs
-;@ Music track $60: Name entry.
-;@ Where: FileNewNameEntry.
+;@ Music track $60: ZELDA name tune (Totaka's Song).
+;@ Where: FileNewNameEntry: the new file is named ZELDA.
 ;@ Entry 64 of SongTable_1E. Header (11 bytes): transpose, note length table, the pattern list of each channel (square 1, square 2, wave, noise; 0 = silent); then the lists and patterns (format: see ReadPattern_1E).
 Music60::
 	db $00 ; transpose

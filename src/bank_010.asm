@@ -335,7 +335,7 @@ Tiles105000::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 ;@ path: gfx/tiles/title
 ;@ Sprite tiles of the opening: LoadTileset10 copies $5400-$59FF to $8000. 64 tiles.
-;@ asset: tiles bpp=2 length=$400
+;@ asset: tiles bpp=2 length=$400 tall
 IntroSpriteTiles::
 	db $00, $00, $01, $00, $06, $01, $08, $07, $38, $07, $20, $1f, $2e, $11, $1e, $05
 	db $2b, $16, $45, $3b, $82, $7d, $87, $78, $79, $06, $11, $0e, $20, $1f, $3f, $00

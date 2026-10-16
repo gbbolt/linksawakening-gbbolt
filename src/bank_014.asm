@@ -629,7 +629,7 @@ IndoorWalls8Objects::
 FullHealthByMaxHearts::
 	db $18, $20, $28, $30, $38, $40, $48, $50, $58, $60, $68, $70
 
-;@ def UpdateWorldTimers()
+;@ def UpdateWorldTimers(b: b)
 ;@ path: world/timers
 ;@ Per-frame bookkeeping of the game world (game mode $0B, before the step dispatcher): the compass chime
 ;@ (sound $1B when wCompassChimeDelay runs out), wClinkTimer, the music restart (wRestartMusicTimer: the
@@ -637,7 +637,9 @@ FullHealthByMaxHearts::
 ;@ the cycle wNoiseSfxCycle (0-$19), the counter mem $DB47 (+1 every 64 frames, up to $FF), and the
 ;@ electric shock: while wElectricShockTimer runs the palettes are normal, and in its first $20 frames
 ;@ the screen shakes sideways, flashes ($CC / $0C) and Link is held.
-;@ test: skip
+;@ test: wCurrentBank = $14
+;@ test: wNoiseSfxCycle = rand(0, 0x19)
+;@ test: b = 0
 UpdateWorldTimers::
 ;> if wCompassChimeDelay:
 	ld a, [wCompassChimeDelay]
@@ -686,7 +688,7 @@ UpdateWorldTimers::
 	jr c, .health
 	cp $f6
 	jr nc, .health
-;>         waves = wSeaWavesSoundTimer + 1
+;>         waves = u8(wSeaWavesSoundTimer + 1)
 	ld a, [wSeaWavesSoundTimer]
 	inc a
 ;>         if waves == 0xA0:
@@ -754,7 +756,7 @@ UpdateWorldTimers::
 ;> if wElectricShockTimer == 0:
 ;>     return
 	ret z
-;> wScreenShakeX = 0
+;> wScreenShakeX = b                            # (b: 0 when the caller runs it)
 	ld a, [hl]
 	ld hl, wScreenShakeX
 	ld [hl], b
@@ -804,7 +806,6 @@ DarknessPausedMotions::
 ;@ wRoomDarknessShown one step towards the target - wRoomDarkness, or 0 (bright) while the inventory
 ;@ covers the screen (wWindowY 0) or a dialogue or the wave effect runs. Not during the motion states
 ;@ of DarknessPausedMotions.
-;@ test: skip
 UpdateRoomDarkness::
 ;> if wGameplaySubtype != 7:
 	ld a, [wGameplaySubtype]
@@ -1009,7 +1010,6 @@ DungeonEntranceCells::
 ;@ Called when the full-screen wave effect has run: sets up the warp that follows it (motion state 3; mem
 ;@ $D474 = 1 makes the arrival use the wave effect too). In a dungeon (indoor maps 0-9) the warp leads to
 ;@ the dungeon's entrance (DungeonEntrances); elsewhere to overworld room $45 at x $38, y $60.
-;@ test: skip
 EndWaveWarp::
 ;> mem[0xD474] = 1
 	ld a, $01
@@ -1122,7 +1122,6 @@ WarpWaveLineOffsets::
 ;@ After Link has lifted a room object: an entity hidden under it (status 5, physics flag bit 5,
 ;@ wEntityPrivate3 = 2) within 8 pixels of the object's square (hBGPosX + 8, hBGPosY + $10) comes out:
 ;@ drop timer $80, wEntityPrivate3 = 0, wEntityTimer1 = $18.
-;@ test: skip
 ReleaseEntitiesUnderObject::
 ;>@l for slot in range(15, -1, -1):
 	ld e, $0f
@@ -1246,14 +1245,16 @@ ThrowSpeedZ::
 ThrowDirections::
 	db $02, $06, $00, $04
 
-;@ def CarriedEntityStep(slot: c)
+;@ def CarriedEntityStep(slot: bc)
 ;@ path: link/carry
 ;@ Runs for the entity Link holds over his head. During a room transition or while Link falls (motion
 ;@ state 6) it is let go at once (ThrowCarriedEntity; not entity type $A8) and stops. Otherwise, after the
 ;@ pause in mem $C5AE, Link throws it when he presses the button of the Power Bracelet (item 3; for
 ;@ entity type 2, a bomb, the bomb item 2) - A or B, or either when neither button holds that item. The
 ;@ throw remembers Link's direction (mem $C5D0 + slot) and plays the sound 8.
-;@ test: skip
+;@ test: slot = rand(0, 15)
+;@ test: wCurrentBank = $14
+;@ test: hLinkDirection = rand(0, 3)
 CarriedEntityStep::
 ;> if wRoomTransitionState or wLinkMotionState == 6:
 	ld a, [wRoomTransitionState]
@@ -1313,7 +1314,7 @@ CarriedEntityStep::
 	and e
 ;>     return
 	jp z, ThrowCarriedEntity.done
-;> mem[0xC5D0 + slot] = hLinkDirection
+;> wEntityLedgeDirection[slot] = hLinkDirection
 	ldh a, [hLinkDirection]
 	ld hl, wEntityLedgeDirection
 	add hl, bc
@@ -1323,14 +1324,16 @@ CarriedEntityStep::
 	ld [hl], $08
 ;> return ThrowCarriedEntity(slot)   # runs on into it
 
-;@ def ThrowCarriedEntity(slot: c)
+;@ def ThrowCarriedEntity(slot: bc)
 ;@ path: link/carry
 ;@ Throws the carried entity in Link's direction: it becomes active again (status 5) - a bomb (type 2)
 ;@ with its fuse ($A0 frames); types $D6, $D5, $6C, $9D, $A8 and $98 go on in their state 2 (type $98
 ;@ also gets a direction from ThrowDirections and a random timer $30-$4F), type $92 in state 3; type 5
 ;@ stays as it is; all others become a thrown object (status 8). The speeds come from ThrowSpeedX / Y / Z
 ;@ (side view and type 2 have their own rows), and Link holds the throwing pose for $0C frames.
-;@ test: skip
+;@ test: slot = rand(0, 15)
+;@ test: wCurrentBank = $14
+;@ test: hLinkDirection = rand(0, 3)
 ThrowCarriedEntity::
 ;> wEntityStatus[slot] = 5
 	ld hl, wEntityStatus
@@ -1470,7 +1473,6 @@ CancelDialog::
 ;@ unless mem $C3C9 is set. Outside the ending, unless the room has torches or Link's animation is $6C,
 ;@ the palettes go to normal at once (transition step 4, BG and OBJ1 $E4, OBJ0 $1C). Once the draw
 ;@ command queue is empty, goes on to the next dialog step.
-;@ test: skip
 DialogStepOpenBox::
 ;> if not mem[0xC3C9]:
 	ld a, [$c3c9]
@@ -1524,7 +1526,6 @@ DialogStepOpenBox::
 ;@ $50); otherwise outside y $16-$73 one pixel up; either way his controls are blocked for the frame
 ;@ (hLinkInteractiveMotionBlocked 1, wLinkPoseLock 2). Not during a room transition or with the debug
 ;@ toggle on.
-;@ test: skip
 KeepLinkInBossArena::
 ;> if wRoomTransitionState or wDebugToggle:
 	ld hl, wDebugToggle
@@ -1636,9 +1637,33 @@ UpdateBumpShake::
 ;@ indoors in a side view object $8A becomes $04, other indoor objects the floor $0D; on the overworld
 ;@ object $20 becomes stairs in rooms $52 and $04, everything else the ground $04. Stairs also set
 ;@ hStairsState, the stairs' position and the warp target position, and play the sound 2.
-;@ test: skip
+;@ test: wCurrentBank = $14
+;@ test: pos = rand(0, 0x9F)
+;@ test: wIsIndoor = rand(0, 1)
 ReplaceRoomObjectWithFloor::
-;> obj = wRoomObjects + pos
+;>@qs1 def QueueSquareRedraw(t0, t1, t2, t3):   # the 10-byte draw command (written out at each use)
+;>@qs2     GetBGAddress()
+;>@qs3     cmd = addr(wDrawCommand) + wDrawCommandsSize
+;>@qs4     wDrawCommandsSize += 10
+;>@qs5     for i, v in enumerate((hBGAddrHigh, hBGAddrLow, 0x81, t0, t1, hBGAddrHigh, u8(hBGAddrLow + 1), 0x81, t2, t3, 0)): mem[cmd + i] = v
+;>@Repl1 def ReplaceD3Object(obj):                      # .objectD3
+;>@m         if hMapRoom not in (0x75, 0x07, 0xAA, 0x4A):
+;>@Repl2             return ReplaceD3WithHole(obj)
+;>@rs         wRoomStatus[hMapRoom] |= 0x10
+;>@Repl3         return PlaceStairs(obj)   # runs on into it
+;>@Plac1 def PlaceStairs(obj):                          # .stairs
+;>@Plac2         mem[obj] = 0xC6
+;>@e         QueueSquareRedraw(0x68, 0x77, 0x69, 0x4B)
+;>@Plac3         hStairsState = 1
+;>@Plac4         hStairsY = (hBGPosY & 0xF0) + 0x10
+;>@Plac5         hStairsX = (hBGPosX & 0xF0) + 8
+;>@w         wWarpDestPosition = (hBGPosY & 0xF0) | (hBGPosX >> 4)
+;>@Plac6         hJingle = 2
+;>@Repl4 def ReplaceD3WithHole(obj):                    # .hole
+;>@Repl5         mem[obj] = 0xE8
+;>@h2         QueueSquareRedraw(0x68, 0x78, 0x69, 0x79)
+;>@Repl6         return
+;> obj = addr(wRoomObjects) + pos
 	ld hl, wRoomObjects
 	add hl, de
 ;> if hRoomObjectType == 0x8E:
@@ -1831,8 +1856,8 @@ ReplaceRoomObjectWithFloor::
 	ld [hli], a
 	ret
 .objectD3
-;> def ReplaceD3Object(obj):
-;>@m     if hMapRoom not in (0x75, 0x07, 0xAA, 0x4A):
+;=@Repl1
+;=@m
 	ldh a, [hMapRoom]
 	cp $75
 	jr z, .secret
@@ -1843,9 +1868,9 @@ ReplaceRoomObjectWithFloor::
 	jr z, .secret
 	cp $4a
 	jr nz, .hole
-;>         return ReplaceD3WithHole(obj)
+;=@Repl2
 .secret
-;>@rs     wRoomStatus[hMapRoom] |= 0x10
+;=@rs
 	ld hl, wRoomObjects
 	add hl, de
 	push hl
@@ -1856,13 +1881,13 @@ ReplaceRoomObjectWithFloor::
 	ld hl, wRoomStatus
 	add hl, de
 	set 4, [hl]
-;>     return PlaceStairs(obj)   # runs on into it
+;=@Repl3
 	pop hl
 .stairs
-;> def PlaceStairs(obj):
-;>     mem[obj] = 0xC6
+;=@Plac1
+;=@Plac2
 	ld [hl], $c6
-;>@e     QueueSquareRedraw(0x68, 0x77, 0x69, 0x4B)
+;=@e
 	call GetBGAddress
 	ld hl, wDrawCommand
 	ld a, [wDrawCommandsSize]
@@ -1897,20 +1922,20 @@ ReplaceRoomObjectWithFloor::
 	ld a, $4b
 	ld [hli], a
 	ld [hl], $00
-;>     hStairsState = 1
+;=@Plac3
 	ld a, $01
 	ldh [hStairsState], a
-;>     hStairsY = (hBGPosY & 0xF0) + 0x10
+;=@Plac4
 	ldh a, [hBGPosY]
 	and $f0
 	add $10
 	ldh [hStairsY], a
-;>     hStairsX = (hBGPosX & 0xF0) + 8
+;=@Plac5
 	ldh a, [hBGPosX]
 	and $f0
 	add $08
 	ldh [hStairsX], a
-;>@w     wWarpDestPosition = (hBGPosY & 0xF0) | (hBGPosX >> 4)
+;=@w
 	ldh a, [hBGPosX]
 	swap a
 	and $0f
@@ -1920,17 +1945,17 @@ ReplaceRoomObjectWithFloor::
 ;=@w
 	or e
 	ld [wWarpDestPosition], a
-;>     hJingle = 2
+;=@Plac6
 	ld a, $02
 	ldh [hJingle], a
 	ret
 .hole
-;> def ReplaceD3WithHole(obj):
-;>     mem[obj] = 0xE8
+;=@Repl4
+;=@Repl5
 	ld hl, wRoomObjects
 	add hl, de
 	ld [hl], $e8
-;>@h2     QueueSquareRedraw(0x68, 0x78, 0x69, 0x79)
+;=@h2
 	call GetBGAddress
 	ld hl, wDrawCommand
 	ld a, [wDrawCommandsSize]
@@ -1965,10 +1990,13 @@ ReplaceRoomObjectWithFloor::
 	ld a, $79
 	ld [hli], a
 	ld [hl], $00
-;>     return
+;=@Repl6
 	ret
-;> def QueueSquareRedraw(t0, t1, t2, t3):     # the 10-byte draw command described above
-;>     ...
+;=@qs1
+;=@qs2
+;=@qs3
+;=@qs4
+;=@qs5
 
 
 ;@ path: unused

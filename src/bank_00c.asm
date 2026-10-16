@@ -7,7 +7,7 @@ SECTION "ROM Bank $00c", ROMX[$4000], BANK[$c]
 
 ;@ path: gfx/tiles/common
 ;@ Sprite tiles (8 x 16 pairs) of Link's items and effects; LoadTileset03 copies $4000-$43FF to $8000 for the menus (tile set requests 3 and 4). 32 tiles.
-;@ asset: tiles bpp=2 length=$200
+;@ asset: tiles bpp=2 length=$200 tall
 MenuSpriteTiles::
 	db $07, $00, $0b, $07, $1b, $04, $3f, $13, $3f, $14, $3f, $10, $27, $18, $1f, $0d
 	db $17, $0d, $2b, $17, $6f, $30, $78, $27, $37, $0f, $1e, $01, $37, $0e, $1f, $00
@@ -43,7 +43,7 @@ MenuSpriteTiles::
 	db $0b, $07, $09, $07, $08, $07, $04, $03, $03, $00, $00, $00, $00, $00, $00, $00
 ;@ path: gfx/tiles/common
 ;@ Sprite tiles every world map has at $8200 (LoadCommonWorldTiles, tile set requests 5-7) and that the menus get with MenuSpriteTiles; LoadTileset1B (the ending) copies $4220-$423F to $8100. 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 WorldSpriteTiles::
 	db $00, $00, $4c, $00, $50, $00, $70, $00, $88, $70, $e4, $18, $f6, $68, $f7, $6a
 	db $7f, $06, $4e, $30, $76, $38, $4c, $30, $3e, $0c, $1e, $00, $00, $00, $00, $00
@@ -63,7 +63,7 @@ WorldSpriteTiles::
 	db $01, $fe, $fe, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 ;@ path: gfx/tiles/common
 ;@ The last $100 bytes of the menus' copy to $8000 (LoadTileset03: $8300-$83FF). 16 tiles.
-;@ asset: tiles bpp=2 length=$100
+;@ asset: tiles bpp=2 length=$100 tall
 MenuSpriteTiles2::
 	db $03, $00, $04, $03, $0b, $07, $14, $0f, $14, $0f, $63, $1f, $b7, $7f, $e7, $7f
 	db $e3, $7f, $ab, $77, $48, $37, $34, $0b, $13, $0c, $18, $07, $0c, $03, $03, $00
@@ -83,7 +83,7 @@ MenuSpriteTiles2::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 ;@ path: gfx/tiles/common
 ;@ Sprite tiles at $4400-$479F that no whole-set loader copies: pieces the game copies on its own when they are needed (items and effects). 58 tiles.
-;@ asset: tiles bpp=2 length=$3A0
+;@ asset: tiles bpp=2 length=$3A0 tall
 ItemSpriteTiles::
 	db $00, $00, $00, $00, $00, $00, $78, $78, $ff, $87, $ff, $84, $7f, $44, $6d, $5e
 	db $7e, $43, $7f, $41, $fe, $82, $fc, $84, $78, $48, $30, $30, $00, $00, $00, $00
@@ -431,7 +431,7 @@ OverworldTiles9200::
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 ;@ path: gfx/sprites/link
 ;@ Link's sprite tiles: 8 x 16 pairs that the game copies to $8000-$80FF frame by frame as he moves (the copy loops around $1C95 read them in 32- and 64-byte pieces). 256 tiles.
-;@ asset: tiles bpp=2 length=$1000
+;@ asset: tiles bpp=2 length=$1000 tall
 LinkSpriteTiles::
 	db $07, $00, $0b, $07, $1b, $04, $3f, $13, $3f, $14, $3f, $10, $27, $18, $1f, $0d
 	db $17, $0d, $2b, $17, $6f, $30, $78, $27, $37, $0f, $1e, $01, $37, $0e, $1f, $00

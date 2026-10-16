@@ -157,7 +157,7 @@ UpdateJingle::
 ;> routine = GetSfxTableEntry(index, table)
 .call
 	call GetSfxTableEntry
-;> return routine(timer=wJingleTimer, step=wJingleStep)   # jp hl: the effect's start or update
+;> raise NotModeled('jp hl: the routine from the table, called with de = addr(wJingleTimer), bc = addr(wJingleStep)')
 	ld de, wJingleTimer
 	ld bc, wJingleStep
 	jp hl
@@ -4358,7 +4358,7 @@ IgnoreJingle::
 ;@ unless a locked effect plays (effect $14 starts anyway), otherwise wActiveWaveSfx plays on
 ;@ (WaveSfxUpdates), with de = wWaveSfxTimer, bc = wWaveSfxStep. Nothing happens while the song needs the
 ;@ wave channel (wMusicBlocksWaveSfx).
-;@ test: skip jumps through a table of routines
+;@ test: wCurrentBank = $1F
 UpdateWaveSfx::
 ;> request = wWaveSfxToPlay
 	ld hl, wWaveSfxToPlay
@@ -4395,7 +4395,7 @@ UpdateWaveSfx::
 	ld a, [wMusicBlocksWaveSfx]
 	and a
 	ret nz
-;> return routine(timer=wWaveSfxTimer, step=wWaveSfxStep)   # jp hl
+;> return table[(index - 1) & 0x7F](addr(wWaveSfxTimer), addr(wWaveSfxStep))   # jp hl (de = the timer, bc = the step)
 	jp hl
 
 ;@ path: sound/sfx/engine
@@ -7343,7 +7343,7 @@ UpdateNoiseSfx::
 ;> routine = GetSfxTableEntry(index, table)
 .call
 	call GetSfxTableEntry
-;> return routine(timer=wNoiseSfxTimer, step=wNoiseSfxStep)   # jp hl
+;> raise NotModeled('jp hl: the routine from the table, called with de = addr(wNoiseSfxTimer), bc = addr(wNoiseSfxStep)')
 	ld de, wNoiseSfxTimer
 	ld bc, wNoiseSfxStep
 	jp hl
